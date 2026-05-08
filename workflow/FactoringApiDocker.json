@@ -1088,6 +1088,8 @@
       ],
       "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
       "name": "HTTP Request Pagos Compraventa",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
       "credentials": {
         "httpBearerAuth": {
           "id": "pKUtFWa4EEzrqUhu",
