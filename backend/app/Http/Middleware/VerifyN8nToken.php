@@ -8,18 +8,17 @@ use Symfony\Component\HttpFoundation\Response;
 
 class VerifyN8nToken
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
     public function handle(Request $request, Closure $next): Response
     {
         $token = $request->bearerToken();
-        $expectedToken = config('services.n8n.token');
+        // Leemos directo del env por si la caché de config en prod está molestando
+        $expectedToken = env('N8N_API_TOKEN', 'MiTokenSuperSecreto123');
 
         if (!$token || $token !== $expectedToken) {
-            return response()->json(['message' => 'Unauthorized or invalid token'], 401);
+            return response()->json([
+                'message' => 'Unauthorized or invalid token',
+                'received' => $token ? 'Token recibido (oculto)' : 'No se recibió token'
+            ], 401);
         }
 
         return $next($request);
