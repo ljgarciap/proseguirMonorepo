@@ -1,53 +1,65 @@
-# Guía de Mantenimiento de Producción - Factoring
+# 🚀 Guía de Despliegue - Monorepo Proseguir
 
-Esta guía contiene los procedimientos críticos para mantener el ambiente de producción estable y realizar tareas de mantenimiento sin romper el sistema de autenticación.
+Esta guía detalla los pasos para actualizar el sistema en el servidor de producción.
 
-## 🔄 Reseteo de Base de Datos (Seguro)
-
-Si necesitas limpiar la base de datos para borrar pruebas y dejar solo los datos iniciales (Seeders), ejecuta estos comandos en orden:
-
-```bash
-cd ~/apps/factoring/deployment_docker
-
-# 1. Borrar archivos de migración temporales (si existen)
-docker compose exec backend sh -c "rm -f database/migrations/*_create_oauth_*.php"
-
-# 2. Resetear base de datos y ejecutar seeders
-docker compose exec backend php artisan migrate:fresh --seed
-
-# 3. Forzar creación de tablas de Passport (apuntando a la fuente en vendor)
-docker compose exec backend php artisan migrate --path=vendor/laravel/passport/database/migrations
-
-# 4. Crear llaves y clientes de acceso OAuth (Modo automático)
-docker compose exec backend php artisan passport:keys --force
-docker compose exec backend php artisan passport:client --personal --no-interaction
-docker compose exec backend php artisan passport:client --password --provider="users" --no-interaction
-```
-
-## 📂 Exportación de Excel (Directa)
-
-La ruta de exportación de historial ha sido liberada del middleware `auth:api` para permitir descargas directas desde el navegador:
-- **URL**: `GET /api/history/{categoria}/export`
-- **Nota**: Esta ruta ya no requiere Token Bearer en la cabecera, permitiendo el uso de `window.open()` o links directos en el frontend.
-
-## 🛠️ Limpieza de Caché y Logs
-
-Si realizas cambios en el archivo `.env` o en las rutas, ejecuta:
+## 1. En tu Máquina Local
+Siempre asegúrate de que todo esté en GitHub antes de ir al servidor.
 
 ```bash
-docker compose exec backend php artisan config:clear
-docker compose exec backend php artisan route:clear
-docker compose exec backend php artisan view:clear
+# Ir a la raíz del proyecto
+cd /ruta/hacia/Proseguir
+
+# Subir cambios
+git add .
+git commit -m "Descripción de tus cambios"
+git push origin master
 ```
 
-Para vaciar los logs de Laravel:
+## 2. En el Servidor (SSH)
+Entra a la carpeta del proyecto y sincroniza.
+
 ```bash
-docker compose exec backend sh -c "echo '' > storage/logs/laravel.log"
+cd /home/admpsl/apps/proseguir
+
+# Bajar lo nuevo
+git pull origin master
+
+# Reconstruir contenedores (solo si cambiaste Dockerfiles o el docker-compose)
+# Si solo cambiaste código PHP/Angular, un restart suele bastar, 
+# pero el 'up --build' es lo más seguro:
+docker compose up -d --build
 ```
 
-## 🤖 Mantenimiento de n8n
+## 3. Mantenimiento del Backend (IMPORTANTE)
+Si añadiste tablas nuevas, librerías o cambiaste el `.env`, corre estos comandos:
 
-El flujo de trabajo de n8n está configurado para conectarse internamente con Laravel. Si el flujo se detiene:
-1. Verifica que el nodo "Mistral" esté devolviendo un JSON válido.
-2. El código del nodo "Extract" está blindado contra fechas vacías (usa `00/00/0000` por defecto).
-3. Asegúrate de que el token `Authorization: Bearer MiTokenSuperSecreto123` coincida entre n8n y el `.env` del backend.
+```bash
+# A. Instalar nuevas librerías (si añadiste paquetes)
+docker exec -it factoring_backend composer install --no-dev --optimize-autoloader
+
+# B. Actualizar Base de Datos (si hay migraciones nuevas)
+docker exec -it factoring_backend php artisan migrate --force
+
+# C. Limpiar Caché (siempre recomendado tras actualizar)
+docker exec -it factoring_backend php artisan config:cache
+docker exec -it factoring_backend php artisan route:cache
+```
+
+---
+
+## 🛠 Solución de Problemas Comunes
+
+### Error 500 al iniciar sesión
+Suele ser un problema de permisos o de falta de llaves de la API.
+```bash
+docker exec -it factoring_backend php artisan passport:install --force
+docker exec -it factoring_backend chown -R www-data:www-data storage/
+```
+
+### El Frontend no conecta a la API (CORS)
+Asegúrate de que el archivo `frontend/set-env.js` tenga `/api` como ruta relativa por defecto. Si necesitas cambiar la URL, hazlo en el `.env` del frontend local antes de subir.
+
+### Acceso a Herramientas
+- **App**: [http://auto.proseguirliquidez.com](http://auto.proseguirliquidez.com)
+- **API**: [http://auto.proseguirliquidez.com:8000](http://auto.proseguirliquidez.com:8000)
+- **n8n**: [http://auto.proseguirliquidez.com/n8n](http://auto.proseguirliquidez.com/n8n)
