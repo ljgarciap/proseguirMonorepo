@@ -1401,13 +1401,6 @@
         ],
         [
           {
-            "node": "Extract text Factoring Compraventa1",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
             "node": "Extract text Pagos Compraventa",
             "type": "main",
             "index": 0
