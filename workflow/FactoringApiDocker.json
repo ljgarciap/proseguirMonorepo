@@ -769,7 +769,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://backend_web:8000/api/webhook/n8n/op",
+        "url": "http://backend_web/api/webhook/n8n/op",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -796,7 +796,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://backend_web:8000/api/webhook/n8n/pagos",
+        "url": "http://backend_web/api/webhook/n8n/pagos",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -823,7 +823,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://backend_web:8000/api/webhook/n8n/opf",
+        "url": "http://backend_web/api/webhook/n8n/opf",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -967,7 +967,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://backend_web:8000/api/webhook/n8n/compraventa",
+        "url": "http://backend_web/api/webhook/n8n/compraventa",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
