@@ -382,7 +382,7 @@ export class LogsComponent implements OnInit {
     this.isLoading = true;
 
     // Construir URL con parámetros
-    const url = new URL(this.apiUrl);
+    const url = new URL(this.apiUrl, window.location.origin);
     if (this.searchTerm) url.searchParams.append('search', this.searchTerm);
     if (this.sortBy) url.searchParams.append('sortBy', this.sortBy);
     if (this.sortDir) url.searchParams.append('sortDir', this.sortDir);

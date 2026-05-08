@@ -686,7 +686,7 @@ export class SheetsComponent implements OnInit {
 
   loadHistory() {
     this.isLoading = true;
-    const url = new URL(`${this.baseUrl}/history/${this.categoria}`);
+    const url = new URL(`${this.baseUrl}/history/${this.categoria}`, window.location.origin);
     if (this.searchTerm) url.searchParams.append('search', this.searchTerm);
     if (this.sortBy) url.searchParams.append('sortBy', this.sortBy);
     if (this.sortDir) url.searchParams.append('sortDir', this.sortDir);
