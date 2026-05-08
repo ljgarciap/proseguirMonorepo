@@ -26,7 +26,7 @@ services:
       - ./backend:/var/www/html
       - ./.env:/var/www/html/.env
     environment:
-      DB_HOST: factoring_db
+      DB_HOST: db
       DB_DATABASE: factoring_db
       DB_USERNAME: factoring_user
       DB_PASSWORD: Softclass_Fact_2026
