@@ -24,6 +24,7 @@ services:
     restart: always
     volumes:
       - ./backend:/var/www/html
+      - .env:/var/www/html/.env
     environment:
       DB_HOST: factoring_db
       DB_DATABASE: factoring_db
