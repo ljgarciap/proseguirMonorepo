@@ -71,6 +71,7 @@ services:
       - N8N_PATH=${N8N_PATH:-/}
       - N8N_CORS_ALLOWED_ORIGINS=*
       - NODE_ENV=production
+      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-false}
     networks:
       - factoring_network
     volumes:
