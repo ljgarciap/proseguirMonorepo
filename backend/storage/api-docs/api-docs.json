@@ -1,0 +1,294 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Factoring API",
+        "description": "API para el sistema de Factoring y Confirming",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/api/dashboard/stats": {
+            "get": {
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Obtener estadísticas globales del dashboard",
+                "description": "Retorna métricas de Cartera, Factoring y Confirming con filtros opcionales.",
+                "operationId": "2d1bd6c9f8fe1cf3f8cafed219f661e0",
+                "parameters": [
+                    {
+                        "name": "fecha_inicio",
+                        "in": "query",
+                        "description": "Fecha de inicio (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "fecha_fin",
+                        "in": "query",
+                        "description": "Fecha de fin (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "cliente",
+                        "in": "query",
+                        "description": "Nombre o identificación del cliente/emisor",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Operación exitosa"
+                    }
+                }
+            }
+        },
+        "/api/history/{categoria}": {
+            "get": {
+                "tags": [
+                    "Historia"
+                ],
+                "summary": "Listar registros históricos por categoría",
+                "operationId": "afea0f77a737e279c7020f54e6bb416a",
+                "parameters": [
+                    {
+                        "name": "categoria",
+                        "in": "path",
+                        "description": "Categoría (cartera, op, pagos, opf)",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "cartera",
+                                "op",
+                                "pagos",
+                                "opf"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Búsqueda global en todas las columnas",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista paginada"
+                    }
+                }
+            }
+        },
+        "/api/history/{categoria}/{id}": {
+            "patch": {
+                "tags": [
+                    "Historia"
+                ],
+                "summary": "Actualizar campos editables de un registro",
+                "operationId": "35b7fcea9a4adce2a5f67ea183bdd60c",
+                "parameters": [
+                    {
+                        "name": "categoria",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "observaciones": {
+                                        "type": "string"
+                                    },
+                                    "sector_economico": {
+                                        "type": "string"
+                                    },
+                                    "ciudad": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Registro actualizado"
+                    }
+                }
+            }
+        },
+        "/api/history/{categoria}/export": {
+            "get": {
+                "tags": [
+                    "Historia"
+                ],
+                "summary": "Exportar registros a Excel",
+                "operationId": "2e9aae20ec95b296e83706fd6e2f76e6",
+                "parameters": [
+                    {
+                        "name": "categoria",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Archivo Excel"
+                    }
+                }
+            }
+        },
+        "/api/webhook/n8n/{categoria}": {
+            "post": {
+                "tags": [
+                    "Webhook"
+                ],
+                "summary": "Recibir datos procesados desde n8n",
+                "description": "Endpoint para insertar o actualizar registros masivos procesados por n8n.",
+                "operationId": "21170389d1466d97b7b30f933220664f",
+                "parameters": [
+                    {
+                        "name": "categoria",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "cartera",
+                                "op",
+                                "pagos",
+                                "opf"
+                            ]
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "filename": {
+                                        "type": "string"
+                                    },
+                                    "data": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Procesado con éxito"
+                    }
+                }
+            }
+        },
+        "/api/sectores": {
+            "get": {
+                "tags": [
+                    "Metadata"
+                ],
+                "summary": "Listar todos los sectores económicos para mapeo",
+                "operationId": "fa75fc396f0b18b61be24dbf88c1368a",
+                "responses": {
+                    "200": {
+                        "description": "Lista de sectores"
+                    }
+                }
+            }
+        },
+        "/api/logs": {
+            "get": {
+                "tags": [
+                    "Logs"
+                ],
+                "summary": "Listar logs de auditoría del sistema",
+                "operationId": "31e244cff7ad44b515146fc14edb06c4",
+                "parameters": [
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Búsqueda en logs",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista paginada de logs"
+                    }
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Dashboard",
+            "description": "Dashboard"
+        },
+        {
+            "name": "Historia",
+            "description": "Historia"
+        },
+        {
+            "name": "Webhook",
+            "description": "Webhook"
+        },
+        {
+            "name": "Metadata",
+            "description": "Metadata"
+        },
+        {
+            "name": "Logs",
+            "description": "Logs"
+        }
+    ]
+}

@@ -1,0 +1,51 @@
+<div class="upload-screen">
+  <div class="upload-card">
+    <div class="card-header">
+      <span class="icon">📁</span>
+      <h2>Procesar Nuevo Documento</h2>
+      <p>Selecciona el tipo y sube tu archivo PDF</p>
+    </div>
+
+    <div class="card-body">
+      <div class="form-group">
+        <label for="tipo">Tipo de Documento</label>
+        <select id="tipo" [(ngModel)]="categoria" class="custom-select">
+          <option value="cartera">Cartera</option>
+          <option value="op">Factoring</option>
+          <option value="pagos">Pagos</option>
+          <option value="opf">Confirming</option>
+          <option value="compraventa">Compraventa</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Archivo PDF</label>
+        <div class="file-drop-area">
+          <span class="file-msg">{{ selectedFile ? selectedFile.name : 'No hay archivo seleccionado' }}</span>
+          <input type="file" class="file-input" (change)="onFileSelected($event)" accept="application/pdf">
+          <button class="fake-file-button">Seleccionar archivo</button>
+        </div>
+      </div>
+
+      <button class="submit-button" (click)="procesar()" [disabled]="!selectedFile || cargando"
+        [class.loading]="cargando">
+        <span *ngIf="!cargando">Subir y Extraer Datos</span>
+        <span *ngIf="cargando" class="spinner"></span>
+        <span *ngIf="cargando"> Procesando...</span>
+      </button>
+    </div>
+
+    <div *ngIf="mensaje" class="status-badge" [class.error]="status === 'error'" [class.success]="status === 'success'"
+      [class.processing]="!status && mensaje">
+      <div class="status-content">
+        <span class="status-icon">
+          {{ status === 'success' ? '✅' : (status === 'error' ? '❌' : '⏳') }}
+        </span>
+        <span class="status-text">{{ mensaje }}</span>
+      </div>
+      <button *ngIf="status === 'error' || status === 'success'" class="btn-reset" (click)="reset()">
+        {{ status === 'success' ? 'Cargar otro' : 'Reintentar' }}
+      </button>
+    </div>
+  </div>
+</div>

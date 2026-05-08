@@ -1,0 +1,32 @@
+<nav class="main-nav">
+  <div class="nav-container">
+    <div class="brand">
+      <span class="brand-name">Ambiente de Test</span>
+    </div>
+
+    <div class="nav-links">
+      <a routerLink="/upload" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon">📤</span> Subir Archivo
+      </a>
+      <a routerLink="/sheets" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon">📊</span> Base de Datos
+      </a>
+      <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon">📈</span> Dashboard
+      </a>
+      <a routerLink="/logs" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon">🛡️</span> Auditoría
+      </a>
+      <a routerLink="/contable" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon">📔</span> Contable
+      </a>
+      <a routerLink="/planilla" routerLinkActive="active" class="nav-item">
+        <span class="nav-icon">🌾</span> Planilla Fincas
+      </a>
+    </div>
+  </div>
+</nav>
+
+<main class="main-content">
+  <router-outlet></router-outlet>
+</main>

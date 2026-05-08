@@ -1,0 +1,240 @@
+<div class="view-container">
+  <div class="header-banner">
+    <div class="title-group">
+      <h1>Planilla de Fincas</h1>
+      <p>Gestión de labores, contratistas e inversión agrícola</p>
+    </div>
+    
+    <div class="filter-group">
+      <select [(ngModel)]="selectedFincaId" (change)="loadData()" class="select-finca">
+        <option [ngValue]="null">Todas las Fincas</option>
+        <option *ngFor="let f of fincas" [ngValue]="f.id">{{ f.nombre }}</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="tabs-navigation">
+    <button (click)="switchTab('actividades')" [class.active]="activeTab === 'actividades'">Labores y Jornales</button>
+    <button (click)="switchTab('gastos')" [class.active]="activeTab === 'gastos'">Gastos e Inversión</button>
+    <button (click)="switchTab('maestros')" [class.active]="activeTab === 'maestros'">Maestros / Parámetros</button>
+    <button (click)="switchTab('resumen')" [class.active]="activeTab === 'resumen'">Resumen Consolidado</button>
+  </div>
+
+  <div *ngIf="message" class="status-alert" [class.error]="message.toLowerCase().includes('error')">
+    {{ message }}
+    <button (click)="message = ''" class="close-btn">&times;</button>
+  </div>
+
+  <div class="content-body">
+    
+    <!-- Pestaña: Actividades (Entrada una a una) -->
+    <div *ngIf="activeTab === 'actividades'" class="tab-content">
+      <div class="entry-card">
+        <h3>Registrar Nueva Labor</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Finca</label>
+            <select [(ngModel)]="newActividad.planilla_finca_id">
+              <option *ngFor="let f of fincas" [value]="f.id">{{ f.nombre }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Trabajador</label>
+            <select [(ngModel)]="newActividad.planilla_trabajador_id">
+              <option *ngFor="let t of trabajadores" [value]="t.id">{{ t.nombre }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Labor / Actividad</label>
+            <select [(ngModel)]="newActividad.planilla_labor_id">
+              <option *ngFor="let l of labores" [value]="l.id">{{ l.nombre }} ({{ l.unidad }})</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Fecha</label>
+            <input type="date" [(ngModel)]="newActividad.fecha">
+          </div>
+          <div class="form-group">
+            <label>Cantidad</label>
+            <input type="number" [(ngModel)]="newActividad.cantidad">
+          </div>
+          <div class="form-group">
+            <label>P. Unit (Opcional)</label>
+            <input type="number" [(ngModel)]="newActividad.precio_unitario" placeholder="Usar sugerido">
+          </div>
+        </div>
+        <div class="form-footer">
+          <input type="text" [(ngModel)]="newActividad.observaciones" placeholder="Observaciones adicionales..." class="obs-input">
+          <button (click)="saveActividad()" class="btn-primary">Guardar Registro</button>
+        </div>
+      </div>
+
+      <div class="data-table-card">
+        <table class="premium-table">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Finca</th><th>Trabajador</th><th>Labor</th><th>Cant.</th><th>V. Unit</th><th>Total</th><th>Ret.</th><th>Neto</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let act of actividades">
+              <td>{{ act.fecha }}</td>
+              <td><span class="finca-tag">{{ act.finca?.nombre }}</span></td>
+              <td><strong>{{ act.trabajador?.nombre }}</strong></td>
+              <td>{{ act.labor?.nombre }}</td>
+              <td>{{ act.cantidad }} {{ act.labor?.unidad }}</td>
+              <td>{{ act.precio_unitario | currency }}</td>
+              <td>{{ act.subtotal | currency }}</td>
+              <td class="text-danger">-{{ act.retencion_valor | currency }} ({{ act.retencion_porcentaje }}%)</td>
+              <td class="text-success">{{ act.neto | currency }}</td>
+              <td><button (click)="deleteActividad(act.id)" class="btn-icon">🗑️</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Pestaña: Gastos -->
+    <div *ngIf="activeTab === 'gastos'" class="tab-content">
+      <div class="entry-card gasto-card">
+        <h3>Registrar Gasto o Inversión</h3>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Finca</label>
+            <select [(ngModel)]="newGasto.planilla_finca_id">
+              <option *ngFor="let f of fincas" [value]="f.id">{{ f.nombre }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Concepto</label>
+            <input type="text" [(ngModel)]="newGasto.concepto" placeholder="Ej: Compra abono">
+          </div>
+          <div class="form-group">
+            <label>Beneficiario</label>
+            <input type="text" [(ngModel)]="newGasto.beneficiario">
+          </div>
+          <div class="form-group">
+            <label>Tipo</label>
+            <select [(ngModel)]="newGasto.tipo">
+              <option value="gasto">Gasto Operativo</option>
+              <option value="inversion">Inversión (Activo)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Valor</label>
+            <input type="number" [(ngModel)]="newGasto.valor">
+          </div>
+          <div class="form-group">
+            <label>Fecha</label>
+            <input type="date" [(ngModel)]="newGasto.fecha">
+          </div>
+        </div>
+        <div class="form-footer">
+          <button (click)="saveGasto()" class="btn-primary">Registrar Egreso</button>
+        </div>
+      </div>
+
+      <div class="data-table-card">
+        <table class="premium-table">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Finca</th><th>Concepto</th><th>Beneficiario</th><th>Tipo</th><th>Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let g of gastos">
+              <td>{{ g.fecha }}</td>
+              <td>{{ g.finca?.nombre }}</td>
+              <td><strong>{{ g.concepto }}</strong></td>
+              <td>{{ g.beneficiario }}</td>
+              <td><span class="type-badge" [class]="g.tipo">{{ g.tipo?.toUpperCase() }}</span></td>
+              <td class="text-danger">{{ g.valor | currency }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Pestaña: Maestros -->
+    <div *ngIf="activeTab === 'maestros'" class="tab-content">
+      <div class="master-nav">
+        <button (click)="activeMaster = 'fincas'" [class.active]="activeMaster === 'fincas'">Fincas</button>
+        <button (click)="activeMaster = 'trabajadores'" [class.active]="activeMaster === 'trabajadores'">Personal</button>
+        <button (click)="activeMaster = 'labores'" [class.active]="activeMaster === 'labores'">Catálogo de Labores</button>
+      </div>
+
+      <!-- Maestro Fincas -->
+      <div *ngIf="activeMaster === 'fincas'" class="master-panel">
+        <div class="mini-form">
+          <input type="text" [(ngModel)]="newFinca.nombre" placeholder="Nombre Finca">
+          <button (click)="saveMaster('fincas')">Añadir Finca</button>
+        </div>
+        <ul class="master-list">
+          <li *ngFor="let f of fincas">
+            <strong>{{ f.nombre }}</strong>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Maestro Trabajadores -->
+      <div *ngIf="activeMaster === 'trabajadores'" class="master-panel">
+        <div class="mini-form">
+          <input type="text" [(ngModel)]="newTrabajador.nombre" placeholder="Nombre Completo">
+          <input type="text" [(ngModel)]="newTrabajador.identificacion" placeholder="Cédula/NIT">
+          <input type="number" [(ngModel)]="newTrabajador.retencion_pactada" placeholder="% Retención Pactado">
+          <button (click)="saveMaster('trabajadores')">Guardar Personal</button>
+        </div>
+        <ul class="master-list">
+          <li *ngFor="let t of trabajadores">
+            <span>{{ t.nombre }}</span> - <small>{{ t.identificacion }}</small>
+            <span class="reten-badge" *ngIf="t.retencion_pactada">Ret: {{ t.retencion_pactada }}%</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Maestro Labores -->
+      <div *ngIf="activeMaster === 'labores'" class="master-panel">
+        <div class="mini-form">
+          <input type="text" [(ngModel)]="newLabor.nombre" placeholder="Nombre de Labor">
+          <input type="text" [(ngModel)]="newLabor.unidad" placeholder="Unidad (Jornal/Metro/etc)">
+          <input type="number" [(ngModel)]="newLabor.precio_sugerido" placeholder="Precio Sugerido">
+          <button (click)="saveMaster('labores')">Crear Labor</button>
+        </div>
+        <ul class="master-list">
+          <li *ngFor="let l of labores">
+            <span>{{ l.nombre }}</span> ({{ l.unidad }}) - {{ l.precio_sugerido | currency }}
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Pestaña: Resumen -->
+    <div *ngIf="activeTab === 'resumen' && resumen" class="tab-content summary-grid">
+      <div class="stat-card">
+        <span class="label">Total Labores (Bruto)</span>
+        <span class="value">{{ resumen.labores?.total_bruto | currency }}</span>
+      </div>
+      <div class="stat-card">
+        <span class="label">Total Retenciones</span>
+        <span class="value text-danger">-{{ resumen.labores?.total_retenciones | currency }}</span>
+      </div>
+      <div class="stat-card highlight">
+        <span class="label">Neto a Pagar Labores</span>
+        <span class="value">{{ resumen.labores?.total_neto| currency }}</span>
+      </div>
+      <div class="stat-card">
+        <span class="label">Gastos Operativos</span>
+        <span class="value text-danger">{{ resumen.gastos?.total_gastos | currency }}</span>
+      </div>
+      <div class="stat-card">
+        <span class="label">Inversión Agrícola</span>
+        <span class="value text-primary">{{ resumen.gastos?.total_inversiones | currency }}</span>
+      </div>
+      <div class="stat-card total-final">
+        <span class="label">COSTO TOTAL DEL PERIODO</span>
+        <span class="value">{{ resumen.gran_total | currency }}</span>
+      </div>
+    </div>
+
+  </div>
+</div>

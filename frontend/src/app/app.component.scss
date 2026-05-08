@@ -1,0 +1,100 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background-color: #f8f9fa; // Fondo de la página
+}
+
+.main-nav {
+  background: #1e1e2d; // Azul oscuro profundo
+  color: white;
+  padding: 0 2rem;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+
+  .nav-container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  
+  .logo { font-size: 1.5rem; }
+  .brand-name {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    //background: linear-gradient(to right, #ffffff, #3498db);
+    background: #ffffff;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .role-selector {
+    margin-left: 15px;
+    select {
+      background: #2d2d3f;
+      color: #3498db;
+      border: 1px solid #3498db;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      cursor: pointer;
+      outline: none;
+      &:hover { background: #3498db; color: white; }
+    }
+  }
+}
+
+.nav-links {
+  display: flex;
+  gap: 8px;
+
+  .nav-item {
+    color: #a2a3b7;
+    text-decoration: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    &:hover {
+      color: white;
+      background: rgba(255,255,255,0.05);
+    }
+
+    &.active {
+      color: white;
+      background: #3498db;
+      box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+    }
+
+    .nav-icon {
+      font-size: 1.1rem;
+    }
+  }
+}
+
+.main-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}

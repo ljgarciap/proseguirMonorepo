@@ -1,0 +1,228 @@
+<div class="view-container">
+  <div class="search-header">
+    <div class="search-card">
+      <span class="search-icon">🔍</span>
+      <input 
+        type="text" 
+        [(ngModel)]="searchTerm" 
+        (keyup.enter)="search()"
+        placeholder="Buscar registros..." 
+        class="search-input"
+      />
+    </div>
+
+    <div class="tabs-container">
+      <button (click)="switchTab('facturas')" [class.active]="activeTab === 'facturas' && !historyMode" class="tab-btn">Facturas</button>
+      <button (click)="switchTab('auxiliar')" [class.active]="activeTab === 'auxiliar' && !historyMode" class="tab-btn">Auxiliar</button>
+      <button (click)="switchTab('bancos')" [class.active]="activeTab === 'bancos' && !historyMode" class="tab-btn">Extracto Banco</button>
+      <button (click)="switchTab('gastos')" [class.active]="activeTab === 'gastos' && !historyMode" class="tab-btn">Gastos</button>
+      <button (click)="toggleHistory()" [class.active]="historyMode" class="tab-btn">Ver Histórico</button>
+    </div>
+
+    <div class="actions-group">
+      <div class="upload-controls" *ngIf="!historyMode">
+        <input type="file" (change)="onFileSelected($event)" #fileInput hidden />
+        <button (click)="fileInput.click()" class="btn-action" [disabled]="uploading">
+          <span class="text">{{ selectedFile ? selectedFile.name : 'Seleccionar Archivo' }}</span>
+        </button>
+        <button (click)="uploadFile()" class="btn-action green" [disabled]="!selectedFile || uploading">
+          <div class="loader-inline" *ngIf="uploading"></div>
+          <span class="text">{{ uploading ? 'Cargando...' : 'Subir' }}</span>
+        </button>
+        <button (click)="reconcile()" class="btn-action blue" [disabled]="uploading" title="Ejecutar Conciliación Automática">
+          <span class="text">Conciliar</span>
+        </button>
+        <button (click)="clearData()" class="btn-action red" [disabled]="uploading" title="Limpiar Módulo">
+          <span class="icon">🗑️</span>
+        </button>
+      </div>
+      <button *ngIf="historyMode" (click)="loadData()" class="btn-action" [disabled]="uploading">
+        <span class="text">Actualizar</span>
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="message" class="status-banner" [class.error]="message.toLowerCase().includes('error')">
+    {{ message }}
+  </div>
+
+  <div class="content-card">
+    <div class="table-container">
+      <!-- Tabla de Historial -->
+      <table class="modern-table" *ngIf="historyMode">
+        <thead>
+          <tr>
+            <th>ID Batch</th><th>Archivo</th><th>Tipo</th><th>Procesados</th><th>Fecha Hora</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let imp of imports">
+            <td class="id-badge">#{{ imp.id }}</td>
+            <td>{{ imp.filename }}</td>
+            <td><span class="type-tag">{{ imp.type?.toUpperCase() }}</span></td>
+            <td><strong>{{ imp.records_processed }}</strong></td>
+            <td>{{ imp.created_at | date:'short' }}</td>
+          </tr>
+          <tr *ngIf="imports.length === 0">
+            <td colspan="5" class="empty-row">No hay historial de cargas.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Tabla de Facturas -->
+      <table class="modern-table" *ngIf="!historyMode && activeTab === 'facturas'">
+        <thead>
+          <tr>
+            <th>Lote</th>
+            <th (click)="sort('factura')" class="sortable">Factura <span class="sort-icon" *ngIf="sortBy === 'factura'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
+            <th (click)="sort('pedido')" class="sortable">Pedido <span class="sort-icon" *ngIf="sortBy === 'pedido'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
+            <th>NIT / Cliente</th>
+            <th (click)="sort('fecha')" class="sortable">Emisión <span class="sort-icon" *ngIf="sortBy === 'fecha'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
+            <th>Vlr. Bruto</th>
+            <th>Total</th>
+            <th>Vínculo</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let fact of facturas">
+            <td><span class="batch-label">#{{ fact.import_batch_id }}</span></td>
+            <td><strong>{{ fact.factura }}</strong></td>
+            <td>{{ fact.pedido }}</td>
+            <td>
+              <div class="customer-info">
+                <span class="nit">{{ fact.nit }}</span>
+                <span class="name">{{ fact.nombre || fact.cliente }}</span>
+              </div>
+            </td>
+            <td>{{ fact.fecha }}</td>
+            <td>{{ fact.vlr_bruto | currency }}</td>
+            <td class="total-cell">{{ fact.total | currency }}</td>
+            <td>
+              <div *ngIf="fact.reconciled_record" class="link-badge" title="Conciliado con Extracto">
+                <span class="icon">🔗</span>
+                <span class="ref">Ext. #{{ fact.reconciled_record.id }}</span>
+              </div>
+              <span *ngIf="!fact.reconciled_record" class="text-muted">—</span>
+            </td>
+            <td><span class="status-badge" [class]="fact.status">{{ fact.status }}</span></td>
+          </tr>
+          <tr *ngIf="facturas.length === 0">
+            <td colspan="8" class="empty-row">No se encontraron facturas.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Tabla de Bancos -->
+      <table class="modern-table" *ngIf="!historyMode && activeTab === 'bancos'">
+        <thead>
+          <tr>
+            <th>Lote</th>
+            <th (click)="sort('fecha')" class="sortable">Fecha <span class="sort-icon" *ngIf="sortBy === 'fecha'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
+            <th (click)="sort('descripcion')" class="sortable">Descripción <span class="sort-icon" *ngIf="sortBy === 'descripcion'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
+            <th (click)="sort('valor')" class="sortable">Valor <span class="sort-icon" *ngIf="sortBy === 'valor'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
+            <th>Vínculo</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let banco of bancos">
+            <td><span class="batch-label">#{{ banco.import_batch_id }}</span></td>
+            <td>{{ banco.fecha }}</td>
+            <td>{{ banco.descripcion }}</td>
+            <td class="total-cell">{{ banco.valor | currency }}</td>
+            <td>
+              <div *ngIf="banco.reconciled_record" class="link-badge" title="Conciliado con Factura">
+                <span class="icon">📄</span>
+                <span class="ref">Fact. {{ banco.reconciled_record.factura }}</span>
+              </div>
+              <span *ngIf="!banco.reconciled_record" class="text-muted">—</span>
+            </td>
+            <td><span class="status-badge" [class]="banco.status">{{ banco.status }}</span></td>
+          </tr>
+          <tr *ngIf="bancos.length === 0">
+            <td colspan="5" class="empty-row">No hay movimientos bancarios.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Tabla de Auxiliar -->
+      <table class="modern-table" *ngIf="!historyMode && activeTab === 'auxiliar'">
+        <thead>
+          <tr>
+            <th>Lote</th>
+            <th (click)="sort('fecha')" class="sortable">Fecha <span class="sort-icon" *ngIf="sortBy === 'fecha'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
+            <th (click)="sort('comprobante')" class="sortable">Co <span class="sort-icon" *ngIf="sortBy === 'comprobante'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
+            <th>Documento</th>
+            <th>Detalle / Tercero</th>
+            <th>Débito</th>
+            <th>Crédito</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let aux of auxiliar">
+            <td><span class="batch-label">#{{ aux.import_batch_id }}</span></td>
+            <td>{{ aux.fecha }}</td>
+            <td><span class="id-badge">{{ aux.comprobante }}</span></td>
+            <td>{{ aux.documento }}</td>
+            <td>
+              <div class="customer-info">
+                <span class="name">{{ aux.detalle }}</span>
+                <span class="nit">{{ aux.tercero }}</span>
+              </div>
+            </td>
+            <td class="text-success">{{ aux.debito_local | currency }}</td>
+            <td class="text-danger">{{ aux.credito_local | currency }}</td>
+          </tr>
+          <tr *ngIf="auxiliar.length === 0">
+            <td colspan="7" class="empty-row">No hay registros auxiliares.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Tabla de Gastos -->
+      <table class="modern-table" *ngIf="!historyMode && activeTab === 'gastos'">
+        <thead>
+          <tr>
+            <th>Lote</th>
+            <th (click)="sort('fecha')" class="sortable">Fecha <span class="sort-icon" *ngIf="sortBy === 'fecha'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
+            <th>Proveedor</th>
+            <th>Concepto</th>
+            <th (click)="sort('valor')" class="sortable">Valor <span class="sort-icon" *ngIf="sortBy === 'valor'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let gasto of gastos">
+            <td><span class="batch-label">#{{ gasto.import_batch_id }}</span></td>
+            <td>{{ gasto.fecha }}</td>
+            <td>
+              <div class="customer-info">
+                <span class="name">{{ gasto.tercero }}</span>
+                <span class="nit">{{ gasto.nit }}</span>
+              </div>
+            </td>
+            <td class="concepto-cell">{{ gasto.concepto }}</td>
+            <td class="total-cell">{{ gasto.valor | currency }}</td>
+          </tr>
+          <tr *ngIf="gastos.length === 0">
+            <td colspan="5" class="empty-row">No hay gastos registrados.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Paginación Modern Elite -->
+    <div class="footer-pagination" *ngIf="totalPages > 0">
+      <div class="pagination-info">
+        {{ (currentPage - 1) * perPage + 1 }} - {{ math.min(currentPage * perPage, totalItems) }} de {{ totalItems }}
+      </div>
+      <div class="pagination-controls">
+        <div class="nav-buttons">
+          <button class="btn-nav" [disabled]="currentPage === 1" (click)="loadData(currentPage - 1)">‹</button>
+          <span class="page-current">Página {{ currentPage }} de {{ totalPages }}</span>
+          <button class="btn-nav" [disabled]="currentPage === totalPages" (click)="loadData(currentPage + 1)">›</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
