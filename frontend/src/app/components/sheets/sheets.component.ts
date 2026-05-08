@@ -62,8 +62,8 @@ import Swal from 'sweetalert2';
             CompraVenta
           </button>
           <button 
-            (click)="setCategory('compraventa')" 
-            [class.active]="categoria === 'compraventa'" 
+            (click)="setCategory('pagos_compraventa')" 
+            [class.active]="categoria === 'pagos_compraventa'" 
             class="tab-btn"
           >
             Pagos CompraVenta
@@ -206,6 +206,14 @@ import Swal from 'sweetalert2';
                     
                     <!-- Compraventa -->
                     <span *ngSwitchCase="'valor'">{{ formatMoney(row[col]) }}</span>
+
+                    <!-- Pagos Compraventa -->
+                    <span *ngSwitchCase="'valor_factura'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'valor_recaudado'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'capital_pagado'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'total_pagado'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'total_recaudo'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'valor_descuento'">{{ formatMoney(row[col]) }}</span>
                     
                     <span *ngSwitchDefault>{{ row[col] !== null ? row[col] : '-' }}</span>
                   </ng-container>
@@ -895,6 +903,18 @@ export class SheetsComponent implements OnInit {
       if (allKeys.includes('observaciones') || true) { // Always show it if editable
         finalCols.push('observaciones');
       }
+      return finalCols;
+    } else if (this.categoria === 'pagos_compraventa') {
+      const prioritized = [
+        'id', 'pago_ref', 'pagador', 'nit_pagador', 'cliente', 'nit_cliente',
+        'fecha_recaudo', 'valor_recaudado', 'capital_pagado', 'total_pagado', 'valor_descuento',
+        'op', 'id_titulo', 'valor_factura', 'fec_inicial', 'fec_final'
+      ];
+      const filtered = prioritized.filter(k => allKeys.includes(k));
+      const excluded = ['updated_at', 'created_at', 'observaciones', 'client_upload_id'];
+      const others = allKeys.filter(k => !prioritized.includes(k) && !excluded.includes(k));
+      const finalCols = [...filtered, ...others];
+      finalCols.push('observaciones');
       return finalCols;
     } else {
       // Ensure 'observaciones' appears at the end

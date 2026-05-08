@@ -54,6 +54,9 @@ class HistoryController extends Controller
             case 'compraventa':
                 $modelClass = \App\Models\Compraventa::class;
                 break;
+            case 'pagos_compraventa':
+                $modelClass = \App\Models\PagoCompraventa::class;
+                break;
             default:
                 return response()->json(['message' => 'Categoría no válida'], 400);
         }
@@ -110,6 +113,7 @@ class HistoryController extends Controller
             case 'pagos': $modelClass = \App\Models\PagoFactoring::class; break;
             case 'opf': $modelClass = \App\Models\OperacionConfirming::class; break;
             case 'compraventa': $modelClass = \App\Models\Compraventa::class; break;
+            case 'pagos_compraventa': $modelClass = \App\Models\PagoCompraventa::class; break;
             default: return response()->json(['message' => 'Categoría no válida'], 400);
         }
 
@@ -138,6 +142,7 @@ class HistoryController extends Controller
             case 'pagos': $modelClass = \App\Models\PagoFactoring::class; break;
             case 'opf': $modelClass = \App\Models\OperacionConfirming::class; break;
             case 'compraventa': $modelClass = \App\Models\Compraventa::class; break;
+            case 'pagos_compraventa': $modelClass = \App\Models\PagoCompraventa::class; break;
             default: return response()->json(['message' => 'Categoría no válida'], 400);
         }
 
@@ -177,6 +182,7 @@ class HistoryController extends Controller
             case 'pagos': $modelClass = \App\Models\PagoFactoring::class; break;
             case 'opf': $modelClass = \App\Models\OperacionConfirming::class; break;
             case 'compraventa': $modelClass = \App\Models\Compraventa::class; break;
+            case 'pagos_compraventa': $modelClass = \App\Models\PagoCompraventa::class; break;
             default: abort(400);
         }
         $query = $modelClass::query();
@@ -201,7 +207,8 @@ class HistoryController extends Controller
             \App\Models\OperacionFactoring::class,
             \App\Models\PagoFactoring::class,
             \App\Models\OperacionConfirming::class,
-            \App\Models\Compraventa::class
+            \App\Models\Compraventa::class,
+            \App\Models\PagoCompraventa::class
         ];
 
         $deletedTotal = 0;

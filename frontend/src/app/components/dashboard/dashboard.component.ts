@@ -466,9 +466,6 @@ Chart.register(...registerables);
           </div>
         </div>
 
-          </div>
-        </div>
-
         <!-- TAB: PAGOS COMPRAVENTA -->
         <div class="tab-view" *ngIf="currentTab === 'pagos_compraventa' && stats.pagos_compraventa">
           <div class="kpi-grid">
