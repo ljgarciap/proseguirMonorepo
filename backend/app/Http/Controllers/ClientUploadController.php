@@ -77,6 +77,7 @@ class ClientUploadController extends Controller
                     'categoria' => $request->categoria // <--- ESTO FALTABA
                 ]);
                 \Illuminate\Support\Facades\Log::info("Respuesta de n8n: " . $response->status());
+                \Illuminate\Support\Facades\Log::info("[DEBUG] categoria enviada a n8n: " . ($request->categoria ?? 'NO_ENVIADA') . " | archivo: " . $upload->original_name);
             } else {
                 \Illuminate\Support\Facades\Log::warning("No se encontró N8N_INTERNAL_WEBHOOK_URL en la configuración.");
             }
