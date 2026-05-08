@@ -15,13 +15,11 @@ class ClientUploadController extends Controller
         $query = ClientUpload::with(['user', 'validator', 'approver']);
 
         // Roles Filtering
-        if (in_array('cliente', $user->roles)) {
+        if (in_array('cliente', $user->roles) && count($user->roles) === 1) {
             $query->where('user_id', $user->id);
         } else {
-            // Operativos/Gerentes/Superadmins: solo deben ver cargas de CLIENTES
-            $query->whereHas('user', function($q) {
-                $q->where('roles', 'like', '%"cliente"%');
-            });
+            // Operativos/Gerentes/Superadmins: solo deben ver lo que se subió CON ROL de cliente
+            $query->where('upload_role', 'cliente');
         }
 
         // Search Filtering
@@ -47,7 +45,8 @@ class ClientUploadController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|max:102400', // Aumentado a 100MB para coincidir con Nginx
+            'file' => 'required|file|max:102400', 
+            'active_role' => 'nullable|string'
         ]);
 
         $file = $request->file('file');
@@ -55,6 +54,7 @@ class ClientUploadController extends Controller
 
         $upload = ClientUpload::create([
             'user_id' => $request->user()->id,
+            'upload_role' => $request->active_role ?? 'cliente',
             'filename' => $path,
             'original_name' => $file->getClientOriginalName(),
             'status' => 'pendiente',
@@ -147,11 +147,9 @@ class ClientUploadController extends Controller
     {
         $user = $request->user();
         
-        $baseQuery = ClientUpload::whereHas('user', function($q) {
-            $q->where('roles', 'like', '%"cliente"%');
-        });
+        $baseQuery = ClientUpload::where('upload_role', 'cliente');
 
-        if (in_array('cliente', $user->roles)) {
+        if (in_array('cliente', $user->roles) && count($user->roles) === 1) {
             $baseQuery->where('user_id', $user->id);
         }
 

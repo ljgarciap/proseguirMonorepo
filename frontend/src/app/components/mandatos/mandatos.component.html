@@ -1,0 +1,145 @@
+<div class="mandatos-container animate__animated animate__fadeIn">
+  <div class="header-section">
+    <h1 class="pro-title">Diligenciamiento de Mandatos</h1>
+    <p class="pro-subtitle">Complete la información legal para la generación del contrato de mandato.</p>
+  </div>
+
+  <form (ngSubmit)="onSubmit()" #mandatoForm="ngForm" class="pro-form-grid">
+    <!-- SECCIÓN MANDANTE -->
+    <div class="form-card mandante-card">
+      <div class="card-header">
+        <i class="fas fa-building"></i>
+        <h2>Información del Mandante</h2>
+      </div>
+      
+      <div class="input-row">
+        <div class="input-group full">
+          <label>Nombre / Razón Social Mandante</label>
+          <input type="text" [(ngModel)]="mandato.mandante_razon_social" name="m_rs" required placeholder="Ej: Empresa S.A.S">
+        </div>
+      </div>
+
+      <div class="input-row">
+        <div class="input-group">
+          <label>Tipo Documento</label>
+          <select [(ngModel)]="mandato.mandante_tipo_documento" name="m_td" required>
+            <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Número Documento</label>
+          <input type="text" [(ngModel)]="mandato.mandante_numero_documento" name="m_nd" required placeholder="123456789">
+        </div>
+      </div>
+
+      <div class="input-row">
+        <div class="input-group">
+          <label>Domicilio (Ciudad)</label>
+          <input type="text" [(ngModel)]="mandato.mandante_domicilio" name="m_dom" required>
+        </div>
+        <div class="input-group">
+          <label>Dirección Mandante</label>
+          <input type="text" [(ngModel)]="mandato.mandante_direccion" name="m_dir" required>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <div class="input-group full">
+          <label>Teléfono Mandante</label>
+          <input type="text" [(ngModel)]="mandato.mandante_telefono" name="m_tel" required>
+        </div>
+      </div>
+
+      <div class="divider">Representante Legal</div>
+
+      <div class="input-row">
+        <div class="input-group full">
+          <label>Nombre Representante Legal</label>
+          <input type="text" [(ngModel)]="mandato.mandante_rep_legal_nombre" name="m_rep_n" required>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <div class="input-group">
+          <label>Tipo Doc. Rep.</label>
+          <select [(ngModel)]="mandato.mandante_rep_legal_tipo_doc" name="m_rep_td" required>
+            <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Número Doc. Rep.</label>
+          <input type="text" [(ngModel)]="mandato.mandante_rep_legal_num_doc" name="m_rep_nd" required>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <div class="input-group full">
+          <label>E-mail Representante</label>
+          <input type="email" [(ngModel)]="mandato.mandante_rep_legal_email" name="m_rep_e" required placeholder="correo@ejemplo.com">
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN FACTOR -->
+    <div class="form-card factor-card">
+      <div class="card-header">
+        <i class="fas fa-hand-holding-usd"></i>
+        <h2>Información del Factor</h2>
+      </div>
+
+      <div class="input-row">
+        <div class="input-group full">
+          <label>Nombre / Razón Social Factor</label>
+          <input type="text" [(ngModel)]="mandato.factor_razon_social" name="f_rs" required>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <div class="input-group">
+          <label>Tipo Documento</label>
+          <input type="text" [(ngModel)]="mandato.factor_tipo_documento" name="f_td" readonly class="readonly">
+        </div>
+        <div class="input-group">
+          <label>Número Documento</label>
+          <input type="text" [(ngModel)]="mandato.factor_numero_documento" name="f_nd" readonly class="readonly">
+        </div>
+      </div>
+
+      <div class="divider">Representante Legal Factor</div>
+
+      <div class="input-row">
+        <div class="input-group full">
+          <label>Nombre Representante Factor</label>
+          <input type="text" [(ngModel)]="mandato.factor_rep_legal_nombre" name="f_rep_n" required>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <div class="input-group">
+          <label>Tipo Doc. Rep.</label>
+          <select [(ngModel)]="mandato.factor_rep_legal_tipo_doc" name="f_rep_td" required>
+            <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Número Doc. Rep.</label>
+          <input type="text" [(ngModel)]="mandato.factor_rep_legal_num_doc" name="f_rep_nd" required>
+        </div>
+      </div>
+
+      <div class="input-row">
+        <div class="input-group full">
+          <label>E-mail Representante Factor</label>
+          <input type="email" [(ngModel)]="mandato.factor_rep_legal_email" name="f_rep_e" required>
+        </div>
+      </div>
+
+      <div class="submit-section">
+        <button type="submit" [disabled]="!mandatoForm.form.valid || loading" class="pro-btn">
+          <span *ngIf="!loading">Registrar Mandato</span>
+          <span *ngIf="loading">Procesando...</span>
+        </button>
+      </div>
+    </div>
+  </form>
+</div>

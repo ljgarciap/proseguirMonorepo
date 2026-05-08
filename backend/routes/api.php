@@ -41,16 +41,16 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
             ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
         
         Route::delete('/logs/{id}', [\App\Http\Controllers\SystemLogController::class, 'destroy'])
-            ->middleware(['auth:api', 'checkrole:superadmin']);
+            ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
 
         Route::post('/logs/{id}/retry', [\App\Http\Controllers\SystemLogController::class, 'retry'])
-            ->middleware(['auth:api', 'checkrole:gerente,superadmin']);
+            ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
             
         Route::delete('/history/{categoria}/{id}', [\App\Http\Controllers\HistoryController::class, 'deleteRecord'])
-            ->middleware(['auth:api', 'checkrole:superadmin']);
+            ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
 
         Route::delete('/history/by-upload/{uploadId}', [\App\Http\Controllers\HistoryController::class, 'deleteByUpload'])
-            ->middleware(['auth:api', 'checkrole:superadmin']);
+            ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
 
         // Usuarios (Superadmin only)
         Route::apiResource('users', \App\Http\Controllers\UserController::class)
@@ -126,3 +126,10 @@ Route::prefix('planilla')->middleware('auth:api')->group(function () {
     });
 });
 Route::get('/document-types', function() { return \App\Models\DocumentType::all(); })->middleware(['auth:api']);
+
+use App\Http\Controllers\MandatoController;
+
+Route::prefix('mandatos')->middleware('auth:api')->group(function () {
+    Route::post('/', [MandatoController::class, 'store'])->middleware('checkrole:cliente');
+    Route::get('/', [MandatoController::class, 'index'])->middleware('checkrole:cliente,gerente,operativo,superadmin');
+});

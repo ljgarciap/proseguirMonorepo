@@ -52,6 +52,7 @@ import Swal from 'sweetalert2';
                 <th>Fecha de Carga</th>
                 <th>Estado</th>
                 <th>Observaciones Operativas</th>
+                <th class="text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -72,9 +73,20 @@ import Swal from 'sweetalert2';
                   }">{{ upload.status }}</span>
                 </td>
                 <td class="text-muted">{{ upload.observations || 'Sin observaciones aún' }}</td>
+                <td class="text-center">
+                  <button *ngIf="upload.status === 'pendiente'" 
+                          class="btn-delete" 
+                          (click)="deleteUpload(upload.id)"
+                          title="Eliminar carga">
+                    <span class="material-symbols-outlined">delete</span>
+                  </button>
+                  <span *ngIf="upload.status !== 'pendiente'" class="text-muted" title="Ya está siendo procesado">
+                    <span class="material-symbols-outlined disabled-icon">lock</span>
+                  </span>
+                </td>
               </tr>
               <tr *ngIf="uploads.length === 0">
-                <td colspan="4" class="empty-state">
+                <td colspan="5" class="empty-state">
                   <span class="material-symbols-outlined">inventory_2</span>
                   <p>No se han encontrado registros de carga.</p>
                 </td>
@@ -171,6 +183,17 @@ import Swal from 'sweetalert2';
     .mt-4 { margin-top: 2rem; }
     .bold { font-weight: 600; }
     .text-muted { color: var(--text-muted); font-style: italic; font-size: 0.85rem; }
+    .text-center { text-align: center; }
+    
+    .btn-delete {
+      background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.2s;
+      &:hover { background: #fee2e2; transform: scale(1.1); }
+      .material-symbols-outlined { font-size: 20px; }
+    }
+
+    .disabled-icon {
+      font-size: 18px; color: #cbd5e1; cursor: help;
+    }
   `]
 })
 export class ClientUploadComponent implements OnInit {
@@ -223,6 +246,9 @@ export class ClientUploadComponent implements OnInit {
     this.isUploading = true;
     const formData = new FormData();
     formData.append('file', this.selectedFile);
+    
+    const activeRole = localStorage.getItem('active_role') || 'cliente';
+    formData.append('active_role', activeRole);
 
     this.http.post(`${environment.apiUrl}/uploads`, formData).subscribe({
       next: () => {
@@ -249,4 +275,30 @@ export class ClientUploadComponent implements OnInit {
       }
     });
   }
+
+  deleteUpload(id: number): void {
+    Swal.fire({
+      title: '¿Estás seguro?',
+      text: "Esta acción eliminará el archivo permanentemente.",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.http.delete(`${environment.apiUrl}/uploads/${id}`).subscribe({
+          next: () => {
+            this.loadUploads();
+            Swal.fire('¡Eliminado!', 'El archivo ha sido borrado.', 'success');
+          },
+          error: (err) => {
+            Swal.fire('Error', err.error?.message || 'No se pudo eliminar el archivo.', 'error');
+          }
+        });
+      }
+    });
+  }
 }
+

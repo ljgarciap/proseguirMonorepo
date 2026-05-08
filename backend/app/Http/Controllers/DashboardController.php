@@ -323,6 +323,16 @@ class DashboardController extends Controller
         
         $tasaPonderada = $totalValorParaPonderar > 0 ? ($sumaTasaPorValor / $totalValorParaPonderar) : $avgTasaFactoring;
 
+        // Distribución de Tasas Ponderadas por Pagador (Para el nuevo gráfico)
+        $weightedByPayer = (clone $factoringOpQuery)
+            ->where('valor_desembolsado', '>', 0)
+            ->select('pagador')
+            ->selectRaw('SUM(tasa_descuento * valor_desembolsado) / SUM(valor_desembolsado) as weighted_avg')
+            ->groupBy('pagador')
+            ->orderBy('weighted_avg', 'desc')
+            ->limit(10)
+            ->get();
+
         // Distribución de Tasas para Gráfico de Tortas
         $tasaDistribution = (clone $factoringOpQuery)
             ->select('tasa_descuento as tasa', \Illuminate\Support\Facades\DB::raw('SUM(valor_desembolsado) as total'))
@@ -337,6 +347,7 @@ class DashboardController extends Controller
             'valor_reserva' => (float)$totalReserva,
             'avg_tasa' => $avgTasaFactoring ? round($avgTasaFactoring, 2) : 0,
             'tasa_ponderada' => round($tasaPonderada, 2),
+            'weighted_by_payer' => $weightedByPayer,
             'tasa_distribution' => $tasaDistribution,
             'pagos_count' => $pagosCount,
             'total_collected' => (float)$totalCollected,

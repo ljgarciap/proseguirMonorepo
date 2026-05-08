@@ -44,6 +44,9 @@ export class UploadComponent {
     // Laravel espera el campo 'file'
     formData.append('file', this.selectedFile);
     formData.append('categoria', this.categoria);
+    
+    const activeRole = localStorage.getItem('active_role') || 'operativo';
+    formData.append('active_role', activeRole);
 
     // Llamamos a nuestra propia API en lugar de n8n directamente
     const apiUrl = `${environment.apiUrl}/uploads`;

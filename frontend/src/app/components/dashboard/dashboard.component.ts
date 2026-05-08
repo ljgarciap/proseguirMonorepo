@@ -253,7 +253,7 @@ Chart.register(...registerables);
               <div class="chart-box tall">
                 <canvas baseChart
                   [data]="dailyPaymentsChartData"
-                  [options]="barChartOptions"
+                  [options]="stackedBarChartOptions"
                   [type]="'bar'">
                 </canvas>
               </div>
@@ -323,15 +323,28 @@ Chart.register(...registerables);
               </table>
             </div>
 
-            <div class="card chart-container span-12">
+            <div class="card chart-container span-6">
               <div class="card-header">
                 <h3>Distribución de Tasas de Colocación</h3>
               </div>
-              <div class="chart-box tall">
+              <div class="chart-box">
                  <canvas baseChart
                   [data]="tasaDistributionChartData"
                   [options]="pieChartOptions"
                   [type]="'pie'">
+                </canvas>
+              </div>
+            </div>
+
+            <div class="card chart-container span-6">
+              <div class="card-header">
+                <h3>Promedio Ponderado por Pagador</h3>
+              </div>
+              <div class="chart-box">
+                 <canvas baseChart
+                  [data]="weightedRatesChartData"
+                  [options]="pieChartOptions"
+                  [type]="'doughnut'">
                 </canvas>
               </div>
             </div>
@@ -749,15 +762,15 @@ export class DashboardComponent implements OnInit {
   };
 
   // Chart: Monto Pagado Timeline (Pagos)
-  public paymentTimelineChartData: ChartData<'line'> = {
+  public paymentTimelineChartData: ChartData<'bar'> = {
     labels: [],
     datasets: [{
       data: [],
-      label: 'Monto Pagado',
-      borderColor: '#5e72e4',
-      backgroundColor: 'rgba(94, 114, 228, 0.1)',
-      fill: true,
-      tension: 0.4
+      label: 'Monto Recaudado',
+      backgroundColor: '#5e72e4',
+      borderColor: '#2b3d95',
+      borderWidth: 1,
+      borderRadius: 5
     }]
   };
 
@@ -778,6 +791,15 @@ export class DashboardComponent implements OnInit {
 
   // Chart: Distribución de Tasas (Factoring)
   public tasaDistributionChartData: ChartData<'pie'> = {
+    labels: [],
+    datasets: [{
+      data: [],
+      backgroundColor: ['#5e72e4', '#2dce89', '#fb6340', '#11cdef', '#f5365c', '#8965e0', '#ffd600']
+    }]
+  };
+
+  // Chart: Promedio Ponderado por Pagador
+  public weightedRatesChartData: ChartData<'doughnut'> = {
     labels: [],
     datasets: [{
       data: [],
@@ -814,6 +836,19 @@ export class DashboardComponent implements OnInit {
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: { x: { beginAtZero: true } }
+  };
+
+  public stackedBarChartOptions: ChartConfiguration['options'] = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { 
+      legend: { position: 'bottom' },
+      tooltip: { mode: 'index', intersect: false }
+    },
+    scales: { 
+      x: { stacked: true },
+      y: { stacked: true, beginAtZero: true } 
+    }
   };
 
   constructor(private http: HttpClient, public router: Router) { }
@@ -1048,6 +1083,11 @@ export class DashboardComponent implements OnInit {
       if (this.stats.factoring.tasa_distribution) {
         this.tasaDistributionChartData.labels = this.stats.factoring.tasa_distribution.map((t: any) => t.tasa + '%');
         this.tasaDistributionChartData.datasets[0].data = this.stats.factoring.tasa_distribution.map((t: any) => parseFloat(t.total));
+      }
+
+      if (this.stats.factoring.weighted_by_payer) {
+        this.weightedRatesChartData.labels = this.stats.factoring.weighted_by_payer.map((w: any) => w.pagador);
+        this.weightedRatesChartData.datasets[0].data = this.stats.factoring.weighted_by_payer.map((w: any) => parseFloat(w.weighted_avg));
       }
 
       if (this.stats.factoring.daily_payments) {

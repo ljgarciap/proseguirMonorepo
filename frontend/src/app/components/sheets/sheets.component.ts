@@ -861,9 +861,8 @@ export class SheetsComponent implements OnInit {
       const prioritized = [
         'id', 'numero_radicado', 'cliente', 'identificacion',
         'actividad_economica', 'sector_economico', 'ciudad',
-        'valor_desembolso', 'saldo_capital',
-        'vencido', 'dias_vencido', 'valor_vencido', 'tiene_mora', 'valor_mora',
-        'fecha_vencimiento_capital', 'estado_capital'
+        'saldo_capital', 'vencido', 'dias_vencido', 'valor_vencido', 'tiene_mora', 'valor_mora',
+        'fecha_vencimiento_capital', 'valor_desembolso'
       ];
 
       // Filter out keys we don't want and add remaining keys at the end
@@ -887,6 +886,7 @@ export class SheetsComponent implements OnInit {
 
   formatHeader(key: string): string {
     if (key === 'valor_desembolso') return 'DESEMBOLSO';
+    if (key === 'fecha_vencimiento_capital') return 'F. VENCIMIENTO CAPITAL';
     if (key === 'numero_radicado') return 'RADICADO';
     if (key === 'valor_aprobado') return 'VALOR PRESENTE';
     if (key === 'devolucion_descuento') return 'DEVOLUCIÓN DESC.';

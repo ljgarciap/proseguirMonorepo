@@ -13,10 +13,17 @@ import { roleGuard } from './guards/role.guard';
 
 import { ProfileSettingsComponent } from './components/profile-settings/profile-settings.component';
 import { UserManagementComponent } from './components/user-management/user-management.component';
+import { MandatosComponent } from './components/mandatos/mandatos.component';
 
 export const routes: Routes = [
     { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     { path: 'login', component: LoginComponent },
+    { 
+        path: 'mandatos', 
+        component: MandatosComponent, 
+        canActivate: [roleGuard], 
+        data: { roles: ['cliente', 'superadmin'] } 
+    },
     { 
         path: 'profile', 
         component: ProfileSettingsComponent, 
@@ -33,7 +40,7 @@ export const routes: Routes = [
         path: 'logs', 
         component: LogsComponent, 
         canActivate: [roleGuard], 
-        data: { roles: ['gerente'] } 
+        data: { roles: ['gerente', 'operativo'] } 
     },
     { 
         path: 'sheets', 

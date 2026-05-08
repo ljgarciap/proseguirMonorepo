@@ -51,7 +51,7 @@ import { interval, Subscription } from 'rxjs';
             </a>
           </div>
 
-          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente'])">
+          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo'])">
             <label>Sistema</label>
             <a routerLink="/logs" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">shield_person</span> Auditoría
@@ -69,6 +69,9 @@ import { interval, Subscription } from 'rxjs';
             <label>Portal Cliente</label>
             <a routerLink="/client-upload" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">folder_shared</span> Mis Cargas
+            </a>
+            <a routerLink="/mandatos" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">description</span> Diligenciar Mandato
             </a>
           </div>
 
@@ -174,7 +177,7 @@ import { interval, Subscription } from 'rxjs';
       @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
       .avatar { width: 36px; height: 36px; background: var(--grad-primary); color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; }
       .user-info { display: flex; flex-direction: column; .name { font-size: 0.85rem; font-weight: 700; color: #2D3748; } .status { font-size: 0.7rem; color: #48BB78; font-weight: 600; } }
-      .content-viewport { flex-grow: 1; overflow-y: auto; padding: 0; }
+      .content-viewport { flex-grow: 1; overflow-y: auto; padding: 2rem; }
 
       .pulse { animation: alertPulse 1.5s infinite; }
       @keyframes alertPulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
