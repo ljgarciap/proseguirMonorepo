@@ -59,7 +59,7 @@ Chart.register(...registerables);
             <button (click)="setTab('pagos')" [class.active]="currentTab === 'pagos'">
               <span class="material-symbols-outlined">receipt_long</span> Pagos Factoring
             </button>
-            <button (click)="setTab('compraventa')" [class.active]="currentTab === 'compraventa'">
+            <button (click)="setTab('confirming')" [class.active]="currentTab === 'confirming'">
               <span class="material-symbols-outlined">assignment</span> CompraVenta
             </button>
             <button (click)="setTab('pagos_compraventa')" [class.active]="currentTab === 'pagos_compraventa'">
