@@ -1,0 +1,9 @@
+vendor/
+node_modules/
+.git/
+.env
+Dockerfile
+storage/*.key
+storage/logs/*.log
+public/storage
+public/build
