@@ -209,8 +209,11 @@ class N8nWebhookController extends Controller
                 break;
             case 'pagos_compraventa':
                 foreach ($data as $row) {
-                    if (isset($row['pagador']) && isset($row['nit_pagador'])) {
-                        $row['nit_pagador'] = \App\Services\ClientMasterService::masterClient($row['pagador'], $row['nit_pagador']);
+                    if (isset($row['pagador'])) {
+                        $row['nit_pagador'] = \App\Services\ClientMasterService::masterClient($row['pagador'], $row['nit_pagador'] ?? null);
+                    }
+                    if (isset($row['cliente'])) {
+                        $row['nit_cliente'] = \App\Services\ClientMasterService::masterClient($row['cliente'], $row['nit_cliente'] ?? null);
                     }
                     $row['client_upload_id'] = $clientUploadId;
                     PagoCompraventa::create($row);

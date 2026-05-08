@@ -64,6 +64,10 @@ class DashboardController extends Controller
             $response['compraventa'] = $this->getCompraventaStats($fechaInicio, $fechaFin, $cliente);
         }
 
+        if (!$categoria || $categoria === 'pagos_compraventa') {
+            $response['pagos_compraventa'] = $this->getPagosCompraventaStats($fechaInicio, $fechaFin, $cliente);
+        }
+
         return response()->json($response);
     }
 
@@ -472,6 +476,46 @@ class DashboardController extends Controller
             'top_vendedores' => $topVendedores,
             'top_compradores' => $topCompradores,
             'vencimientos' => $vencimientos
+        ];
+    }
+
+    private function getPagosCompraventaStats($fechaInicio, $fechaFin, $cliente)
+    {
+        $applyFilters = $this->getApplyFilters($fechaInicio, $fechaFin, $cliente);
+        $query = $applyFilters(\App\Models\PagoCompraventa::query(), 'created_at');
+        
+        $totalRecaudado = (clone $query)->sum('valor_recaudado');
+        $totalCapital = (clone $query)->sum('capital_pagado');
+        $totalDescuento = (clone $query)->sum('valor_descuento');
+        $count = (clone $query)->count();
+        
+        $topPagadores = (clone $query)
+            ->select('pagador', 'nit_pagador', \Illuminate\Support\Facades\DB::raw('SUM(valor_recaudado) as total'))
+            ->groupBy('pagador', 'nit_pagador')
+            ->orderBy('total', 'desc')
+            ->limit(10)
+            ->get();
+            
+        $topClientes = (clone $query)
+            ->select('cliente', 'nit_cliente', \Illuminate\Support\Facades\DB::raw('SUM(valor_recaudado) as total'))
+            ->groupBy('cliente', 'nit_cliente')
+            ->orderBy('total', 'desc')
+            ->limit(10)
+            ->get();
+
+        $ultimosPagos = (clone $query)
+            ->orderBy('created_at', 'desc')
+            ->limit(20)
+            ->get();
+
+        return [
+            'total_recaudado' => (float)$totalRecaudado,
+            'total_capital' => (float)$totalCapital,
+            'total_descuento' => (float)$totalDescuento,
+            'count' => $count,
+            'top_pagadores' => $topPagadores,
+            'top_clientes' => $topClientes,
+            'ultimos_pagos' => $ultimosPagos
         ];
     }
 }

@@ -466,6 +466,102 @@ Chart.register(...registerables);
           </div>
         </div>
 
+          </div>
+        </div>
+
+        <!-- TAB: PAGOS COMPRAVENTA -->
+        <div class="tab-view" *ngIf="currentTab === 'pagos_compraventa' && stats.pagos_compraventa">
+          <div class="kpi-grid">
+            <div class="kpi-card pro-card navy">
+              <div class="kpi-icon"><span class="material-symbols-outlined">paid</span></div>
+              <div class="kpi-body">
+                <label>Total Recaudado</label>
+                <div class="value">{{ formatMoney(stats.pagos_compraventa.total_recaudado) }}</div>
+              </div>
+            </div>
+            <div class="kpi-card pro-card cyan">
+              <div class="kpi-icon"><span class="material-symbols-outlined">account_balance_wallet</span></div>
+              <div class="kpi-body">
+                <label>Capital Pagado</label>
+                <div class="value">{{ formatMoney(stats.pagos_compraventa.total_capital) }}</div>
+              </div>
+            </div>
+            <div class="kpi-card pro-card orange">
+              <div class="kpi-icon"><span class="material-symbols-outlined">price_check</span></div>
+              <div class="kpi-body">
+                <label>Total Descuento</label>
+                <div class="value">{{ formatMoney(stats.pagos_compraventa.total_descuento) }}</div>
+              </div>
+            </div>
+            <div class="kpi-card pro-card purple">
+              <div class="kpi-icon"><span class="material-symbols-outlined">reorder</span></div>
+              <div class="kpi-body">
+                <label>Operaciones</label>
+                <div class="value">{{ stats.pagos_compraventa.count }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashboard-grid">
+            <div class="card chart-container span-6">
+              <div class="card-header">
+                <h3>Top Pagadores (Recaudo)</h3>
+              </div>
+              <div class="chart-box doughnut">
+                <canvas baseChart
+                  [data]="topPagadoresPCChartData"
+                  [options]="pieChartOptions"
+                  [type]="'doughnut'">
+                </canvas>
+              </div>
+            </div>
+            <div class="card chart-container span-6">
+              <div class="card-header">
+                <h3>Top Clientes (Recaudo)</h3>
+              </div>
+              <div class="chart-box doughnut">
+                <canvas baseChart
+                  [data]="topClientesPCChartData"
+                  [options]="pieChartOptions"
+                  [type]="'doughnut'">
+                </canvas>
+              </div>
+            </div>
+
+            <div class="card table-container span-12">
+              <div class="card-header">
+                <h3>Últimos Pagos Procesados</h3>
+              </div>
+              <div class="table-scroll">
+                <table class="pro-table">
+                  <thead>
+                    <tr>
+                      <th>Ref. Pago</th>
+                      <th>Pagador</th>
+                      <th>Cliente</th>
+                      <th>Fecha Recaudo</th>
+                      <th class="text-right">Capital Pagado</th>
+                      <th class="text-right">Total Pagado</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let p of stats.pagos_compraventa.ultimos_pagos">
+                      <td><span class="badge secondary">{{ p.pago_ref }}</span></td>
+                      <td>{{ p.pagador }}</td>
+                      <td>{{ p.cliente }}</td>
+                      <td>{{ p.fecha_recaudo }}</td>
+                      <td class="text-right">{{ formatMoney(p.capital_pagado) }}</td>
+                      <td class="text-right">{{ formatMoney(p.total_pagado) }}</td>
+                      <td><span class="badge success">{{ p.estado }}</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <div class="loading-overlay" *ngIf="isLoading">
@@ -818,6 +914,17 @@ export class DashboardComponent implements OnInit {
     datasets: [{ data: [], backgroundColor: ['#5e72e4', '#2dce89', '#fb6340', '#11cdef', '#f5365c'] }]
   };
 
+  // Pagos Compraventa Charts
+  public topPagadoresPCChartData: ChartData<'doughnut'> = {
+    labels: [],
+    datasets: [{ data: [], backgroundColor: ['#5e72e4', '#2dce89', '#fb6340', '#11cdef', '#f5365c'] }]
+  };
+
+  public topClientesPCChartData: ChartData<'doughnut'> = {
+    labels: [],
+    datasets: [{ data: [], backgroundColor: ['#5e72e4', '#2dce89', '#fb6340', '#11cdef', '#f5365c'] }]
+  };
+
   public pieChartOptions: ChartConfiguration['options'] = {
     responsive: true,
     maintainAspectRatio: false,
@@ -1131,6 +1238,18 @@ export class DashboardComponent implements OnInit {
       if (this.stats.compraventa.top_compradores) {
         this.topCompradoresChartData.labels = this.stats.compraventa.top_compradores.map((c: any) => c.comprador);
         this.topCompradoresChartData.datasets[0].data = this.stats.compraventa.top_compradores.map((c: any) => parseFloat(c.total));
+      }
+    }
+
+    // PAGOS COMPRAVENTA
+    if (this.stats.pagos_compraventa) {
+      if (this.stats.pagos_compraventa.top_pagadores) {
+        this.topPagadoresPCChartData.labels = this.stats.pagos_compraventa.top_pagadores.map((p: any) => p.pagador);
+        this.topPagadoresPCChartData.datasets[0].data = this.stats.pagos_compraventa.top_pagadores.map((p: any) => parseFloat(p.total));
+      }
+      if (this.stats.pagos_compraventa.top_clientes) {
+        this.topClientesPCChartData.labels = this.stats.pagos_compraventa.top_clientes.map((c: any) => c.cliente);
+        this.topClientesPCChartData.datasets[0].data = this.stats.pagos_compraventa.top_clientes.map((c: any) => parseFloat(c.total));
       }
     }
   }
