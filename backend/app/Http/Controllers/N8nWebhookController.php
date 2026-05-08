@@ -8,6 +8,7 @@ use App\Models\OperacionFactoring;
 use App\Models\PagoFactoring;
 use App\Models\OperacionConfirming;
 use App\Models\Compraventa;
+use App\Models\PagoCompraventa;
 use App\Models\SystemLog;
 
 class N8nWebhookController extends Controller
@@ -206,6 +207,15 @@ class N8nWebhookController extends Controller
                     Compraventa::create($row);
                 }
                 break;
+            case 'pagos_compraventa':
+                foreach ($data as $row) {
+                    if (isset($row['pagador']) && isset($row['nit_pagador'])) {
+                        $row['nit_pagador'] = \App\Services\ClientMasterService::masterClient($row['pagador'], $row['nit_pagador']);
+                    }
+                    $row['client_upload_id'] = $clientUploadId;
+                    PagoCompraventa::create($row);
+                }
+                break;
             default:
                 throw new \Exception('Categoría no válida');
         }
@@ -305,6 +315,25 @@ class N8nWebhookController extends Controller
             'Fecha_Vencimiento' => 'fecha_vencimiento',
             'Banco' => 'banco',
             'Cuenta_Nro' => 'cuenta_nro',
+
+            // Pagos Compraventa specific
+            'Pago_Ref' => 'pago_ref',
+            'NIT_Pagador' => 'nit_pagador',
+            'NIT_Cliente' => 'nit_cliente',
+            'Concepto' => 'concepto',
+            'Estado' => 'estado',
+            'Fecha_Recaudo' => 'fecha_recaudo',
+            'Op' => 'op',
+            'Id_Titulo' => 'id_titulo',
+            'Valor_Factura' => 'valor_factura',
+            'Fec_Inicial' => 'fec_inicial',
+            'Fec_Final' => 'fec_final',
+            'Saldo_Capital' => 'saldo_capital',
+            'Valor_Descuento' => 'valor_descuento',
+            'Capital_Pagado' => 'capital_pagado',
+            'Total_Pagado' => 'total_pagado',
+            'Total_Recaudo' => 'total_recaudo',
+            'Valor_Recaudado' => 'valor_recaudado',
         ];
 
         return array_map(function ($row) use ($explicitMap) {
@@ -334,11 +363,12 @@ class N8nWebhookController extends Controller
 
         // Map categories to their respective name & nit keys
         $keys = [
-            'cartera' => ['name' => 'cliente', 'nit' => 'identificacion'],
-            'op'      => ['name' => 'cliente', 'nit' => 'nit_cliente'],
-            'pagos'   => ['name' => 'cliente', 'nit' => 'nit'],
-            'opf'     => ['name' => 'emisor',  'nit' => 'emisor_nit'],
-            'compraventa' => ['name' => 'vendedor', 'nit' => 'nit_vendedor'],
+            'cartera'      => ['name' => 'cliente',  'nit' => 'identificacion'],
+            'op'           => ['name' => 'cliente',  'nit' => 'nit_cliente'],
+            'pagos'        => ['name' => 'cliente',  'nit' => 'nit'],
+            'opf'          => ['name' => 'emisor',   'nit' => 'emisor_nit'],
+            'compraventa'  => ['name' => 'vendedor', 'nit' => 'nit_vendedor'],
+            'pagos_compraventa' => ['name' => 'pagador', 'nit' => 'nit_pagador'],
         ];
 
         if (!isset($keys[$categoria])) return $data;

@@ -632,31 +632,6 @@
                 },
                 "conditions": [
                   {
-                    "id": "cf30d018-50ad-4932-bbb7-5a87ca820c73",
-                    "leftValue": "={{ $json.body.categoria }}",
-                    "rightValue": "compraventa",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals",
-                      "name": "filter.operator.equals"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": true,
-              "outputKey": "4"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": true,
-                  "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 3
-                },
-                "conditions": [
-                  {
                     "id": "d1e2f3a4-b5c6-7890-defa-bc1234567890",
                     "leftValue": "={{ $json.body.categoria }}",
                     "rightValue": "pagos_compraventa",
@@ -670,7 +645,7 @@
                 "combinator": "and"
               },
               "renameOutput": true,
-              "outputKey": "5"
+              "outputKey": "4"
             }
           ]
         },
@@ -1136,7 +1111,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://backend_web/api/webhook/n8n/compraventa",
+        "url": "http://backend_web/api/webhook/n8n/pagos_compraventa",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
