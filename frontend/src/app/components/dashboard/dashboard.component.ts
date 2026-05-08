@@ -51,7 +51,7 @@ Chart.register(...registerables);
               <span class="material-symbols-outlined">payments</span> Cartera CYF
             </button>
             <button (click)="setTab('cartera_factoring')" [class.active]="currentTab === 'cartera_factoring'">
-              <span class="material-symbols-outlined">analytics</span> Cartera Factorial
+              <span class="material-symbols-outlined">analytics</span> Cartera Factoring
             </button>
             <button (click)="setTab('factoring')" [class.active]="currentTab === 'factoring'">
               <span class="material-symbols-outlined">account_balance</span> Factoring
