@@ -742,7 +742,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://backend_web:8000/api/webhook/n8n/cartera",
+        "url": "http://backend_web/api/webhook/n8n/cartera",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
