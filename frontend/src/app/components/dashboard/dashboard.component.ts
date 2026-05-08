@@ -51,7 +51,7 @@ Chart.register(...registerables);
               <span class="material-symbols-outlined">payments</span> Cartera CYF
             </button>
             <button (click)="setTab('cartera_factoring')" [class.active]="currentTab === 'cartera_factoring'">
-              <span class="material-symbols-outlined">analytics</span> Cartera Factoring
+              <span class="material-symbols-outlined">analytics</span> Cartera Factorial
             </button>
             <button (click)="setTab('factoring')" [class.active]="currentTab === 'factoring'">
               <span class="material-symbols-outlined">account_balance</span> Factoring
@@ -60,10 +60,10 @@ Chart.register(...registerables);
               <span class="material-symbols-outlined">receipt_long</span> Pagos Factoring
             </button>
             <button (click)="setTab('compraventa')" [class.active]="currentTab === 'compraventa'">
-              <span class="material-symbols-outlined">assignment</span> Compraventa
+              <span class="material-symbols-outlined">assignment</span> CompraVenta
             </button>
             <button (click)="setTab('pagos_compraventa')" [class.active]="currentTab === 'pagos_compraventa'">
-              <span class="material-symbols-outlined">paid</span> Pagos Compraventa
+              <span class="material-symbols-outlined">paid</span> Pagos CompraVenta
             </button>
           </div>
 

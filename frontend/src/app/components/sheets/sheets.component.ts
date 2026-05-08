@@ -31,7 +31,14 @@ import Swal from 'sweetalert2';
             [class.active]="categoria === 'cartera'" 
             class="tab-btn"
           >
-            Cartera
+            Cartera CYF
+          </button>
+          <button 
+            (click)="setCategory('cartera_factoring')" 
+            [class.active]="categoria === 'cartera_factoring'" 
+            class="tab-btn"
+          >
+            Cartera Factoring
           </button>
           <button 
             (click)="setCategory('op')" 
@@ -45,21 +52,21 @@ import Swal from 'sweetalert2';
             [class.active]="categoria === 'pagos'" 
             class="tab-btn"
           >
-            Pagos
+            Pagos Factoring
           </button>
           <button 
             (click)="setCategory('opf')" 
             [class.active]="categoria === 'opf'" 
             class="tab-btn"
           >
-            Confirming
+            CompraVenta
           </button>
           <button 
             (click)="setCategory('compraventa')" 
             [class.active]="categoria === 'compraventa'" 
             class="tab-btn"
           >
-            Compraventa
+            Pagos CompraVenta
           </button>
         </div>
         
@@ -210,8 +217,13 @@ import Swal from 'sweetalert2';
                 </td>
               </tr>
               <tr *ngIf="data.length === 0 && !isLoading">
-                <td [attr.colspan]="getColumns().length" class="empty-row">
-                  No se encontraron registros activos.
+                <td [attr.colspan]="getColumns().length + 1" class="empty-row">
+                  <ng-container *ngIf="categoria === 'cartera_factoring'">
+                    🚧 Cartera Factoring — Módulo en construcción. Próximamente disponible.
+                  </ng-container>
+                  <ng-container *ngIf="categoria !== 'cartera_factoring'">
+                    No se encontraron registros activos.
+                  </ng-container>
                 </td>
               </tr>
             </tbody>
@@ -823,6 +835,15 @@ export class SheetsComponent implements OnInit {
 
   setCategory(cat: string) {
     this.categoria = cat;
+    if (cat === 'cartera_factoring') {
+      // Tab vacía por ahora - no llama al backend
+      this.searchTerm = '';
+      this.currentPage = 1;
+      this.data = [];
+      this.totalItems = 0;
+      this.isLoading = false;
+      return;
+    }
     this.onCategoryChange();
   }
 
