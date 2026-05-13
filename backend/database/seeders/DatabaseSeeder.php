@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             DocumentTypeSeeder::class,
             UserSeeder::class,
             SectorSeeder::class,
+            AccountingParameterSeeder::class,
         ]);
     }
 }
