@@ -60,6 +60,13 @@ return [
             'report' => false,
         ],
 
+        'local_insumos' => [
+            'driver' => 'local',
+            'root' => base_path('../insumos'),
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*

@@ -53,8 +53,18 @@ Al borrar volúmenes, n8n se reinicia. Pasos obligatorios:
 3.  Importar el archivo `workflow/FactoringApiDocker.json`.
 4.  **Activar (Switch ON)** el flujo para que la URL de producción no devuelva 404.
 
-## 5. Lecciones Aprendidas (Evitar errores recurrentes)
-*   **Error 500 (Cipher):** Causado por cambiar la `APP_KEY`. Solución: Mantenerla fija en `PROD.env`.
-*   **Error 500 (Passport):** Causado por permisos `777` en las llaves. Solución: Usar `600`.
-*   **Invalid URL (Frontend):** Causado por usar rutas relativas en el constructor `new URL()`. Solución: El código ahora usa `window.location.origin` por defecto.
-*   **ECONNREFUSED (n8n):** Causado por usar nombres de host incorrectos (usar `factoring_n8n` en lugar de `n8n`).
+# 6. Módulo Conciliación Susuerte (REQUERIDO)
+Para que el procesamiento de PDFs funcione en el servidor, ejecuta:
+```bash
+# Instalar dependencias de Node en el backend
+docker exec factoring_backend npm install pdfreader
+
+# Recrear el enlace de storage de forma relativa (Evita Error 403)
+docker exec factoring_backend rm -f public/storage
+docker exec factoring_backend ln -s ../storage/app/public public/storage
+```
+
+## 7. Lecciones Aprendidas (Evitar errores recurrentes)
+*   **Error 403 (Descarga):** Causado por enlaces simbólicos con rutas absolutas locales. Solución: Usar rutas relativas en el comando `ln -s`.
+*   **Error 502/500 (Conciliación):** Causado por la falta de Node.js o `pdfreader` en el contenedor de backend.
+*   **Error ESM (Node):** Los archivos `.js` en el backend se tratan como módulos ES. Solución: El ayudante de PDF debe llamarse `extract_pdf.cjs`.

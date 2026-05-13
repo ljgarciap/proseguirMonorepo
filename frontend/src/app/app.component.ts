@@ -46,22 +46,25 @@ import { interval, Subscription } from 'rxjs';
                 <span class="nav-badge" *ngIf="getInternalDocsBadge() > 0">{{ getInternalDocsBadge() }}</span>
               </div>
             </a>
-            <a *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" routerLink="/mandatos" routerLinkActive="active" class="nav-link">
+            <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])" routerLink="/mandatos" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">contract</span> Revisión Mandatos
             </a>
           </div>
 
-          <div class="nav-section" *ngIf="authService.isAuthorized(['operativo', 'superadmin'])">
+          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])">
             <label>Administración</label>
             <a routerLink="/contable" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">account_balance_wallet</span> Contable
+            </a>
+            <a routerLink="/conciliacion-susuerte" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">fact_check</span> Conciliación Susuerte
             </a>
             <a routerLink="/planilla" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">agriculture</span> Planilla Fincas
             </a>
           </div>
 
-          <div class="nav-section" *ngIf="authService.isAuthorized(['operativo', 'superadmin'])">
+          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])">
             <label>Sistema</label>
             <a routerLink="/logs" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">shield_person</span> Auditoría

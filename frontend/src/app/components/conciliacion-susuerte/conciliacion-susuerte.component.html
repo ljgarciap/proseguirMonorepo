@@ -1,0 +1,77 @@
+<div class="view-container">
+  <div class="search-header">
+    <div class="page-info">
+      <h2 class="view-title">
+        <span class="material-symbols-outlined">fact_check</span>
+        Conciliación Susuerte
+      </h2>
+      <p class="view-subtitle">Carga los documentos para realizar el cruce contable entre el extracto bancario y la lista de abonos.</p>
+    </div>
+
+    <div class="actions-group">
+      <div class="upload-controls">
+        <div class="file-input-group">
+          <input type="file" id="xlsxInput" (change)="onFileSelected($event, 'xlsx')" accept=".xlsx" hidden />
+          <button (click)="openFileInput('xlsxInput')" class="btn-action" [class.has-file]="xlsxFile">
+            <span class="material-symbols-outlined">{{ xlsxFile ? 'check_circle' : 'upload_file' }}</span>
+            <span class="text">{{ xlsxFile ? xlsxFile.name : 'Lista Abonos (XLSX)' }}</span>
+          </button>
+        </div>
+
+        <div class="file-input-group">
+          <input type="file" id="pdfInput" (change)="onFileSelected($event, 'pdf')" accept=".pdf" hidden />
+          <button (click)="openFileInput('pdfInput')" class="btn-action" [class.has-file]="pdfFile">
+            <span class="material-symbols-outlined">{{ pdfFile ? 'check_circle' : 'picture_as_pdf' }}</span>
+            <span class="text">{{ pdfFile ? pdfFile.name : 'Extracto Bancario (PDF)' }}</span>
+          </button>
+        </div>
+
+        <button (click)="onConciliate()" class="btn-action blue" [disabled]="!xlsxFile || !pdfFile || isProcessing">
+          <div class="loader-inline" *ngIf="isProcessing"></div>
+          <span class="text">{{ isProcessing ? 'Procesando...' : 'Conciliar' }}</span>
+        </button>
+
+        <button (click)="onClear()" class="btn-action red" [disabled]="results.length === 0 && !xlsxFile && !pdfFile">
+          <span class="material-symbols-outlined">delete</span>
+          <span class="text">Limpiar</span>
+        </button>
+
+        <a [href]="downloadUrl" target="_blank" class="btn-action green" *ngIf="downloadUrl">
+          <span class="material-symbols-outlined">download</span>
+          <span class="text">Descargar</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="content-card mt-4" *ngIf="results.length > 0">
+    <div class="table-container">
+      <table class="modern-table">
+        <thead>
+          <tr>
+            <th>Estado</th>
+            <th>Fecha (Susuerte)</th>
+            <th>Fecha (Banco)</th>
+            <th>Monto</th>
+            <th>Descripción (Susuerte)</th>
+            <th>Descripción (Banco)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of results">
+            <td>
+              <span class="status-badge" [class]="getStatusClass(item.Status)">
+                {{ item.Status }}
+              </span>
+            </td>
+            <td>{{ item['Date (Susuerte)'] }}</td>
+            <td>{{ item['Date (Bank)'] }}</td>
+            <td class="total-cell">{{ item.Amount | currency }}</td>
+            <td>{{ item['Description (Susuerte)'] }}</td>
+            <td>{{ item['Description (Bank)'] }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

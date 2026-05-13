@@ -14,10 +14,17 @@ import { roleGuard } from './guards/role.guard';
 import { ProfileSettingsComponent } from './components/profile-settings/profile-settings.component';
 import { UserManagementComponent } from './components/user-management/user-management.component';
 import { MandatosComponent } from './components/mandatos/mandatos.component';
+import { ConciliacionSusuerteComponent } from './components/conciliacion-susuerte/conciliacion-susuerte.component';
 
 export const routes: Routes = [
     { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     { path: 'login', component: LoginComponent },
+    { 
+        path: 'conciliacion-susuerte', 
+        component: ConciliacionSusuerteComponent, 
+        canActivate: [roleGuard], 
+        data: { roles: ['superadmin', 'operativo', 'gerente', 'contable'] } 
+    },
     { 
         path: 'mandatos', 
         component: MandatosComponent, 
