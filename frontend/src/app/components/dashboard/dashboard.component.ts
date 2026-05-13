@@ -116,7 +116,7 @@ Chart.register(...registerables);
                 <div class="footer">Cartera activa gestionada</div>
               </div>
             </div>
-            <div class="kpi-card pro-card orange" (click)="navigateToSheets('cartera', 'vencido')">
+            <div class="kpi-card pro-card orange" (click)="navigateToSheets('cartera', '', 'vencido')">
               <div class="kpi-icon"><span class="material-symbols-outlined">running_with_errors</span></div>
               <div class="kpi-body">
                 <label>Valor Vencido</label>
@@ -124,7 +124,7 @@ Chart.register(...registerables);
                 <div class="footer">Pendiente por recaudar</div>
               </div>
             </div>
-            <div class="kpi-card pro-card red" (click)="navigateToSheets('cartera', 'mora')">
+            <div class="kpi-card pro-card red" (click)="navigateToSheets('cartera', '', 'mora')">
               <div class="kpi-icon"><span class="material-symbols-outlined">error</span></div>
               <div class="kpi-body">
                 <label>Valor Mora</label>
@@ -1283,11 +1283,12 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  navigateToSheets(category: string, filterText: string = '') {
+  navigateToSheets(category: string, filterText: string = '', filter: string = '') {
     this.router.navigate(['/sheets'], {
       queryParams: {
         categoria: category,
-        q: filterText
+        q: filterText,
+        filter: filter
       }
     });
   }

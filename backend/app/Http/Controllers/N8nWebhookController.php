@@ -337,6 +337,13 @@ class N8nWebhookController extends Controller
             'Total_Pagado' => 'total_pagado',
             'Total_Recaudo' => 'total_recaudo',
             'Valor_Recaudado' => 'valor_recaudado',
+            'Descuento_Mora_Causado_No_Pagado' => 'descuento_mora_causado_np',
+            'Descuento_Mora_Causado_NoPagado' => 'descuento_mora_causado_np',
+            'Rec_Descuento_Mora_Causado_Np' => 'rec_descuento_mora_np',
+            'Rec_Descuento_Mora_Causado_NP' => 'rec_descuento_mora_np',
+            'Rec_Descuento_Mora_Causado_NP_Valor' => 'rec_descuento_mora_np',
+            'Saldo_Despues_Pago' => 'saldo_despues_pago',
+            'Saldo_Despues_Del_Pago' => 'saldo_despues_pago',
         ];
 
         return array_map(function ($row) use ($explicitMap) {

@@ -8,6 +8,8 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
     networks:
       - factoring_network
+    ports:
+      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
 

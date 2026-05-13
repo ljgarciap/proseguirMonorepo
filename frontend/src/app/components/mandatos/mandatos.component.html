@@ -33,20 +33,9 @@
       </div>
 
       <div class="input-row">
-        <div class="input-group">
-          <label>Domicilio (Ciudad)</label>
-          <input type="text" [(ngModel)]="mandato.mandante_domicilio" name="m_dom" required>
-        </div>
-        <div class="input-group">
-          <label>Dirección Mandante</label>
-          <input type="text" [(ngModel)]="mandato.mandante_direccion" name="m_dir" required>
-        </div>
-      </div>
-
-      <div class="input-row">
         <div class="input-group full">
-          <label>Teléfono Mandante</label>
-          <input type="text" [(ngModel)]="mandato.mandante_telefono" name="m_tel" required>
+          <label>Domicilio</label>
+          <input type="text" [(ngModel)]="mandato.mandante_domicilio" name="m_dom" required>
         </div>
       </div>
 
@@ -73,6 +62,17 @@
       </div>
 
       <div class="input-row">
+        <div class="input-group">
+          <label>Dirección Mandante</label>
+          <input type="text" [(ngModel)]="mandato.mandante_direccion" name="m_dir" required>
+        </div>
+        <div class="input-group">
+          <label>Teléfono Mandante</label>
+          <input type="text" [(ngModel)]="mandato.mandante_telefono" name="m_tel" required>
+        </div>
+      </div>
+
+      <div class="input-row">
         <div class="input-group full">
           <label>E-mail Representante</label>
           <input type="email" [(ngModel)]="mandato.mandante_rep_legal_email" name="m_rep_e" required placeholder="correo@ejemplo.com">
@@ -87,21 +87,25 @@
         <h2>Información del Factor</h2>
       </div>
 
+
       <div class="input-row">
         <div class="input-group full">
           <label>Nombre / Razón Social Factor</label>
-          <input type="text" [(ngModel)]="mandato.factor_razon_social" name="f_rs" required>
+          <input type="text" [(ngModel)]="mandato.factor_razon_social" name="f_rs" required placeholder="Ej: Factores y Servicios S.A.S.">
         </div>
       </div>
 
       <div class="input-row">
         <div class="input-group">
           <label>Tipo Documento</label>
-          <input type="text" [(ngModel)]="mandato.factor_tipo_documento" name="f_td" readonly class="readonly">
+          <select [(ngModel)]="mandato.factor_tipo_documento" name="f_td" required>
+            <option value="" disabled selected>Seleccione...</option>
+            <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
+          </select>
         </div>
         <div class="input-group">
           <label>Número Documento</label>
-          <input type="text" [(ngModel)]="mandato.factor_numero_documento" name="f_nd" readonly class="readonly">
+          <input type="text" [(ngModel)]="mandato.factor_numero_documento" name="f_nd" required placeholder="901.234.567-8">
         </div>
       </div>
 

@@ -33,6 +33,7 @@ class HistoryController extends Controller
     public function index(Request $request, $categoria)
     {
         $search = $request->query('search');
+        $filter = $request->query('filter');
         $sortBy = $request->query('sortBy', 'id');
         $sortDir = $request->query('sortDir', 'desc');
         $perPage = $request->query('perPage', 15);
@@ -62,6 +63,15 @@ class HistoryController extends Controller
         }
 
         $query = $modelClass::query();
+
+        // Specific Filters (from Dashboard clicks)
+        if ($categoria === 'cartera') {
+            if ($filter === 'mora') {
+                $query->where('valor_mora', '>', 0);
+            } elseif ($filter === 'vencido') {
+                $query->where('dias_vencido', '>', 0);
+            }
+        }
 
         if (!empty($search)) {
             $table = (new $modelClass)->getTable();

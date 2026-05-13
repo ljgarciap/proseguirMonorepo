@@ -192,6 +192,15 @@ import Swal from 'sweetalert2';
                     
                     <span *ngSwitchCase="'total_recaudado_comprobante'">{{ formatMoney(row[col]) }}</span>
                     
+                    <!-- Pagos Compraventa -->
+                    <span *ngSwitchCase="'valor_factura'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'valor_descuento'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'capital_pagado'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'total_pagado'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'descuento_mora_causado_np'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'rec_descuento_mora_np'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'saldo_despues_pago'">{{ formatMoney(row[col]) }}</span>
+
                     <!-- Settlement Fields -->
                     <span *ngSwitchCase="'intereses_diarios'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'intereses_pagados'">{{ formatMoney(row[col]) }}</span>
@@ -206,14 +215,6 @@ import Swal from 'sweetalert2';
                     
                     <!-- Compraventa -->
                     <span *ngSwitchCase="'valor'">{{ formatMoney(row[col]) }}</span>
-
-                    <!-- Pagos Compraventa -->
-                    <span *ngSwitchCase="'valor_factura'">{{ formatMoney(row[col]) }}</span>
-                    <span *ngSwitchCase="'valor_recaudado'">{{ formatMoney(row[col]) }}</span>
-                    <span *ngSwitchCase="'capital_pagado'">{{ formatMoney(row[col]) }}</span>
-                    <span *ngSwitchCase="'total_pagado'">{{ formatMoney(row[col]) }}</span>
-                    <span *ngSwitchCase="'total_recaudo'">{{ formatMoney(row[col]) }}</span>
-                    <span *ngSwitchCase="'valor_descuento'">{{ formatMoney(row[col]) }}</span>
                     
                     <span *ngSwitchDefault>{{ row[col] !== null ? row[col] : '-' }}</span>
                   </ng-container>
@@ -666,6 +667,7 @@ export class SheetsComponent implements OnInit {
 
   // Parámetros de tabla
   searchTerm: string = '';
+  currentFilter: string = '';
   sortBy: string = 'id';
   sortDir: 'asc' | 'desc' = 'desc';
   currentPage: number = 1;
@@ -687,9 +689,9 @@ export class SheetsComponent implements OnInit {
       if (params['categoria']) {
         this.categoria = params['categoria'];
       }
-      if (params['q']) {
-        this.searchTerm = params['q'];
-      }
+      this.searchTerm = params['q'] || '';
+      this.currentFilter = params['filter'] || '';
+      
       this.loadHistory();
     });
   }
@@ -708,6 +710,7 @@ export class SheetsComponent implements OnInit {
     this.isLoading = true;
     const url = new URL(`${this.baseUrl}/history/${this.categoria}`, window.location.origin);
     if (this.searchTerm) url.searchParams.append('search', this.searchTerm);
+    if (this.currentFilter) url.searchParams.append('filter', this.currentFilter);
     if (this.sortBy) url.searchParams.append('sortBy', this.sortBy);
     if (this.sortDir) url.searchParams.append('sortDir', this.sortDir);
     url.searchParams.append('page', this.currentPage.toString());
@@ -857,6 +860,7 @@ export class SheetsComponent implements OnInit {
 
   onCategoryChange() {
     this.searchTerm = '';
+    this.currentFilter = '';
     this.sortBy = 'id';
     this.sortDir = 'desc';
     this.currentPage = 1;
@@ -900,21 +904,22 @@ export class SheetsComponent implements OnInit {
       const others = allKeys.filter(k => !prioritized.includes(k) && !excluded.includes(k));
 
       const finalCols = [...filtered, ...others];
-      if (allKeys.includes('observaciones') || true) { // Always show it if editable
+      if (allKeys.includes('observaciones')) {
         finalCols.push('observaciones');
       }
       return finalCols;
     } else if (this.categoria === 'pagos_compraventa') {
       const prioritized = [
-        'id', 'pago_ref', 'pagador', 'nit_pagador', 'cliente', 'nit_cliente',
-        'fecha_recaudo', 'valor_recaudado', 'capital_pagado', 'total_pagado', 'valor_descuento',
-        'op', 'id_titulo', 'valor_factura', 'fec_inicial', 'fec_final'
+        'pago_ref', 'fecha_recaudo', 'estado', 'op', 'id_titulo', 'pagador', 'nit_pagador',
+        'cliente', 'nit_cliente', 'concepto', 'valor_factura', 'fec_inicial', 'fec_final',
+        'dias', 'factor', 'saldo_capital', 'valor_descuento', 'capital_pagado',
+        'descuento_mora_causado_np', 'rec_descuento_mora_np', 'total_pagado', 'saldo_despues_pago'
       ];
       const filtered = prioritized.filter(k => allKeys.includes(k));
-      const excluded = ['updated_at', 'created_at', 'observaciones', 'client_upload_id'];
+      const excluded = ['updated_at', 'created_at', 'observaciones', 'client_upload_id', 'id', 'total_recaudo', 'valor_recaudado'];
       const others = allKeys.filter(k => !prioritized.includes(k) && !excluded.includes(k));
       const finalCols = [...filtered, ...others];
-      finalCols.push('observaciones');
+      if (allKeys.includes('observaciones')) finalCols.push('observaciones');
       return finalCols;
     } else {
       // Ensure 'observaciones' appears at the end
@@ -933,6 +938,12 @@ export class SheetsComponent implements OnInit {
     if (key === 'devolucion_descuento') return 'DEVOLUCIÓN DESC.';
     if (key === 'margen_reserva') return 'MARGEN RESERVA';
     if (key === 'estado_liquidacion') return 'ESTADO';
+    if (key === 'descuento_mora_causado_np') return 'DESCUENTO / MORA CAUSADO NO PAGADO';
+    if (key === 'rec_descuento_mora_np') return 'REC. DESCUENTO/ MORA CAUSADO NP';
+    if (key === 'total_pagado') return 'TOTAL RECAUDO';
+    if (key === 'pago_ref') return 'PAGO REF';
+    if (key === 'descuento_mora_causado_np') return 'DESCUENTO / MORA CAUSADO NO PAGADO';
+    if (key === 'rec_descuento_mora_np') return 'REC. DESCUENTO/ MORA CAUSADO NP';
     return key.replace(/_/g, ' ').toUpperCase();
   }
 

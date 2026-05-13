@@ -917,7 +917,7 @@
             },
             {
               "name": "messages",
-              "value": "={{ \n[\n  {\n    \"role\": \"user\",\n    \"content\": \"Analiza este documento de 'NOTIFICACIÓN DE GARANTÍA MOBILIARIA ENDOSO Y CESIÓN DE DERECHOS ECONÓMICOS'. Extrae la información técnica y los títulos de factura.\\n\\nJSON REQUERIDO:\\n{\\n  \\\"vendedor\\\": { \\\"nombre\\\": \\\"\\\", \\\"nit\\\": \\\"\\\" },\\n  \\\"comprador\\\": { \\\"nombre\\\": \\\"\\\", \\\"nit\\\": \\\"\\\" },\\n  \\\"factor\\\": { \\\"nombre\\\": \\\"\\\", \\\"nit\\\": \\\"\\\" },\\n  \\\"detalle_facturas\\\": [\\n    {\\n      \\\"nro_factura\\\": \\\"\\\",\\n      \\\"valor\\\": \\\"\\\",\\n      \\\"fecha_vencimiento\\\": \\\"\\\"\\n    }\\n  ],\\n  \\\"pago\\\": {\\n    \\\"banco\\\": \\\"\\\",\\n    \\\"tipo_cuenta\\\": \\\"\\\",\\n    \\\"cuenta_nro\\\": \\\"\\\"\\n  }\\n}\\n\\nTexto a procesar: \" + $json.extractedText\n  }\n] \n}}"
+              "value": "={{ \n[\n  {\n    \"role\": \"user\",\n    \"content\": \"Analiza este documento de 'NOTIFICACIÓN DE GARANTÍA MOBILIARIA ENDOSO Y CESIÓN DE DERECHOS ECONÓMICOS'. Extrae la información técnica y los títulos de factura.\\n\\nJSON REQUERIDO:\\n{\\n  \\\"vendedor\\\": { \\\"nombre\\\": \\\"\\\", \\\"nit\\\": \\\"\\\" },\\n  \\\"comprador\\\": { \\\"nombre\\\": \\\"\\\", \\\"nit\\\": \\\"\\\" },\\n  \\\"factor\\\": { \\\"nombre\\\": \\\"\\\", \\\"nit\\\": \\\"\\\" },\\n  \\\"detalle_facturas\\\": [\\n    {\\n      \\\"nro_factura\\\": \\\"\\\",\\n      \\\"valor\\\": \\\"\\\",\\n      \\\"fecha_vencimiento\\\": \\\"\\\"\\n    }\\n  ],\\n  \\\"pago\\\": {\\n    \\\"banco\\\": \\\"\\\",\\n    \\\"tipo_cuenta\\\": \\\"\\\",\\n    \\\"cuenta_nro\\\": \\\"\\\"\\n  }\\n}\\n\\nTexto a procesar: \" + $json.markdown\n  }\n] \n}}"
             },
             {
               "name": "response_format",
@@ -1014,6 +1014,20 @@
     },
     {
       "parameters": {
+        "fieldToSplitOut": "pages",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        3008,
+        3296
+      ],
+      "id": "c3d4e5f6-a7b8-9012-bcde-f12345678902",
+      "name": "Split Out Pagos Compraventa"
+    },
+    {
+      "parameters": {
         "batchSize": 5,
         "options": {
           "reset": false
@@ -1026,25 +1040,7 @@
         3296
       ],
       "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-      "name": "Loop Over Items Pagos Compraventa",
-      "connections": {
-        "main": [
-          [
-            {
-              "node": "Final Response",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "HTTP Request Pagos Compraventa",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      }
+      "name": "Loop Over Items Pagos Compraventa"
     },
     {
       "parameters": {
@@ -1061,7 +1057,7 @@
             },
             {
               "name": "messages",
-              "value": "={{ \n[\n  {\n    \"role\": \"user\",\n    \"content\": \"Analiza este documento de 'PAGOS COMPRA VENTA PAGADOR' de Proseguir. Extrae los campos clave del recaudo.\\n\\nJSON REQUERIDO:\\n{\\n  \\\"pago_ref\\\": \\\"\\\",\\n  \\\"pagador\\\": { \\\"nombre\\\": \\\"\\\", \\\"nit\\\": \\\"\\\" },\\n  \\\"cliente\\\": { \\\"nombre\\\": \\\"\\\", \\\"nit\\\": \\\"\\\" },\\n  \\\"concepto\\\": \\\"\\\",\\n  \\\"estado\\\": \\\"\\\",\\n  \\\"fecha_recaudo\\\": \\\"\\\",\\n  \\\"detalle_operaciones\\\": [\\n    {\\n      \\\"op\\\": \\\"\\\",\\n      \\\"id_titulo\\\": \\\"\\\",\\n      \\\"valor_factura\\\": \\\"\\\",\\n      \\\"fec_inicial\\\": \\\"\\\",\\n      \\\"fec_final\\\": \\\"\\\",\\n      \\\"dias\\\": \\\"\\\",\\n      \\\"factor\\\": \\\"\\\",\\n      \\\"saldo_capital\\\": \\\"\\\",\\n      \\\"valor_descuento\\\": \\\"\\\",\\n      \\\"capital_pagado\\\": \\\"\\\",\\n      \\\"total_pagado\\\": \\\"\\\"\\n    }\\n  ],\\n  \\\"totales\\\": {\\n    \\\"subtotal_recaudo\\\": \\\"\\\",\\n    \\\"total_recaudo\\\": \\\"\\\",\\n    \\\"valor_recaudado\\\": \\\"\\\",\\n    \\\"capital_pagado\\\": \\\"\\\",\\n    \\\"valor_descuento\\\": \\\"\\\"\\n  }\\n}\\n\\nTexto a procesar: \" + $json.extractedText\n  }\n] \n}}"
+              "value": "={{ [ { \"role\": \"user\", \"content\": \"Analiza este documento de 'PAGOS COMPRA VENTA PAGADOR' de Proseguir. Extrae TODOS los registros de la tabla 'Liquidación' y los campos de la cabecera.\\n\\nINSTRUCCIONES CRÍTICAS DE CABECERA:\\n1. PAGO REF: El valor exacto a la derecha de 'PAGO Nº.' (ej: REF-1-95). NO lo confundas con el NIT.\\n2. FECHA RECAUDO: Busca 'Fecha Recaudo:' en el centro del encabezado (ej: 09/10/2025). IGNORA 'Fecha Impresión' y 'Hora Impresión' que están arriba a la derecha.\\n3. NIT PAGADOR: El número con guion (ej: 900715610-7) que aparece a la derecha de 'Pagador: BGREEN S A S' bajo la columna 'C.C. / NIT:'.\\n4. NIT CLIENTE: El número con guion (ej: 901228343-1) que aparece a la derecha de 'Cliente: LIQUITECH SAS' bajo la columna 'C.C. / NIT:'.\\n5. ESTADO: El valor a la derecha de 'ESTADO:' (ej: VALIDADA).\\n\\nINSTRUCCIONES DE TABLA 'Liquidación':\\nExtrae CADA fila de la tabla. No te detengas en la primera. Mapea:\\n- op: Columna 'Op#'\\n- id_titulo: Columna 'IdTitulo'\\n- valor_factura: Columna 'Valor Factura'\\n- fec_inicial: Columna 'Fec Inicial'\\n- fec_final: Columna 'Fec Final'\\n- dias: Columna 'Dias'\\n- factor: Columna 'Factor'\\n- saldo_capital: Columna 'Saldo Capital'\\n- valor_descuento: Columna 'Valor Descuento'\\n- capital_pagado: Columna 'Capital Pagado'\\n- descuento_mora_causado_np: Columna 'Descuento /Mora Causado No Pagado'\\n- rec_descuento_mora_np: Columna 'Rec. Descuento/ Mora Causado NP'\\n- total_pagado: Columna 'Total Pagado' (Importante: este es el valor individual por fila)\\n- saldo_despues_pago: Columna 'Saldo Después del Pago'\\n\\nJSON REQUERIDO:\\n{\\n  \\\"pago_ref\\\": \\\"\\\",\\n  \\\"pagador\\\": { \\\"nombre\\\": \\\"\\\", \\\"nit\\\": \\\"\\\" },\\n  \\\"cliente\\\": { \\\"nombre\\\": \\\"\\\", \\\"nit\\\": \\\"\\\" },\\n  \\\"concepto\\\": \\\"\\\",\\n  \\\"estado\\\": \\\"\\\",\\n  \\\"fecha_recaudo\\\": \\\"\\\",\\n  \\\"detalle_operaciones\\\": [\\n    {\\n      \\\"op\\\": \\\"\\\", \\\"id_titulo\\\": \\\"\\\", \\\"valor_factura\\\": \\\"\\\", \\\"fec_inicial\\\": \\\"\\\", \\\"fec_final\\\": \\\"\\\", \\\"dias\\\": \\\"\\\", \\\"factor\\\": \\\"\\\", \\\"saldo_capital\\\": \\\"\\\", \\\"valor_descuento\\\": \\\"\\\", \\\"capital_pagado\\\": \\\"\\\", \\\"descuento_mora_causado_np\\\": \\\"\\\", \\\"rec_descuento_mora_np\\\": \\\"\\\", \\\"total_pagado\\\": \\\"\\\", \\\"saldo_despues_pago\\\": \\\"\\\"\\n    }\\n  ]\\n}\\n\\nTexto a procesar: \" + $json.markdown } ] }}"
             },
             {
               "name": "response_format",
@@ -1099,7 +1095,7 @@
     },
     {
       "parameters": {
-        "jsCode": "let allRows = [];\n\nconst filename = $('Webhook').item.json.body.original_name;\n\nconst limpiarNumero = (valor) => {\n  if (typeof valor === 'number') return valor;\n  if (!valor || valor === \"-\" || valor === \"\" || valor === undefined) return 0;\n  let limpio = valor.toString().replace(/,/g, '').replace(/\\$/g, '').trim();\n  return parseFloat(limpio) || 0;\n};\n\nfor (const item of $input.all()) {\n  try {\n    const rawContent = item.json.choices[0].message.content;\n    const data = JSON.parse(rawContent);\n\n    const pagoRef = data.pago_ref || '';\n    const pagador = data.pagador?.nombre || '';\n    const pagadorNit = data.pagador?.nit || '';\n    const cliente = data.cliente?.nombre || '';\n    const clienteNit = data.cliente?.nit || '';\n    const concepto = data.concepto || '';\n    const estado = data.estado || '';\n    const fechaRecaudo = data.fecha_recaudo || '';\n    const totales = data.totales || {};\n\n    if (data.detalle_operaciones && Array.isArray(data.detalle_operaciones)) {\n      data.detalle_operaciones.forEach(op => {\n        allRows.push({\n          json: {\n            filename: filename,\n            Pago_Ref: pagoRef,\n            Pagador: pagador,\n            NIT_Pagador: pagadorNit,\n            Cliente: cliente,\n            NIT_Cliente: clienteNit,\n            Concepto: concepto,\n            Estado: estado,\n            Fecha_Recaudo: fechaRecaudo,\n            Op: op.op || '',\n            Id_Titulo: op.id_titulo || '',\n            Valor_Factura: limpiarNumero(op.valor_factura),\n            Fec_Inicial: op.fec_inicial || '',\n            Fec_Final: op.fec_final || '',\n            Dias: op.dias || '',\n            Factor: op.factor || '',\n            Saldo_Capital: limpiarNumero(op.saldo_capital),\n            Valor_Descuento: limpiarNumero(op.valor_descuento),\n            Capital_Pagado: limpiarNumero(op.capital_pagado),\n            Total_Pagado: limpiarNumero(op.total_pagado),\n            Total_Recaudo: limpiarNumero(totales.total_recaudo),\n            Valor_Recaudado: limpiarNumero(totales.valor_recaudado)\n          }\n        });\n      });\n    }\n  } catch (e) {\n    console.error(\"Error en Code Extract Pagos Compraventa: \", e);\n  }\n}\n\nreturn allRows;"
+        "jsCode": "let allRows = [];\n\nconst filename = $('Webhook').item.json.body.original_name;\n\nconst limpiarNumero = (valor) => {\n  if (typeof valor === 'number') return valor;\n  if (!valor || valor === \"-\" || valor === \"\" || valor === undefined) return 0;\n  let limpio = valor.toString().replace(/,/g, '').replace(/\\$/g, '').trim();\n  return parseFloat(limpio) || 0;\n};\n\nfor (const item of $input.all()) {\n  try {\n    const rawContent = item.json.choices[0].message.content;\n    const data = JSON.parse(rawContent);\n\n    const pagoRef = data.pago_ref || '';\n    const pagador = data.pagador?.nombre || '';\n    const pagadorNit = data.pagador?.nit || '';\n    const cliente = data.cliente?.nombre || '';\n    const clienteNit = data.cliente?.nit || '';\n    const concepto = data.concepto || '';\n    const estado = data.estado || '';\n    const fechaRecaudo = data.fecha_recaudo || '';\n    const totales = data.totales || {};\n\n    if (data.detalle_operaciones && Array.isArray(data.detalle_operaciones)) {\n      data.detalle_operaciones.forEach(op => {\n        allRows.push({\n          json: {\n            filename: filename,\n            Pago_Ref: pagoRef,\n            Pagador: pagador,\n            NIT_Pagador: pagadorNit,\n            Cliente: cliente,\n            NIT_Cliente: clienteNit,\n            Concepto: concepto,\n            Estado: estado,\n            Fecha_Recaudo: fechaRecaudo,\n            Op: op.op || '',\n            Id_Titulo: op.id_titulo || '',\n            Valor_Factura: limpiarNumero(op.valor_factura),\n            Fec_Inicial: op.fec_inicial || '',\n            Fec_Final: op.fec_final || '',\n            Dias: op.dias || '',\n            Factor: op.factor || '',\n            Saldo_Capital: limpiarNumero(op.saldo_capital),\n            Valor_Descuento: limpiarNumero(op.valor_descuento),\n            Capital_Pagado: limpiarNumero(op.capital_pagado),\n            Descuento_Mora_Causado_No_Pagado: limpiarNumero(op.descuento_mora_causado_np),\n            Rec_Descuento_Mora_Causado_Np: limpiarNumero(op.rec_descuento_mora_np),\n            Total_Pagado: limpiarNumero(op.total_pagado),\n            Saldo_Despues_Pago: limpiarNumero(op.saldo_despues_pago),\n            Total_Recaudo: limpiarNumero(totales.total_recaudo),\n            Valor_Recaudado: limpiarNumero(totales.valor_recaudado)\n          }\n        });\n      });\n    }\n  } catch (e) {\n    console.error(\"Error en Code Extract Pagos Compraventa: \", e);\n  }\n}\n\nreturn allRows;"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1589,6 +1585,17 @@
       ]
     },
     "Extract text Pagos Compraventa": {
+      "main": [
+        [
+          {
+            "node": "Split Out Pagos Compraventa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Pagos Compraventa": {
       "main": [
         [
           {
