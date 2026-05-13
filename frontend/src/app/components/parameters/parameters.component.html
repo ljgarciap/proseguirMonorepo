@@ -1,0 +1,72 @@
+<div class="parameters-container animate__animated animate__fadeIn">
+  <header class="view-header">
+    <div class="title-area">
+      <h1>Configuración de Parámetros</h1>
+      <p>Administre las tablas maestras y diccionarios del sistema.</p>
+    </div>
+  </header>
+
+  <div class="layout-grid">
+    <!-- Sidebar Tabs -->
+    <aside class="sidebar-tabs card">
+      <button 
+        *ngFor="let table of tables" 
+        class="tab-btn" 
+        [class.active]="activeTable.id === table.id"
+        (click)="selectTable(table)">
+        {{ table.label }}
+        <span class="material-symbols-outlined">chevron_right</span>
+      </button>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <div class="card p-0 overflow-hidden">
+        <div class="table-header p-3">
+          <h2>{{ activeTable.label }}</h2>
+          <button class="btn-pro primary sm" (click)="openModal()">
+            <span class="material-symbols-outlined">add</span> Nuevo Registro
+          </button>
+        </div>
+
+        <div class="table-wrapper">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th *ngFor="let f of activeTable.fields">{{ f.label }}</th>
+                <th class="text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let record of records">
+                <td *ngFor="let f of activeTable.fields">
+                  <!-- Color Badge -->
+                  <div *ngIf="f.type === 'color'" class="color-badge" [style.background]="record[f.name]">
+                    {{ record[f.name] }}
+                  </div>
+                  <!-- Normal Text -->
+                  <span *ngIf="f.type !== 'color'">{{ record[f.name] }}</span>
+                </td>
+                <td class="text-right">
+                  <div class="actions">
+                    <button class="btn-pro secondary sm icon-only" (click)="openModal(record)">
+                      <span class="material-symbols-outlined">edit</span>
+                    </button>
+                    <button class="btn-pro danger sm icon-only" (click)="deleteRecord(record)">
+                      <span class="material-symbols-outlined">delete</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="records.length === 0 && !loading">
+                <td [attr.colspan]="activeTable.fields.length + 1" class="empty-state">
+                  No hay registros en esta tabla.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>

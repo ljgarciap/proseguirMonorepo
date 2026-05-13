@@ -132,4 +132,21 @@ use App\Http\Controllers\MandatoController;
 Route::prefix('mandatos')->middleware('auth:api')->group(function () {
     Route::post('/', [MandatoController::class, 'store'])->middleware('checkrole:cliente');
     Route::get('/', [MandatoController::class, 'index'])->middleware('checkrole:cliente,gerente,operativo,superadmin');
+    Route::patch('/{id}/status', [MandatoController::class, 'updateStatus'])->middleware('checkrole:operativo,superadmin');
+});
+
+// Parámetros Genéricos (Superadmin)
+Route::prefix('parameters')->middleware(['auth:api'])->group(function () {
+    Route::get('/{table}', [\App\Http\Controllers\ParameterController::class, 'index']);
+    Route::post('/{table}', [\App\Http\Controllers\ParameterController::class, 'store'])->middleware('checkrole:superadmin');
+    Route::put('/{table}/{id}', [\App\Http\Controllers\ParameterController::class, 'update'])->middleware('checkrole:superadmin');
+    Route::delete('/{table}/{id}', [\App\Http\Controllers\ParameterController::class, 'destroy'])->middleware('checkrole:superadmin');
+});
+
+// Documentos Internos (Staff Flow)
+Route::prefix('internal-docs')->middleware(['auth:api', 'checkrole:operativo,contable,gerente,superadmin'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\InternalDocumentController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\InternalDocumentController::class, 'store']);
+    Route::patch('/{id}/status', [\App\Http\Controllers\InternalDocumentController::class, 'updateStatus']);
+    Route::delete('/{id}', [\App\Http\Controllers\InternalDocumentController::class, 'destroy']);
 });

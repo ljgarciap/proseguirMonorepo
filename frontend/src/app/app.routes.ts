@@ -22,25 +22,25 @@ export const routes: Routes = [
         path: 'mandatos', 
         component: MandatosComponent, 
         canActivate: [roleGuard], 
-        data: { roles: ['cliente', 'superadmin'] } 
+        data: { roles: ['cliente', 'superadmin', 'operativo'] } 
     },
     { 
         path: 'profile', 
         component: ProfileSettingsComponent, 
         canActivate: [roleGuard], 
-        data: { roles: ['gerente', 'operativo', 'cliente'] } 
+        data: { roles: ['gerente', 'operativo', 'cliente', 'contable', 'superadmin'] } 
     },
     { 
         path: 'dashboard', 
         component: DashboardComponent, 
         canActivate: [roleGuard], 
-        data: { roles: ['gerente', 'operativo'] } 
+        data: { roles: ['gerente', 'operativo', 'contable', 'superadmin'] } 
     },
     { 
         path: 'logs', 
         component: LogsComponent, 
         canActivate: [roleGuard], 
-        data: { roles: ['gerente', 'operativo'] } 
+        data: { roles: ['gerente', 'operativo', 'contable', 'superadmin'] } 
     },
     { 
         path: 'sheets', 
@@ -83,6 +83,18 @@ export const routes: Routes = [
         component: UserManagementComponent, 
         canActivate: [roleGuard], 
         data: { roles: ['superadmin'] } 
+    },
+    { 
+        path: 'parameters', 
+        loadComponent: () => import('./components/parameters/parameters.component').then(m => m.ParametersComponent), 
+        canActivate: [roleGuard], 
+        data: { roles: ['superadmin'] } 
+    },
+    { 
+        path: 'internal-docs', 
+        loadComponent: () => import('./components/internal-docs/internal-docs.component').then(m => m.InternalDocsComponent), 
+        canActivate: [roleGuard], 
+        data: { roles: ['operativo', 'contable', 'gerente', 'superadmin'] } 
     },
     { path: '**', redirectTo: '' }
 ];

@@ -17,6 +17,10 @@ import Swal from 'sweetalert2';
           <p>Gestión y carga de archivos para validación operativa.</p>
         </div>
         <div class="actions">
+          <div class="search-box-inline">
+            <span class="material-symbols-outlined">search</span>
+            <input type="text" [(ngModel)]="searchText" placeholder="Buscar por nombre de archivo..." (ngModelChange)="onSearch()">
+          </div>
           <button class="btn-pro primary" (click)="fileInput.click()" [disabled]="isUploading">
             <span class="material-symbols-outlined">{{ isUploading ? 'sync' : 'upload_file' }}</span>
             {{ isUploading ? 'Subiendo...' : 'Cargar Nuevo Archivo' }}
@@ -129,9 +133,15 @@ import Swal from 'sweetalert2';
     .overflow-hidden { overflow: hidden; }
     
     .view-header {
-      display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2.5rem;
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem;
       h1 { margin: 0 0 0.5rem 0; color: var(--primary); font-size: 1.8rem; }
       p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
     }
 
     .upload-feedback-card {
@@ -144,6 +154,14 @@ import Swal from 'sweetalert2';
         .details { display: flex; flex-direction: column; .filename { font-weight: 700; color: var(--primary); } .filesize { font-size: 0.8rem; color: var(--secondary); } }
       }
       .action-btns { display: flex; gap: 1rem; }
+    }
+
+    .search-box-inline {
+      display: flex; align-items: center; background: white; border: 1px solid #E2E8F0;
+      border-radius: 10px; padding: 0.5rem 1rem; gap: 0.5rem; width: 300px;
+      box-shadow: var(--shadow-sm);
+      span { font-size: 20px; color: #94A3B8; }
+      input { border: none; outline: none; width: 100%; font-size: 0.9rem; &::placeholder { color: #CBD5E1; } }
     }
 
     .file-cell { display: flex; align-items: center; gap: 10px; .material-symbols-outlined { color: var(--secondary); font-size: 18px; } }
@@ -207,6 +225,7 @@ export class ClientUploadComponent implements OnInit {
   lastPage: number = 1;
   totalItems: number = 0;
   perPage: number = 10;
+  searchText: string = '';
 
   constructor(private http: HttpClient) {}
 
@@ -215,13 +234,21 @@ export class ClientUploadComponent implements OnInit {
   }
 
   loadUploads(): void {
-    const url = `${environment.apiUrl}/uploads?page=${this.currentPage}&perPage=${this.perPage}`;
+    let url = `${environment.apiUrl}/uploads?page=${this.currentPage}&perPage=${this.perPage}`;
+    if (this.searchText) {
+      url += `&search=${encodeURIComponent(this.searchText)}`;
+    }
     this.http.get<any>(url).subscribe(response => {
       this.uploads = response.data || [];
       this.currentPage = response.current_page || 1;
       this.lastPage = response.last_page || 1;
       this.totalItems = response.total || 0;
     });
+  }
+
+  onSearch(): void {
+    this.currentPage = 1;
+    this.loadUploads();
   }
 
   onPerPageChange(): void {

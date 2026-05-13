@@ -21,7 +21,7 @@ import { interval, Subscription } from 'rxjs';
         </div>
 
         <nav class="sidebar-nav">
-          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo'])">
+          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])">
             <label>Operaciones</label>
             <a routerLink="/dashboard" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">dashboard</span> Dashboard
@@ -32,16 +32,26 @@ import { interval, Subscription } from 'rxjs';
             <a *ngIf="authService.isAuthorized(['operativo'])" routerLink="/upload" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">upload_file</span> Subir Operación
             </a>
-            <a routerLink="/validation" routerLinkActive="active" class="nav-link">
+            <a *ngIf="authService.isAuthorized(['operativo', 'gerente'])" routerLink="/validation" routerLinkActive="active" class="nav-link">
               <div class="nav-link-content">
                 <span class="material-symbols-outlined">rule</span> 
                 <span>Validación</span>
-                <span class="nav-badge" *ngIf="getPendingBadge() > 0">{{ getPendingBadge() }}</span>
+                <span class="nav-badge" *ngIf="getValidationBadge() > 0">{{ getValidationBadge() }}</span>
               </div>
+            </a>
+            <a *ngIf="authService.isAuthorized(['operativo', 'contable', 'gerente', 'superadmin'])" routerLink="/internal-docs" routerLinkActive="active" class="nav-link">
+              <div class="nav-link-content">
+                <span class="material-symbols-outlined">mail</span> 
+                <span>Bandeja Interna</span>
+                <span class="nav-badge" *ngIf="getInternalDocsBadge() > 0">{{ getInternalDocsBadge() }}</span>
+              </div>
+            </a>
+            <a *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" routerLink="/mandatos" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">contract</span> Revisión Mandatos
             </a>
           </div>
 
-          <div class="nav-section" *ngIf="authService.isAuthorized(['operativo'])">
+          <div class="nav-section" *ngIf="authService.isAuthorized(['operativo', 'superadmin'])">
             <label>Administración</label>
             <a routerLink="/contable" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">account_balance_wallet</span> Contable
@@ -51,7 +61,7 @@ import { interval, Subscription } from 'rxjs';
             </a>
           </div>
 
-          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo'])">
+          <div class="nav-section" *ngIf="authService.isAuthorized(['operativo', 'superadmin'])">
             <label>Sistema</label>
             <a routerLink="/logs" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">shield_person</span> Auditoría
@@ -62,6 +72,9 @@ import { interval, Subscription } from 'rxjs';
             <label>Configuración</label>
             <a routerLink="/users" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">group</span> Gestión Usuarios
+            </a>
+            <a routerLink="/parameters" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">settings_applications</span> Parámetros
             </a>
           </div>
 
@@ -90,13 +103,28 @@ import { interval, Subscription } from 'rxjs';
 
       <!-- Main Content Area -->
       <div class="main-wrapper">
-        <!-- GLOBAL PENDING NOTIFICATION BAR (HIGH VISIBILITY) -->
-        <div class="pending-alert-bar" *ngIf="getPendingBadge() > 0 && !router.url.includes('/validation')">
+        <!-- GLOBAL PENDING NOTIFICATION BAR -->
+        <div class="pending-alert-bar" [ngClass]="{'critical': isExpiring()}" *ngIf="(getValidationBadge() > 0 || getInternalDocsBadge() > 0) && !router.url.includes('/validation') && !router.url.includes('/internal-docs')">
            <div class="alert-content">
-              <span class="material-symbols-outlined pulse">warning</span>
-              <p>Tienes <strong>{{ getPendingBadge() }}</strong> documentos pendientes de {{ authService.getActiveRole() === 'operativo' ? 'validación' : 'aprobación' }}.</p>
+              <span class="material-symbols-outlined pulse">{{ isExpiring() ? 'timer' : 'warning' }}</span>
+              
+              <!-- Message for Client Uploads -->
+              <p *ngIf="getValidationBadge() > 0">
+                Tienes <strong>{{ getValidationBadge() }}</strong> documentos de clientes pendientes.
+              </p>
+
+              <!-- Message for Internal Docs (Contable / Gerente) -->
+              <p *ngIf="getInternalDocsBadge() > 0">
+                Tienes <strong>{{ getInternalDocsBadge() }}</strong> documentos internos pendientes. 
+                <span *ngIf="isExpiring()" style="color: #fee2e2; margin-left: 4px;">(¡Atención: Algunos están a punto de vencer!)</span>
+              </p>
            </div>
-           <button class="btn-alert-action" routerLink="/validation">Gestionar Ahora</button>
+           
+           <button *ngIf="authService.isAuthorized(['operativo', 'gerente']) && (pendingCounts.operativo > 0 || pendingCounts.gerente > 0)" 
+                   class="btn-alert-action" routerLink="/validation">Validar Clientes</button>
+           
+           <button *ngIf="(authService.getActiveRole() === 'contable' && pendingCounts.contable > 0) || (authService.getActiveRole() === 'gerente' && pendingCounts.internal_gerente > 0)"
+                   class="btn-alert-action" routerLink="/internal-docs" style="margin-left: 10px;">Ver Bandeja Interna</button>
         </div>
 
         <header class="top-bar">
@@ -157,10 +185,20 @@ import { interval, Subscription } from 'rxjs';
       .nav-badge { position: absolute; right: 0; background: var(--danger); color: white; font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 6px; min-width: 18px; text-align: center; box-shadow: 0 2px 4px rgba(229, 62, 62, 0.3); }
 
       /* Pending Alert Bar */
-      .pending-alert-bar {
-        background: #FFF5F5; border-bottom: 1px solid #FED7D7; padding: 10px 2rem; display: flex; justify-content: space-between; align-items: center; animation: slideDown 0.4s ease-out;
-        .alert-content { display: flex; align-items: center; gap: 12px; p { margin: 0; font-size: 0.9rem; color: #C53030; } .material-symbols-outlined { color: #E53E3E; font-size: 20px; } }
-        .btn-alert-action { background: #E53E3E; color: white; border: none; padding: 6px 14px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.2s; &:hover { background: #C53030; transform: translateY(-1px); } }
+      .pending-alert-bar { 
+        background: #fffbeb; /* Soft amber background */
+        color: #b45309; /* Dark amber text for high contrast */
+        border-bottom: 1px solid #fde68a;
+        padding: 12px 2rem; 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+        transition: all 0.3s ease;
+        &.critical { background: #dc2626; color: white; border-bottom-color: #b91c1c; }
+        .alert-content { display: flex; align-items: center; gap: 12px; p { margin: 0; font-size: 0.95rem; font-weight: 500; } } 
+        .btn-alert-action { background: #f59e0b; border: none; color: white; padding: 6px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: background 0.2s; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2); &:hover { background: #d97706; } } 
+        &.critical .btn-alert-action { background: white; color: #dc2626; box-shadow: 0 2px 4px rgba(0,0,0,0.1); &:hover { background: #fef2f2; } }
       }
 
       @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
@@ -185,7 +223,9 @@ import { interval, Subscription } from 'rxjs';
 })
 export class AppComponent implements OnInit, OnDestroy {
   showUserMenu = false;
-  pendingCounts: { operativo: number, gerente: number, total: number } = { operativo: 0, gerente: 0, total: 0 };
+  pendingCounts: { operativo: number, gerente: number, contable: number, internal_gerente: number, expiring_contable?: number, expiring_gerente?: number, total: number } = { 
+    operativo: 0, gerente: 0, contable: 0, internal_gerente: 0, expiring_contable: 0, expiring_gerente: 0, total: 0 
+  };
   private pollingSub!: Subscription;
 
   constructor(public authService: AuthService, public router: Router, private http: HttpClient) {}
@@ -213,12 +253,28 @@ export class AppComponent implements OnInit, OnDestroy {
     });
   }
 
-  getPendingBadge(): number {
+  getValidationBadge(): number {
     const role = this.authService.getActiveRole();
     if (role === 'operativo') return this.pendingCounts.operativo;
     if (role === 'gerente') return this.pendingCounts.gerente;
-    if (role === 'superadmin') return this.pendingCounts.total;
+    if (role === 'superadmin') return this.pendingCounts.operativo + this.pendingCounts.gerente;
     return 0;
+  }
+
+  getInternalDocsBadge(): number {
+    const role = this.authService.getActiveRole();
+    if (role === 'contable') return this.pendingCounts.contable;
+    if (role === 'gerente') return this.pendingCounts.internal_gerente;
+    if (role === 'superadmin') return this.pendingCounts.contable + this.pendingCounts.internal_gerente;
+    return 0;
+  }
+
+  isExpiring(): boolean {
+    const role = this.authService.getActiveRole();
+    if (role === 'contable') return (this.pendingCounts.expiring_contable || 0) > 0;
+    if (role === 'gerente') return (this.pendingCounts.expiring_gerente || 0) > 0;
+    if (role === 'superadmin') return ((this.pendingCounts.expiring_contable || 0) + (this.pendingCounts.expiring_gerente || 0)) > 0;
+    return false;
   }
 
   toggleUserMenu() { this.showUserMenu = !this.showUserMenu; }

@@ -157,10 +157,33 @@ class ClientUploadController extends Controller
         $operativoCount = (clone $baseQuery)->where('status', 'pendiente')->count();
         $gerenteCount = (clone $baseQuery)->where('status', 'validado')->count();
 
+        // Documentos Internos Pendientes
+        $internalContable = \App\Models\InternalDocument::where('target_role', 'contable')->where('estado', 'pendiente')->count();
+        $internalGerente = \App\Models\InternalDocument::where('target_role', 'gerente')->where('estado', 'pendiente')->count();
+
+        // Documentos Internos por Vencer (< 2 horas)
+        $expiringContable = 0;
+        $expiringGerente = 0;
+        $pendingInternals = \App\Models\InternalDocument::with('priority')->where('estado', 'pendiente')->get();
+        foreach ($pendingInternals as $doc) {
+            if ($doc->priority && $doc->priority->horas_vencimiento) {
+                $expiresAt = $doc->created_at->addHours($doc->priority->horas_vencimiento);
+                $hoursRemaining = now()->diffInHours($expiresAt, false);
+                if ($hoursRemaining <= 2) {
+                    if ($doc->target_role === 'contable') $expiringContable++;
+                    if ($doc->target_role === 'gerente') $expiringGerente++;
+                }
+            }
+        }
+
         return response()->json([
             'operativo' => $operativoCount,
             'gerente' => $gerenteCount,
-            'total' => $operativoCount + $gerenteCount
+            'contable' => $internalContable,
+            'internal_gerente' => $internalGerente,
+            'expiring_contable' => $expiringContable,
+            'expiring_gerente' => $expiringGerente,
+            'total' => $operativoCount + $gerenteCount + $internalContable + $internalGerente
         ]);
     }
 

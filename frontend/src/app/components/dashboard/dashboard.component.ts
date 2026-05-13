@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClientModule, HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { AuthService } from '../../services/auth.service';
 import { BaseChartDirective, provideCharts, withDefaultRegisterables } from 'ng2-charts';
 import { ChartConfiguration, ChartData, ChartType, Chart, registerables } from 'chart.js';
 import jsPDF from 'jspdf';
@@ -20,7 +21,50 @@ Chart.register(...registerables);
   providers: [provideCharts(withDefaultRegisterables())],
     template: `
     <div class="dashboard-wrapper" #dashboardContent>
-      <header class="view-header">
+      <!-- CONTABLE DASHBOARD VIEW -->
+      <div class="view-container" *ngIf="authService.getActiveRole() === 'contable'" style="padding: 2.5rem 3rem;">
+        <header class="view-header" style="border: none; padding: 0; margin-bottom: 2rem; background: transparent;">
+          <div class="title-area">
+            <h1>Panel de Control Contable</h1>
+            <p>Bienvenido al módulo de gestión y control documental interno.</p>
+          </div>
+        </header>
+
+        <div class="kpi-grid">
+          <div class="kpi-card pro-card navy" (click)="router.navigate(['/internal-docs'])">
+            <div class="kpi-icon"><span class="material-symbols-outlined">mail</span></div>
+            <div class="kpi-body">
+              <label>Bandeja Interna</label>
+              <div class="value">{{ pendingInternalDocs }}</div>
+              <div class="footer">Documentos pendientes de gestión</div>
+            </div>
+          </div>
+          <div class="kpi-card pro-card cyan" (click)="router.navigate(['/profile'])">
+            <div class="kpi-icon"><span class="material-symbols-outlined">person</span></div>
+            <div class="kpi-body">
+              <label>Estado de Cuenta</label>
+              <div class="value">Activo</div>
+              <div class="footer">Perfil de usuario verificado</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-4" style="background: white; border-radius: 20px; padding: 2rem;">
+           <h3 style="color: var(--primary); margin-bottom: 1.5rem;">Acciones Rápidas</h3>
+           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+              <button class="btn-pro secondary" (click)="router.navigate(['/internal-docs'])" style="justify-content: center; height: 60px;">
+                <span class="material-symbols-outlined">visibility</span> Ver Bandeja de Entrada
+              </button>
+              <button class="btn-pro primary" (click)="router.navigate(['/profile'])" style="justify-content: center; height: 60px;">
+                <span class="material-symbols-outlined">manage_accounts</span> Configurar mi Perfil
+              </button>
+           </div>
+        </div>
+      </div>
+
+      <!-- STAFF DASHBOARD VIEW (Operativo/Gerente/Superadmin) -->
+      <div *ngIf="authService.getActiveRole() !== 'contable'">
+        <header class="view-header">
         <div class="title-area">
           <h1>Análisis de Liquidez & Cartera</h1>
           <p>Supervisión detallada de métricas operativas y financieras.</p>
@@ -561,7 +605,7 @@ Chart.register(...registerables);
 
       </div>
 
-      <div class="loading-overlay" *ngIf="isLoading">
+      <div class="loading-overlay" *ngIf="isLoading && authService.getActiveRole() !== 'contable'">
         <div class="pro-spinner"></div>
         <p>Procesando Inteligencia Financiera...</p>
       </div>
@@ -615,6 +659,12 @@ Chart.register(...registerables);
       justify-content: space-between;
       align-items: center;
       padding-top: 0.5rem;
+
+      .btn-group {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+      }
     }
 
     .pro-tabs {
@@ -770,6 +820,7 @@ export class DashboardComponent implements OnInit {
     compraventa: null
   };
   pendingCount: number = 0;
+  pendingInternalDocs: number = 0;
   private apiUrl = `${environment.apiUrl}/dashboard/stats`;
   // Pagination & Search States
   tableSettings: any = {
@@ -955,10 +1006,22 @@ export class DashboardComponent implements OnInit {
     }
   };
 
-  constructor(private http: HttpClient, public router: Router) { }
+  constructor(private http: HttpClient, public router: Router, public authService: AuthService) { }
 
   ngOnInit() {
-    this.loadStats();
+    if (this.authService.getActiveRole() === 'contable') {
+      this.loadContableStats();
+    } else {
+      this.loadStats();
+    }
+  }
+
+  loadContableStats() {
+    this.isLoading = true;
+    this.http.get<any>(`${environment.apiUrl}/uploads/pending-count`).subscribe(res => {
+      this.pendingInternalDocs = res.contable;
+      this.isLoading = false;
+    });
   }
 
   setTab(tab: string) {

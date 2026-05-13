@@ -87,6 +87,7 @@ import Swal from 'sweetalert2';
     .pro-status.gerente { background: #E0F2F1; color: var(--secondary); }
     .pro-status.operativo { background: #FFF7ED; color: var(--warning); }
     .pro-status.cliente { background: #F3E5F5; color: #9C27B0; }
+    .pro-status.contable { background: #E8EAF6; color: #3F51B5; }
 
     .actions { display: flex; justify-content: flex-end; gap: 8px; }
     .doc-cell { display: flex; flex-direction: column; .doc-type { font-size: 0.7rem; font-weight: 800; color: var(--primary); } .doc-num { font-size: 0.9rem; color: var(--text-main); } }
@@ -160,6 +161,7 @@ export class UserManagementComponent implements OnInit {
                    <label><input type="checkbox" class="swal-role" value="gerente" ${user?.roles?.includes('gerente') ? 'checked' : ''}> Gerente</label>
                    <label><input type="checkbox" class="swal-role" value="superadmin" ${user?.roles?.includes('superadmin') ? 'checked' : ''}> Admin</label>
                    <label><input type="checkbox" class="swal-role" value="cliente" ${user?.roles?.includes('cliente') ? 'checked' : ''}> Cliente</label>
+                   <label><input type="checkbox" class="swal-role" value="contable" ${user?.roles?.includes('contable') ? 'checked' : ''}> Contable</label>
                 </div>
              </div>
           </div>

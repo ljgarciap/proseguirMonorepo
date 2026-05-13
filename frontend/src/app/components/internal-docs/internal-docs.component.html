@@ -1,0 +1,195 @@
+<div class="view-container">
+  <header class="view-header">
+    <div class="title-area">
+      <h1>Bandeja Interna de Documentos</h1>
+      <p>Gestión de flujo documental entre Operativo, Contabilidad y Gerencia.</p>
+    </div>
+    <button class="btn-pro primary" (click)="openUploadModal()" *ngIf="authService.isAuthorized(['operativo', 'contable'])">
+      <span class="material-symbols-outlined">send</span> Nuevo Envío
+    </button>
+  </header>
+
+  <div class="tabs-and-search" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0;">
+    <div class="pro-tabs" style="margin-bottom: 0; border-bottom: none;">
+      <button class="tab-btn" [class.active]="currentTab === 'pendientes'" (click)="setTab('pendientes')">
+        <span class="material-symbols-outlined">hourglass_empty</span>
+        Por Procesar
+      </button>
+      <button class="tab-btn" [class.active]="currentTab === 'procesados'" (click)="setTab('procesados')">
+        <span class="material-symbols-outlined">task_alt</span>
+        Historial Procesados
+      </button>
+    </div>
+    
+    <div class="search-box" style="position: relative; margin-bottom: 6px;">
+      <span class="material-symbols-outlined" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 1.2rem;">search</span>
+      <input type="text" [(ngModel)]="searchTerm" (ngModelChange)="currentPage = 1" placeholder="Buscar documento..." style="padding: 8px 12px 8px 36px; border: 1px solid #cbd5e1; border-radius: 8px; width: 250px; outline: none; font-size: 0.9rem;">
+    </div>
+  </div>
+
+  <div class="card p-0 overflow-hidden shadow-sm">
+    <div class="table-scroll-wrapper">
+      <table class="pro-table">
+        <thead>
+          <tr>
+            <th (click)="sortBy('titulo')" style="cursor: pointer; user-select: none;">
+              Documento
+              <span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle; color: #94a3b8;" *ngIf="sortColumn === 'titulo'">{{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+            </th>
+            <th (click)="sortBy('remitente')" style="cursor: pointer; user-select: none;">
+              De/Para
+              <span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle; color: #94a3b8;" *ngIf="sortColumn === 'remitente'">{{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+            </th>
+            <th (click)="sortBy('categoria')" style="cursor: pointer; user-select: none;">
+              Categoría
+              <span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle; color: #94a3b8;" *ngIf="sortColumn === 'categoria'">{{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+            </th>
+            <th>Observaciones</th>
+            <th (click)="sortBy('prioridad')" style="cursor: pointer; user-select: none;">
+              Prioridad
+              <span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle; color: #94a3b8;" *ngIf="sortColumn === 'prioridad'">{{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+            </th>
+            <th (click)="sortBy('estado')" style="cursor: pointer; user-select: none;">
+              Estado
+              <span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle; color: #94a3b8;" *ngIf="sortColumn === 'estado'">{{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
+            </th>
+            <th>SLA Restante</th>
+            <th class="text-right" style="padding-right: 1.5rem;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let doc of pagedDocuments" [ngClass]="'row-' + getRemainingTime(doc).status">
+            <td>
+              <div class="doc-cell">
+                <span class="name">{{ doc.titulo }}</span>
+                <span class="date">{{ doc.created_at | date:'medium' }}</span>
+              </div>
+            </td>
+            <td>
+              <div style="display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">De:</span>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <div class="avatar-sm" style="width: 24px; height: 24px; font-size: 0.7rem; background: #e2e8f0; color: #475569;">
+                      {{ doc.sender?.name?.charAt(0) }}
+                    </div>
+                    <strong style="font-size: 0.85rem; color: #334155;">{{ doc.sender?.name }}</strong>
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">Para:</span>
+                  <span class="role-badge" [ngClass]="doc.target_role" style="font-size: 0.7rem; padding: 2px 8px;">
+                    {{ doc.target_role | uppercase }}
+                  </span>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="cat-label">{{ doc.category?.nombre }}</span>
+            </td>
+            <td>
+              <span class="obs-text" [title]="doc.mensaje">{{ doc.mensaje || '-' }}</span>
+            </td>
+            <td>
+              <span class="prio-tag" [style.background]="doc.priority?.color">
+                {{ doc.priority?.nombre }}
+              </span>
+            </td>
+            <td>
+              <span class="status-pill" [ngClass]="doc.estado">{{ doc.estado | titlecase }}</span>
+            </td>
+            <td>
+              <div class="sla-badge" [ngClass]="getRemainingTime(doc).status" *ngIf="getRemainingTime(doc).status !== 'none'">
+                <span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 4px; vertical-align: middle;">
+                  {{ getRemainingTime(doc).status === 'expired' ? 'error' : 'timer' }}
+                </span>
+                {{ getRemainingTime(doc).text }}
+              </div>
+              <span *ngIf="getRemainingTime(doc).status === 'none'" style="color: #94a3b8; font-size: 0.8rem;">N/A</span>
+            </td>
+            <td class="text-right" style="padding-right: 1.5rem;">
+              <div class="actions">
+                <button class="btn-pro secondary sm icon-only" (click)="openViewer(doc)" title="Visualizar">
+                  <span class="material-symbols-outlined">visibility</span>
+                </button>
+                <button class="btn-pro secondary sm icon-only" (click)="downloadFile(doc)" title="Descargar">
+                  <span class="material-symbols-outlined">download</span>
+                </button>
+                
+                <!-- Sender Actions (Delete if pending and not acting as receiver) -->
+                <ng-container *ngIf="doc.sender_id == currentUser?.id && doc.target_role !== authService.getActiveRole() && doc.estado === 'pendiente'">
+                  <button class="btn-pro danger sm icon-only" (click)="deleteDocument(doc)" title="Eliminar Documento">
+                    <span class="material-symbols-outlined">delete</span>
+                  </button>
+                </ng-container>
+                
+                <!-- Quick Status Actions for Receivers -->
+                <ng-container *ngIf="doc.target_role === authService.getActiveRole() && doc.estado === 'pendiente'">
+                  <button class="btn-pro success sm icon-only" (click)="updateStatus(doc, 'procesado')" title="Marcar como Procesado">
+                    <span class="material-symbols-outlined">check_circle</span>
+                  </button>
+                  <button class="btn-pro danger sm icon-only" (click)="updateStatus(doc, 'rechazado')" title="Rechazar">
+                    <span class="material-symbols-outlined">cancel</span>
+                  </button>
+                </ng-container>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="filteredDocuments.length === 0 && !loading">
+            <td colspan="8" class="empty-state">No se han encontrado documentos en esta vista.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="pagination-footer" style="padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; background: #fafafa;">
+      <span style="color: #64748b; font-size: 0.85rem;">
+        Mostrando {{ showingFrom }} a {{ showingTo }} de {{ filteredDocuments.length }} documentos
+      </span>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button class="btn-pro secondary sm" [disabled]="currentPage === 1" (click)="changePage(currentPage - 1)">Anterior</button>
+        <span style="padding: 4px 12px; font-weight: 600; color: #334155; font-size: 0.85rem;">Página {{ currentPage }} de {{ totalPages || 1 }}</span>
+        <button class="btn-pro secondary sm" [disabled]="currentPage === totalPages || totalPages === 0" (click)="changePage(currentPage + 1)">Siguiente</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIGHTBOX VIEWER MODAL -->
+  <div class="viewer-overlay" *ngIf="showViewer" (click)="closeViewer()">
+    <div class="viewer-content" (click)="$event.stopPropagation()">
+      <header class="viewer-header">
+        <div class="doc-title">
+          <span class="material-symbols-outlined">description</span>
+          <div>
+            <h4>{{ selectedDoc?.titulo }}</h4>
+            <p>{{ selectedDoc?.created_at | date:'medium' }} - Enviado por {{ selectedDoc?.sender?.name }}</p>
+          </div>
+        </div>
+        <div class="viewer-actions">
+          <button class="btn-icon" (click)="downloadFile(selectedDoc)" title="Descargar Original">
+            <span class="material-symbols-outlined">download</span>
+          </button>
+          <button class="btn-icon close" (click)="closeViewer()">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="viewer-body">
+        <img *ngIf="isImage" [src]="viewerUrl" alt="Documento" class="viewer-image">
+        
+        <iframe *ngIf="!isImage && !isExcel" [src]="viewerUrl | safeUrl" width="100%" height="100%" frameborder="0"></iframe>
+        
+        <!-- EXCEL / SPREADSHEET FALLBACK -->
+        <div *ngIf="isExcel" style="text-align: center; color: #475569; padding: 2rem;">
+           <span class="material-symbols-outlined" style="font-size: 5rem; color: #217346; margin-bottom: 1rem;">table_view</span>
+           <h3 style="color: #1e293b; margin-bottom: 0.5rem;">Vista previa no disponible</h3>
+           <p style="margin-bottom: 1.5rem; font-size: 0.9rem;">Las hojas de cálculo no pueden visualizarse dentro de la plataforma.</p>
+           <button class="btn-pro primary" (click)="downloadFile(selectedDoc)" style="display: inline-flex; justify-content: center;">
+             <span class="material-symbols-outlined">download</span> Descargar Excel
+           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

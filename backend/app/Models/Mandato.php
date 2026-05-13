@@ -28,7 +28,8 @@ class Mandato extends Model
         'factor_rep_legal_tipo_doc',
         'factor_rep_legal_num_doc',
         'factor_rep_legal_email',
-        'status'
+        'status',
+        'observaciones'
     ];
 
     public function user()

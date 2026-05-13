@@ -74,5 +74,17 @@ class UserSeeder extends Seeder
                 'roles' => ['gerente', 'operativo']
             ]
         );
+
+        // 6. Contable
+        User::updateOrCreate(
+            ['numero_documento' => '6789'],
+            [
+                'name' => 'Contador General',
+                'email' => 'contable@test.com',
+                'password' => Hash::make('6789'),
+                'tipo_documento_id' => $cc,
+                'roles' => ['contable']
+            ]
+        );
     }
 }

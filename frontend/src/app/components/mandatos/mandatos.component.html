@@ -1,8 +1,19 @@
 <div class="mandatos-container animate__animated animate__fadeIn">
   <div class="header-section">
-    <h1 class="pro-title">Diligenciamiento de Mandatos</h1>
-    <p class="pro-subtitle">Complete la información legal para la generación del contrato de mandato.</p>
+    <h1 class="pro-title">Gestión de Mandatos</h1>
+    <p class="pro-subtitle">Complete y revise la información legal para la generación del contrato de mandato.</p>
   </div>
+
+  <div class="pro-tabs">
+    <button *ngIf="authService.isAuthorized(['cliente', 'superadmin'])" class="tab-btn" [class.active]="currentTab === 'diligenciar'" (click)="currentTab = 'diligenciar'">
+      <span class="material-symbols-outlined">edit_document</span> Diligenciar Nuevo
+    </button>
+    <button class="tab-btn" [class.active]="currentTab === 'historial'" (click)="currentTab = 'historial'">
+      <span class="material-symbols-outlined">history</span> Historial / Revisión
+    </button>
+  </div>
+
+  <div *ngIf="currentTab === 'diligenciar'" class="tab-content animate__animated animate__fadeIn">
 
   <form (ngSubmit)="onSubmit()" #mandatoForm="ngForm" class="pro-form-grid">
     <!-- SECCIÓN MANDANTE -->
@@ -146,4 +157,85 @@
       </div>
     </div>
   </form>
+  </div>
+
+  <!-- TAB HISTORIAL -->
+  <div *ngIf="currentTab === 'historial'" class="tab-content animate__animated animate__fadeIn">
+    
+    <div class="table-tools">
+      <div class="search-box">
+        <span class="material-symbols-outlined">search</span>
+        <input type="text" [(ngModel)]="searchText" placeholder="Buscar por mandante, NIT o estado..." (ngModelChange)="currentPage = 1">
+      </div>
+    </div>
+
+    <div class="card p-0 overflow-hidden shadow-sm">
+      <div class="table-scroll-wrapper">
+        <table class="pro-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Mandante</th>
+              <th>Rep. Legal</th>
+              <th>Factor</th>
+              <th>Estado</th>
+              <th>Observaciones</th>
+              <th *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" class="text-right" style="padding-right: 1.5rem;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let m of paginatedMandatos">
+              <td>
+                <span class="date">{{ m.created_at | date:'mediumDate' }}</span>
+              </td>
+              <td>
+                <div class="doc-cell">
+                  <span class="name">{{ m.mandante_razon_social }}</span>
+                  <span style="font-size: 0.75rem; color: #64748b;">NIT: {{ m.mandante_numero_documento }}</span>
+                </div>
+              </td>
+              <td>{{ m.mandante_rep_legal_nombre }}</td>
+              <td>{{ m.factor_razon_social }}</td>
+              <td>
+                <span class="status-pill" [ngClass]="m.status">{{ m.status | titlecase }}</span>
+              </td>
+              <td>
+                <span class="obs-text" [title]="m.observaciones">{{ m.observaciones || '-' }}</span>
+              </td>
+              <td *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" class="text-right" style="padding-right: 1.5rem;">
+                <div class="actions" *ngIf="m.status === 'pendiente'">
+                  <button class="btn-pro success sm icon-only" (click)="updateMandatoStatus(m, 'firmado')" title="Aprobar Mandato">
+                    <span class="material-symbols-outlined">check_circle</span>
+                  </button>
+                  <button class="btn-pro danger sm icon-only" (click)="updateMandatoStatus(m, 'rechazado')" title="Rechazar Mandato">
+                    <span class="material-symbols-outlined">cancel</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="filteredMandatos.length === 0">
+              <td colspan="7" class="empty-state">No se han encontrado mandatos en el historial.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination Footer -->
+      <div class="table-footer" *ngIf="filteredMandatos.length > 0">
+        <div class="pagination-info">
+          Mostrando {{ (currentPage - 1) * itemsPerPage + 1 }} a {{ Math.min(currentPage * itemsPerPage, filteredMandatos.length) }} de {{ filteredMandatos.length }} mandatos
+        </div>
+        <div class="pagination-actions">
+          <button class="btn-pro secondary sm" (click)="prevPage()" [disabled]="currentPage === 1">
+            <span class="material-symbols-outlined">chevron_left</span> Anterior
+          </button>
+          <span class="page-indicator">Página {{ currentPage }} de {{ totalPages }}</span>
+          <button class="btn-pro secondary sm" (click)="nextPage()" [disabled]="currentPage === totalPages">
+            Siguiente <span class="material-symbols-outlined">chevron_right</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>

@@ -9,7 +9,31 @@ class MandatoController extends Controller
 {
     public function index()
     {
-        return response()->json(Mandato::where('user_id', auth()->id())->get());
+        $user = auth()->user();
+        $roles = $user->roles ?? [];
+        $isAdminOrOp = in_array('superadmin', $roles) || in_array('operativo', $roles);
+
+        if ($isAdminOrOp) {
+            return response()->json(Mandato::with('user')->orderBy('created_at', 'desc')->get());
+        }
+
+        return response()->json(Mandato::where('user_id', $user->id)->orderBy('created_at', 'desc')->get());
+    }
+
+    public function updateStatus(Request $request, $id)
+    {
+        $request->validate([
+            'status' => 'required|in:pendiente,firmado,rechazado',
+            'observaciones' => 'nullable|string'
+        ]);
+
+        $mandato = Mandato::findOrFail($id);
+        $mandato->update([
+            'status' => $request->status,
+            'observaciones' => $request->observaciones
+        ]);
+
+        return response()->json($mandato);
     }
 
     public function store(Request $request)
