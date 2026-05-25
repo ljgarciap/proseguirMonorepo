@@ -4,13 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Models\Destinatario;
-use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Passport\Passport;
 use Tests\TestCase;
 
 class DestinatarioTest extends TestCase
 {
-    use DatabaseTransactions;
+    use RefreshDatabase;
 
     private $admin;
 
