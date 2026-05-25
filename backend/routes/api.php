@@ -56,6 +56,24 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
         Route::apiResource('users', \App\Http\Controllers\UserController::class)
             ->middleware(['auth:api', 'checkrole:superadmin']);
         
+        // Destinatarios (Superadmin only)
+        Route::apiResource('destinatarios', \App\Http\Controllers\DestinatarioController::class)
+            ->middleware(['auth:api', 'checkrole:superadmin']);
+        
+        // Notificaciones (Superadmin only)
+        Route::apiResource('notificaciones', \App\Http\Controllers\NotificacionController::class)
+            ->middleware(['auth:api', 'checkrole:superadmin']);
+        
+        // Asignaciones (Superadmin only)
+        Route::get('/asignaciones', [\App\Http\Controllers\AsignacionController::class, 'index'])
+            ->middleware(['auth:api', 'checkrole:superadmin']);
+        Route::get('/asignaciones/{id}', [\App\Http\Controllers\AsignacionController::class, 'show'])
+            ->middleware(['auth:api', 'checkrole:superadmin']);
+        Route::post('/asignaciones', [\App\Http\Controllers\AsignacionController::class, 'store'])
+            ->middleware(['auth:api', 'checkrole:superadmin']);
+        Route::delete('/asignaciones/{id}', [\App\Http\Controllers\AsignacionController::class, 'destroy'])
+            ->middleware(['auth:api', 'checkrole:superadmin']);
+        
         // Pending count (dashboard related)
         Route::get('/uploads/pending-count', [\App\Http\Controllers\ClientUploadController::class, 'pendingCount'])
             ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
