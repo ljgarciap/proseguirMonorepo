@@ -83,6 +83,9 @@ jobs:
             # 3. Reconstruir frontend y backend conservando volúmenes
             docker compose up -d --build
             
+            # Reiniciar Nginx para limpiar la caché DNS y evitar Error 502 Bad Gateway
+            docker compose restart backend_web
+            
             # 4. Instalar/actualizar dependencias de Composer y Node.js en el backend
             docker exec factoring_backend composer install --no-dev --optimize-autoloader
             docker exec factoring_backend npm install pdfreader
