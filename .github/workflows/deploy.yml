@@ -1,0 +1,105 @@
+name: CI/CD Pipeline - Proseguir Factoring
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test-backend:
+    name: Backend Tests (Laravel)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, mysql, sqlite
+      - name: Install Composer Dependencies
+        run: |
+          cd backend
+          composer install --no-progress --prefer-dist
+      - name: Setup Env and Generate Key
+        run: |
+          cd backend
+          cp .env.example .env
+          php artisan key:generate
+      - name: Run Tests (SQLite In-Memory)
+        run: |
+          cd backend
+          php artisan test
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
+
+  test-frontend:
+    name: Frontend Tests (Angular)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install NPM Dependencies
+        run: |
+          cd frontend
+          npm ci --legacy-peer-deps
+      - name: Config Env File
+        run: |
+          cd frontend
+          npm run config-env
+      - name: Run Angular Headless Tests
+        run: |
+          cd frontend
+          npm run test:ci
+
+  deploy:
+    name: Production Deploy (CD)
+    needs: [test-backend, test-frontend]
+    runs-on: ubuntu-latest
+    # Solo despliega en push a la rama master, nunca en pull requests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - name: Deploy to Server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            cd /home/admpsl/apps/proseguir
+            
+            # 1. Sincronizar y actualizar código
+            git pull origin master
+            
+            # 2. Copiar archivos .env correctos de producción
+            cp PROD.env .env
+            cp frontend/.env.prod frontend/.env
+            
+            # 3. Reconstruir frontend y backend conservando volúmenes
+            docker compose up -d --build
+            
+            # 4. Instalar/actualizar dependencias de Composer y Node.js en el backend
+            docker exec factoring_backend composer install --no-dev --optimize-autoloader
+            docker exec factoring_backend npm install pdfreader
+            
+            # 5. Migraciones incrementales de DB (SEGURAS, NO FRESH)
+            docker exec factoring_backend php artisan migrate --force
+            
+            # 6. Configurar seguridad Passport
+            docker exec factoring_backend php artisan passport:install --force
+            docker exec factoring_backend chmod 600 storage/oauth-private.key
+            docker exec factoring_backend chmod 600 storage/oauth-public.key
+            
+            # 7. Recrear el enlace simbólico de storage de forma relativa (Evita Error 403)
+            docker exec factoring_backend rm -f public/storage
+            docker exec factoring_backend ln -s ../storage/app/public public/storage
+            
+            # 8. Limpieza y caché para optimizar rendimiento Laravel
+            docker exec factoring_backend php artisan config:cache
+            docker exec factoring_backend php artisan route:cache
+            docker exec factoring_backend chmod -R 777 storage bootstrap/cache
