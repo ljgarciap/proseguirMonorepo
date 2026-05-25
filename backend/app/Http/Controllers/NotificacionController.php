@@ -40,15 +40,15 @@ class NotificacionController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Notificacion $notificacion)
+    public function show(Notificacion $notificacione)
     {
-        return response()->json($notificacion);
+        return response()->json($notificacione);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Notificacion $notificacion)
+    public function update(Request $request, Notificacion $notificacione)
     {
         $request->validate([
             'nombre' => 'required|string|max:255',
@@ -56,29 +56,29 @@ class NotificacionController extends Controller
             'activo' => 'required|boolean'
         ]);
 
-        $notificacion->update([
+        $notificacione->update([
             'nombre' => $request->nombre,
             'mensaje' => $request->mensaje,
             'activo' => (bool)$request->activo
         ]);
 
-        return response()->json($notificacion);
+        return response()->json($notificacione);
     }
 
     /**
      * Remove the specified resource from storage.
      * Block delete if there are associated recipients.
      */
-    public function destroy(Notificacion $notificacion)
+    public function destroy(Notificacion $notificacione)
     {
         // Regla de Negocio: No se permite eliminar si hay destinatarios asociados en la tabla intermedia
-        if ($notificacion->destinatarios()->count() > 0) {
+        if ($notificacione->destinatarios()->count() > 0) {
             return response()->json([
                 'message' => 'No se puede eliminar la notificación porque tiene destinatarios asociados.'
             ], 422);
         }
 
-        $notificacion->delete();
+        $notificacione->delete();
         return response()->json(null, 204);
     }
 }
