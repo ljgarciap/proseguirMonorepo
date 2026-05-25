@@ -15,6 +15,9 @@ import { ProfileSettingsComponent } from './components/profile-settings/profile-
 import { UserManagementComponent } from './components/user-management/user-management.component';
 import { MandatosComponent } from './components/mandatos/mandatos.component';
 import { ConciliacionSusuerteComponent } from './components/conciliacion-susuerte/conciliacion-susuerte.component';
+import { DestinatariosComponent } from './components/destinatarios/destinatarios.component';
+import { NotificacionesComponent } from './components/notificaciones/notificaciones.component';
+import { AsignacionesComponent } from './components/asignaciones/asignaciones.component';
 
 export const routes: Routes = [
     { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
@@ -88,6 +91,24 @@ export const routes: Routes = [
     { 
         path: 'users', 
         component: UserManagementComponent, 
+        canActivate: [roleGuard], 
+        data: { roles: ['superadmin'] } 
+    },
+    { 
+        path: 'destinatarios', 
+        component: DestinatariosComponent, 
+        canActivate: [roleGuard], 
+        data: { roles: ['superadmin'] } 
+    },
+    { 
+        path: 'notificaciones', 
+        component: NotificacionesComponent, 
+        canActivate: [roleGuard], 
+        data: { roles: ['superadmin'] } 
+    },
+    { 
+        path: 'asignaciones', 
+        component: AsignacionesComponent, 
         canActivate: [roleGuard], 
         data: { roles: ['superadmin'] } 
     },

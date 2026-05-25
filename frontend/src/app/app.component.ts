@@ -72,6 +72,19 @@ import { interval, Subscription } from 'rxjs';
           </div>
 
           <div class="nav-section" *ngIf="authService.getActiveRole() === 'superadmin'">
+            <label>Notificaciones</label>
+            <a routerLink="/destinatarios" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">mail_lock</span> Destinatarios
+            </a>
+            <a routerLink="/notificaciones" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">notifications_active</span> Notificaciones
+            </a>
+            <a routerLink="/asignaciones" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">assignment_ind</span> Asignaciones
+            </a>
+          </div>
+
+          <div class="nav-section" *ngIf="authService.getActiveRole() === 'superadmin'">
             <label>Configuración</label>
             <a routerLink="/users" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">group</span> Gestión Usuarios
