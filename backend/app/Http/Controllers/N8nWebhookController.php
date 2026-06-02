@@ -42,24 +42,67 @@ class N8nWebhookController extends Controller
         \Illuminate\Support\Facades\Log::info("Payload recibido (resumen): " . substr(json_encode($request->all()), 0, 500));
 
         $data = $request->input('data', []);
-        $filename = $request->input('filename') ?? $request->query('filename');
-        
-        // Si mandan un solo objeto en vez de array, lo convertimos a array.
-        if (!is_array(reset($data)) && count($data) > 0) {
-            $data = [$data];
+        $filename = null;
+        $clientUploadId = null;
+
+        // 1. Intentamos obtener por upload_id
+        $uploadId = $request->input('upload_id') ?? $request->query('upload_id');
+        if ($uploadId) {
+            $upload = \App\Models\ClientUpload::find($uploadId);
+            if ($upload) {
+                $clientUploadId = $upload->id;
+                $filename = $upload->original_name;
+            }
         }
-        // Extraer filename del array si no vino en el request/query
-        if (empty($filename) && is_array($data)) {
-            foreach ($data as $row) {
-                if (isset($row['filename']) || isset($row['NombreArchivo'])) {
-                    $filename = $row['filename'] ?? $row['NombreArchivo'];
-                    break;
+
+        // 2. Si no se resolvió por upload_id, intentamos por el filename del request/query
+        if (!$clientUploadId) {
+            $reqFilename = $request->input('filename') ?? $request->query('filename');
+            if ($reqFilename) {
+                $upload = \App\Models\ClientUpload::where('filename', $reqFilename)
+                    ->orWhere('original_name', $reqFilename)
+                    ->orWhere('filename', 'like', '%' . basename($reqFilename))
+                    ->first();
+                if ($upload) {
+                    $clientUploadId = $upload->id;
+                    $filename = $upload->original_name;
+                } else {
+                    $filename = $reqFilename;
                 }
             }
         }
 
+        // 3. Si sigue vacío, buscamos en las filas de datos
+        if (!$clientUploadId && is_array($data)) {
+            $extractedFilename = null;
+            $tempData = !is_array(reset($data)) && count($data) > 0 ? [$data] : $data;
+            foreach ($tempData as $row) {
+                if (isset($row['filename']) || isset($row['NombreArchivo'])) {
+                    $extractedFilename = $row['filename'] ?? $row['NombreArchivo'];
+                    break;
+                }
+            }
+            if ($extractedFilename) {
+                $upload = \App\Models\ClientUpload::where('filename', $extractedFilename)
+                    ->orWhere('original_name', $extractedFilename)
+                    ->orWhere('filename', 'like', '%' . basename($extractedFilename))
+                    ->first();
+                if ($upload) {
+                    $clientUploadId = $upload->id;
+                    $filename = $upload->original_name;
+                } else {
+                    $filename = $extractedFilename;
+                }
+            }
+        }
+
+        // Si mandan un solo objeto en vez de array, lo convertimos a array.
+        if (!is_array(reset($data)) && count($data) > 0) {
+            $data = [$data];
+        }
+
         try {
-            $this->processData($data, $categoria, $filename);
+            $this->processData($data, $categoria, $filename, $clientUploadId);
 
             SystemLog::create([
                 'categoria' => $categoria,
@@ -87,25 +130,30 @@ class N8nWebhookController extends Controller
         }
     }
 
-    public function processData(array $data, string $categoria, ?string $filename = null)
+    public function processData(array $data, string $categoria, ?string $filename = null, $clientUploadId = null)
     {
         // 1. Normalize Keys to Match Database Columns (Snake Case) FIRST
         $data = $this->mapKeysToDatabase($data, $categoria);
 
-        // 2. Extraemos 'filename' de los datos y lo quitamos para no insertarlo en los modelos
+        // 2. Extraemos 'filename' y 'nombre_archivo' de los datos y los quitamos para no insertarlos en los modelos
         foreach ($data as $key => $row) {
             if (isset($row['filename'])) {
-                if (empty($filename)) {
-                    $filename = $row['filename'];
-                }
                 unset($data[$key]['filename']);
+            }
+            if (isset($row['nombre_archivo'])) {
+                unset($data[$key]['nombre_archivo']);
             }
         }
 
-        // Search for the ClientUpload ID using the filename
-        $clientUploadId = null;
-        if (!empty($filename)) {
-            $clientUploadId = \App\Models\ClientUpload::where('filename', $filename)->value('id');
+        // Si no nos pasaron el ID del upload, intentamos resolverlo
+        if (empty($clientUploadId) && !empty($filename)) {
+            $upload = \App\Models\ClientUpload::where('filename', $filename)
+                ->orWhere('original_name', $filename)
+                ->orWhere('filename', 'like', '%' . basename($filename))
+                ->first();
+            if ($upload) {
+                $clientUploadId = $upload->id;
+            }
         }
 
         // 3. Apply Batch Consensus for Identifiers (Nombre -> NIT)

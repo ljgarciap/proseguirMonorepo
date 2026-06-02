@@ -47,13 +47,16 @@ class InternalDocumentController extends Controller
             'prioridad_id' => 'required|exists:accounting_priorities,id',
         ]);
 
-        $path = $request->file('archivo')->store('internal_docs', 'public');
+        $file = $request->file('archivo');
+        $path = $file->store('internal_docs', 'public');
+        $originalName = $file->getClientOriginalName();
 
         $doc = InternalDocument::create([
             'sender_id' => Auth::id(),
             'target_role' => $request->target_role,
             'titulo' => $request->titulo,
             'archivo_path' => $path,
+            'original_name' => $originalName,
             'categoria_id' => $request->categoria_id,
             'prioridad_id' => $request->prioridad_id,
             'mensaje' => $request->mensaje,

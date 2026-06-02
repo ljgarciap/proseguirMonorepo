@@ -13,6 +13,8 @@ import Swal from 'sweetalert2';
   styleUrls: ['./document-requests.component.css']
 })
 export class DocumentRequestsComponent implements OnInit {
+  // expose environment to template
+  public environment = environment
   loading = false;
   submitting = false;
 

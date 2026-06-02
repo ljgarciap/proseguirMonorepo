@@ -76,7 +76,7 @@ import Swal from 'sweetalert2';
                     {{ log.categoria || 'N/A' | uppercase }}
                   </span>
                 </td>
-                <td class="filename">{{ log.filename || '-' }}</td>
+                <td class="filename" title="{{ log.original_name || log.filename || '-' }}">{{ log.original_name || log.filename || '-' }}</td>
                 <td>
                   <span class="status-indicator" 
                         [class.success]="log.action.includes('Recibido') || log.action.includes('éxito')"
@@ -316,7 +316,7 @@ import Swal from 'sweetalert2';
 
     .id-badge { color: #94a3b8; font-weight: 500; width: 60px; }
     .timestamp { color: #64748b; width: 150px; }
-    .filename { color: #0284c7; font-weight: 500; }
+    .filename { color: #0284c7; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; }
     .text-right { text-align: right; }
     .font-medium { font-weight: 500; }
     .empty-row { padding: 48px; text-align: center; color: #94a3b8; }
@@ -542,7 +542,7 @@ export class LogsComponent implements OnInit {
         // First find the upload ID by filename
         this.http.get<any>(`${environment.apiUrl}/uploads?search=${log.filename}`).subscribe({
           next: (res) => {
-            const upload = res.data ? res.data.find((u: any) => u.filename === log.filename) : null;
+            const upload = res.data ? res.data.find((u: any) => u.original_name === log.filename || u.filename === log.filename) : null;
             if (!upload) {
               this.showToast('No se encontró el registro del archivo para este log', 'error');
               this.isLoading = false;
