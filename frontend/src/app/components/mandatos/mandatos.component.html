@@ -91,69 +91,79 @@
       </div>
       
       <div class="input-row">
-        <div class="input-group full">
+        <div class="input-group full" [class.has-error]="validationErrors['mandante_razon_social']">
           <label>Nombre / Razón Social Mandante</label>
           <input type="text" [(ngModel)]="mandato.mandante_razon_social" name="m_rs" required placeholder="Ej: Empresa S.A.S">
+          <span class="error-msg" *ngIf="validationErrors['mandante_razon_social']">{{ getFieldError('mandante_razon_social') }}</span>
         </div>
       </div>
 
       <div class="input-row">
-        <div class="input-group">
+        <div class="input-group" [class.has-error]="validationErrors['mandante_tipo_documento']">
           <label>Tipo Documento</label>
           <select [(ngModel)]="mandato.mandante_tipo_documento" name="m_td" required>
             <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
           </select>
+          <span class="error-msg" *ngIf="validationErrors['mandante_tipo_documento']">{{ getFieldError('mandante_tipo_documento') }}</span>
         </div>
-        <div class="input-group">
+        <div class="input-group" [class.has-error]="validationErrors['mandante_numero_documento']">
           <label>Número Documento</label>
           <input type="text" [(ngModel)]="mandato.mandante_numero_documento" name="m_nd" required placeholder="123456789">
+          <span class="error-msg" *ngIf="validationErrors['mandante_numero_documento']">{{ getFieldError('mandante_numero_documento') }}</span>
         </div>
       </div>
 
       <div class="input-row">
-        <div class="input-group full">
+        <div class="input-group full" [class.has-error]="validationErrors['mandante_domicilio']">
           <label>Domicilio</label>
           <input type="text" [(ngModel)]="mandato.mandante_domicilio" name="m_dom" required>
+          <span class="error-msg" *ngIf="validationErrors['mandante_domicilio']">{{ getFieldError('mandante_domicilio') }}</span>
         </div>
       </div>
 
       <div class="divider">Representante Legal</div>
 
       <div class="input-row">
-        <div class="input-group full">
+        <div class="input-group full" [class.has-error]="validationErrors['mandante_rep_legal_nombre']">
           <label>Nombre Representante Legal</label>
           <input type="text" [(ngModel)]="mandato.mandante_rep_legal_nombre" name="m_rep_n" required>
+          <span class="error-msg" *ngIf="validationErrors['mandante_rep_legal_nombre']">{{ getFieldError('mandante_rep_legal_nombre') }}</span>
         </div>
       </div>
 
       <div class="input-row">
-        <div class="input-group">
+        <div class="input-group" [class.has-error]="validationErrors['mandante_rep_legal_tipo_doc']">
           <label>Tipo Doc. Rep.</label>
           <select [(ngModel)]="mandato.mandante_rep_legal_tipo_doc" name="m_rep_td" required>
             <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
           </select>
+          <span class="error-msg" *ngIf="validationErrors['mandante_rep_legal_tipo_doc']">{{ getFieldError('mandante_rep_legal_tipo_doc') }}</span>
         </div>
-        <div class="input-group">
+        <div class="input-group" [class.has-error]="validationErrors['mandante_rep_legal_num_doc']">
           <label>Número Doc. Rep.</label>
           <input type="text" [(ngModel)]="mandato.mandante_rep_legal_num_doc" name="m_rep_nd" required>
+          <span class="error-msg" *ngIf="validationErrors['mandante_rep_legal_num_doc']">{{ getFieldError('mandante_rep_legal_num_doc') }}</span>
         </div>
       </div>
 
       <div class="input-row">
-        <div class="input-group">
+        <div class="input-group" [class.has-error]="validationErrors['mandante_direccion']">
           <label>Dirección Mandante</label>
           <input type="text" [(ngModel)]="mandato.mandante_direccion" name="m_dir" required>
+          <span class="error-msg" *ngIf="validationErrors['mandante_direccion']">{{ getFieldError('mandante_direccion') }}</span>
         </div>
-        <div class="input-group">
+        <div class="input-group" [class.has-error]="validationErrors['mandante_telefono']">
           <label>Teléfono Mandante</label>
           <input type="text" [(ngModel)]="mandato.mandante_telefono" name="m_tel" required>
+          <span class="error-msg" *ngIf="validationErrors['mandante_telefono']">{{ getFieldError('mandante_telefono') }}</span>
         </div>
       </div>
 
       <div class="input-row">
-        <div class="input-group full">
+        <div class="input-group full" [class.has-error]="validationErrors['mandante_rep_legal_email']">
           <label>E-mail Representante</label>
           <input type="email" [(ngModel)]="mandato.mandante_rep_legal_email" name="m_rep_e" required placeholder="correo@ejemplo.com">
+          <span class="error-msg" *ngIf="validationErrors['mandante_rep_legal_email']">{{ getFieldError('mandante_rep_legal_email') }}</span>
         </div>
       </div>
     </div>
@@ -167,52 +177,59 @@
 
 
       <div class="input-row">
-        <div class="input-group full">
+        <div class="input-group full" [class.has-error]="validationErrors['factor_razon_social']">
           <label>Nombre / Razón Social Factor</label>
           <input type="text" [(ngModel)]="mandato.factor_razon_social" name="f_rs" required placeholder="Ej: Factores y Servicios S.A.S.">
+          <span class="error-msg" *ngIf="validationErrors['factor_razon_social']">{{ getFieldError('factor_razon_social') }}</span>
         </div>
       </div>
 
       <div class="input-row">
-        <div class="input-group">
+        <div class="input-group" [class.has-error]="validationErrors['factor_tipo_documento']">
           <label>Tipo Documento</label>
           <select [(ngModel)]="mandato.factor_tipo_documento" name="f_td" required>
             <option value="" disabled selected>Seleccione...</option>
             <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
           </select>
+          <span class="error-msg" *ngIf="validationErrors['factor_tipo_documento']">{{ getFieldError('factor_tipo_documento') }}</span>
         </div>
-        <div class="input-group">
+        <div class="input-group" [class.has-error]="validationErrors['factor_numero_documento']">
           <label>Número Documento</label>
           <input type="text" [(ngModel)]="mandato.factor_numero_documento" name="f_nd" required placeholder="901.234.567-8">
+          <span class="error-msg" *ngIf="validationErrors['factor_numero_documento']">{{ getFieldError('factor_numero_documento') }}</span>
         </div>
       </div>
 
       <div class="divider">Representante Legal Factor</div>
 
       <div class="input-row">
-        <div class="input-group full">
+        <div class="input-group full" [class.has-error]="validationErrors['factor_rep_legal_nombre']">
           <label>Nombre Representante Factor</label>
           <input type="text" [(ngModel)]="mandato.factor_rep_legal_nombre" name="f_rep_n" required>
+          <span class="error-msg" *ngIf="validationErrors['factor_rep_legal_nombre']">{{ getFieldError('factor_rep_legal_nombre') }}</span>
         </div>
       </div>
 
       <div class="input-row">
-        <div class="input-group">
+        <div class="input-group" [class.has-error]="validationErrors['factor_rep_legal_tipo_doc']">
           <label>Tipo Doc. Rep.</label>
           <select [(ngModel)]="mandato.factor_rep_legal_tipo_doc" name="f_rep_td" required>
             <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
           </select>
+          <span class="error-msg" *ngIf="validationErrors['factor_rep_legal_tipo_doc']">{{ getFieldError('factor_rep_legal_tipo_doc') }}</span>
         </div>
-        <div class="input-group">
+        <div class="input-group" [class.has-error]="validationErrors['factor_rep_legal_num_doc']">
           <label>Número Doc. Rep.</label>
           <input type="text" [(ngModel)]="mandato.factor_rep_legal_num_doc" name="f_rep_nd" required>
+          <span class="error-msg" *ngIf="validationErrors['factor_rep_legal_num_doc']">{{ getFieldError('factor_rep_legal_num_doc') }}</span>
         </div>
       </div>
 
       <div class="input-row">
-        <div class="input-group full">
+        <div class="input-group full" [class.has-error]="validationErrors['factor_rep_legal_email']">
           <label>E-mail Representante Factor</label>
           <input type="email" [(ngModel)]="mandato.factor_rep_legal_email" name="f_rep_e" required>
+          <span class="error-msg" *ngIf="validationErrors['factor_rep_legal_email']">{{ getFieldError('factor_rep_legal_email') }}</span>
         </div>
       </div>
 

@@ -93,6 +93,26 @@
       flex-direction: column;
       gap: 0.5rem;
 
+      &.has-error {
+        label {
+          color: #dc2626;
+        }
+        input, select {
+          border-color: #fca5a5;
+          background: #fff5f5;
+          &:focus {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+          }
+        }
+        .error-msg {
+          color: #dc2626;
+          font-size: 0.75rem;
+          font-weight: 500;
+          margin-top: 0.125rem;
+        }
+      }
+
       &.full {
         flex: 100%;
       }

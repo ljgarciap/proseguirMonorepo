@@ -36,6 +36,7 @@ export class MandatosComponent implements OnInit {
 
   documentTypes = ['CC', 'CE', 'NIT', 'PAS', 'PEP'];
   loading = false;
+  validationErrors: { [key: string]: string[] } = {};
   
   currentTab: 'diligenciar' | 'historial' = 'diligenciar';
   activeRequest: any = null;
@@ -196,6 +197,7 @@ export class MandatosComponent implements OnInit {
 
   onSubmit(): void {
     this.loading = true;
+    this.validationErrors = {};
     this.http.post(`${environment.apiUrl}/mandatos`, this.mandato).subscribe({
       next: (res) => {
         Swal.fire({
@@ -210,18 +212,79 @@ export class MandatosComponent implements OnInit {
         this.loading = false;
       },
       error: (err) => {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'No se pudo guardar el mandato. Verifique los campos.',
-          confirmButtonColor: '#ef4444'
-        });
         this.loading = false;
+        if (err.status === 422 && err.error?.errors) {
+          this.validationErrors = err.error.errors;
+          
+          const errorList = Object.keys(this.validationErrors)
+            .map(key => {
+              const friendlyName = this.getFieldFriendlyName(key);
+              const friendlyError = this.getFieldError(key);
+              return `<li><strong>${friendlyName}:</strong> ${friendlyError}</li>`;
+            }).join('');
+
+          Swal.fire({
+            icon: 'error',
+            title: 'Error de Validación',
+            html: `
+              <p>Por favor verifique los siguientes campos con errores:</p>
+              <ul style="text-align: left; font-size: 0.9rem; margin-top: 10px; max-height: 200px; overflow-y: auto;">
+                ${errorList}
+              </ul>
+            `,
+            confirmButtonColor: '#ef4444'
+          });
+        } else {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: err.error?.message || 'No se pudo guardar el mandato. Verifique los campos.',
+            confirmButtonColor: '#ef4444'
+          });
+        }
       }
     });
   }
 
+  getFieldFriendlyName(key: string): string {
+    const names: { [key: string]: string } = {
+      mandante_razon_social: 'Nombre / Razón Social Mandante',
+      mandante_tipo_documento: 'Tipo Documento Mandante',
+      mandante_numero_documento: 'Número Documento Mandante',
+      mandante_domicilio: 'Domicilio Mandante',
+      mandante_direccion: 'Dirección Mandante',
+      mandante_telefono: 'Teléfono Mandante',
+      mandante_rep_legal_nombre: 'Nombre Representante Legal',
+      mandante_rep_legal_tipo_doc: 'Tipo Doc. Rep. Legal',
+      mandante_rep_legal_num_doc: 'Número Doc. Rep. Legal',
+      mandante_rep_legal_email: 'E-mail Representante Legal',
+      factor_razon_social: 'Nombre / Razón Social Factor',
+      factor_tipo_documento: 'Tipo Documento Factor',
+      factor_numero_documento: 'Número Documento Factor',
+      factor_rep_legal_nombre: 'Nombre Representante Factor',
+      factor_rep_legal_tipo_doc: 'Tipo Doc. Rep. Factor',
+      factor_rep_legal_num_doc: 'Número Doc. Rep. Factor',
+      factor_rep_legal_email: 'E-mail Representante Factor'
+    };
+    return names[key] || key;
+  }
+
+  getFieldError(key: string): string | null {
+    if (this.validationErrors && this.validationErrors[key] && this.validationErrors[key].length > 0) {
+      const errorMsg = this.validationErrors[key][0].toLowerCase();
+      if (errorMsg.includes('must be a valid email') || errorMsg.includes('correo electrónico') || errorMsg.includes('email')) {
+        return 'Debe ser un correo electrónico válido (ej: usuario@dominio.com).';
+      }
+      if (errorMsg.includes('required') || errorMsg.includes('obligatorio') || errorMsg.includes('requerido')) {
+        return 'Este campo es obligatorio.';
+      }
+      return this.validationErrors[key][0];
+    }
+    return null;
+  }
+
   resetForm(): void {
+    this.validationErrors = {};
     this.mandato = {
       mandante_razon_social: '',
       mandante_tipo_documento: 'CC',
