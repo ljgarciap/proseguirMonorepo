@@ -107,6 +107,7 @@ use App\Http\Controllers\ContableController;
 
 Route::prefix('contable')->middleware('auth:api')->group(function () {
     Route::post('/upload/{type}', [ContableImportController::class, 'upload'])->middleware('checkrole:cliente,superadmin');
+    Route::delete('/clear', [ContableController::class, 'clearAll'])->middleware('checkrole:superadmin');
     
     Route::middleware('checkrole:gerente,operativo,superadmin')->group(function () {
         Route::get('/facturas', [ContableController::class, 'getFacturas']);
@@ -114,7 +115,6 @@ Route::prefix('contable')->middleware('auth:api')->group(function () {
         Route::get('/auxiliar', [ContableController::class, 'getAuxiliares']);
         Route::get('/gastos', [ContableController::class, 'getGastos']);
         Route::get('/imports', [ContableController::class, 'getImports']);
-        Route::delete('/clear', [ContableController::class, 'clearAll']);
         Route::post('/reconcile', [App\Http\Controllers\ReconciliationController::class, 'reconcile']);
     });
 });
@@ -149,11 +149,20 @@ Route::prefix('planilla')->middleware('auth:api')->group(function () {
 Route::get('/document-types', function() { return \App\Models\DocumentType::all(); })->middleware(['auth:api']);
 
 use App\Http\Controllers\MandatoController;
+use App\Http\Controllers\CreditoOrdinarioController;
 
 Route::prefix('mandatos')->middleware('auth:api')->group(function () {
     Route::post('/', [MandatoController::class, 'store'])->middleware('checkrole:cliente');
     Route::get('/', [MandatoController::class, 'index'])->middleware('checkrole:cliente,gerente,operativo,superadmin');
     Route::patch('/{id}/status', [MandatoController::class, 'updateStatus'])->middleware('checkrole:operativo,superadmin');
+});
+
+// Créditos Ordinarios (Proceso BPMN)
+Route::prefix('creditos')->middleware('auth:api')->group(function () {
+    Route::get('/', [CreditoOrdinarioController::class, 'index']);
+    Route::post('/', [CreditoOrdinarioController::class, 'store']);
+    Route::get('/{id}', [CreditoOrdinarioController::class, 'show']);
+    Route::post('/{id}/transition', [CreditoOrdinarioController::class, 'transition']);
 });
 
 // Parámetros Genéricos (Superadmin)
@@ -170,4 +179,10 @@ Route::prefix('internal-docs')->middleware(['auth:api', 'checkrole:operativo,con
     Route::post('/', [\App\Http\Controllers\InternalDocumentController::class, 'store']);
     Route::patch('/{id}/status', [\App\Http\Controllers\InternalDocumentController::class, 'updateStatus']);
     Route::delete('/{id}', [\App\Http\Controllers\InternalDocumentController::class, 'destroy']);
+});
+
+// Limpieza de Base de Datos (Superadmin)
+Route::prefix('db-cleaner')->middleware(['auth:api', 'checkrole:superadmin'])->group(function () {
+    Route::post('/clear-tables', [\App\Http\Controllers\DbCleanerController::class, 'clearTables']);
+    Route::post('/reset', [\App\Http\Controllers\DbCleanerController::class, 'resetDatabase']);
 });

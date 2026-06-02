@@ -1,0 +1,632 @@
+<div class="view-container">
+  <!-- View Header -->
+  <header class="view-header">
+    <div class="title-area">
+      <h1>Crédito Ordinario</h1>
+      <p>Gestión del flujo BPMN y aprobaciones de solicitudes de crédito.</p>
+    </div>
+    
+    <div class="header-actions">
+      <span class="role-indicator-badge">
+        <span class="material-symbols-outlined">shield_person</span>
+        Perfil Activo: {{ activeRole | titlecase }}
+      </span>
+      <button *ngIf="['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)" class="btn-pro primary" (click)="openNewRequestModal()">
+        <span class="material-symbols-outlined">add_circle</span> Nueva Solicitud
+      </button>
+    </div>
+  </header>
+
+  <!-- Empty State if no credits -->
+  <div class="empty-state-card card" *ngIf="creditos.length === 0">
+    <span class="material-symbols-outlined icon">receipt_long</span>
+    <h3>No hay solicitudes registradas</h3>
+    <p>No se encontraron solicitudes de crédito ordinario asociadas a tu cuenta en este momento.</p>
+    <button *ngIf="['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)" class="btn-pro primary" (click)="openNewRequestModal()">
+      Crear Primera Solicitud
+    </button>
+  </div>
+
+  <!-- Main Content Grid -->
+  <div class="main-grid" *ngIf="creditos.length > 0">
+    <!-- Sidebar List -->
+    <aside class="sidebar-list">
+      <div class="list-header">
+        <h3>Solicitudes ({{ creditos.length }})</h3>
+      </div>
+      
+      <div class="credit-items-container">
+        <div *ngFor="let item of creditos" 
+             class="credit-item-card" 
+             [class.active]="selectedCredito?.id === item.id"
+             (click)="selectCredito(item)">
+          <div class="item-header">
+            <span class="sol-num">{{ item.numero_solicitud }}</span>
+            <span class="status-badge" [ngClass]="item.estado">
+              {{ item.estado === 'completado' ? 'Completado' : item.estado === 'rechazado' ? 'Rechazado' : 'En Proceso' }}
+            </span>
+          </div>
+          <div class="item-body">
+            <div class="client-name">
+              <span class="material-symbols-outlined">person</span>
+              {{ item.cliente?.name }}
+            </div>
+            <div class="monto-info">
+              <strong>${{ item.monto | number:'1.2-2' }}</strong>
+              <span class="plazo">/ {{ item.plazo_meses }} meses</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Detail Panel -->
+    <main class="detail-panel" *ngIf="selectedCredito">
+      <!-- Credit Summary Banner -->
+      <div class="card summary-banner">
+        <div class="banner-grid">
+          <div>
+            <label>NÚMERO SOLICITUD</label>
+            <h4>{{ selectedCredito.numero_solicitud }}</h4>
+          </div>
+          <div>
+            <label>CLIENTE</label>
+            <h4>{{ selectedCredito.cliente?.name }}</h4>
+          </div>
+          <div>
+            <label>MONTO SOLICITADO</label>
+            <h4 class="primary-text">${{ selectedCredito.monto | number:'1.2-2' }} COP</h4>
+          </div>
+          <div>
+            <label>PLAZO</label>
+            <h4>{{ selectedCredito.plazo_meses }} meses</h4>
+          </div>
+          <div>
+            <label>ESTADO ACTUAL</label>
+            <span class="status-detail-badge" [ngClass]="selectedCredito.estado">
+              {{ selectedCredito.estado | titlecase }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- BPMN Stepper Map -->
+      <div class="card bpmn-stepper-card">
+        <h3>Mapa del Flujo del Proceso (BPMN)</h3>
+        <p class="section-desc">Visualización secuencial del estado actual de la solicitud en las distintas etapas de aprobación.</p>
+        
+        <div class="bpmn-stepper">
+          <div *ngFor="let step of bpmnSteps; let i = index" 
+               class="bpmn-step" 
+               [ngClass]="getStepClass(step.key)"
+               [title]="step.desc">
+            <div class="step-line" *ngIf="i > 0"></div>
+            <div class="step-bubble">
+              <span class="material-symbols-outlined" *ngIf="getStepClass(step.key) === 'completed'">check</span>
+              <span class="step-num" *ngIf="getStepClass(step.key) !== 'completed'">{{ i + 1 }}</span>
+            </div>
+            <div class="step-label">
+              <span class="label-text">{{ step.label }}</span>
+              <span class="label-role">{{ step.roleLabel }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Panel & Rules -->
+      <div class="card action-card" [class.authorized]="isUserRoleAuthorized()">
+        <header class="action-header">
+          <div class="action-title-group">
+            <span class="material-symbols-outlined status-icon">
+              {{ isUserRoleAuthorized() ? 'lock_open' : 'lock' }}
+            </span>
+            <div>
+              <h3>Acciones de Aprobación del Flujo</h3>
+              <p>Estado actual de la etapa: <strong>{{ selectedCredito.estado | titlecase }}</strong></p>
+            </div>
+          </div>
+          <span class="authorized-badge" [class.yes]="isUserRoleAuthorized()">
+            {{ isUserRoleAuthorized() ? 'Tu rol está autorizado' : 'Requiere otro rol' }}
+          </span>
+        </header>
+
+        <div class="action-body">
+          <!-- UNAUTHORIZED ROLE MESSAGE -->
+          <div class="unauthorized-message" *ngIf="!isUserRoleAuthorized()">
+            <div class="warning-alert">
+              <span class="material-symbols-outlined">warning</span>
+              <div>
+                <strong>Acceso Restringido</strong>
+                <p>Tu rol activo ({{ activeRole | titlecase }}) no tiene permisos para operar en esta etapa del proceso. La acción debe ser ejecutada por el rol correspondiente de la matriz BPMN.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- AUTHORIZED ACTIONS BY STATE -->
+          <div class="authorized-actions" *ngIf="isUserRoleAuthorized()">
+            <!-- Stage 1: revision_documental (Coordinador Comercial) -->
+            <div *ngIf="selectedCredito.estado === 'revision_documental'" class="action-buttons-layout">
+              <p class="action-instructions">Como <strong>Coordinador Comercial</strong>, debes verificar que los documentos iniciales cargados en el expediente del cliente estén correctos.</p>
+              <div class="flex-actions">
+                <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Documentación inicial verificada y aprobada.')">
+                  <span class="material-symbols-outlined">check_circle</span> Aprobar Documentos
+                </button>
+                <button class="btn-pro warning" (click)="executeTransition('completar', 'Se solicita al cliente completar la documentación.')">
+                  <span class="material-symbols-outlined">assignment_return</span> Solicitar Completar Soportes
+                </button>
+                <button class="btn-pro danger" (click)="executeTransition('rechazar', 'Solicitud rechazada en revisión inicial.')">
+                  <span class="material-symbols-outlined">cancel</span> Rechazar Solicitud
+                </button>
+              </div>
+            </div>
+
+            <!-- Stage 2: completar_solicitud (Cliente) -->
+            <div *ngIf="selectedCredito.estado === 'completar_solicitud'">
+              <p class="action-instructions">Como <strong>Cliente</strong>, debes completar la información solicitada por el asesor comercial. Una vez realizado, confirma el envío.</p>
+              <button class="btn-pro primary" (click)="executeTransition('aprobar', 'El cliente ha enviado la información complementaria solicitada.')">
+                <span class="material-symbols-outlined">send</span> Enviar Solicitud Completada
+              </button>
+            </div>
+
+            <!-- Stage 3: analisis_sarlaft_financiero (Parallel Cumplimiento / Comercial) -->
+            <div *ngIf="selectedCredito.estado === 'analisis_sarlaft_financiero'">
+              <p class="action-instructions">Esta etapa requiere **análisis en paralelo**. Sube los PDFs correspondientes a tu rol:</p>
+              
+              <div class="parallel-actions-grid">
+                <!-- Oficial de Cumplimiento Area -->
+                <div class="role-action-box" [class.active]="activeRole === 'oficial_cumplimiento' || activeRole === 'superadmin'">
+                  <h5>🛡️ Oficial de Cumplimiento (SARLAFT)</h5>
+                  <p>Debe validar listas restrictivas y generar los reportes de Síntesis y Datacrédito.</p>
+                  
+                  <div class="upload-controls">
+                    <div class="upload-item">
+                      <label>1. Documento Síntesis SARLAFT (PDF)</label>
+                      <input type="file" id="file-sintesis" (change)="onFileUpload($event, 'sarlft_sintesis')" 
+                             [disabled]="!(activeRole === 'oficial_cumplimiento' || activeRole === 'superadmin')" accept=".pdf" class="file-input-hide">
+                      <label for="file-sintesis" class="btn-pro secondary sm btn-upload">
+                        <span class="material-symbols-outlined">upload</span>
+                        {{ selectedCredito.documentos?.sarlft_sintesis ? 'Reemplazar Síntesis' : 'Cargar Síntesis' }}
+                      </label>
+                      <span class="file-status" *ngIf="selectedCredito.documentos?.sarlft_sintesis">✅ Cargado</span>
+                    </div>
+
+                    <div class="upload-item">
+                      <label>2. Reporte Datacrédito (PDF)</label>
+                      <input type="file" id="file-datacredito" (change)="onFileUpload($event, 'sarlft_datacredito')"
+                             [disabled]="!(activeRole === 'oficial_cumplimiento' || activeRole === 'superadmin')" accept=".pdf" class="file-input-hide">
+                      <label for="file-datacredito" class="btn-pro secondary sm btn-upload">
+                        <span class="material-symbols-outlined">upload</span>
+                        {{ selectedCredito.documentos?.sarlft_datacredito ? 'Reemplazar Datacrédito' : 'Cargar Datacrédito' }}
+                      </label>
+                      <span class="file-status" *ngIf="selectedCredito.documentos?.sarlft_datacredito">✅ Cargado</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Coordinador Comercial Area -->
+                <div class="role-action-box" [class.active]="activeRole === 'coordinador_comercial' || activeRole === 'superadmin'">
+                  <h5>📈 Coordinador Comercial</h5>
+                  <p>Debe elaborar la Planilla de Análisis Financiero y la Presentación del Comité.</p>
+                  
+                  <div class="upload-controls">
+                    <div class="upload-item">
+                      <label>1. Planilla de Análisis Financiero (PDF)</label>
+                      <input type="file" id="file-analisis" (change)="onFileUpload($event, 'analisis_financiero')"
+                             [disabled]="!(activeRole === 'coordinador_comercial' || activeRole === 'superadmin')" accept=".pdf" class="file-input-hide">
+                      <label for="file-analisis" class="btn-pro secondary sm btn-upload">
+                        <span class="material-symbols-outlined">upload</span>
+                        {{ selectedCredito.documentos?.analisis_financiero ? 'Reemplazar Análisis' : 'Cargar Análisis' }}
+                      </label>
+                      <span class="file-status" *ngIf="selectedCredito.documentos?.analisis_financiero">✅ Cargado</span>
+                    </div>
+
+                    <div class="upload-item">
+                      <label>2. Presentación del Cliente para Comité (PDF)</label>
+                      <input type="file" id="file-presentacion" (change)="onFileUpload($event, 'presentacion_comite')"
+                             [disabled]="!(activeRole === 'coordinador_comercial' || activeRole === 'superadmin')" accept=".pdf" class="file-input-hide">
+                      <label for="file-presentacion" class="btn-pro secondary sm btn-upload">
+                        <span class="material-symbols-outlined">upload</span>
+                        {{ selectedCredito.documentos?.presentacion_comite ? 'Reemplazar Presentación' : 'Cargar Presentación' }}
+                      </label>
+                      <span class="file-status" *ngIf="selectedCredito.documentos?.presentacion_comite">✅ Cargado</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="transition-trigger-box" *ngIf="selectedCredito.documentos?.sarlft_sintesis && selectedCredito.documentos?.sarlft_datacredito && selectedCredito.documentos?.analisis_financiero && selectedCredito.documentos?.presentacion_comite">
+                <div class="info-alert">
+                  <span class="material-symbols-outlined">info</span>
+                  <p>Todos los documentos requeridos de análisis paralelo han sido cargados con éxito. Procede a confirmar el paso a Gerencia.</p>
+                </div>
+                <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Análisis paralelo SARLAFT y financiero completado con éxito.')">
+                  Enviar a Aprobación de Gerencia
+                </button>
+              </div>
+            </div>
+
+            <!-- Stage 4: aprobacion_presentacion (Gerente) -->
+            <div *ngIf="selectedCredito.estado === 'aprobacion_presentacion'" class="action-buttons-layout">
+              <p class="action-instructions">Como <strong>Gerencia</strong>, debes revisar la presentación comercial y el análisis financiero consolidado del cliente.</p>
+              <div class="flex-actions">
+                <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Presentación del cliente aprobada para el Comité de Créditos.')">
+                  <span class="material-symbols-outlined">check_circle</span> Aprobar Presentación
+                </button>
+                <button class="btn-pro danger" (click)="executeTransition('rechazar', 'Presentación rechazada. Se devuelve a corrección comercial.')">
+                  <span class="material-symbols-outlined">assignment_return</span> Rechazar y Devolver
+                </button>
+              </div>
+            </div>
+
+            <!-- Stage 5: comite_evaluacion (Comité de Crédito) -->
+            <div *ngIf="selectedCredito.estado === 'comite_evaluacion'">
+              <p class="action-instructions">Como <strong>Comité de Crédito</strong>, deben realizar la evaluación del crédito y cargar el **Acta Oficial del Comité firmada** antes de dar el veredicto final.</p>
+              
+              <div class="upload-controls" style="margin-bottom: 20px;">
+                <div class="upload-item">
+                  <label>Cargar Acta de Comité Firmada (PDF obligatorio)</label>
+                  <input type="file" id="file-acta" (change)="onFileUpload($event, 'acta_comite_firmada')" accept=".pdf" class="file-input-hide">
+                  <label for="file-acta" class="btn-pro secondary sm btn-upload">
+                    <span class="material-symbols-outlined">upload</span>
+                    {{ selectedCredito.documentos?.acta_comite_firmada ? 'Reemplazar Acta Firmada' : 'Cargar Acta Firmada' }}
+                  </label>
+                  <span class="file-status" *ngIf="selectedCredito.documentos?.acta_comite_firmada">✅ Cargado</span>
+                </div>
+              </div>
+
+              <div class="flex-actions" *ngIf="selectedCredito.documentos?.acta_comite_firmada">
+                <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Crédito formalmente aprobado por el Comité de Créditos.')">
+                  <span class="material-symbols-outlined">check_circle</span> Aprobar Crédito Ordinario
+                </button>
+                <button class="btn-pro danger" (click)="executeTransition('rechazar', 'Crédito rechazado formalmente en sesión del Comité.')">
+                  <span class="material-symbols-outlined">cancel</span> Rechazar Crédito
+                </button>
+              </div>
+            </div>
+
+            <!-- Stage 6: formalizacion_garantias (Coordinador / Cliente / Operativo) -->
+            <div *ngIf="selectedCredito.estado === 'formalizacion_garantias'">
+              <p class="action-instructions">Etapa de formalización de garantías. Sigue los pasos según tu rol:</p>
+              
+              <div class="guarantees-layout">
+                <!-- Cliente / Comercial load -->
+                <div class="guarantee-box">
+                  <h5>✍️ Carga de Garantías Firmadas</h5>
+                  <p>El cliente o comercial debe cargar las garantías formalizadas y firmadas en formato PDF.</p>
+                  <input type="file" id="file-garantias" (change)="onFileUpload($event, 'garantias_firmadas')" 
+                         [disabled]="!(activeRole === 'cliente' || activeRole === 'coordinador_comercial' || activeRole === 'superadmin')" accept=".pdf" class="file-input-hide">
+                  <label for="file-garantias" class="btn-pro secondary sm btn-upload">
+                    <span class="material-symbols-outlined">upload</span>
+                    {{ selectedCredito.documentos?.garantias_firmadas ? 'Reemplazar Garantías' : 'Cargar Garantías' }}
+                  </label>
+                  <span class="file-status" *ngIf="selectedCredito.documentos?.garantias_firmadas">✅ Cargado</span>
+                </div>
+
+                <!-- Dirección Administrativa approval -->
+                <div class="guarantee-box" [class.highlight]="activeRole === 'operativo' || activeRole === 'superadmin'">
+                  <h5>🏢 Revisión y Registro (Dir. Administrativa)</h5>
+                  <p>El rol operativo de Dirección Administrativa debe revisar los documentos de garantías cargados y proceder con su registro formal.</p>
+                  
+                  <button class="btn-pro primary" 
+                          [disabled]="!selectedCredito.documentos?.garantias_firmadas || !(activeRole === 'operativo' || activeRole === 'superadmin')"
+                          (click)="executeTransition('aprobar', 'Garantías revisadas, registradas y validadas por Dirección Administrativa.')">
+                    Aprobar y Registrar Garantías
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stage 7: aprobacion_registro_cyf (Comercial / Gerente) -->
+            <div *ngIf="selectedCredito.estado === 'aprobacion_registro_cyf'">
+              <p class="action-instructions">Registro de la operación en el sistema financiero principal core CYF:</p>
+              
+              <div class="cyf-layout">
+                <div class="cyf-box">
+                  <h5>📝 Registro de Crédito en CYF (Comercial)</h5>
+                  <p>El Coordinador Comercial debe registrar el crédito en CYF y cargar el soporte.</p>
+                  <input type="file" id="file-cyf" (change)="onFileUpload($event, 'registro_cyf')" 
+                         [disabled]="!(activeRole === 'coordinador_comercial' || activeRole === 'superadmin')" accept=".pdf" class="file-input-hide">
+                  <label for="file-cyf" class="btn-pro secondary sm btn-upload">
+                    <span class="material-symbols-outlined">upload</span>
+                    {{ selectedCredito.documentos?.registro_cyf ? 'Reemplazar Soporte CYF' : 'Cargar Soporte CYF' }}
+                  </label>
+                  <span class="file-status" *ngIf="selectedCredito.documentos?.registro_cyf">✅ Soporte CYF Cargado</span>
+                </div>
+
+                <div class="cyf-box" [class.highlight]="activeRole === 'gerente' || activeRole === 'superadmin'">
+                  <h5>👔 Aprobación del Registro (Gerencia)</h5>
+                  <p>La Gerencia Financiera debe aprobar el registro core de la operación.</p>
+                  
+                  <button class="btn-pro primary" 
+                          [disabled]="!selectedCredito.documentos?.registro_cyf || !(activeRole === 'gerente' || activeRole === 'superadmin')"
+                          (click)="executeTransition('aprobar', 'Registro core CYF verificado y aprobado por Gerencia.')">
+                    Aprobar Registro CYF
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stage 8: desembolso_ingreso (Operativo / Dir. Administrativa) -->
+            <div *ngIf="selectedCredito.estado === 'desembolso_ingreso'">
+              <p class="action-instructions">Como <strong>Dirección Administrativa</strong>, debes ingresar la operación de desembolso en el core CYF y cargar los soportes (Instrucción de Egreso y Registro de Desembolso).</p>
+              
+              <div class="upload-controls" style="margin-bottom: 20px;">
+                <div class="upload-item">
+                  <label>Soporte de Egreso y Desembolso CYF (PDF)</label>
+                  <input type="file" id="file-desembolso" (change)="onFileUpload($event, 'desembolso_egreso')" accept=".pdf" class="file-input-hide">
+                  <label for="file-desembolso" class="btn-pro secondary sm btn-upload">
+                    <span class="material-symbols-outlined">upload</span>
+                    {{ selectedCredito.documentos?.desembolso_egreso ? 'Reemplazar Soporte Egreso' : 'Cargar Soporte Egreso' }}
+                  </label>
+                  <span class="file-status" *ngIf="selectedCredito.documentos?.desembolso_egreso">✅ Soporte Cargado</span>
+                </div>
+              </div>
+
+              <button class="btn-pro primary" 
+                      [disabled]="!selectedCredito.documentos?.desembolso_egreso"
+                      (click)="executeTransition('aprobar', 'Operación de desembolso y egreso registrada exitosamente en core CYF.')">
+                Completar Registro Desembolso
+              </button>
+            </div>
+
+            <!-- Stage 9: desembolso_aprobacion (Gerencia) -->
+            <div *ngIf="selectedCredito.estado === 'desembolso_aprobacion'">
+              <p class="action-instructions">Como <strong>Gerencia</strong>, debes dar la autorización final al desembolso financiero y firma de soporte bancario.</p>
+              <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Operación de desembolso autorizada. Enviada a Tesorería para transferencia bancaria.')">
+                <span class="material-symbols-outlined">task_alt</span> Autorizar y Firmar Desembolso
+              </button>
+            </div>
+
+            <!-- Stage 10: ejecucion_transferencia (Tesorería) -->
+            <div *ngIf="selectedCredito.estado === 'ejecucion_transferencia'">
+              <p class="action-instructions">Como <strong>Tesorería</strong>, debes ejecutar la transferencia bancaria hacia la cuenta del cliente y cargar el **Comprobante de Transferencia definitivo**.</p>
+              
+              <div class="upload-controls" style="margin-bottom: 20px;">
+                <div class="upload-item">
+                  <label>Cargar Comprobante de Transferencia Bancaria (PDF)</label>
+                  <input type="file" id="file-transferencia" (change)="onFileUpload($event, 'comprobante_transferencia')" accept=".pdf" class="file-input-hide">
+                  <label for="file-transferencia" class="btn-pro secondary sm btn-upload">
+                    <span class="material-symbols-outlined">upload</span>
+                    {{ selectedCredito.documentos?.comprobante_transferencia ? 'Reemplazar Comprobante' : 'Cargar Comprobante' }}
+                  </label>
+                  <span class="file-status" *ngIf="selectedCredito.documentos?.comprobante_transferencia">✅ Comprobante Cargado</span>
+                </div>
+              </div>
+
+              <button class="btn-pro primary" 
+                      [disabled]="!selectedCredito.documentos?.comprobante_transferencia"
+                      (click)="executeTransition('aprobar', 'Transferencia bancaria ejecutada exitosamente. Soporte de pago enviado.')">
+                <span class="material-symbols-outlined">send</span> Completar Proceso de Crédito
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attached Documents Area -->
+      <div class="card documents-card">
+        <h3>Expediente de Documentos de Crédito</h3>
+        <p class="section-desc">Listado completo de soportes documentales generados y cargados a lo largo del proceso.</p>
+        
+        <div class="documents-grid">
+          <!-- Solicitud y Requisitos -->
+          <div class="doc-box">
+            <span class="material-symbols-outlined doc-icon">folder_zip</span>
+            <div class="doc-details">
+              <strong>Formulario y Requisitos del Cliente</strong>
+              <p class="desc">Formulario inicial y soportes comerciales.</p>
+              <div class="doc-footer" style="margin-top:8px;">
+                <span class="doc-tag" *ngIf="!selectedCredito.documentos?.formulario_solicitud">No requerido físicamente</span>
+                <a *ngIf="selectedCredito.documentos?.formulario_solicitud" [href]="selectedCredito.documentos.formulario_solicitud" target="_blank" class="btn-pro secondary sm">
+                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- SARLAFT Sintesis -->
+          <div class="doc-box">
+            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.sarlft_sintesis">verified_user</span>
+            <div class="doc-details">
+              <strong>Síntesis SARLAFT</strong>
+              <p class="desc">Reporte del Oficial de Cumplimiento sobre listas restrictivas.</p>
+              <div class="doc-footer" style="margin-top:8px;">
+                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.sarlft_sintesis">Pendiente</span>
+                <a *ngIf="selectedCredito.documentos?.sarlft_sintesis" [href]="selectedCredito.documentos.sarlft_sintesis" target="_blank" class="btn-pro secondary sm">
+                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- SARLAFT Datacredito -->
+          <div class="doc-box">
+            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.sarlft_datacredito">credit_card</span>
+            <div class="doc-details">
+              <strong>Reporte Centrales Datacrédito</strong>
+              <p class="desc">Reporte crediticio de centrales de información.</p>
+              <div class="doc-footer" style="margin-top:8px;">
+                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.sarlft_datacredito">Pendiente</span>
+                <a *ngIf="selectedCredito.documentos?.sarlft_datacredito" [href]="selectedCredito.documentos.sarlft_datacredito" target="_blank" class="btn-pro secondary sm">
+                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Analisis Financiero -->
+          <div class="doc-box">
+            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.analisis_financiero">analytics</span>
+            <div class="doc-details">
+              <strong>Análisis Financiero de Solicitud</strong>
+              <p class="desc">Cálculo de capacidad de pago y endeudamiento comercial.</p>
+              <div class="doc-footer" style="margin-top:8px;">
+                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.analisis_financiero">Pendiente</span>
+                <a *ngIf="selectedCredito.documentos?.analisis_financiero" [href]="selectedCredito.documentos.analisis_financiero" target="_blank" class="btn-pro secondary sm">
+                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Presentacion del Comité -->
+          <div class="doc-box">
+            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.presentacion_comite">presentation_play</span>
+            <div class="doc-details">
+              <strong>Presentación para Comité de Crédito</strong>
+              <p class="desc">Ficha y propuesta de otorgamiento de crédito.</p>
+              <div class="doc-footer" style="margin-top:8px;">
+                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.presentacion_comite">Pendiente</span>
+                <a *ngIf="selectedCredito.documentos?.presentacion_comite" [href]="selectedCredito.documentos.presentacion_comite" target="_blank" class="btn-pro secondary sm">
+                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Acta Comité -->
+          <div class="doc-box">
+            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.acta_comite_firmada">assignment_turned_in</span>
+            <div class="doc-details">
+              <strong>Acta de Comité Firmada</strong>
+              <p class="desc">Soporte decisorio firmado por miembros de Comité.</p>
+              <div class="doc-footer" style="margin-top:8px;">
+                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.acta_comite_firmada">Pendiente</span>
+                <a *ngIf="selectedCredito.documentos?.acta_comite_firmada" [href]="selectedCredito.documentos.acta_comite_firmada" target="_blank" class="btn-pro secondary sm">
+                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Garantias Firmadas -->
+          <div class="doc-box">
+            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.garantias_firmadas">draw</span>
+            <div class="doc-details">
+              <strong>Pagarés y Garantías Firmadas</strong>
+              <p class="desc">Documentos jurídicos y pagarés del crédito.</p>
+              <div class="doc-footer" style="margin-top:8px;">
+                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.garantias_firmadas">Pendiente</span>
+                <a *ngIf="selectedCredito.documentos?.garantias_firmadas" [href]="selectedCredito.documentos.garantias_firmadas" target="_blank" class="btn-pro secondary sm">
+                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- CYF Registro -->
+          <div class="doc-box">
+            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.registro_cyf">account_balance</span>
+            <div class="doc-details">
+              <strong>Registro core CYF</strong>
+              <p class="desc">Soporte de cargue en el sistema financiero.</p>
+              <div class="doc-footer" style="margin-top:8px;">
+                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.registro_cyf">Pendiente</span>
+                <a *ngIf="selectedCredito.documentos?.registro_cyf" [href]="selectedCredito.documentos.registro_cyf" target="_blank" class="btn-pro secondary sm">
+                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Desembolso Egreso -->
+          <div class="doc-box">
+            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.desembolso_egreso">request_quote</span>
+            <div class="doc-details">
+              <strong>Egreso y Liquidación Desembolso</strong>
+              <p class="desc">Documento de egreso y autorización de pago.</p>
+              <div class="doc-footer" style="margin-top:8px;">
+                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.desembolso_egreso">Pendiente</span>
+                <a *ngIf="selectedCredito.documentos?.desembolso_egreso" [href]="selectedCredito.documentos.desembolso_egreso" target="_blank" class="btn-pro secondary sm">
+                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Comprobante Transferencia -->
+          <div class="doc-box">
+            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.comprobante_transferencia">payments</span>
+            <div class="doc-details">
+              <strong>Comprobante de Transferencia</strong>
+              <p class="desc">Transferencia bancaria al cliente.</p>
+              <div class="doc-footer" style="margin-top:8px;">
+                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.comprobante_transferencia">Pendiente</span>
+                <a *ngIf="selectedCredito.documentos?.comprobante_transferencia" [href]="selectedCredito.documentos.comprobante_transferencia" target="_blank" class="btn-pro secondary sm">
+                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audit Log Timeline -->
+      <div class="card timeline-card">
+        <h3>Historial de Auditoría y Trazabilidad</h3>
+        <p class="section-desc">Línea de tiempo de cambios de estado del crédito con comentarios detallados.</p>
+        
+        <div class="audit-timeline">
+          <div *ngFor="let log of selectedCredito.historial_estados" class="timeline-item">
+            <div class="timeline-badge" [ngClass]="log.estado_nuevo">
+              <span class="material-symbols-outlined">history</span>
+            </div>
+            <div class="timeline-panel">
+              <div class="timeline-header">
+                <span class="user-info"><strong>{{ log.usuario }}</strong> ({{ log.rol | titlecase }})</span>
+                <span class="date">{{ log.fecha | date:'medium' }}</span>
+              </div>
+              <div class="timeline-states">
+                <span class="state-node prev">{{ log.estado_anterior | titlecase }}</span>
+                <span class="material-symbols-outlined arrow">arrow_forward</span>
+                <span class="state-node next" [ngClass]="log.estado_nuevo">{{ log.estado_nuevo | titlecase }}</span>
+              </div>
+              <p class="timeline-comment">{{ log.comentario }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Creative Glassmorphism Modal for New Credit Solicitud -->
+<div class="modal-backdrop" *ngIf="showNewRequestModal">
+  <div class="modal-card card">
+    <header class="modal-header">
+      <h3>Nueva Solicitud de Crédito Ordinario</h3>
+      <button class="btn-close" (click)="showNewRequestModal = false">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </header>
+    
+    <div class="modal-body">
+      <div class="pro-input-group">
+        <label>Monto del Crédito (COP)</label>
+        <input type="number" [(ngModel)]="newRequest.monto" placeholder="Ej: 15000000" class="pro-input">
+      </div>
+      
+      <div class="pro-input-group">
+        <label>Plazo en Meses</label>
+        <select [(ngModel)]="newRequest.plazo_meses" class="pro-input">
+          <option [value]="6">6 meses</option>
+          <option [value]="12">12 meses</option>
+          <option [value]="18">18 meses</option>
+          <option [value]="24">24 meses</option>
+          <option [value]="36">36 meses</option>
+          <option [value]="48">48 meses</option>
+        </select>
+      </div>
+
+      <div class="info-note">
+        <span class="material-symbols-outlined">info</span>
+        <p>Al crear esta solicitud, el crédito iniciará automáticamente en la etapa de <strong>Revisión de Solicitud y Documentación</strong> para ser evaluada por un Coordinador Comercial.</p>
+      </div>
+    </div>
+
+    <footer class="modal-footer">
+      <button class="btn-pro secondary" (click)="showNewRequestModal = false">Cancelar</button>
+      <button class="btn-pro primary" (click)="submitNewRequest()">Crear Solicitud</button>
+    </footer>
+  </div>
+</div>

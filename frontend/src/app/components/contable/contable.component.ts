@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-contable',
@@ -37,7 +38,7 @@ export class ContableComponent implements OnInit {
   sortBy: string = 'id';
   sortDir: string = 'desc';
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, public authService: AuthService) {}
 
   ngOnInit() {
     this.loadData();
