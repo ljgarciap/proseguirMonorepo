@@ -21,10 +21,13 @@ import { interval, Subscription } from 'rxjs';
         </div>
 
         <nav class="sidebar-nav">
-          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])">
+          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'])">
             <label>Operaciones</label>
-            <a routerLink="/dashboard" routerLinkActive="active" class="nav-link">
+            <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])" routerLink="/dashboard" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">dashboard</span> Dashboard
+            </a>
+            <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'])" routerLink="/creditos" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">payments</span> Crédito Ordinario
             </a>
             <a *ngIf="authService.isAuthorized(['operativo'])" routerLink="/sheets" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">database</span> Base de Datos
@@ -92,6 +95,9 @@ import { interval, Subscription } from 'rxjs';
             <a routerLink="/parameters" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">settings_applications</span> Parámetros
             </a>
+            <a routerLink="/db-cleaner" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">restart_alt</span> Limpieza BD
+            </a>
           </div>
 
           <div class="nav-section" *ngIf="authService.isAuthorized(['cliente'])">
@@ -102,6 +108,9 @@ import { interval, Subscription } from 'rxjs';
             <a routerLink="/mandatos" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">description</span> Diligenciar Mandato
             </a>
+            <a routerLink="/creditos" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">payments</span> Crédito Ordinario
+            </a>
           </div>
 
         </nav>
@@ -109,10 +118,10 @@ import { interval, Subscription } from 'rxjs';
         <div class="sidebar-footer">
           <div class="test-role-switcher">
             <span class="material-symbols-outlined">person_pin</span>
-            <select [ngModel]="authService.getActiveRole()" (ngModelChange)="switchRole($event)">
-              <option *ngFor="let r of authService.getAllRoles()" [value]="r">{{ r | titlecase }}</option>
-              <option *ngIf="authService.isAuthorized(['superadmin'])" value="superadmin">Superadmin</option>
-            </select>
+             <select [ngModel]="authService.getActiveRole()" (ngModelChange)="switchRole($event)">
+               <option *ngFor="let r of authService.getAllRoles()" [value]="r">{{ r.split('_').join(' ') | titlecase }}</option>
+               <option *ngIf="authService.isAuthorized(['superadmin'])" value="superadmin">Superadmin</option>
+             </select>
           </div>
         </div>
       </aside>
@@ -151,10 +160,10 @@ import { interval, Subscription } from 'rxjs';
             <div class="user-profile-wrapper" (click)="toggleUserMenu()">
               <div class="user-profile">
                 <div class="avatar">{{ authService.getActiveRole()?.charAt(0)?.toUpperCase() }}</div>
-                <div class="user-info">
-                  <span class="name">{{ authService.getUser()?.name || 'Usuario' }}</span>
-                  <span class="status">Perfil: {{ authService.getActiveRole() | titlecase }}</span>
-                </div>
+                 <div class="user-info">
+                   <span class="name">{{ authService.getUser()?.name || 'Usuario' }}</span>
+                   <span class="status">Perfil: {{ authService.getActiveRole()?.split('_')?.join(' ') | titlecase }}</span>
+                 </div>
                 <span class="material-symbols-outlined expand-icon">expand_more</span>
               </div>
               
@@ -301,6 +310,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.checkPendingTasks();
     if (role === 'cliente') {
       this.router.navigate(['/client-upload']);
+    } else if (['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'].includes(role)) {
+      this.router.navigate(['/creditos']);
     } else {
       this.router.navigate(['/dashboard']);
     }

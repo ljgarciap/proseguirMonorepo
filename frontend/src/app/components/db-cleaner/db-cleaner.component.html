@@ -1,0 +1,92 @@
+<div class="view-container">
+  <!-- View Header -->
+  <header class="view-header">
+    <div class="title-area">
+      <h1>Limpieza de Base de Datos</h1>
+      <p>Panel administrativo para la depuración selectiva y el reinicio general del sistema.</p>
+    </div>
+    <div class="header-actions">
+      <span class="role-indicator-badge">
+        <span class="material-symbols-outlined">security</span>
+        Acceso Exclusivo: Superadmin
+      </span>
+    </div>
+  </header>
+
+  <!-- Status / Message Banner -->
+  <div class="status-banner" *ngIf="message" [class.error]="isError" [class.success]="!isError && !loading">
+    <div class="loader-inline" *ngIf="loading"></div>
+    <span style="margin-left: 8px;">{{ message }}</span>
+  </div>
+
+  <div class="cleaner-grid">
+    <!-- Selective Clear Module (Left/Main Panel) -->
+    <div class="card cleaner-card">
+      <div class="card-header-flex">
+        <div>
+          <h3>Limpieza Selectiva de Módulos</h3>
+          <p class="section-desc">Selecciona las secciones de datos que deseas depurar permanentemente de la base de datos.</p>
+        </div>
+        <div class="select-all-checkbox">
+          <label>
+            <input type="checkbox" (change)="toggleAll($event)">
+            Seleccionar Todos
+          </label>
+        </div>
+      </div>
+
+      <div class="modules-list">
+        <div *ngFor="let mod of modulesList" class="module-item" [class.selected]="mod.selected">
+          <label class="module-label">
+            <input type="checkbox" [(ngModel)]="mod.selected">
+            <div class="module-info-wrap">
+              <span class="material-symbols-outlined module-icon">{{ mod.icon }}</span>
+              <div class="module-text">
+                <span class="module-title">{{ mod.label }}</span>
+                <span class="module-desc">{{ mod.desc }}</span>
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="card-footer-actions">
+        <button class="btn-pro danger" [disabled]="loading || !hasSelection()" (click)="clearSelectedModules()">
+          <span class="material-symbols-outlined">delete_sweep</span>
+          Vaciar Módulos Seleccionados
+        </button>
+      </div>
+    </div>
+
+    <!-- Danger Zone (Right/Side Panel) -->
+    <div class="card danger-zone-card">
+      <div class="danger-header">
+        <span class="material-symbols-outlined icon">warning</span>
+        <h3>Zona de Peligro</h3>
+      </div>
+      
+      <p class="danger-desc">
+        Las acciones de esta sección tienen un impacto destructivo masivo sobre el sistema completo. Por favor utilícelas con extrema precaución.
+      </p>
+
+      <div class="danger-action-box">
+        <h5>Reinicio Total del Sistema (Prístino)</h5>
+        <p>
+          Borra absolutamente todas las tablas del sistema (incluyendo usuarios de prueba, operaciones y registros del sistema) y vuelve a ejecutar el sembrado inicial.
+        </p>
+        
+        <div class="alert-box-danger">
+          <span class="material-symbols-outlined">info</span>
+          <p>
+            Al reiniciar, las credenciales de administración se restaurarán al usuario por defecto: <b>admin@test.com</b> con clave <b>1234</b>.
+          </p>
+        </div>
+
+        <button class="btn-pro critical" [disabled]="loading" (click)="resetAndSeedDatabase()">
+          <span class="material-symbols-outlined">restart_alt</span>
+          Reinicio Completo del Sistema
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

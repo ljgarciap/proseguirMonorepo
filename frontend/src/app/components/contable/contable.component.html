@@ -32,7 +32,7 @@
         <button (click)="reconcile()" class="btn-action blue" [disabled]="uploading" title="Ejecutar Conciliación Automática">
           <span class="text">Conciliar</span>
         </button>
-        <button (click)="clearData()" class="btn-action red" [disabled]="uploading" title="Limpiar Módulo">
+        <button *ngIf="authService.isAuthorized(['superadmin'])" (click)="clearData()" class="btn-action red" [disabled]="uploading" title="Limpiar Módulo">
           <span class="icon">🗑️</span>
         </button>
       </div>

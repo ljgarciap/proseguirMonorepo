@@ -124,5 +124,17 @@ export const routes: Routes = [
         canActivate: [roleGuard], 
         data: { roles: ['operativo', 'contable', 'gerente', 'superadmin'] } 
     },
+    { 
+        path: 'creditos', 
+        loadComponent: () => import('./components/credito-ordinario/credito-ordinario.component').then(m => m.CreditoOrdinarioComponent), 
+        canActivate: [roleGuard], 
+        data: { roles: ['cliente', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'] } 
+    },
+    { 
+        path: 'db-cleaner', 
+        loadComponent: () => import('./components/db-cleaner/db-cleaner.component').then(m => m.DbCleanerComponent), 
+        canActivate: [roleGuard], 
+        data: { roles: ['superadmin'] } 
+    },
     { path: '**', redirectTo: '' }
 ];
