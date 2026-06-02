@@ -131,4 +131,47 @@ export class DbCleanerComponent implements OnInit {
       }
     });
   }
+
+  // Check and repair database schema
+  repairDatabaseSchema() {
+    Swal.fire({
+      title: 'Chequeo e Integridad',
+      text: 'Se verificará si existen todas las tablas necesarias en la base de datos y se repararán las que falten de forma segura (sin borrar datos existentes). ¿Deseas continuar?',
+      icon: 'info',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, chequear y reparar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#2B6CB0',
+      cancelButtonColor: '#718096'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.loading = true;
+        this.message = 'Verificando estructura de la base de datos...';
+        this.isError = false;
+
+        this.http.post(`${environment.apiUrl}/db-cleaner/repair`, {}).subscribe({
+          next: (res: any) => {
+            this.loading = false;
+            if (res.status === 'ok') {
+              this.message = res.message;
+              Swal.fire('Estructura Correcta', res.message, 'success');
+            } else if (res.status === 'repaired') {
+              this.message = `Tablas reparadas: ${res.missing_tables.join(', ')}`;
+              Swal.fire({
+                title: 'Reparación Exitosa',
+                html: `<p>Se detectaron y crearon las siguientes tablas faltantes:</p><ul>${res.missing_tables.map((t: string) => `<li><b>${t}</b></li>`).join('')}</ul>`,
+                icon: 'success'
+              });
+            }
+          },
+          error: (err) => {
+            this.loading = false;
+            this.isError = true;
+            this.message = err.error.message || 'Ocurrió un error al diagnosticar/reparar la base de datos.';
+            Swal.fire('Error de Diagnóstico', this.message, 'error');
+          }
+        });
+      }
+    });
+  }
 }

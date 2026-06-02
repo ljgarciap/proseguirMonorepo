@@ -46,7 +46,8 @@ class DbCleanerController extends Controller
         ],
         'notificaciones' => [
             'notificaciones',
-            'destinatarios'
+            'destinatarios',
+            're_notificacion_destinatario'
         ],
         'system_logs' => [
             'system_logs'
@@ -91,16 +92,50 @@ class DbCleanerController extends Controller
      */
     public function resetDatabase()
     {
-        Schema::disableForeignKeyConstraints();
+        try {
+            // Re-run all migrations from scratch and seed initial database data
+            Artisan::call('migrate:fresh', [
+                '--force' => true,
+                '--seed' => true
+            ]);
 
-        // 1. Gather all tables to truncate (application tables)
-        $allApplicationTables = [];
+            // Reinstall passport to recreate OAuth clients
+            Artisan::call('passport:install', [
+                '--force' => true,
+                '--no-interaction' => true
+            ]);
+
+            $output = Artisan::output();
+            
+            return response()->json([
+                'message' => 'Base de datos reiniciada, migraciones ejecutadas y semillas aplicadas correctamente.',
+                'output' => $output
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al reiniciar la base de datos: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Diagnose and repair missing database tables in production/local environment
+     */
+    public function repairSchema()
+    {
+        $missingTables = [];
+
+        // Collect all tables defined in modules
         foreach ($this->modules as $tables) {
-            $allApplicationTables = array_merge($allApplicationTables, $tables);
+            foreach ($tables as $table) {
+                if (!Schema::hasTable($table)) {
+                    $missingTables[] = $table;
+                }
+            }
         }
 
-        // Add core tables that need to be cleared and re-seeded
-        $coreTablesToSeed = [
+        // Collect core tables
+        $coreTables = [
             'users',
             'document_types',
             'sectores',
@@ -108,31 +143,69 @@ class DbCleanerController extends Controller
             'accounting_categories',
             'accounting_priorities'
         ];
-
-        $tablesToTruncate = array_merge($allApplicationTables, $coreTablesToSeed);
-
-        // Truncate all collected tables
-        foreach ($tablesToTruncate as $table) {
-            if (Schema::hasTable($table)) {
-                DB::table($table)->truncate();
+        foreach ($coreTables as $table) {
+            if (!Schema::hasTable($table)) {
+                $missingTables[] = $table;
             }
         }
 
-        Schema::enableForeignKeyConstraints();
-
-        // 2. Re-run initial seeds
-        try {
-            Artisan::call('db:seed', ['--force' => true]);
-            $output = Artisan::output();
-            
+        if (empty($missingTables)) {
             return response()->json([
-                'message' => 'Base de datos reiniciada y semillas aplicadas correctamente.',
-                'output' => $output
+                'status' => 'ok',
+                'message' => 'Todas las tablas requeridas están presentes en la base de datos.'
             ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Error al ejecutar las semillas: ' . $e->getMessage()
-            ], 500);
         }
+
+        // Find associated migrations for missing tables
+        $migrationFiles = glob(database_path('migrations/*.php'));
+        $migrationsToReset = [];
+
+        foreach ($missingTables as $table) {
+            foreach ($migrationFiles as $file) {
+                $filename = basename($file);
+                if (str_contains($filename, "create_{$table}_table") || 
+                    str_contains($filename, "create_{$table}s_table") ||
+                    str_contains($filename, "create_{$table}") ||
+                    ($table === 'notificaciones' && str_contains($filename, 'notifications')) ||
+                    ($table === 'destinatarios' && str_contains($filename, 'notifications')) ||
+                    ($table === 're_notificacion_destinatario' && str_contains($filename, 'notifications'))
+                ) {
+                    $migrationsToReset[] = pathinfo($filename, PATHINFO_FILENAME);
+                }
+            }
+        }
+
+        $migrationsToReset = array_unique($migrationsToReset);
+
+        if (!empty($migrationsToReset)) {
+            // Delete records of these migrations from migrations table so Laravel will run them again
+            DB::table('migrations')->whereIn('migration', $migrationsToReset)->delete();
+
+            try {
+                // Re-run pending migrations
+                Artisan::call('migrate', ['--force' => true]);
+                $output = Artisan::output();
+
+                return response()->json([
+                    'status' => 'repaired',
+                    'message' => 'Se detectaron y repararon tablas faltantes exitosamente.',
+                    'missing_tables' => $missingTables,
+                    'repaired_migrations' => $migrationsToReset,
+                    'output' => $output
+                ]);
+            } catch (\Exception $e) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Error al ejecutar las migraciones de reparación: ' . $e->getMessage(),
+                    'missing_tables' => $missingTables
+                ], 500);
+            }
+        }
+
+        return response()->json([
+            'status' => 'missing_no_migrations',
+            'message' => 'Se detectaron tablas faltantes pero no se encontraron sus migraciones asociadas.',
+            'missing_tables' => $missingTables
+        ], 400);
     }
 }
