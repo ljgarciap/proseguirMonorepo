@@ -56,14 +56,8 @@ import { interval, Subscription } from 'rxjs';
 
           <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])">
             <label>Administración</label>
-            <a routerLink="/contable" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">account_balance_wallet</span> Contable
-            </a>
             <a routerLink="/conciliacion-susuerte" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">fact_check</span> Conciliación Susuerte
-            </a>
-            <a routerLink="/planilla" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">agriculture</span> Planilla Fincas
             </a>
           </div>
 
