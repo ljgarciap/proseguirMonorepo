@@ -50,7 +50,7 @@ import Swal from 'sweetalert2';
               <td>
                 <div class="roles-badges" style="display: flex; gap: 4px; flex-wrap: wrap;">
                   <span *ngFor="let role of user.roles" class="pro-status" [ngClass]="role">
-                    {{ role | titlecase }}
+                    {{ role.split('_').join(' ') | titlecase }}
                   </span>
                 </div>
               </td>
@@ -88,6 +88,10 @@ import Swal from 'sweetalert2';
     .pro-status.operativo { background: #FFF7ED; color: var(--warning); }
     .pro-status.cliente { background: #F3E5F5; color: #9C27B0; }
     .pro-status.contable { background: #E8EAF6; color: #3F51B5; }
+    .pro-status.coordinador_comercial { background: #E0F2FE; color: #0369A1; }
+    .pro-status.oficial_cumplimiento { background: #D1FAE5; color: #047857; }
+    .pro-status.comite_credito { background: #FFE4E6; color: #BE123C; }
+    .pro-status.tesoreria { background: #FEF3C7; color: #D97706; }
 
     .actions { display: flex; justify-content: flex-end; gap: 8px; }
     .doc-cell { display: flex; flex-direction: column; .doc-type { font-size: 0.7rem; font-weight: 800; color: var(--primary); } .doc-num { font-size: 0.9rem; color: var(--text-main); } }
@@ -156,13 +160,17 @@ export class UserManagementComponent implements OnInit {
              </div>
              <div class="pro-input-group">
                 <label style="display:block; margin-bottom:10px; font-weight:600;">Roles / Perfiles</label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 0.85rem;">
-                   <label><input type="checkbox" class="swal-role" value="operativo" ${user?.roles?.includes('operativo') ? 'checked' : ''}> Operativo</label>
-                   <label><input type="checkbox" class="swal-role" value="gerente" ${user?.roles?.includes('gerente') ? 'checked' : ''}> Gerente</label>
+                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 0.82rem;">
+                   <label><input type="checkbox" class="swal-role" value="operativo" ${user?.roles?.includes('operativo') ? 'checked' : ''}> Dir. Administrativa</label>
+                   <label><input type="checkbox" class="swal-role" value="gerente" ${user?.roles?.includes('gerente') ? 'checked' : ''}> Gerencia</label>
                    <label><input type="checkbox" class="swal-role" value="superadmin" ${user?.roles?.includes('superadmin') ? 'checked' : ''}> Admin</label>
                    <label><input type="checkbox" class="swal-role" value="cliente" ${user?.roles?.includes('cliente') ? 'checked' : ''}> Cliente</label>
                    <label><input type="checkbox" class="swal-role" value="contable" ${user?.roles?.includes('contable') ? 'checked' : ''}> Contable</label>
-                </div>
+                   <label><input type="checkbox" class="swal-role" value="coordinador_comercial" ${user?.roles?.includes('coordinador_comercial') ? 'checked' : ''}> Comercial</label>
+                   <label><input type="checkbox" class="swal-role" value="oficial_cumplimiento" ${user?.roles?.includes('oficial_cumplimiento') ? 'checked' : ''}> Oficial Cumpl.</label>
+                   <label><input type="checkbox" class="swal-role" value="comite_credito" ${user?.roles?.includes('comite_credito') ? 'checked' : ''}> Comité Crédito</label>
+                   <label><input type="checkbox" class="swal-role" value="tesoreria" ${user?.roles?.includes('tesoreria') ? 'checked' : ''}> Tesorería</label>
+                 </div>
              </div>
           </div>
         </div>

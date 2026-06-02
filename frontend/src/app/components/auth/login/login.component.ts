@@ -55,7 +55,7 @@ import { AuthService } from '../../../services/auth.service';
           <div class="role-list">
              <button *ngFor="let role of availableRoles" (click)="selectRole(role)" class="btn-role">
                 <span class="material-symbols-outlined">person_pin</span>
-                {{ role | titlecase }}
+                {{ role.split('_').join(' ') | titlecase }}
                 <span class="material-symbols-outlined chevron">chevron_right</span>
              </button>
           </div>
