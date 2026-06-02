@@ -6,6 +6,10 @@
       <p>Panel administrativo para la depuración selectiva y el reinicio general del sistema.</p>
     </div>
     <div class="header-actions">
+      <button class="btn-pro primary" [disabled]="loading" (click)="repairDatabaseSchema()" style="margin-right: 12px; background-color: #2b6cb0; border-color: #2b6cb0;">
+        <span class="material-symbols-outlined">build_circle</span>
+        Chequear y Reparar DB
+      </button>
       <span class="role-indicator-badge">
         <span class="material-symbols-outlined">security</span>
         Acceso Exclusivo: Superadmin

@@ -185,4 +185,5 @@ Route::prefix('internal-docs')->middleware(['auth:api', 'checkrole:operativo,con
 Route::prefix('db-cleaner')->middleware(['auth:api', 'checkrole:superadmin'])->group(function () {
     Route::post('/clear-tables', [\App\Http\Controllers\DbCleanerController::class, 'clearTables']);
     Route::post('/reset', [\App\Http\Controllers\DbCleanerController::class, 'resetDatabase']);
+    Route::post('/repair', [\App\Http\Controllers\DbCleanerController::class, 'repairSchema']);
 });
