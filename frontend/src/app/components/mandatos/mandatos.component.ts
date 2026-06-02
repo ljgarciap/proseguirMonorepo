@@ -38,6 +38,7 @@ export class MandatosComponent implements OnInit {
   loading = false;
   
   currentTab: 'diligenciar' | 'historial' = 'diligenciar';
+  activeRequest: any = null;
   historialMandatos: any[] = [];
   Math = Math;
   
@@ -79,8 +80,60 @@ export class MandatosComponent implements OnInit {
   ngOnInit(): void {
     if (!this.authService.isAuthorized(['cliente'])) {
       this.currentTab = 'historial';
+    } else {
+      this.loadActiveRequest();
     }
     this.loadHistorial();
+  }
+
+  loadActiveRequest(): void {
+    this.http.get<any>(`${environment.apiUrl}/document-requests/active`).subscribe(res => {
+      this.activeRequest = res;
+    });
+  }
+
+  uploadDocument(event: any, itemId: number): void {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      Swal.fire('Formato no permitido', 'Únicamente se permiten archivos en formato PDF.', 'error');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('active_role', 'cliente');
+    formData.append('document_request_item_id', itemId.toString());
+
+    Swal.fire({
+      title: 'Subiendo archivo...',
+      text: 'Por favor espere mientras se carga el documento.',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    this.http.post(`${environment.apiUrl}/uploads`, formData).subscribe({
+      next: () => {
+        Swal.fire('Cargado', 'El documento ha sido cargado para validación.', 'success');
+        this.loadActiveRequest();
+      },
+      error: (err) => {
+        Swal.fire('Error', err.error?.message || 'No se pudo subir el archivo.', 'error');
+      }
+    });
+  }
+
+  getApprovedCount(): number {
+    if (!this.activeRequest || !this.activeRequest.items) return 0;
+    return this.activeRequest.items.filter((i: any) => i.estado === 'aprobado').length;
+  }
+
+  getProgressPercentage(): number {
+    if (!this.activeRequest || !this.activeRequest.items || this.activeRequest.items.length === 0) return 0;
+    const approved = this.getApprovedCount();
+    return Math.round((approved / this.activeRequest.items.length) * 100);
   }
 
   loadHistorial(): void {

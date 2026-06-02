@@ -46,7 +46,8 @@ class ClientUploadController extends Controller
     {
         $request->validate([
             'file' => 'required|file|max:102400', 
-            'active_role' => 'nullable|string'
+            'active_role' => 'nullable|string',
+            'document_request_item_id' => 'nullable|exists:document_request_items,id'
         ]);
 
         $file = $request->file('file');
@@ -59,6 +60,15 @@ class ClientUploadController extends Controller
             'original_name' => $file->getClientOriginalName(),
             'status' => 'pendiente',
         ]);
+
+        if ($request->filled('document_request_item_id')) {
+            $item = \App\Models\DocumentRequestItem::findOrFail($request->document_request_item_id);
+            $item->update([
+                'client_upload_id' => $upload->id,
+                'estado' => 'subido',
+                'observaciones' => null
+            ]);
+        }
 
         // REENVÍO INTERNO A n8n (Sin CORS, sin Firewall)
         try {
@@ -74,7 +84,7 @@ class ClientUploadController extends Controller
                     'upload_id' => $upload->id,
                     'user_id' => $upload->user_id,
                     'original_name' => $upload->original_name,
-                    'categoria' => $request->categoria // <--- ESTO FALTABA
+                    'categoria' => $request->categoria
                 ]);
                 \Illuminate\Support\Facades\Log::info("Respuesta de n8n: " . $response->status());
                 \Illuminate\Support\Facades\Log::info("[DEBUG] categoria enviada a n8n: " . ($request->categoria ?? 'NO_ENVIADA') . " | archivo: " . $upload->original_name);
@@ -111,6 +121,8 @@ class ClientUploadController extends Controller
             ]);
         }
 
+        $this->syncRequestItem($upload);
+
         return response()->json($upload);
     }
 
@@ -140,6 +152,8 @@ class ClientUploadController extends Controller
                 'approved_by' => $request->user()->id
             ]);
         }
+
+        $this->syncRequestItem($upload);
 
         return response()->json($upload);
     }
@@ -213,6 +227,15 @@ class ClientUploadController extends Controller
             }
         }
 
+        // Restablecer item de solicitud asociado si existe
+        if ($upload->requestItem) {
+            $upload->requestItem->update([
+                'client_upload_id' => null,
+                'estado' => 'pendiente',
+                'observaciones' => null
+            ]);
+        }
+
         // Borrar archivo físico
         if (Storage::exists($upload->filename)) {
             Storage::delete($upload->filename);
@@ -221,5 +244,32 @@ class ClientUploadController extends Controller
         $upload->delete();
 
         return response()->json(['message' => 'Archivo eliminado correctamente']);
+    }
+
+    private function syncRequestItem(ClientUpload $upload)
+    {
+        $item = \App\Models\DocumentRequestItem::where('client_upload_id', $upload->id)->first();
+        if ($item) {
+            $nuevoEstado = 'pendiente';
+            if ($upload->status === 'pendiente') $nuevoEstado = 'subido';
+            elseif ($upload->status === 'validado') $nuevoEstado = 'validado';
+            elseif ($upload->status === 'aprobado') $nuevoEstado = 'aprobado';
+            elseif ($upload->status === 'rechazado') $nuevoEstado = 'rechazado';
+
+            $item->update([
+                'estado' => $nuevoEstado,
+                'observaciones' => $upload->observations
+            ]);
+
+            $request = $item->request;
+            if ($request) {
+                $pendingItems = $request->items()->where('estado', '!=', 'aprobado')->count();
+                if ($pendingItems === 0) {
+                    $request->update(['estado' => 'completado']);
+                } else {
+                    $request->update(['estado' => 'pendiente']);
+                }
+            }
+        }
     }
 }

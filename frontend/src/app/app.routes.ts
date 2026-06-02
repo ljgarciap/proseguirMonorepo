@@ -10,6 +10,8 @@ import { ClientUploadComponent } from './components/client-upload/client-upload.
 import { OperatorValidationComponent } from './components/operator-validation/operator-validation.component';
 import { LoginComponent } from './components/auth/login/login.component';
 import { roleGuard } from './guards/role.guard';
+import { DocumentConfigComponent } from './components/document-config/document-config.component';
+import { DocumentRequestsComponent } from './components/document-requests/document-requests.component';
 
 import { ProfileSettingsComponent } from './components/profile-settings/profile-settings.component';
 import { UserManagementComponent } from './components/user-management/user-management.component';
@@ -135,6 +137,18 @@ export const routes: Routes = [
         loadComponent: () => import('./components/db-cleaner/db-cleaner.component').then(m => m.DbCleanerComponent), 
         canActivate: [roleGuard], 
         data: { roles: ['superadmin'] } 
+    },
+    { 
+        path: 'document-requests', 
+        component: DocumentRequestsComponent, 
+        canActivate: [roleGuard], 
+        data: { roles: ['operativo', 'superadmin'] } 
+    },
+    { 
+        path: 'document-config', 
+        component: DocumentConfigComponent, 
+        canActivate: [roleGuard], 
+        data: { roles: ['operativo', 'superadmin'] } 
     },
     { path: '**', redirectTo: '' }
 ];

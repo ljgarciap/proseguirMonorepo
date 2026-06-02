@@ -31,4 +31,9 @@ class ClientUpload extends Model
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
+
+    public function requestItem()
+    {
+        return $this->hasOne(DocumentRequestItem::class, 'client_upload_id');
+    }
 }

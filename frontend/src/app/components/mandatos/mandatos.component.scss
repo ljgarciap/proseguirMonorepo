@@ -29,6 +29,10 @@
     gap: 2rem;
     align-items: start;
 
+    .full-width {
+      grid-column: 1 / -1;
+    }
+
     @media (max-width: 992px) {
       grid-template-columns: 1fr;
     }

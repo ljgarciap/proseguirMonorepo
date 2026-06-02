@@ -187,3 +187,28 @@ Route::prefix('db-cleaner')->middleware(['auth:api', 'checkrole:superadmin'])->g
     Route::post('/reset', [\App\Http\Controllers\DbCleanerController::class, 'resetDatabase']);
     Route::post('/repair', [\App\Http\Controllers\DbCleanerController::class, 'repairSchema']);
 });
+
+// Requisitos de Documentos (Superadmin, Operativo)
+Route::prefix('document-requirements')->middleware(['auth:api', 'checkrole:superadmin,operativo'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\DocumentRequirementController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\DocumentRequirementController::class, 'store']);
+    Route::put('/{id}', [\App\Http\Controllers\DocumentRequirementController::class, 'update']);
+    Route::delete('/{id}', [\App\Http\Controllers\DocumentRequirementController::class, 'destroy']);
+});
+
+// Presets de Documentos (Superadmin, Operativo)
+Route::prefix('document-presets')->middleware(['auth:api', 'checkrole:superadmin,operativo'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\DocumentPresetController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\DocumentPresetController::class, 'store']);
+    Route::put('/{id}', [\App\Http\Controllers\DocumentPresetController::class, 'update']);
+    Route::delete('/{id}', [\App\Http\Controllers\DocumentPresetController::class, 'destroy']);
+});
+
+// Solicitudes de Documentos a Clientes
+Route::prefix('document-requests')->middleware(['auth:api'])->group(function () {
+    Route::get('/active', [\App\Http\Controllers\DocumentRequestController::class, 'activeRequest']);
+    Route::get('/clients', [\App\Http\Controllers\DocumentRequestController::class, 'getClients'])->middleware('checkrole:superadmin,operativo');
+    Route::get('/', [\App\Http\Controllers\DocumentRequestController::class, 'index'])->middleware('checkrole:superadmin,operativo');
+    Route::post('/', [\App\Http\Controllers\DocumentRequestController::class, 'store'])->middleware('checkrole:superadmin,operativo');
+    Route::delete('/{id}', [\App\Http\Controllers\DocumentRequestController::class, 'destroy'])->middleware('checkrole:superadmin,operativo');
+});
