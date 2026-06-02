@@ -72,7 +72,8 @@ jobs:
             cd /home/admpsl/apps/proseguir
             
             # 1. Sincronizar y actualizar código
-            git pull origin master
+            git fetch origin
+            git reset --hard origin/master
             
             # 2. Copiar archivos .env correctos de producción
             cp PROD.env .env
