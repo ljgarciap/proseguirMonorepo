@@ -252,8 +252,26 @@ import { interval, Subscription } from 'rxjs';
 })
 export class AppComponent implements OnInit, OnDestroy {
   showUserMenu = false;
-  pendingCounts: { operativo: number, gerente: number, contable: number, internal_gerente: number, expiring_contable?: number, expiring_gerente?: number, total: number } = { 
-    operativo: 0, gerente: 0, contable: 0, internal_gerente: 0, expiring_contable: 0, expiring_gerente: 0, total: 0 
+  pendingCounts: { 
+    operativo: number, 
+    gerente: number, 
+    contable: number, 
+    internal_gerente: number, 
+    internal_operativo?: number,
+    expiring_contable?: number, 
+    expiring_gerente?: number, 
+    expiring_operativo?: number,
+    total: number 
+  } = { 
+    operativo: 0, 
+    gerente: 0, 
+    contable: 0, 
+    internal_gerente: 0, 
+    internal_operativo: 0,
+    expiring_contable: 0, 
+    expiring_gerente: 0, 
+    expiring_operativo: 0,
+    total: 0 
   };
   private pollingSub!: Subscription;
 
@@ -294,7 +312,8 @@ export class AppComponent implements OnInit, OnDestroy {
     const role = this.authService.getActiveRole();
     if (role === 'contable') return this.pendingCounts.contable;
     if (role === 'gerente') return this.pendingCounts.internal_gerente;
-    if (role === 'superadmin') return this.pendingCounts.contable + this.pendingCounts.internal_gerente;
+    if (role === 'operativo') return this.pendingCounts.internal_operativo || 0;
+    if (role === 'superadmin') return this.pendingCounts.contable + this.pendingCounts.internal_gerente + (this.pendingCounts.internal_operativo || 0);
     return 0;
   }
 
@@ -302,7 +321,8 @@ export class AppComponent implements OnInit, OnDestroy {
     const role = this.authService.getActiveRole();
     if (role === 'contable') return (this.pendingCounts.expiring_contable || 0) > 0;
     if (role === 'gerente') return (this.pendingCounts.expiring_gerente || 0) > 0;
-    if (role === 'superadmin') return ((this.pendingCounts.expiring_contable || 0) + (this.pendingCounts.expiring_gerente || 0)) > 0;
+    if (role === 'operativo') return (this.pendingCounts.expiring_operativo || 0) > 0;
+    if (role === 'superadmin') return ((this.pendingCounts.expiring_contable || 0) + (this.pendingCounts.expiring_gerente || 0) + (this.pendingCounts.expiring_operativo || 0)) > 0;
     return false;
   }
 

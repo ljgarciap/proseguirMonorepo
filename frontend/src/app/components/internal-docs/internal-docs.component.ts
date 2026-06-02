@@ -77,7 +77,7 @@ export class InternalDocsComponent implements OnInit {
       // 1. View / Role Filter
       let roleMatch = isSuperadmin;
       if (!isSuperadmin) {
-        if (activeRole === 'operativo' && doc.sender?.email === userEmail) {
+        if (activeRole === 'operativo' && (doc.sender?.email === userEmail || doc.target_role === 'operativo')) {
           roleMatch = true;
         } else if (activeRole === 'contable' && doc.target_role === 'contable') {
           roleMatch = true;
@@ -213,8 +213,9 @@ export class InternalDocsComponent implements OnInit {
             <div class="pro-input-group">
               <label style="display:block; margin-bottom:5px; font-weight:600;">Enviar a:</label>
               <select id="swal-target" class="pro-input" style="width:100%">
-                <option value="contable">Área Contable</option>
-                <option value="gerente">Gerencia General</option>
+                <option value="contable">CONTABILIDAD</option>
+                <option value="gerente">GERENCIA PSL</option>
+                <option value="operativo">ÁREA ADMINISTRATIVA</option>
               </select>
             </div>
             <div class="pro-input-group">

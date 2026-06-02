@@ -79,7 +79,7 @@
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">Para:</span>
                   <span class="role-badge" [ngClass]="doc.target_role" style="font-size: 0.7rem; padding: 2px 8px;">
-                    {{ doc.target_role | uppercase }}
+                    {{ doc.target_role === 'contable' ? 'CONTABILIDAD' : (doc.target_role === 'gerente' ? 'GERENCIA PSL' : (doc.target_role === 'operativo' ? 'ÁREA ADMINISTRATIVA' : (doc.target_role | uppercase))) }}
                   </span>
                 </div>
               </div>

@@ -22,7 +22,10 @@ class InternalDocumentController extends Controller
 
         if (!$isAdmin) {
             $query->where(function($q) use ($user, $roles) {
-                if (in_array('operativo', $roles)) $q->orWhere('sender_id', $user->id);
+                if (in_array('operativo', $roles)) {
+                    $q->orWhere('sender_id', $user->id)
+                      ->orWhere('target_role', 'operativo');
+                }
                 if (in_array('contable', $roles)) $q->orWhere('target_role', 'contable');
                 if (in_array('gerente', $roles)) $q->orWhere('target_role', 'gerente');
             });
@@ -39,7 +42,7 @@ class InternalDocumentController extends Controller
         $request->validate([
             'titulo' => 'required|string',
             'archivo' => 'required|file|max:10240', // Max 10MB
-            'target_role' => 'required|in:contable,gerente',
+            'target_role' => 'required|in:contable,gerente,operativo',
             'categoria_id' => 'required|exists:accounting_categories,id',
             'prioridad_id' => 'required|exists:accounting_priorities,id',
         ]);
