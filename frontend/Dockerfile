@@ -8,6 +8,7 @@ RUN npm install --legacy-peer-deps
 
 # Copiamos el resto del código y compilamos
 COPY . .
+ENV NODE_OPTIONS="--max-old-space-size=1024"
 RUN npm run build -- --configuration production
 
 # Etapa 2: Serve
