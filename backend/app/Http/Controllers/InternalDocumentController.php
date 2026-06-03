@@ -72,11 +72,20 @@ class InternalDocumentController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'estado' => 'required|in:visto,procesado,rechazado'
+            'estado' => 'required|in:visto,procesado,rechazado',
+            'motivo_rechazo' => 'nullable|string'
         ]);
 
         $doc = InternalDocument::findOrFail($id);
-        $doc->update(['estado' => $request->estado]);
+        
+        $updateData = ['estado' => $request->estado];
+        if ($request->estado === 'rechazado') {
+            $updateData['motivo_rechazo'] = $request->motivo_rechazo;
+        } else {
+            $updateData['motivo_rechazo'] = null;
+        }
+
+        $doc->update($updateData);
 
         return response()->json($doc);
     }

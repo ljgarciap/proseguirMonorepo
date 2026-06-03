@@ -289,10 +289,44 @@ export class InternalDocsComponent implements OnInit {
   }
 
   updateStatus(doc: any, status: string) {
-    this.http.patch(`${environment.apiUrl}/internal-docs/${doc.id}/status`, { estado: status }).subscribe(() => {
-      doc.estado = status;
-      Swal.fire('Actualizado', `Estado cambiado a ${status}.`, 'success');
-    });
+    if (status === 'rechazado') {
+      Swal.fire({
+        title: 'Motivo de Rechazo',
+        input: 'textarea',
+        inputPlaceholder: 'Escriba el motivo del rechazo aquí...',
+        inputAttributes: {
+          'aria-label': 'Escriba el motivo del rechazo aquí'
+        },
+        showCancelButton: true,
+        confirmButtonText: 'Confirmar Rechazo',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#718096',
+        inputValidator: (value) => {
+          if (!value || !value.trim()) {
+            return '¡Debe escribir un motivo de rechazo!';
+          }
+          return null;
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          const motivo = result.value;
+          this.http.patch(`${environment.apiUrl}/internal-docs/${doc.id}/status`, { 
+            estado: 'rechazado',
+            motivo_rechazo: motivo 
+          }).subscribe(() => {
+            doc.estado = 'rechazado';
+            doc.motivo_rechazo = motivo;
+            Swal.fire('Rechazado', 'El documento ha sido rechazado.', 'success');
+          });
+        }
+      });
+    } else {
+      this.http.patch(`${environment.apiUrl}/internal-docs/${doc.id}/status`, { estado: status }).subscribe(() => {
+        doc.estado = status;
+        Swal.fire('Actualizado', `Estado cambiado a ${status}.`, 'success');
+      });
+    }
   }
 
   deleteDocument(doc: any) {
