@@ -1,3 +1,5 @@
+<?php
+
 // migration to add original_name to system_logs
 declare(strict_types=1);
 

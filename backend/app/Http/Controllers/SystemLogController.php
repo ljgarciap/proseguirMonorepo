@@ -80,6 +80,7 @@ class SystemLogController extends Controller
             \App\Models\SystemLog::create([
                 'categoria' => $log->categoria,
                 'filename' => $log->filename,
+                'original_name' => $log->original_name,
                 'action' => 'Reintento Exitoso',
                 'message' => "Reintento manual del log #{$log->id} procesado con éxito.",
                 'records_processed' => count($data),
@@ -92,6 +93,7 @@ class SystemLogController extends Controller
             \App\Models\SystemLog::create([
                 'categoria' => $log->categoria,
                 'filename' => $log->filename,
+                'original_name' => $log->original_name,
                 'action' => 'Error en Reintento',
                 'message' => "Error reintentando log #{$log->id}: " . $e->getMessage(),
                 'records_processed' => 0,

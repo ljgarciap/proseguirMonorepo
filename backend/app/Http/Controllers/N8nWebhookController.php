@@ -43,6 +43,7 @@ class N8nWebhookController extends Controller
 
         $data = $request->input('data', []);
         $filename = null;
+        $originalName = null;
         $clientUploadId = null;
 
         // 1. Intentamos obtener por upload_id
@@ -51,7 +52,8 @@ class N8nWebhookController extends Controller
             $upload = \App\Models\ClientUpload::find($uploadId);
             if ($upload) {
                 $clientUploadId = $upload->id;
-                $filename = $upload->original_name;
+                $filename = $upload->filename;
+                $originalName = $upload->original_name;
             }
         }
 
@@ -59,15 +61,19 @@ class N8nWebhookController extends Controller
         if (!$clientUploadId) {
             $reqFilename = $request->input('filename') ?? $request->query('filename');
             if ($reqFilename) {
+                $nameWithoutExt = pathinfo($reqFilename, PATHINFO_FILENAME);
                 $upload = \App\Models\ClientUpload::where('filename', $reqFilename)
                     ->orWhere('original_name', $reqFilename)
                     ->orWhere('filename', 'like', '%' . basename($reqFilename))
+                    ->orWhere('original_name', 'like', $nameWithoutExt . '.%')
                     ->first();
                 if ($upload) {
                     $clientUploadId = $upload->id;
-                    $filename = $upload->original_name;
+                    $filename = $upload->filename;
+                    $originalName = $upload->original_name;
                 } else {
                     $filename = $reqFilename;
+                    $originalName = $reqFilename;
                 }
             }
         }
@@ -83,15 +89,19 @@ class N8nWebhookController extends Controller
                 }
             }
             if ($extractedFilename) {
+                $nameWithoutExt = pathinfo($extractedFilename, PATHINFO_FILENAME);
                 $upload = \App\Models\ClientUpload::where('filename', $extractedFilename)
                     ->orWhere('original_name', $extractedFilename)
                     ->orWhere('filename', 'like', '%' . basename($extractedFilename))
+                    ->orWhere('original_name', 'like', $nameWithoutExt . '.%')
                     ->first();
                 if ($upload) {
                     $clientUploadId = $upload->id;
-                    $filename = $upload->original_name;
+                    $filename = $upload->filename;
+                    $originalName = $upload->original_name;
                 } else {
                     $filename = $extractedFilename;
+                    $originalName = $extractedFilename;
                 }
             }
         }
@@ -107,6 +117,7 @@ class N8nWebhookController extends Controller
             SystemLog::create([
                 'categoria' => $categoria,
                 'filename' => $filename,
+                'original_name' => $originalName,
                 'action' => 'Webhook Recibido',
                 'message' => 'Lote de datos procesado con éxito.',
                 'records_processed' => count($data),
@@ -119,6 +130,7 @@ class N8nWebhookController extends Controller
             SystemLog::create([
                 'categoria' => $categoria,
                 'filename' => $filename,
+                'original_name' => $originalName,
                 'action' => 'Error en Webhook',
                 'message' => 'Fallo al procesar: ' . $e->getMessage(),
                 'records_processed' => 0,
