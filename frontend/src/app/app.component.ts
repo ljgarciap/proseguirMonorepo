@@ -50,7 +50,11 @@ import { interval, Subscription } from 'rxjs';
               </div>
             </a>
             <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])" routerLink="/mandatos" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">contract</span> Revisión Mandatos
+              <div class="nav-link-content">
+                <span class="material-symbols-outlined">contract</span> 
+                <span>Revisión Mandatos</span>
+                <span class="nav-badge" *ngIf="getMandatosBadge() > 0">{{ getMandatosBadge() }}</span>
+              </div>
             </a>
           </div>
 
@@ -261,6 +265,7 @@ export class AppComponent implements OnInit, OnDestroy {
     expiring_contable?: number, 
     expiring_gerente?: number, 
     expiring_operativo?: number,
+    pending_mandates?: number,
     total: number 
   } = { 
     operativo: 0, 
@@ -271,6 +276,7 @@ export class AppComponent implements OnInit, OnDestroy {
     expiring_contable: 0, 
     expiring_gerente: 0, 
     expiring_operativo: 0,
+    pending_mandates: 0,
     total: 0 
   };
   private pollingSub!: Subscription;
@@ -314,6 +320,14 @@ export class AppComponent implements OnInit, OnDestroy {
     if (role === 'gerente') return this.pendingCounts.internal_gerente;
     if (role === 'operativo') return this.pendingCounts.internal_operativo || 0;
     if (role === 'superadmin') return this.pendingCounts.contable + this.pendingCounts.internal_gerente + (this.pendingCounts.internal_operativo || 0);
+    return 0;
+  }
+
+  getMandatosBadge(): number {
+    const role = this.authService.getActiveRole();
+    if (role === 'operativo' || role === 'superadmin') {
+      return this.pendingCounts.pending_mandates || 0;
+    }
     return 0;
   }
 

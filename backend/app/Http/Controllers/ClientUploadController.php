@@ -193,6 +193,8 @@ class ClientUploadController extends Controller
             }
         }
 
+        $pendingMandates = \App\Models\Mandato::where('status', 'pendiente')->count();
+
         return response()->json([
             'operativo' => $operativoCount,
             'gerente' => $gerenteCount,
@@ -202,7 +204,8 @@ class ClientUploadController extends Controller
             'expiring_contable' => $expiringContable,
             'expiring_gerente' => $expiringGerente,
             'expiring_operativo' => $expiringOperativo,
-            'total' => $operativoCount + $gerenteCount + $internalContable + $internalGerente + $internalOperativo
+            'pending_mandates' => $pendingMandates,
+            'total' => $operativoCount + $gerenteCount + $internalContable + $internalGerente + $internalOperativo + $pendingMandates
         ]);
     }
 
