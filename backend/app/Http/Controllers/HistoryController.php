@@ -231,4 +231,41 @@ class HistoryController extends Controller
             'deleted_records' => $deletedTotal
         ]);
     }
+
+    public function deleteByFile(Request $request)
+    {
+        $filename = $request->query('filename');
+        if (!$filename) {
+            return response()->json(['message' => 'filename requerido'], 400);
+        }
+
+        // Find all uploads matching filename, original_name or base name
+        $nameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
+        $uploadIds = \App\Models\ClientUpload::where('filename', $filename)
+            ->orWhere('original_name', $filename)
+            ->orWhere('filename', 'like', '%' . basename($filename))
+            ->orWhere('original_name', 'like', $nameWithoutExt . '.%')
+            ->pluck('id');
+
+        $tables = [
+            \App\Models\OperacionCartera::class,
+            \App\Models\OperacionFactoring::class,
+            \App\Models\PagoFactoring::class,
+            \App\Models\OperacionConfirming::class,
+            \App\Models\Compraventa::class,
+            \App\Models\PagoCompraventa::class
+        ];
+
+        $deletedTotal = 0;
+        if ($uploadIds->isNotEmpty()) {
+            foreach ($tables as $modelClass) {
+                $deletedTotal += $modelClass::whereIn('client_upload_id', $uploadIds)->delete();
+            }
+        }
+
+        return response()->json([
+            'message' => 'Limpieza masiva completada',
+            'deleted_records' => $deletedTotal
+        ]);
+    }
 }

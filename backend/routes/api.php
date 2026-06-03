@@ -52,6 +52,9 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
         Route::delete('/history/by-upload/{uploadId}', [\App\Http\Controllers\HistoryController::class, 'deleteByUpload'])
             ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
 
+        Route::delete('/history/by-file', [\App\Http\Controllers\HistoryController::class, 'deleteByFile'])
+            ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
+
         // Usuarios (Superadmin only)
         Route::apiResource('users', \App\Http\Controllers\UserController::class)
             ->middleware(['auth:api', 'checkrole:superadmin']);

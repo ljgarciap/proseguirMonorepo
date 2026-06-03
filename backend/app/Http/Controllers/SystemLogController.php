@@ -41,6 +41,15 @@ class SystemLogController extends Controller
             });
         }
 
+        $query->select('categoria', 'filename', 'original_name', 'action')
+            ->selectRaw('MAX(id) as id')
+            ->selectRaw('MAX(created_at) as created_at')
+            ->selectRaw('MAX(message) as message')
+            ->selectRaw('SUM(records_processed) as records_processed')
+            ->selectRaw('MAX(payload) as payload')
+            ->selectRaw('MAX(error_details) as error_details')
+            ->groupBy('categoria', 'filename', 'original_name', 'action');
+
         return response()->json($query->orderBy($sortBy, $sortDir)->paginate($perPage));
     }
 

@@ -527,9 +527,10 @@ export class LogsComponent implements OnInit {
   }
 
   deleteFileData(log: any) {
+    const filenameToDisplay = log.original_name || log.filename || '';
     Swal.fire({
       title: '¿Borrar TODOS los datos de este archivo?',
-      text: `Esta acción eliminará todos los registros de cartera, factoring, etc., asociados al archivo "${log.filename}". Esta acción no se puede deshacer.`,
+      text: `Esta acción eliminará todos los registros de cartera, factoring, etc., asociados al archivo "${filenameToDisplay}". Esta acción no se puede deshacer.`,
       icon: 'error',
       showCancelButton: true,
       confirmButtonColor: '#d33',
@@ -539,32 +540,18 @@ export class LogsComponent implements OnInit {
     }).then((result) => {
       if (result.isConfirmed) {
         this.isLoading = true;
-        // First find the upload ID by filename
-        this.http.get<any>(`${environment.apiUrl}/uploads?search=${log.filename}`).subscribe({
-          next: (res) => {
-            const upload = res.data ? res.data.find((u: any) => u.original_name === log.filename || u.filename === log.filename) : null;
-            if (!upload) {
-              this.showToast('No se encontró el registro del archivo para este log', 'error');
-              this.isLoading = false;
-              return;
-            }
-
-            // Now delete by upload ID
-            this.http.delete(`${environment.apiUrl}/history/by-upload/${upload.id}`).subscribe({
-              next: (delRes: any) => {
-                Swal.fire('¡Limpieza Completada!', `${delRes.deleted_records} registros fueron eliminados exitosamente.`, 'success');
-                this.isLoading = false;
-              },
-              error: (err) => {
-                console.error(err);
-                this.showToast('Error al intentar el borrado masivo', 'error');
-                this.isLoading = false;
-              }
-            });
+        
+        // Use the new single direct endpoint to delete by filename/original_name
+        const queryParam = encodeURIComponent(log.filename || log.original_name || '');
+        this.http.delete(`${environment.apiUrl}/history/by-file?filename=${queryParam}`).subscribe({
+          next: (delRes: any) => {
+            Swal.fire('¡Limpieza Completada!', `${delRes.deleted_records} registros fueron eliminados exitosamente.`, 'success');
+            this.isLoading = false;
+            this.loadLogs();
           },
           error: (err) => {
             console.error(err);
-            this.showToast('Error al buscar el archivo', 'error');
+            this.showToast(err.error?.message || 'Error al intentar el borrado masivo', 'error');
             this.isLoading = false;
           }
         });
