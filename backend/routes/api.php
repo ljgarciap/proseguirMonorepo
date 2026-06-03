@@ -84,7 +84,7 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
             Route::post('/', [\App\Http\Controllers\ClientUploadController::class, 'store'])
                 ->middleware('checkrole:cliente');
             Route::get('/{id}/download', [\App\Http\Controllers\ClientUploadController::class, 'download'])
-                ->middleware('checkrole:operativo,gerente,superadmin');
+                ->middleware('checkrole:cliente,operativo,gerente,superadmin');
             Route::post('/{id}/validate', [\App\Http\Controllers\ClientUploadController::class, 'validateUpload'])
                 ->middleware('checkrole:operativo');
             Route::post('/{id}/approve', [\App\Http\Controllers\ClientUploadController::class, 'approveUpload'])

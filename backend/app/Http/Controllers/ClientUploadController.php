@@ -206,9 +206,17 @@ class ClientUploadController extends Controller
         ]);
     }
 
-    public function download($id)
+    public function download(Request $request, $id)
     {
         $upload = ClientUpload::findOrFail($id);
+        $user = $request->user();
+
+        // Si es cliente, validar que sea su propio archivo
+        if (in_array('cliente', $user->roles) && count($user->roles) === 1) {
+            if ($upload->user_id !== $user->id) {
+                return response()->json(['message' => 'No tienes permiso para ver este archivo.'], 403);
+            }
+        }
         
         if (!Storage::exists($upload->filename)) {
             return response()->json(['message' => 'Archivo no encontrado físicamente en el servidor.'], 404);
