@@ -364,6 +364,22 @@ Chart.register(...registerables);
                     <th class="text-right">Monto</th>
                   </tr>
                 </thead>
+                <tbody>
+                  <tr *ngFor="let v of stats.factoring.vencimientos">
+                    <td>
+                      <div class="payer-cell" [title]="'Vence en ' + v.dias + ' días (' + safeDate(v.fecha, 'dd/MM/yyyy') + ')'">
+                        <span class="name">{{ v.pagador }}</span>
+                        <span class="due-badge" [ngClass]="v.estado.toLowerCase().replace(' ', '-')">
+                          {{ v.dias === 0 ? 'Hoy' : (v.dias === 1 ? 'Mañana' : 'En ' + v.dias + ' días') }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="text-right bold text-nowrap" style="vertical-align: middle;">{{ formatMoney(v.monto) }}</td>
+                  </tr>
+                  <tr *ngIf="!stats.factoring?.vencimientos || stats.factoring.vencimientos.length === 0">
+                    <td colspan="2" class="text-center py-4 text-muted">No hay vencimientos próximos (5 días)</td>
+                  </tr>
+                </tbody>
               </table>
             </div>
 
@@ -804,6 +820,27 @@ Chart.register(...registerables);
     .shadow-sm { box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06); }
     .pulse { animation: alertPulse 1.5s infinite; }
     @keyframes alertPulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
+
+    .payer-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      .name { font-weight: 600; color: #2D3748; }
+      .due-badge {
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 4px;
+        width: fit-content;
+        text-transform: uppercase;
+        &.vencido { background: #FED7D7; color: #C53030; }
+        &.por-vencer { background: #FEEBC8; color: #C05621; }
+        &.vigente { background: #EBF8FF; color: #2B6CB0; }
+      }
+    }
+    .text-nowrap {
+      white-space: nowrap !important;
+    }
   `]
 })
 export class DashboardComponent implements OnInit {
