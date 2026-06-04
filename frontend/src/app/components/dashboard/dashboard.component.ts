@@ -404,6 +404,7 @@ Chart.register(...registerables);
                  <canvas baseChart
                   [data]="weightedRatesChartData"
                   [options]="pieChartOptions"
+                  (chartClick)="onWeightedRateClick($event)"
                   [type]="'doughnut'">
                 </canvas>
               </div>
@@ -1380,6 +1381,14 @@ export class DashboardComponent implements OnInit {
       const index = event.active[0].index;
       const label = this.moraChartData.labels![index] as string;
       this.navigateToSheets('cartera', label);
+    }
+  }
+
+  onWeightedRateClick(event: any) {
+    if (event.active && event.active.length > 0) {
+      const index = event.active[0].index;
+      const label = this.weightedRatesChartData.labels![index] as string;
+      this.navigateToSheets('op', label);
     }
   }
 
