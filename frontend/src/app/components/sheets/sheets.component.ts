@@ -228,6 +228,10 @@ import Swal from 'sweetalert2';
                     
                     <!-- Compraventa -->
                     <span *ngSwitchCase="'valor'">{{ formatMoney(row[col]) }}</span>
+
+                    <!-- Integer Formatting -->
+                    <span *ngSwitchCase="'dias_vencido'">{{ formatInteger(row[col]) }}</span>
+                    <span *ngSwitchCase="'plazo_meses'">{{ formatInteger(row[col]) }}</span>
                     
                     <span *ngSwitchDefault>{{ row[col] !== null ? row[col] : '-' }}</span>
                   </ng-container>
@@ -445,6 +449,12 @@ import Swal from 'sweetalert2';
                   </ng-container>
                   <ng-container *ngSwitchCase="'valor'">
                     <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'dias_vencido'">
+                    <span>{{ formatInteger(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'plazo_meses'">
+                    <span>{{ formatInteger(selectedRow[col]) }}</span>
                   </ng-container>
 
                   <!-- default display -->
@@ -1314,5 +1324,11 @@ export class SheetsComponent implements OnInit {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2
     }).format(num);
+  }
+
+  formatInteger(value: any): string {
+    if (value === null || value === undefined || value === '') return '-';
+    const num = Math.round(Number(value));
+    return isNaN(num) ? value : num.toString();
   }
 }
