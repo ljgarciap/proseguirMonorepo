@@ -16,10 +16,12 @@ return new class extends Migration
             $table->string('original_name')->nullable()->after('archivo_path');
         });
 
-        // Backfill existing rows with the original name derived from the stored path
-        DB::table('internal_documents')->whereNotNull('archivo_path')->update([
-            'original_name' => DB::raw("SUBSTRING_INDEX(archivo_path, '/', -1)")
-        ]);
+        // Backfill existing rows with the original name derived from the stored path (MySQL only)
+        if (config('database.default') !== 'sqlite') {
+            DB::table('internal_documents')->whereNotNull('archivo_path')->update([
+                'original_name' => DB::raw("SUBSTRING_INDEX(archivo_path, '/', -1)")
+            ]);
+        }
     }
 
     /**
