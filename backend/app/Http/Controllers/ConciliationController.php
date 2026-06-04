@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use App\Services\ConciliationService;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\ConciliationExport;
 use Illuminate\Support\Facades\Storage;
+use App\Models\ConciliacionSusuerte;
 
 class ConciliationController extends Controller
 {
@@ -35,6 +37,16 @@ class ConciliationController extends Controller
 
         try {
             $results = $this->service->conciliate($fullXlsxPath, $fullPdfPath);
+
+            // Store history in conciliaciones_susuerte table
+            $conciliacion = ConciliacionSusuerte::create([
+                'user_id' => Auth::id(),
+                'conciliated_at' => now(),
+                'total_amount' => array_sum(array_column($results, 'Amount')),
+                'matched_count' => count(array_filter($results, fn($r) => $r['Status'] === 'CONCILIADO')),
+                'generated_gastos' => 0,
+                'details' => $results,
+            ]);
 
             $fileName = 'conciliacion_' . now()->format('Ymd_His') . '.xlsx';
             Excel::store(new ConciliationExport($results), $fileName, 'public');

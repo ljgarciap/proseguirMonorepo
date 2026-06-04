@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { ConciliacionSusuerteService } from '../../services/conciliacion-susuerte.service';
 import Swal from 'sweetalert2';
 
@@ -17,7 +18,10 @@ export class ConciliacionSusuerteComponent {
   results: any[] = [];
   downloadUrl: string | null = null;
 
-  constructor(private conciliationService: ConciliacionSusuerteService) {}
+  constructor(
+    private conciliationService: ConciliacionSusuerteService,
+    public router: Router
+  ) {}
 
   openFileInput(id: string) {
     document.getElementById(id)?.click();
@@ -37,7 +41,7 @@ export class ConciliacionSusuerteComponent {
     return 'only-bank';
   }
 
-  onClear() {
+  newConciliation() {
     this.xlsxFile = null;
     this.pdfFile = null;
     this.results = [];
