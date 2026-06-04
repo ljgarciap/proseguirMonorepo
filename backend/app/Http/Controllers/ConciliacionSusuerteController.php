@@ -29,4 +29,28 @@ class ConciliacionSusuerteController extends Controller
         // This endpoint simply acknowledges the request; the frontend will reset the view.
         return response()->json(['message' => 'Nueva conciliación iniciada']);
     }
+
+    /**
+     * Update details/observations of a conciliation record.
+     */
+    public function update(Request $request, $id): JsonResponse
+    {
+        $request->validate([
+            'details' => 'required|array'
+        ]);
+
+        $conciliacion = ConciliacionSusuerte::findOrFail($id);
+        $conciliacion->update([
+            'details' => $request->input('details')
+        ]);
+
+        // Re-generate Excel file with updated details
+        $fileName = 'conciliacion_' . $conciliacion->conciliated_at->format('Ymd_His') . '.xlsx';
+        \Maatwebsite\Excel\Facades\Excel::store(new \App\Exports\ConciliationExport($conciliacion->details), $fileName, 'public');
+
+        return response()->json([
+            'message' => 'Observaciones guardadas con éxito',
+            'download_url' => asset('storage/' . $fileName)
+        ]);
+    }
 }

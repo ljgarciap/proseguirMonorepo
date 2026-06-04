@@ -58,6 +58,55 @@ class ConciliacionSusuerteTest extends TestCase
             ]);
     }
 
+    public function test_authenticated_user_can_update_observations()
+    {
+        $conciliacion = ConciliacionSusuerte::create([
+            'user_id' => $this->user->id,
+            'total_amount' => 1000.00,
+            'matched_count' => 1,
+            'details' => [
+                [
+                    'Status' => 'CONCILIADO',
+                    'Date (Susuerte)' => '2026-06-04',
+                    'Date (Bank)' => '2026-06-04',
+                    'Amount' => 1000.00,
+                    'Description (Susuerte)' => 'Test Susuerte',
+                    'Description (Bank)' => 'Test Bank',
+                    'Observations' => ''
+                ]
+            ],
+            'conciliated_at' => now(),
+        ]);
+
+        $updatedDetails = [
+            [
+                'Status' => 'CONCILIADO',
+                'Date (Susuerte)' => '2026-06-04',
+                'Date (Bank)' => '2026-06-04',
+                'Amount' => 1000.00,
+                'Description (Susuerte)' => 'Test Susuerte',
+                'Description (Bank)' => 'Test Bank',
+                'Observations' => 'Updated test observation'
+            ]
+        ];
+
+        $response = $this->actingAs($this->user, 'api')
+            ->putJson("/api/conciliaciones-susuerte/{$conciliacion->id}", [
+                'details' => $updatedDetails
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'Observaciones guardadas con éxito'
+            ])
+            ->assertJsonStructure(['download_url']);
+
+        $this->assertEquals(
+            'Updated test observation',
+            ConciliacionSusuerte::find($conciliacion->id)->details[0]['Observations']
+        );
+    }
+
     public function test_unauthenticated_user_cannot_access_history()
     {
         $response = $this->getJson('/api/conciliaciones-susuerte/history');

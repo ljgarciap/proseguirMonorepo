@@ -40,10 +40,25 @@
             <span class="text">Ver Historial</span>
           </button>
 
+        <button (click)="saveObservations()" class="btn-action blue" *ngIf="conciliationId" [disabled]="isSavingObservations">
+          <span class="material-symbols-outlined">save</span>
+          <span class="text">{{ isSavingObservations ? 'Guardando...' : 'Guardar Observaciones' }}</span>
+        </button>
+
         <a [href]="downloadUrl" target="_blank" class="btn-action green" *ngIf="downloadUrl">
           <span class="material-symbols-outlined">download</span>
           <span class="text">Descargar</span>
         </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Filter Row (only when there are results) -->
+  <div class="filters-card mt-4" *ngIf="results.length > 0">
+    <div class="filter-inputs">
+      <div class="input-wrapper" style="position: relative; flex: 1; min-width: 280px;">
+        <span class="material-symbols-outlined search-icon" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #a0aec0;">search</span>
+        <input type="text" [(ngModel)]="searchTerm" placeholder="Buscar por descripción, monto o fecha..." class="filter-input" style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 2.2rem; border: 1px solid rgba(226, 232, 240, 0.8); border-radius: 8px; background: rgba(255, 255, 255, 0.6);" />
       </div>
     </div>
   </div>
@@ -59,10 +74,11 @@
             <th>Monto</th>
             <th>Descripción (Susuerte)</th>
             <th>Descripción (Banco)</th>
+            <th>Observaciones</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let item of results">
+          <tr *ngFor="let item of filteredResults">
             <td>
               <span class="status-badge" [class]="getStatusClass(item.Status)">
                 {{ item.Status }}
@@ -73,6 +89,12 @@
             <td class="total-cell">{{ item.Amount | currency }}</td>
             <td>{{ item['Description (Susuerte)'] }}</td>
             <td>{{ item['Description (Bank)'] }}</td>
+            <td>
+              <input type="text" [(ngModel)]="item.Observations" placeholder="Agregar nota..." class="table-input" style="width: 100%; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px 8px; font-size: 0.85rem;" />
+            </td>
+          </tr>
+          <tr *ngIf="filteredResults.length === 0">
+            <td colspan="7" class="text-center py-4">No se encontraron resultados que coincidan con la búsqueda.</td>
           </tr>
         </tbody>
       </table>

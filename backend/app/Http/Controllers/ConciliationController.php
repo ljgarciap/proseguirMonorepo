@@ -56,6 +56,7 @@ class ConciliationController extends Controller
 
             return response()->json([
                 'message' => 'Conciliación completada con éxito',
+                'id' => $conciliacion->id,
                 'results' => $results,
                 'download_url' => asset('storage/' . $fileName)
             ]);
