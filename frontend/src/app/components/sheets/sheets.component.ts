@@ -92,9 +92,10 @@ import Swal from 'sweetalert2';
             <thead>
               <tr>
                 <th 
-                  *ngFor="let col of getColumns()" 
+                  *ngFor="let col of getColumns(); let i = index" 
                   (click)="sortByColumn(col)"
                   [class.sortable]="true"
+                  [ngClass]="'sticky-col-' + (i + 1)"
                 >
                   <div class="th-content">
                     {{ formatHeader(col) }}
@@ -108,10 +109,22 @@ import Swal from 'sweetalert2';
             </thead>
             <tbody>
               <tr *ngFor="let row of data">
-                <td *ngFor="let col of getColumns()">
+                <td *ngFor="let col of getColumns(); let i = index" [ngClass]="'sticky-col-' + (i + 1)">
                   <ng-container [ngSwitch]="col">
                     <ng-container *ngSwitchCase="'id'">
                       <span class="id-badge">#{{ row[col] }}</span>
+                    </ng-container>
+
+                    <ng-container *ngSwitchCase="'cliente'">
+                      <a (click)="openDetailModal(row)" class="client-link">
+                        {{ row[col] }}
+                      </a>
+                    </ng-container>
+
+                    <ng-container *ngSwitchCase="'pagador'">
+                      <a (click)="openDetailModal(row)" class="client-link">
+                        {{ row[col] }}
+                      </a>
                     </ng-container>
 
                     <ng-container *ngSwitchCase="'estado_liquidacion'">
@@ -271,6 +284,175 @@ import Swal from 'sweetalert2';
               >
                 ›
               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div class="modal-backdrop" *ngIf="selectedRow">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Detalle de Registro #{{ selectedRow.id || selectedRow.pago_ref }}</h3>
+          <button (click)="closeDetailModal()" class="btn-close">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="detail-grid">
+            <div class="detail-item" *ngFor="let col of getColumns()">
+              <label class="detail-label">{{ formatHeader(col) }}</label>
+              
+              <div class="detail-value">
+                <ng-container [ngSwitch]="col">
+                  <!-- observations is always editable -->
+                  <ng-container *ngSwitchCase="'observaciones'">
+                    <div class="editable-cell-modal">
+                      <input 
+                        type="text" 
+                        [(ngModel)]="selectedRow[col]" 
+                        (blur)="saveRecord(selectedRow)"
+                        placeholder="Agregar nota..."
+                        class="modal-input"
+                      />
+                      <span class="save-status inline" [class.success]="saveStatus[selectedRow.id] === 'success'" [class.saving]="saveStatus[selectedRow.id] === 'saving'">
+                        {{ saveStatus[selectedRow.id] === 'saving' ? '⏳' : (saveStatus[selectedRow.id] === 'success' ? '✅' : '') }}
+                      </span>
+                    </div>
+                  </ng-container>
+
+                  <!-- sector_economico select is editable for cartera -->
+                  <ng-container *ngSwitchCase="'sector_economico'">
+                    <div class="editable-cell-modal">
+                      <select 
+                        *ngIf="categoria === 'cartera'; else readOnlySector"
+                        [(ngModel)]="selectedRow[col]" 
+                        (change)="saveRecord(selectedRow)"
+                        class="modal-select"
+                      >
+                        <option *ngFor="let s of sectors" [value]="s.nombre">{{ s.nombre }}</option>
+                      </select>
+                      <ng-template #readOnlySector>
+                        <span>{{ selectedRow[col] || '-' }}</span>
+                      </ng-template>
+                      <span class="save-status inline" [class.success]="saveStatus[selectedRow.id] === 'success'" [class.saving]="saveStatus[selectedRow.id] === 'saving'">
+                        {{ saveStatus[selectedRow.id] === 'saving' ? '⏳' : (saveStatus[selectedRow.id] === 'success' ? '✅' : '') }}
+                      </span>
+                    </div>
+                  </ng-container>
+
+                  <!-- ciudad input is editable for cartera -->
+                  <ng-container *ngSwitchCase="'ciudad'">
+                    <div class="editable-cell-modal">
+                      <input 
+                        *ngIf="categoria === 'cartera'; else readOnlyCiudad"
+                        type="text" 
+                        [(ngModel)]="selectedRow[col]" 
+                        (blur)="saveRecord(selectedRow)"
+                        class="modal-input"
+                      />
+                      <ng-template #readOnlyCiudad>
+                        <span>{{ selectedRow[col] || '-' }}</span>
+                      </ng-template>
+                      <span class="save-status inline" [class.success]="saveStatus[selectedRow.id] === 'success'" [class.saving]="saveStatus[selectedRow.id] === 'saving'">
+                        {{ saveStatus[selectedRow.id] === 'saving' ? '⏳' : (saveStatus[selectedRow.id] === 'success' ? '✅' : '') }}
+                      </span>
+                    </div>
+                  </ng-container>
+
+                  <!-- currency format columns -->
+                  <ng-container *ngSwitchCase="'valor_desembolso'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'saldo_capital'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'valor_vencido'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'valor_mora'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'saldo_total'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'valor_ultimo_abono'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'monto'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'valor_aprobado'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'valor_desembolsado'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'valor_reserva'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'descuento_financiero'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'total_recaudado_comprobante'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'valor_factura'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'valor_descuento'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'capital_pagado'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'total_pagado'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'descuento_mora_causado_np'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'rec_descuento_mora_np'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'saldo_despues_pago'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'intereses_diarios'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'intereses_pagados'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'devolucion_descuento'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'margen_reserva'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'reembolso_g_desembolso'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'base_negociacion'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'rendimientos_proyectados'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'valor_pagar_deudor'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'valor'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+
+                  <!-- default display -->
+                  <ng-container *ngSwitchDefault>
+                    <span>{{ selectedRow[col] !== null ? selectedRow[col] : '-' }}</span>
+                  </ng-container>
+                </ng-container>
+              </div>
             </div>
           </div>
         </div>
@@ -437,9 +619,6 @@ import Swal from 'sweetalert2';
         text-transform: uppercase;
         letter-spacing: 0.05em;
         border-bottom: 1px solid #f1f5f9;
-        position: sticky;
-        top: 0;
-        z-index: 10;
         cursor: pointer;
         user-select: none;
 
@@ -464,6 +643,54 @@ import Swal from 'sweetalert2';
 
       tr:hover td {
         background-color: #f8fafc;
+      }
+
+      /* Sticky Columns Support */
+      .sticky-col-1 {
+        position: sticky;
+        left: 0;
+        background: white;
+        z-index: 5;
+        width: 70px;
+        min-width: 70px;
+      }
+      .sticky-col-2 {
+        position: sticky;
+        left: 70px;
+        background: white;
+        z-index: 5;
+        width: 130px;
+        min-width: 130px;
+      }
+      .sticky-col-3 {
+        position: sticky;
+        left: 200px;
+        background: white;
+        z-index: 5;
+        width: 250px;
+        min-width: 250px;
+        box-shadow: 4px 0 6px -2px rgba(0,0,0,0.06);
+      }
+
+      th.sticky-col-1, th.sticky-col-2, th.sticky-col-3 {
+        background: #fcfcfc;
+        z-index: 6;
+      }
+
+      tr:hover td.sticky-col-1,
+      tr:hover td.sticky-col-2,
+      tr:hover td.sticky-col-3 {
+        background-color: #f8fafc !important;
+      }
+
+      .client-link {
+        color: #3b82f6;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: underline;
+        &:hover {
+          color: #1d4ed8;
+        }
       }
 
       .table-input {
@@ -650,6 +877,121 @@ import Swal from 'sweetalert2';
       }
     }
 
+    /* Modal Backdrop and Card */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-card {
+      background: white;
+      width: 90%;
+      max-width: 900px;
+      max-height: 85vh;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid #edf2f7;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      h3 { margin: 0; font-size: 1.25rem; font-weight: 700; color: #1e293b; }
+    }
+
+    .btn-close {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      color: #718096;
+      &:hover { color: #2d3748; }
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      background: #f8fafc;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #edf2f7;
+    }
+
+    .detail-label {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .detail-value {
+      font-size: 0.95rem;
+      color: #1e293b;
+      font-weight: 600;
+    }
+
+    .editable-cell-modal {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .modal-input {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.9rem;
+      color: #1e293b;
+      background: white;
+      outline: none;
+      &:focus { border-color: #3b82f6; }
+    }
+
+    .modal-select {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #3b82f6;
+      background: white;
+      cursor: pointer;
+      outline: none;
+      text-transform: uppercase;
+      &:focus { border-color: #3b82f6; }
+    }
+
     @keyframes spin {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
@@ -664,6 +1006,7 @@ export class SheetsComponent implements OnInit {
   math = Math;
   saveStatus: { [id: number]: 'saving' | 'success' | 'error' | null } = {};
   sectors: any[] = [];
+  selectedRow: any = null;
 
   // Parámetros de tabla
   searchTerm: string = '';
@@ -884,6 +1227,14 @@ export class SheetsComponent implements OnInit {
     }
   }
 
+  openDetailModal(row: any) {
+    this.selectedRow = row;
+  }
+
+  closeDetailModal() {
+    this.selectedRow = null;
+  }
+
   getColumns(): string[] {
     if (this.data.length === 0) return [];
 
@@ -942,8 +1293,6 @@ export class SheetsComponent implements OnInit {
     if (key === 'rec_descuento_mora_np') return 'REC. DESCUENTO/ MORA CAUSADO NP';
     if (key === 'total_pagado') return 'TOTAL RECAUDO';
     if (key === 'pago_ref') return 'PAGO REF';
-    if (key === 'descuento_mora_causado_np') return 'DESCUENTO / MORA CAUSADO NO PAGADO';
-    if (key === 'rec_descuento_mora_np') return 'REC. DESCUENTO/ MORA CAUSADO NP';
     return key.replace(/_/g, ' ').toUpperCase();
   }
 
