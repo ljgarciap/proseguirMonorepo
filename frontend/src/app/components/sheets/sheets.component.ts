@@ -96,6 +96,7 @@ import Swal from 'sweetalert2';
                   (click)="sortByColumn(col)"
                   [class.sortable]="true"
                   [ngClass]="'sticky-col-' + (i + 1)"
+                  [class.text-right]="isNumericColumn(col)"
                 >
                   <div class="th-content">
                     {{ formatHeader(col) }}
@@ -109,7 +110,9 @@ import Swal from 'sweetalert2';
             </thead>
             <tbody>
               <tr *ngFor="let row of data">
-                <td *ngFor="let col of getColumns(); let i = index" [ngClass]="'sticky-col-' + (i + 1)">
+                <td *ngFor="let col of getColumns(); let i = index" 
+                    [ngClass]="'sticky-col-' + (i + 1)"
+                    [class.text-right]="isNumericColumn(col)">
                   <ng-container [ngSwitch]="col">
                     <ng-container *ngSwitchCase="'id'">
                       <span class="id-badge">#{{ row[col] }}</span>
@@ -1002,6 +1005,13 @@ import Swal from 'sweetalert2';
       &:focus { border-color: #3b82f6; }
     }
 
+    .text-right {
+      text-align: right !important;
+    }
+    th.text-right .th-content {
+      justify-content: flex-end;
+    }
+
     @keyframes spin {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
@@ -1330,5 +1340,18 @@ export class SheetsComponent implements OnInit {
     if (value === null || value === undefined || value === '') return '-';
     const num = Math.round(Number(value));
     return isNaN(num) ? value : num.toString();
+  }
+
+  isNumericColumn(col: string): boolean {
+    const numericCols = [
+      'valor_desembolso', 'saldo_capital', 'valor_vencido', 'valor_mora', 'saldo_total', 'valor_ultimo_abono',
+      'monto', 'valor_aprobado', 'valor_desembolsado', 'valor_reserva', 'descuento_financiero',
+      'total_recaudado_comprobante', 'valor_factura', 'valor_descuento', 'capital_pagado', 'total_pagado',
+      'descuento_mora_causado_np', 'rec_descuento_mora_np', 'saldo_despues_pago', 'intereses_diarios',
+      'intereses_pagados', 'devolucion_descuento', 'margen_reserva', 'reembolso_g_desembolso',
+      'base_negociacion', 'rendimientos_proyectados', 'valor_pagar_deudor', 'valor',
+      'dias_vencido', 'plazo_meses', 'tasa_interes', 'tasa_interes_nm', 'dias', 'factor', 'valor_recaudado', 'total_recaudo'
+    ];
+    return numericCols.includes(col);
   }
 }

@@ -73,7 +73,7 @@
         <table class="premium-table">
           <thead>
             <tr>
-              <th>Fecha</th><th>Finca</th><th>Trabajador</th><th>Labor</th><th>Cant.</th><th>V. Unit</th><th>Total</th><th>Ret.</th><th>Neto</th><th></th>
+              <th>Fecha</th><th>Finca</th><th>Trabajador</th><th>Labor</th><th class="text-right">Cant.</th><th class="text-right">V. Unit</th><th class="text-right">Total</th><th class="text-right">Ret.</th><th class="text-right">Neto</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -82,11 +82,11 @@
               <td><span class="finca-tag">{{ act.finca?.nombre }}</span></td>
               <td><strong>{{ act.trabajador?.nombre }}</strong></td>
               <td>{{ act.labor?.nombre }}</td>
-              <td>{{ act.cantidad }} {{ act.labor?.unidad }}</td>
-              <td>{{ act.precio_unitario | currency }}</td>
-              <td>{{ act.subtotal | currency }}</td>
-              <td class="text-danger">-{{ act.retencion_valor | currency }} ({{ act.retencion_porcentaje }}%)</td>
-              <td class="text-success">{{ act.neto | currency }}</td>
+              <td class="text-right">{{ act.cantidad }} {{ act.labor?.unidad }}</td>
+              <td class="text-right">{{ act.precio_unitario | currency }}</td>
+              <td class="text-right">{{ act.subtotal | currency }}</td>
+              <td class="text-danger text-right">-{{ act.retencion_valor | currency }} ({{ act.retencion_porcentaje }}%)</td>
+              <td class="text-success text-right">{{ act.neto | currency }}</td>
               <td><button (click)="deleteActividad(act.id)" class="btn-icon">🗑️</button></td>
             </tr>
           </tbody>
@@ -138,7 +138,7 @@
         <table class="premium-table">
           <thead>
             <tr>
-              <th>Fecha</th><th>Finca</th><th>Concepto</th><th>Beneficiario</th><th>Tipo</th><th>Valor</th>
+              <th>Fecha</th><th>Finca</th><th>Concepto</th><th>Beneficiario</th><th>Tipo</th><th class="text-right">Valor</th>
             </tr>
           </thead>
           <tbody>
@@ -148,7 +148,7 @@
               <td><strong>{{ g.concepto }}</strong></td>
               <td>{{ g.beneficiario }}</td>
               <td><span class="type-badge" [class]="g.tipo">{{ g.tipo?.toUpperCase() }}</span></td>
-              <td class="text-danger">{{ g.valor | currency }}</td>
+              <td class="text-danger text-right">{{ g.valor | currency }}</td>
             </tr>
           </tbody>
         </table>
