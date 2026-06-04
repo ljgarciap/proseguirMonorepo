@@ -15,15 +15,17 @@ describe('ConciliacionSusuerteHistoryComponent', () => {
     mockHistoryService = jasmine.createSpyObj('ConciliacionSusuerteHistoryService', ['getHistory', 'startNewConciliation']);
     mockRouter = jasmine.createSpyObj('Router', ['navigate']);
 
-    // Mock service default return values
-    mockHistoryService.getHistory.and.returnValue(of({
-      data: [
-        { id: 1, total_amount: 100, conciliated_at: '2026-06-04T12:00:00Z', matched_count: 5, details: [] }
-      ],
-      current_page: 1,
-      last_page: 1,
-      total: 1
-    }));
+    // Mock service default return values using dynamic fake implementation to support paging tests
+    mockHistoryService.getHistory.and.callFake((page: number = 1, perPage: number = 10) => {
+      return of({
+        data: [
+          { id: 1, total_amount: 100, conciliated_at: '2026-06-04T12:00:00Z', matched_count: 5, details: [] }
+        ],
+        current_page: page,
+        last_page: 3,
+        total: 10
+      });
+    });
     mockHistoryService.startNewConciliation.and.returnValue(of({ message: 'Success' }));
 
     await TestBed.configureTestingModule({
