@@ -78,15 +78,20 @@ import Swal from 'sweetalert2';
                 </td>
                 <td class="text-muted">{{ upload.observations || 'Sin observaciones aún' }}</td>
                 <td class="text-center">
-                  <button *ngIf="upload.status === 'pendiente'" 
-                          class="btn-delete" 
-                          (click)="deleteUpload(upload.id)"
-                          title="Eliminar carga">
-                    <span class="material-symbols-outlined">delete</span>
-                  </button>
-                  <span *ngIf="upload.status !== 'pendiente'" class="text-muted" title="Ya está siendo procesado">
-                    <span class="material-symbols-outlined disabled-icon">lock</span>
-                  </span>
+                  <div class="actions-cell-inline">
+                    <button class="btn-view" (click)="viewFile(upload.id, upload.original_name)" title="Visualizar documento">
+                      <span class="material-symbols-outlined">visibility</span>
+                    </button>
+                    <button *ngIf="upload.status === 'pendiente'" 
+                            class="btn-delete" 
+                            (click)="deleteUpload(upload.id)"
+                            title="Eliminar carga">
+                      <span class="material-symbols-outlined">delete</span>
+                    </button>
+                    <span *ngIf="upload.status !== 'pendiente'" class="text-muted" title="Ya está siendo procesado">
+                      <span class="material-symbols-outlined disabled-icon">lock</span>
+                    </span>
+                  </div>
                 </td>
               </tr>
               <tr *ngIf="uploads.length === 0">
@@ -203,6 +208,16 @@ import Swal from 'sweetalert2';
     .text-muted { color: var(--text-muted); font-style: italic; font-size: 0.85rem; }
     .text-center { text-align: center; }
     
+    .actions-cell-inline {
+      display: flex; gap: 8px; justify-content: center; align-items: center;
+    }
+
+    .btn-view {
+      background: none; border: none; color: #1A3B8B; cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.2s;
+      &:hover { background: #EBF4FF; transform: scale(1.1); }
+      .material-symbols-outlined { font-size: 20px; }
+    }
+
     .btn-delete {
       background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.2s;
       &:hover { background: #fee2e2; transform: scale(1.1); }
@@ -324,6 +339,31 @@ export class ClientUploadComponent implements OnInit {
             Swal.fire('Error', err.error?.message || 'No se pudo eliminar el archivo.', 'error');
           }
         });
+      }
+    });
+  }
+
+  viewFile(id: number, originalName: string): void {
+    this.http.get(`${environment.apiUrl}/uploads/${id}/download`, {
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob) => {
+        const fileType = blob.type;
+        const url = window.URL.createObjectURL(blob);
+        
+        if (fileType === 'application/pdf' || fileType.startsWith('image/')) {
+          window.open(url, '_blank');
+        } else {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = originalName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+      },
+      error: (err) => {
+        Swal.fire('Error', 'No se pudo cargar el archivo para visualización.', 'error');
       }
     });
   }

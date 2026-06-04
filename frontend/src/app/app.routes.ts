@@ -10,11 +10,14 @@ import { ClientUploadComponent } from './components/client-upload/client-upload.
 import { OperatorValidationComponent } from './components/operator-validation/operator-validation.component';
 import { LoginComponent } from './components/auth/login/login.component';
 import { roleGuard } from './guards/role.guard';
+import { DocumentConfigComponent } from './components/document-config/document-config.component';
+import { DocumentRequestsComponent } from './components/document-requests/document-requests.component';
 
 import { ProfileSettingsComponent } from './components/profile-settings/profile-settings.component';
 import { UserManagementComponent } from './components/user-management/user-management.component';
 import { MandatosComponent } from './components/mandatos/mandatos.component';
 import { ConciliacionSusuerteComponent } from './components/conciliacion-susuerte/conciliacion-susuerte.component';
+import { ConciliacionSusuerteHistoryComponent } from './components/conciliacion-susuerte-history/conciliacion-susuerte-history.component';
 import { DestinatariosComponent } from './components/destinatarios/destinatarios.component';
 import { NotificacionesComponent } from './components/notificaciones/notificaciones.component';
 import { AsignacionesComponent } from './components/asignaciones/asignaciones.component';
@@ -25,6 +28,12 @@ export const routes: Routes = [
     { 
         path: 'conciliacion-susuerte', 
         component: ConciliacionSusuerteComponent, 
+        canActivate: [roleGuard], 
+        data: { roles: ['superadmin', 'operativo', 'gerente', 'contable'] } 
+    },
+    { 
+        path: 'conciliacion-susuerte-history', 
+        component: ConciliacionSusuerteHistoryComponent, 
         canActivate: [roleGuard], 
         data: { roles: ['superadmin', 'operativo', 'gerente', 'contable'] } 
     },
@@ -135,6 +144,18 @@ export const routes: Routes = [
         loadComponent: () => import('./components/db-cleaner/db-cleaner.component').then(m => m.DbCleanerComponent), 
         canActivate: [roleGuard], 
         data: { roles: ['superadmin'] } 
+    },
+    { 
+        path: 'document-requests', 
+        component: DocumentRequestsComponent, 
+        canActivate: [roleGuard], 
+        data: { roles: ['operativo', 'superadmin'] } 
+    },
+    { 
+        path: 'document-config', 
+        component: DocumentConfigComponent, 
+        canActivate: [roleGuard], 
+        data: { roles: ['operativo', 'superadmin'] } 
     },
     { path: '**', redirectTo: '' }
 ];
