@@ -16,9 +16,18 @@ class ConciliacionSusuerteTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        // Create an operative user
-        $this->user = User::factory()->create([
-            'role' => 'operativo'
+        
+        $cc = \App\Models\DocumentType::where('codigo', 'CC')->first() 
+            ?? \App\Models\DocumentType::first() 
+            ?? \App\Models\DocumentType::create(['nombre' => 'Cedula', 'codigo' => 'CC']);
+
+        $this->user = User::create([
+            'name' => 'Operativo Test User',
+            'email' => 'operativo.test.' . uniqid() . '@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'test_op_' . uniqid(),
+            'tipo_documento_id' => $cc->id,
+            'roles' => ['operativo']
         ]);
     }
 
