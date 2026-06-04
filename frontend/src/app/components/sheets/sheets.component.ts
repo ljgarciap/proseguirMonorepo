@@ -204,6 +204,7 @@ import Swal from 'sweetalert2';
                     <span *ngSwitchCase="'valor_aprobado'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'valor_desembolsado'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'valor_reserva'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'saldo_pendiente'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'descuento_financiero'">{{ formatMoney(row[col]) }}</span>
                     
                     <span *ngSwitchCase="'total_recaudado_comprobante'">{{ formatMoney(row[col]) }}</span>
@@ -397,6 +398,9 @@ import Swal from 'sweetalert2';
                     <span>{{ formatMoney(selectedRow[col]) }}</span>
                   </ng-container>
                   <ng-container *ngSwitchCase="'valor_reserva'">
+                    <span>{{ formatMoney(selectedRow[col]) }}</span>
+                  </ng-container>
+                  <ng-container *ngSwitchCase="'saldo_pendiente'">
                     <span>{{ formatMoney(selectedRow[col]) }}</span>
                   </ng-container>
                   <ng-container *ngSwitchCase="'descuento_financiero'">
@@ -1313,6 +1317,7 @@ export class SheetsComponent implements OnInit {
     if (key === 'rec_descuento_mora_np') return 'REC. DESCUENTO/ MORA CAUSADO NP';
     if (key === 'total_pagado') return 'TOTAL RECAUDO';
     if (key === 'pago_ref') return 'PAGO REF';
+    if (key === 'saldo_pendiente') return 'SALDO PENDIENTE VENCIDO';
     return key.replace(/_/g, ' ').toUpperCase();
   }
 
@@ -1350,7 +1355,8 @@ export class SheetsComponent implements OnInit {
       'descuento_mora_causado_np', 'rec_descuento_mora_np', 'saldo_despues_pago', 'intereses_diarios',
       'intereses_pagados', 'devolucion_descuento', 'margen_reserva', 'reembolso_g_desembolso',
       'base_negociacion', 'rendimientos_proyectados', 'valor_pagar_deudor', 'valor',
-      'dias_vencido', 'plazo_meses', 'tasa_interes', 'tasa_interes_nm', 'dias', 'factor', 'valor_recaudado', 'total_recaudo'
+      'dias_vencido', 'plazo_meses', 'tasa_interes', 'tasa_interes_nm', 'dias', 'factor', 'valor_recaudado', 'total_recaudo',
+      'saldo_pendiente'
     ];
     return numericCols.includes(col);
   }
