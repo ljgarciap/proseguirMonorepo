@@ -165,7 +165,7 @@ Chart.register(...registerables);
               <div class="kpi-body">
                 <label>Valor Vencido</label>
                 <div class="value">{{ formatMoney(stats.cartera.total_vencido) }}</div>
-                <div class="footer">Pendiente por recaudar</div>
+                <div class="footer">Retraso <= 3 días</div>
               </div>
             </div>
             <div class="kpi-card pro-card red" (click)="navigateToSheets('cartera', '', 'mora')">
