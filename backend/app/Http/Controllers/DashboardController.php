@@ -198,7 +198,7 @@ class DashboardController extends Controller
         $factoringOpQuery = $applyFilters(\App\Models\OperacionFactoring::query(), 'created_at');
         $factoringOpCount = (clone $factoringOpQuery)->count();
         $totalFinanced = (clone $factoringOpQuery)->sum('valor_aprobado');
-        $totalDisbursed = (clone $factoringOpQuery)->sum('valor_desembolsado');
+        $totalDisbursed = (clone $factoringOpQuery)->sum('valor_aprobado') - (clone $factoringOpQuery)->sum('descuento_financiero');
         $totalReserva = (clone $factoringOpQuery)->sum('valor_reserva');
         $avgTasaFactoring = (clone $factoringOpQuery)->avg('tasa_descuento');
         
