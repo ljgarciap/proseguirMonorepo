@@ -24,6 +24,10 @@ export class ParametersComponent implements OnInit {
       { name: 'nombre', label: 'Nombre', type: 'text' },
       { name: 'color', label: 'Color', type: 'color' },
       { name: 'horas_vencimiento', label: 'Horas Venc.', type: 'number' }
+    ]},
+    { id: 'tipo_personas', label: 'Tipos de Persona', fields: [
+      { name: 'codigo', label: 'Código', type: 'text' },
+      { name: 'nombre', label: 'Nombre', type: 'text' }
     ]}
   ];
 

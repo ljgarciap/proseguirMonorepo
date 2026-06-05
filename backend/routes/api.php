@@ -61,6 +61,10 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
         Route::apiResource('users', \App\Http\Controllers\UserController::class)
             ->middleware(['auth:api', 'checkrole:superadmin']);
         
+        // Clientes (Superadmin, Gerente, Operativo)
+        Route::apiResource('clientes', \App\Http\Controllers\ClienteController::class)
+            ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
+        
         // Destinatarios (Superadmin only)
         Route::apiResource('destinatarios', \App\Http\Controllers\DestinatarioController::class)
             ->middleware(['auth:api', 'checkrole:superadmin']);
