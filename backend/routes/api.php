@@ -56,6 +56,8 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
             ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
 
         // Usuarios (Superadmin only)
+        Route::post('users/{id}/restore', [\App\Http\Controllers\UserController::class, 'restore'])
+            ->middleware(['auth:api', 'checkrole:superadmin']);
         Route::apiResource('users', \App\Http\Controllers\UserController::class)
             ->middleware(['auth:api', 'checkrole:superadmin']);
         

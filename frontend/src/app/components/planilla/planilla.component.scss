@@ -235,3 +235,7 @@
 }
 
 .btn-icon { background: transparent; border: none; cursor: pointer; opacity: 0.6; &:hover { opacity: 1; } }
+
+.text-right {
+  text-align: right !important;
+}

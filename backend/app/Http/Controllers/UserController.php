@@ -9,9 +9,28 @@ use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(User::with('documentType')->orderBy('name')->get());
+        $status = $request->query('status', 'active');
+        $search = $request->query('search');
+
+        $query = User::with('documentType')->orderBy('name');
+
+        if ($status === 'inactive') {
+            $query->onlyTrashed();
+        } elseif ($status === 'all') {
+            $query->withTrashed();
+        }
+
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('numero_documento', 'like', "%{$search}%");
+            });
+        }
+
+        return response()->json($query->get());
     }
 
     public function store(Request $request)
@@ -81,10 +100,17 @@ class UserController extends Controller
     {
         // Prevent deleting the last superadmin or yourself
         if ($user->id === auth()->id()) {
-            return response()->json(['message' => 'No puedes eliminarte a ti mismo.'], 422);
+            return response()->json(['message' => 'No puedes desactivar tu propio usuario.'], 422);
         }
 
         $user->delete();
         return response()->json(null, 204);
+    }
+
+    public function restore($id)
+    {
+        $user = User::onlyTrashed()->findOrFail($id);
+        $user->restore();
+        return response()->json($user);
     }
 }

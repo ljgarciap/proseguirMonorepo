@@ -49,7 +49,7 @@
                 {{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
               </span>
             </th>
-            <th (click)="setSort('total_amount')">
+            <th (click)="setSort('total_amount')" class="text-right">
               Monto Total Susuerte
               <span class="material-symbols-outlined sort-arrow" *ngIf="sortField === 'total_amount'">
                 {{ sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward' }}
@@ -80,7 +80,7 @@
           <tr *ngFor="let item of filteredHistory">
             <td>#{{ item.id }}</td>
             <td>{{ item.conciliated_at | date:'dd/MM/yyyy HH:mm' }}</td>
-            <td class="total-cell">{{ item.total_amount | currency }}</td>
+            <td class="total-cell text-right">{{ item.total_amount | currency }}</td>
             <td>
               <span class="badge badge-success">{{ item.matched_count || 0 }}</span>
             </td>
@@ -156,7 +156,7 @@
               <th>Estado</th>
               <th>Fecha Susuerte</th>
               <th>Fecha Banco</th>
-              <th>Monto</th>
+              <th class="text-right">Monto</th>
               <th>Descripción Susuerte</th>
               <th>Descripción Banco</th>
             </tr>
@@ -170,7 +170,7 @@
               </td>
               <td>{{ record['Date (Susuerte)'] || '-' }}</td>
               <td>{{ record['Date (Bank)'] || '-' }}</td>
-              <td class="total-cell">{{ record.Amount | currency }}</td>
+              <td class="total-cell text-right">{{ record.Amount | currency }}</td>
               <td>{{ record['Description (Susuerte)'] || '-' }}</td>
               <td>{{ record['Description (Bank)'] || '-' }}</td>
             </tr>

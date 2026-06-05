@@ -71,7 +71,7 @@
             <th>Estado</th>
             <th>Fecha (Susuerte)</th>
             <th>Fecha (Banco)</th>
-            <th>Monto</th>
+            <th class="text-right">Monto</th>
             <th>Descripción (Susuerte)</th>
             <th>Descripción (Banco)</th>
             <th>Observaciones</th>
@@ -86,7 +86,7 @@
             </td>
             <td>{{ item['Date (Susuerte)'] }}</td>
             <td>{{ item['Date (Bank)'] }}</td>
-            <td class="total-cell">{{ item.Amount | currency }}</td>
+            <td class="total-cell text-right">{{ item.Amount | currency }}</td>
             <td>{{ item['Description (Susuerte)'] }}</td>
             <td>{{ item['Description (Bank)'] }}</td>
             <td>
