@@ -157,5 +157,11 @@ export const routes: Routes = [
         canActivate: [roleGuard], 
         data: { roles: ['operativo', 'superadmin'] } 
     },
+    { 
+        path: 'clientes', 
+        loadComponent: () => import('./components/clientes/clientes.component').then(m => m.ClientesComponent), 
+        canActivate: [roleGuard], 
+        data: { roles: ['superadmin', 'gerente', 'operativo'] } 
+    },
     { path: '**', redirectTo: '' }
 ];
