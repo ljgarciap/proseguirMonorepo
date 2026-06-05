@@ -194,8 +194,9 @@ Chart.register(...registerables);
             </div>
 
             <div class="card table-container span-4">
-              <div class="card-header">
+              <div class="card-header" (click)="showClientsBalanceModal = true" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;" title="Ver todos los clientes con saldo">
                 <h3>Top Clientes por Saldo</h3>
+                <span class="material-symbols-outlined" style="font-size: 20px; color: #718096;">open_in_new</span>
               </div>
               <table class="pro-table x-small">
                 <thead>
@@ -622,6 +623,43 @@ Chart.register(...registerables);
 
       </div>
 
+      <!-- MODAL FOR ALL CLIENTS WITH BALANCE (SCRUM-66) -->
+      <div class="modal-backdrop" *ngIf="showClientsBalanceModal">
+        <div class="modal-card" style="max-width: 600px;">
+          <header class="modal-header">
+            <h3>Clientes con Saldo</h3>
+            <button class="btn-close" (click)="showClientsBalanceModal = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </header>
+          <main class="modal-body" style="padding: 1.5rem;">
+            <div class="search-wrapper mb-3" style="max-width: 100%; position: relative; margin-bottom: 1rem;">
+              <span class="material-symbols-outlined search-icon" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #a0aec0; pointer-events: none;">search</span>
+              <input type="text" [(ngModel)]="searchClientBalance" placeholder="Buscar cliente..." class="filter-input" style="width: 100%; padding: 0.5rem 0.5rem 0.5rem 2.2rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; outline: none;" />
+            </div>
+            <div style="max-height: 400px; overflow-y: auto;">
+              <table class="pro-table small" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                  <tr style="border-bottom: 2px solid #edf2f7; text-align: left;">
+                    <th style="padding: 8px; color: #4a5568; font-weight: 600;">Cliente</th>
+                    <th style="padding: 8px; text-align: right; color: #4a5568; font-weight: 600;">Saldo Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let c of filteredClientsBalance" (click)="showClientsBalanceModal = false; navigateToSheets('cartera', c.cliente)" class="clickable" style="cursor: pointer; border-bottom: 1px solid #edf2f7;">
+                    <td style="padding: 8px; color: #2d3748;">{{ c.cliente }}</td>
+                    <td style="padding: 8px; text-align: right; font-weight: 700; color: #1e40af;">{{ formatMoney(c.saldo_total) }}</td>
+                  </tr>
+                  <tr *ngIf="filteredClientsBalance.length === 0">
+                    <td colspan="2" class="text-center py-3" style="padding: 16px; text-align: center; color: #718096;">No se encontraron clientes con saldo.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </main>
+        </div>
+      </div>
+
       <div class="loading-overlay" *ngIf="isLoading && authService.getActiveRole() !== 'contable'">
         <div class="pro-spinner"></div>
         <p>Procesando Inteligencia Financiera...</p>
@@ -805,6 +843,63 @@ Chart.register(...registerables);
       border-radius: 50%; animation: spin 1s linear infinite;
     }
 
+    /* Modal Backdrop and Card */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(15, 23, 42, 0.3);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1100;
+    }
+
+    .modal-card {
+      background: white;
+      width: 90%;
+      max-width: 600px;
+      max-height: 90vh;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalSlideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      h3 { margin: 0; font-size: 1.2rem; font-weight: 700; color: #0f172a; }
+    }
+
+    .btn-close {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      color: #64748b;
+      &:hover { color: #0f172a; }
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+    }
+
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     .spinning { animation: spin 1s linear infinite; }
 
@@ -851,6 +946,16 @@ export class DashboardComponent implements OnInit {
   isRefreshing = false;
   isLoading = true;
   isGeneratingPdf = false;
+  showClientsBalanceModal = false;
+  searchClientBalance = '';
+
+  get filteredClientsBalance() {
+    const list = this.stats?.cartera?.client_ranking || [];
+    if (!this.searchClientBalance) return list;
+    const term = this.searchClientBalance.toLowerCase();
+    return list.filter((c: any) => c.cliente?.toLowerCase().includes(term));
+  }
+
   stats: any = {
     cartera: null,
     factoring: null,

@@ -124,7 +124,6 @@ class DashboardController extends Controller
             ->select('cliente', 'identificacion', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total_ops'), \Illuminate\Support\Facades\DB::raw('SUM(saldo_capital) as saldo_total'))
             ->groupBy('cliente', 'identificacion')
             ->orderBy('saldo_total', 'desc')
-            ->limit(10)
             ->get();
 
         // Debtors in Mora (Aggregated per Client)
