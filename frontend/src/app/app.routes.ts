@@ -21,6 +21,7 @@ import { ConciliacionSusuerteHistoryComponent } from './components/conciliacion-
 import { DestinatariosComponent } from './components/destinatarios/destinatarios.component';
 import { NotificacionesComponent } from './components/notificaciones/notificaciones.component';
 import { AsignacionesComponent } from './components/asignaciones/asignaciones.component';
+import { RoadmapComponent } from './components/roadmap/roadmap.component';
 
 export const routes: Routes = [
     { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
@@ -168,6 +169,12 @@ export const routes: Routes = [
         loadComponent: () => import('./components/visitas/visitas.component').then(m => m.VisitasComponent), 
         canActivate: [roleGuard], 
         data: { roles: ['superadmin', 'gerente', 'operativo'] } 
+    },
+    {
+        path: 'roadmap',
+        component: RoadmapComponent,
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
     },
     { path: '**', redirectTo: '' }
 ];
