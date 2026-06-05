@@ -163,5 +163,11 @@ export const routes: Routes = [
         canActivate: [roleGuard], 
         data: { roles: ['superadmin', 'gerente', 'operativo'] } 
     },
+    { 
+        path: 'visitas', 
+        loadComponent: () => import('./components/visitas/visitas.component').then(m => m.VisitasComponent), 
+        canActivate: [roleGuard], 
+        data: { roles: ['superadmin', 'gerente', 'operativo'] } 
+    },
     { path: '**', redirectTo: '' }
 ];

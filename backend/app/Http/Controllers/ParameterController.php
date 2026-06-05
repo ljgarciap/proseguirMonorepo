@@ -14,6 +14,8 @@ class ParameterController extends Controller
         'accounting_categories' => \App\Models\AccountingCategory::class,
         'accounting_priorities' => \App\Models\AccountingPriority::class,
         'tipo_personas' => \App\Models\TipoPersona::class,
+        'tipo_creditos' => \App\Models\TipoCredito::class,
+        'amortizaciones' => \App\Models\Amortizacion::class,
     ];
 
     public function index($table)
