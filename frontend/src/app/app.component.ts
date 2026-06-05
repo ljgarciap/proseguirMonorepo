@@ -66,6 +66,9 @@ import { interval, Subscription } from 'rxjs';
             <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'superadmin'])" routerLink="/clientes" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">group</span> Registro de Clientes
             </a>
+            <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'superadmin'])" routerLink="/visitas" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">chat_bubble</span> Registro de Visita a Cliente
+            </a>
           </div>
 
           <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])">

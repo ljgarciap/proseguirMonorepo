@@ -28,6 +28,14 @@ export class ParametersComponent implements OnInit {
     { id: 'tipo_personas', label: 'Tipos de Persona', fields: [
       { name: 'codigo', label: 'Código', type: 'text' },
       { name: 'nombre', label: 'Nombre', type: 'text' }
+    ]},
+    { id: 'tipo_creditos', label: 'Tipos de Crédito', fields: [
+      { name: 'codigo', label: 'Código', type: 'text' },
+      { name: 'nombre', label: 'Nombre', type: 'text' }
+    ]},
+    { id: 'amortizaciones', label: 'Amortizaciones', fields: [
+      { name: 'codigo', label: 'Código', type: 'text' },
+      { name: 'nombre', label: 'Nombre', type: 'text' }
     ]}
   ];
 
