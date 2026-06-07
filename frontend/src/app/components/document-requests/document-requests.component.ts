@@ -200,4 +200,23 @@ export class DocumentRequestsComponent implements OnInit {
     const approved = this.getApprovedCount(req);
     return Math.round((approved / req.items.length) * 100);
   }
+
+  downloadTemplate(reqId: number, originalName: string) {
+    this.http.get(`${environment.apiUrl}/document-requirements/${reqId}/download-template`, {
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = originalName || 'plantilla.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      },
+      error: () => {
+        Swal.fire('Error', 'No se pudo descargar el formato de plantilla.', 'error');
+      }
+    });
+  }
 }

@@ -128,7 +128,10 @@
               <label>
                 <input type="checkbox" [checked]="selectedRequirementIds.includes(r.id)" (change)="toggleRequirement(r.id)">
                 <div class="item-text">
-                  <span class="title">{{ r.nombre }}</span>
+                  <span class="title">
+                    {{ r.nombre }}
+                    <span *ngIf="r.tiene_plantilla" style="color: #1d4ed8; font-size: 0.7rem; font-weight: bold; background: #e0f2fe; padding: 1px 4px; border-radius: 4px; margin-left: 4px;">Formato</span>
+                  </span>
                   <span class="desc" *ngIf="r.descripcion">{{ r.descripcion }}</span>
                 </div>
               </label>
@@ -172,6 +175,12 @@
               <div class="title-details">
                 <span class="item-title">{{ item.requirement?.nombre }}</span>
                 <span class="item-desc" *ngIf="item.requirement?.descripcion">{{ item.requirement?.descripcion }}</span>
+                <span *ngIf="item.requirement?.tiene_plantilla" class="template-doc-link" style="font-size: 0.8rem; color: #1d4ed8; margin-top: 4px;">
+                  📁 Formato: 
+                  <button type="button" (click)="downloadTemplate(item.requirement.id, item.requirement.plantilla_nombre)" style="background:none; border:none; padding:0; color:#1d4ed8; text-decoration:underline; font-weight:700; cursor:pointer;">
+                    {{ item.requirement.plantilla_nombre }}
+                  </button>
+                </span>
               </div>
             </div>
             

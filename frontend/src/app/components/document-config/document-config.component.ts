@@ -18,8 +18,9 @@ export class DocumentConfigComponent implements OnInit {
 
   // Requirements data
   requirements: any[] = [];
-  requirementForm = { id: null as number | null, nombre: '', descripcion: '', activo: true };
+  requirementForm = { id: null as number | null, nombre: '', descripcion: '', activo: true, tiene_plantilla: false, plantilla_nombre: '' };
   showRequirementForm = false;
+  selectedTemplateFile: File | null = null;
 
   // Presets data
   presets: any[] = [];
@@ -41,32 +42,50 @@ export class DocumentConfigComponent implements OnInit {
   }
 
   openNewRequirement() {
-    this.requirementForm = { id: null, nombre: '', descripcion: '', activo: true };
+    this.requirementForm = { id: null, nombre: '', descripcion: '', activo: true, tiene_plantilla: false, plantilla_nombre: '' };
+    this.selectedTemplateFile = null;
     this.showRequirementForm = true;
   }
 
   editRequirement(req: any) {
-    this.requirementForm = { ...req };
+    this.requirementForm = { ...req, tiene_plantilla: !!req.tiene_plantilla };
+    this.selectedTemplateFile = null;
     this.showRequirementForm = true;
+  }
+
+  onTemplateSelected(event: any) {
+    this.selectedTemplateFile = event.target.files[0] || null;
   }
 
   saveRequirement() {
     this.loading = true;
+    const formData = new FormData();
+    formData.append('nombre', this.requirementForm.nombre);
+    formData.append('descripcion', this.requirementForm.descripcion || '');
+    formData.append('activo', this.requirementForm.activo ? '1' : '0');
+    formData.append('tiene_plantilla', this.requirementForm.tiene_plantilla ? '1' : '0');
+    
+    if (this.selectedTemplateFile) {
+      formData.append('plantilla', this.selectedTemplateFile);
+    }
+
     if (this.requirementForm.id) {
-      this.http.put(`${environment.apiUrl}/document-requirements/${this.requirementForm.id}`, this.requirementForm).subscribe({
+      this.http.post(`${environment.apiUrl}/document-requirements/${this.requirementForm.id}`, formData).subscribe({
         next: () => {
           this.loading = false;
           this.showRequirementForm = false;
+          this.selectedTemplateFile = null;
           Swal.fire('Guardado', 'Requisito actualizado correctamente.', 'success');
           this.loadRequirements();
         },
         error: () => { this.loading = false; }
       });
     } else {
-      this.http.post(`${environment.apiUrl}/document-requirements`, this.requirementForm).subscribe({
+      this.http.post(`${environment.apiUrl}/document-requirements`, formData).subscribe({
         next: () => {
           this.loading = false;
           this.showRequirementForm = false;
+          this.selectedTemplateFile = null;
           Swal.fire('Creado', 'Requisito creado correctamente.', 'success');
           this.loadRequirements();
         },
@@ -181,6 +200,25 @@ export class DocumentConfigComponent implements OnInit {
             Swal.fire('Error', 'No se pudo eliminar la plantilla.', 'error');
           }
         });
+      }
+    });
+  }
+
+  downloadTemplate(reqId: number, originalName: string) {
+    this.http.get(`${environment.apiUrl}/document-requirements/${reqId}/download-template`, {
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = originalName || 'plantilla.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      },
+      error: () => {
+        Swal.fire('Error', 'No se pudo descargar el archivo de formato o plantilla.', 'error');
       }
     });
   }

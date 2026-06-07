@@ -219,11 +219,15 @@ Route::prefix('db-cleaner')->middleware(['auth:api', 'checkrole:superadmin'])->g
     Route::post('/repair', [\App\Http\Controllers\DbCleanerController::class, 'repairSchema']);
 });
 
+Route::get('/document-requirements/{id}/download-template', [\App\Http\Controllers\DocumentRequirementController::class, 'downloadTemplate'])
+    ->middleware(['auth:api']);
+
 // Requisitos de Documentos (Superadmin, Operativo)
 Route::prefix('document-requirements')->middleware(['auth:api', 'checkrole:superadmin,operativo'])->group(function () {
     Route::get('/', [\App\Http\Controllers\DocumentRequirementController::class, 'index']);
     Route::post('/', [\App\Http\Controllers\DocumentRequirementController::class, 'store']);
     Route::put('/{id}', [\App\Http\Controllers\DocumentRequirementController::class, 'update']);
+    Route::post('/{id}', [\App\Http\Controllers\DocumentRequirementController::class, 'update']); // Fallback for multipart form uploads in PHP
     Route::delete('/{id}', [\App\Http\Controllers\DocumentRequirementController::class, 'destroy']);
 });
 

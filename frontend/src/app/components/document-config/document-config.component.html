@@ -51,6 +51,19 @@
             Estado Activo
           </label>
         </div>
+        <div class="switch-group">
+          <label class="switch-label">
+            <input type="checkbox" [(ngModel)]="requirementForm.tiene_plantilla" name="req_tiene_plantilla">
+            ¿Proveer Formato/Plantilla para Diligenciar?
+          </label>
+        </div>
+        <div class="input-group" *ngIf="requirementForm.tiene_plantilla" style="grid-column: span 2;">
+          <label>Archivo de Plantilla (PDF / Word / Excel)</label>
+          <input type="file" (change)="onTemplateSelected($event)">
+          <div class="current-file-info" *ngIf="requirementForm.plantilla_nombre" style="margin-top: 4px; font-size: 0.8rem; color: #475569;">
+            Archivo actual: <b>{{ requirementForm.plantilla_nombre }}</b>
+          </div>
+        </div>
         <div class="form-actions">
           <button type="button" class="btn-pro secondary" (click)="showRequirementForm = false">Cancelar</button>
           <button type="submit" class="btn-pro primary" [disabled]="!reqForm.form.valid || loading">Guardar</button>
@@ -66,6 +79,13 @@
           <div class="req-text">
             <span class="req-title">{{ req.nombre }}</span>
             <span class="req-desc">{{ req.descripcion || 'Sin descripción adicional' }}</span>
+            <div class="req-template-info" *ngIf="req.tiene_plantilla" style="margin-top: 6px; font-size: 0.8rem; color: #1d4ed8; display: flex; align-items: center; gap: 4px;">
+              <span class="material-symbols-outlined" style="font-size: 16px;">download_for_offline</span>
+              Plantilla: 
+              <button type="button" (click)="downloadTemplate(req.id, req.plantilla_nombre)" style="background: none; border: none; padding: 0; color: #1d4ed8; font-weight: 600; text-decoration: underline; cursor: pointer;">
+                {{ req.plantilla_nombre }}
+              </button>
+            </div>
           </div>
         </div>
         <div class="req-meta">

@@ -116,7 +116,7 @@ class ClienteTest extends TestCase
         $this->assertEquals('55555', $response->json()[0]['numero_documento']);
 
         // Filter by type
-        $response = $this->getJson('/api/clientes?tipo_persona=Jurídica');
+        $response = $this->getJson('/api/clientes?tipo_persona=Jur');
         $response->assertStatus(200);
         $this->assertCount(1, $response->json());
         $this->assertEquals('99999', $response->json()[0]['numero_documento']);

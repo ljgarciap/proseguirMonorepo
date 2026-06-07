@@ -12,11 +12,15 @@ class DocumentRequirement extends Model
     protected $fillable = [
         'nombre',
         'descripcion',
-        'activo'
+        'activo',
+        'tiene_plantilla',
+        'plantilla_path',
+        'plantilla_nombre'
     ];
 
     protected $casts = [
-        'activo' => 'boolean'
+        'activo' => 'boolean',
+        'tiene_plantilla' => 'boolean'
     ];
 
     public function presets()
