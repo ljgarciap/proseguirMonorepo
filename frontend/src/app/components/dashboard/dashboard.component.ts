@@ -261,11 +261,12 @@ Chart.register(...registerables);
                 <div class="value">{{ stats.factoring.efficiency_score }} <small>días</small></div>
               </div>
             </div>
-            <div class="kpi-card pro-card orange">
-              <div class="kpi-icon"><span class="material-symbols-outlined">price_check</span></div>
+            <div class="kpi-card pro-card orange" (click)="navigateToSheets('pagos')">
+              <div class="kpi-icon"><span class="material-symbols-outlined">receipt</span></div>
               <div class="kpi-body">
-                <label>Costo Pronto Pago</label>
-                <div class="value">{{ formatMoney(stats.factoring.early_payment_cost) }}</div>
+                <label>Facturas Canceladas</label>
+                <div class="value">{{ stats.factoring.pagos_count }}</div>
+                <div class="footer">Click para ver detalle</div>
               </div>
             </div>
             <div class="kpi-card pro-card purple">
