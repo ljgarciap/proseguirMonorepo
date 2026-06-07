@@ -41,6 +41,15 @@ class SystemLogController extends Controller
             });
         }
 
+        $query->select('categoria', 'filename', 'original_name', 'action')
+            ->selectRaw('MAX(id) as id')
+            ->selectRaw('MAX(created_at) as created_at')
+            ->selectRaw('MAX(message) as message')
+            ->selectRaw('SUM(records_processed) as records_processed')
+            ->selectRaw('MAX(payload) as payload')
+            ->selectRaw('MAX(error_details) as error_details')
+            ->groupBy('categoria', 'filename', 'original_name', 'action');
+
         return response()->json($query->orderBy($sortBy, $sortDir)->paginate($perPage));
     }
 
@@ -80,6 +89,7 @@ class SystemLogController extends Controller
             \App\Models\SystemLog::create([
                 'categoria' => $log->categoria,
                 'filename' => $log->filename,
+                'original_name' => $log->original_name,
                 'action' => 'Reintento Exitoso',
                 'message' => "Reintento manual del log #{$log->id} procesado con éxito.",
                 'records_processed' => count($data),
@@ -92,6 +102,7 @@ class SystemLogController extends Controller
             \App\Models\SystemLog::create([
                 'categoria' => $log->categoria,
                 'filename' => $log->filename,
+                'original_name' => $log->original_name,
                 'action' => 'Error en Reintento',
                 'message' => "Error reintentando log #{$log->id}: " . $e->getMessage(),
                 'records_processed' => 0,

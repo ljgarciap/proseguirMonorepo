@@ -105,6 +105,14 @@ class DbCleanerController extends Controller
                 '--no-interaction' => true
             ]);
 
+            // Ensure the personal access client is created in the database to prevent login 500 errors
+            Artisan::call('passport:client', [
+                '--personal' => true,
+                '--name' => 'Factoring Personal Access Client',
+                '--provider' => 'users',
+                '--no-interaction' => true
+            ]);
+
             $output = Artisan::output();
             
             return response()->json([

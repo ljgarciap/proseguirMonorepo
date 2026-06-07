@@ -65,6 +65,7 @@
     
     &.contable { background: #E8EAF6; color: #3F51B5; }
     &.gerente { background: #E0F2F1; color: var(--secondary); }
+    &.operativo { background: #F3E5F5; color: #8E24AA; }
   }
   
   .details {
@@ -123,6 +124,7 @@
 
 .role-badge.contable { background: #E8EAF6; color: #3F51B5; }
 .role-badge.gerente { background: #E0F2F1; color: var(--secondary); }
+.role-badge.operativo { background: #F3E5F5; color: #8E24AA; }
 
 .actions { display: flex; justify-content: flex-end; gap: 8px; white-space: nowrap; }
 .empty-state { padding: 3rem; text-align: center; color: var(--text-muted); font-style: italic; }

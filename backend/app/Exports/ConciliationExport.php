@@ -9,7 +9,7 @@ use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class ConciliationExport implements FromCollection, WithHeadings, ShouldAutoSize, WithStyles
+class ConciliationExport implements FromCollection, WithHeadings, ShouldAutoSize, WithStyles, WithMapping
 {
     protected $results;
 
@@ -31,7 +31,21 @@ class ConciliationExport implements FromCollection, WithHeadings, ShouldAutoSize
             'Date (Bank)',
             'Amount',
             'Description (Susuerte)',
-            'Description (Bank)'
+            'Description (Bank)',
+            'Observations'
+        ];
+    }
+
+    public function map($row): array
+    {
+        return [
+            $row['Status'] ?? '',
+            $row['Date (Susuerte)'] ?? '',
+            $row['Date (Bank)'] ?? '',
+            $row['Amount'] ?? '',
+            $row['Description (Susuerte)'] ?? '',
+            $row['Description (Bank)'] ?? '',
+            $row['Observations'] ?? ''
         ];
     }
 

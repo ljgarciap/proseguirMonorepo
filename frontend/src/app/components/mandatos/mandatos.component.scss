@@ -13,6 +13,7 @@
       font-weight: 800;
       background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
       -webkit-background-clip: text;
+      background-clip: text;
       -webkit-text-fill-color: transparent;
       margin-bottom: 0.5rem;
     }
@@ -28,6 +29,10 @@
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
     align-items: start;
+
+    .full-width {
+      grid-column: 1 / -1;
+    }
 
     @media (max-width: 992px) {
       grid-template-columns: 1fr;
@@ -87,6 +92,26 @@
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
+
+      &.has-error {
+        label {
+          color: #dc2626;
+        }
+        input, select {
+          border-color: #fca5a5;
+          background: #fff5f5;
+          &:focus {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1);
+          }
+        }
+        .error-msg {
+          color: #dc2626;
+          font-size: 0.75rem;
+          font-weight: 500;
+          margin-top: 0.125rem;
+        }
+      }
 
       &.full {
         flex: 100%;

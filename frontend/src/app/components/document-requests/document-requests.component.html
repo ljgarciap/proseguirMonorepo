@@ -1,0 +1,204 @@
+<div class="view-container">
+  <header class="view-header">
+    <div class="title-area">
+      <h1>Solicitudes de Documentación</h1>
+      <p>Gestione y supervise la entrega de archivos requeridos por parte de los clientes.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-pro primary" (click)="openNewRequest()">
+        <span class="material-symbols-outlined">send</span> Nueva Solicitud
+      </button>
+    </div>
+  </header>
+
+  <!-- Filters and tools -->
+  <div class="filter-tools-bar card">
+    <div class="filter-group">
+      <label>Filtrar Estado:</label>
+      <select [(ngModel)]="statusFilter" (change)="onFilterChange()" class="compact-select">
+        <option value="todos">Todos los Estados</option>
+        <option value="pendiente">Pendientes</option>
+        <option value="completado">Completados</option>
+      </select>
+    </div>
+    <span class="results-count">Total: <b>{{ totalRequests }}</b> solicitudes encontradas</span>
+  </div>
+
+  <!-- Main Request List Table -->
+  <div class="table-card card p-0 overflow-hidden mt-3">
+    <div class="table-scroll-wrapper">
+      <table class="pro-table">
+        <thead>
+          <tr>
+            <th>Fecha Solicitud</th>
+            <th>Cliente</th>
+            <th>Progreso / Tareas</th>
+            <th>Estado</th>
+            <th>Creado Por</th>
+            <th class="text-right" style="padding-right: 1.5rem;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let req of requests">
+            <td>
+              <span class="date">{{ req.created_at | date:'mediumDate' }}</span>
+            </td>
+            <td>
+              <div class="client-cell">
+                <span class="name">{{ req.cliente?.name }}</span>
+                <span class="nit">NIT/Cédula: {{ req.cliente?.numero_documento }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="progress-wrap">
+                <div class="progress-bar-container">
+                  <div class="progress-bar-fill" [style.width.%]="getProgressPercentage(req)"></div>
+                </div>
+                <span class="progress-text">
+                  {{ getProgressPercentage(req) }}% ({{ getApprovedCount(req) }} / {{ req.items?.length }} aprobados)
+                </span>
+              </div>
+            </td>
+            <td>
+              <span class="status-pill" [ngClass]="req.estado">{{ req.estado }}</span>
+            </td>
+            <td>{{ req.creador?.name || 'Sistema' }}</td>
+            <td class="text-right" style="padding-right: 1.5rem;">
+              <div class="actions">
+                <button class="btn-pro success sm icon-only" (click)="viewRequestDetails(req)" title="Ver Detalle y Requisitos">
+                  <span class="material-symbols-outlined">checklist</span>
+                </button>
+                <button class="btn-pro danger sm icon-only" (click)="deleteRequest(req.id)" title="Cancelar Solicitud">
+                  <span class="material-symbols-outlined">delete</span>
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="requests.length === 0">
+            <td colspan="6" class="empty-state">No se han encontrado solicitudes de documentos registradas.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="table-footer" *ngIf="requests.length > 0">
+      <div class="pagination-info">
+        Página {{ currentPage }} de {{ lastPage }}
+      </div>
+      <div class="pagination-actions">
+        <button class="btn-pro secondary sm" (click)="changePage(currentPage - 1)" [disabled]="currentPage === 1">
+          <span class="material-symbols-outlined">chevron_left</span> Anterior
+        </button>
+        <button class="btn-pro secondary sm" (click)="changePage(currentPage + 1)" [disabled]="currentPage === lastPage">
+          Siguiente <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- --- MODAL: Nueva Solicitud --- -->
+  <div class="modal-backdrop" *ngIf="showNewRequestForm">
+    <div class="modal-card card">
+      <div class="modal-header">
+        <h3>Crear Solicitud de Documentos</h3>
+        <button class="btn-close" (click)="showNewRequestForm = false">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="input-group full">
+          <label>Seleccione el Cliente</label>
+          <select [(ngModel)]="selectedClientId" class="form-select">
+            <option value="" disabled selected>Elegir Cliente...</option>
+            <option *ngFor="let c of clients" [value]="c.id">{{ c.name }} ({{ c.numero_documento }})</option>
+          </select>
+        </div>
+
+        <div class="input-group full mt-3">
+          <label>Usar Plantilla / Preset (Opcional)</label>
+          <select [(ngModel)]="selectedPresetId" (change)="onPresetChange()" class="form-select">
+            <option value="">-- Elección Libre / Sin plantilla --</option>
+            <option *ngFor="let p of presets" [value]="p.id">{{ p.nombre }}</option>
+          </select>
+        </div>
+
+        <div class="requirements-selection mt-3">
+          <label class="section-label">Documentos Requeridos:</label>
+          <div class="checklist-grid">
+            <div class="checklist-item" *ngFor="let r of requirements" [class.selected]="selectedRequirementIds.includes(r.id)">
+              <label>
+                <input type="checkbox" [checked]="selectedRequirementIds.includes(r.id)" (change)="toggleRequirement(r.id)">
+                <div class="item-text">
+                  <span class="title">{{ r.nombre }}</span>
+                  <span class="desc" *ngIf="r.descripcion">{{ r.descripcion }}</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-pro secondary" (click)="showNewRequestForm = false">Cancelar</button>
+        <button class="btn-pro primary" [disabled]="submitting || !selectedClientId || selectedRequirementIds.length === 0" (click)="submitRequest()">
+          {{ submitting ? 'Enviando...' : 'Enviar Solicitud' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- --- MODAL: Detalles / Lista de Chequeo Requisitos --- -->
+  <div class="modal-backdrop" *ngIf="selectedRequest">
+    <div class="modal-card card request-details-modal">
+      <div class="modal-header">
+        <div class="header-text">
+          <h3>Detalle de Requisitos: {{ selectedRequest.cliente?.name }}</h3>
+          <p>Solicitado el {{ selectedRequest.created_at | date:'medium' }}</p>
+        </div>
+        <button class="btn-close" (click)="closeDetails()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="checklist-progress">
+          <div class="progress-wrap">
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" [style.width.%]="getProgressPercentage(selectedRequest)"></div>
+            </div>
+            <span>{{ getProgressPercentage(selectedRequest) }}% Completado</span>
+          </div>
+        </div>
+
+        <div class="items-list-vertical mt-3">
+          <div class="item-row" *ngFor="let item of selectedRequest.items">
+            <div class="item-header-info">
+              <span class="material-symbols-outlined icon-doc">description</span>
+              <div class="title-details">
+                <span class="item-title">{{ item.requirement?.nombre }}</span>
+                <span class="item-desc" *ngIf="item.requirement?.descripcion">{{ item.requirement?.descripcion }}</span>
+              </div>
+            </div>
+            
+            <div class="item-status-block">
+              <span class="status-indicator-badge" [ngClass]="item.estado">
+                <span class="status-dot"></span>
+                {{ item.estado | uppercase }}
+              </span>
+              
+              <!-- File download link if file uploaded -->
+              <a *ngIf="item.upload" [href]="environment.apiUrl + '/uploads/' + item.upload.id + '/download'" class="btn-download-file" target="_blank" title="Descargar archivo cargado">
+                <span class="material-symbols-outlined">cloud_download</span>
+                <span>{{ item.upload.original_name }}</span>
+              </a>
+            </div>
+
+            <!-- Observations if rejected -->
+            <div class="item-observations" *ngIf="item.estado === 'rechazado' && item.observaciones">
+              <span class="material-symbols-outlined text-danger">error</span>
+              <p>Motivo Rechazo: {{ item.observaciones }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-pro primary" (click)="closeDetails()">Aceptar</button>
+      </div>
+    </div>
+  </div>
+</div>
