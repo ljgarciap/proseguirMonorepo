@@ -95,8 +95,9 @@ import Swal from 'sweetalert2';
                   *ngFor="let col of getColumns()" 
                   (click)="sortByColumn(col)"
                   [class.sortable]="true"
+                  [class.text-right]="isNumericColumn(col)"
                 >
-                  <div class="th-content">
+                  <div class="th-content" [style.justifyContent]="isNumericColumn(col) ? 'flex-end' : 'flex-start'">
                     {{ formatHeader(col) }}
                     <span class="sort-icon" *ngIf="sortBy === col">
                       {{ sortDir === 'asc' ? '↑' : '↓' }}
@@ -108,7 +109,7 @@ import Swal from 'sweetalert2';
             </thead>
             <tbody>
               <tr *ngFor="let row of data">
-                <td *ngFor="let col of getColumns()">
+                <td *ngFor="let col of getColumns()" [class.text-right]="isNumericColumn(col)">
                   <ng-container [ngSwitch]="col">
                     <ng-container *ngSwitchCase="'id'">
                       <span class="id-badge">#{{ row[col] }}</span>
@@ -174,6 +175,22 @@ import Swal from 'sweetalert2';
                       </div>
                     </ng-container>
 
+                    <!-- Rounded values (dias_vencido, plazo_meses, dias) -->
+                    <span *ngSwitchCase="'dias_vencido'">{{ roundValue(row[col]) }}</span>
+                    <span *ngSwitchCase="'plazo_meses'">{{ roundValue(row[col]) }}</span>
+                    <span *ngSwitchCase="'dias'">{{ roundValue(row[col]) }}</span>
+
+                    <!-- Interest Rates (tasa_interes, tasa, factor, avg_tasa) -->
+                    <span *ngSwitchCase="'tasa_interes'">{{ formatPercentage(row[col]) }}</span>
+                    <span *ngSwitchCase="'tasa_descuento'">{{ formatPercentage(row[col]) }}</span>
+                    <span *ngSwitchCase="'tasa_factor'">{{ formatPercentage(row[col]) }}</span>
+                    <span *ngSwitchCase="'factor'">{{ formatPercentage(row[col]) }}</span>
+
+                    <!-- Identification / NIT Formatting -->
+                    <span *ngSwitchCase="'identificacion'">{{ formatNit(row[col]) }}</span>
+                    <span *ngSwitchCase="'nit_cliente'">{{ formatNit(row[col]) }}</span>
+                    <span *ngSwitchCase="'nit_pagador'">{{ formatNit(row[col]) }}</span>
+
                     <!-- Currency Formatting -->
                     <!-- Cartera -->
                     <span *ngSwitchCase="'valor_desembolso'">{{ formatMoney(row[col]) }}</span>
@@ -207,11 +224,15 @@ import Swal from 'sweetalert2';
                     <span *ngSwitchCase="'devolucion_descuento'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'margen_reserva'">{{ formatMoney(row[col]) }}</span>
                     
-                    <!-- Confirming -->
+                     <!-- Confirming -->
                     <span *ngSwitchCase="'reembolso_g_desembolso'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'base_negociacion'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'rendimientos_proyectados'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'valor_pagar_deudor'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'valor_pagar_deudores'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'total_val'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'total_recaudo'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'valor_recaudado'">{{ formatMoney(row[col]) }}</span>
                     
                     <!-- Compraventa -->
                     <span *ngSwitchCase="'valor'">{{ formatMoney(row[col]) }}</span>
@@ -452,6 +473,10 @@ import Swal from 'sweetalert2';
         }
 
         .sort-icon { color: #3b82f6; font-size: 14px; }
+        
+        &.text-right {
+          text-align: right;
+        }
       }
 
       td {
@@ -460,6 +485,10 @@ import Swal from 'sweetalert2';
         color: #334155;
         font-size: 14px;
         white-space: nowrap;
+        
+        &.text-right {
+          text-align: right;
+        }
       }
 
       tr:hover td {
@@ -900,7 +929,7 @@ export class SheetsComponent implements OnInit {
 
       // Filter out keys we don't want and add remaining keys at the end
       const filtered = prioritized.filter(k => allKeys.includes(k));
-      const excluded = ['updated_at', 'created_at', 'tipo_garantia', 'estado_garantia', 'garantia_detalle', 'observaciones'];
+      const excluded = ['updated_at', 'created_at', 'tipo_garantia', 'estado_garantia', 'garantia_detalle', 'observaciones', 'client_upload_id'];
       const others = allKeys.filter(k => !prioritized.includes(k) && !excluded.includes(k));
 
       const finalCols = [...filtered, ...others];
@@ -952,18 +981,63 @@ export class SheetsComponent implements OnInit {
 
     let cleanVal = value;
     if (typeof value === 'string') {
-      // Strip out any existing currency symbols, commas, or spaces if n8n ingested it roughly
-      cleanVal = value.replace(/[\$,\s]/g, '');
+      // Strip out currency symbols, commas, or spaces
+      cleanVal = value.replace(/[\$\.,\s]/g, '');
     }
 
     const num = Number(cleanVal);
-    if (isNaN(num)) return value; // Return original string if it is completely unparseable
+    if (isNaN(num)) return value;
 
-    return new Intl.NumberFormat('en-US', {
+    // Use es-CO formatting which defaults to $ symbol with point as thousands separator and comma as decimal separator.
+    // However, since we want only integer/rounded currency representation, we force minimumFractionDigits to 0.
+    return new Intl.NumberFormat('es-CO', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'COP',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 2
+      maximumFractionDigits: 0
     }).format(num);
+  }
+
+  isNumericColumn(col: string): boolean {
+    const numericCols = [
+      'saldo_capital', 'dias_vencido', 'valor_vencido', 'valor_mora', 'valor_desembolso',
+      'monto', 'valor_aprobado', 'valor_desembolsado', 'valor_reserva', 'descuento_financiero',
+      'total_recaudado_comprobante', 'valor_factura', 'valor_descuento', 'capital_pagado',
+      'total_pagado', 'descuento_mora_causado_np', 'rec_descuento_mora_np', 'saldo_despues_pago',
+      'intereses_diarios', 'intereses_pagados', 'devolucion_descuento', 'margen_reserva',
+      'reembolso_g_desembolso', 'base_negociacion', 'rendimientos_proyectados', 'valor_pagar_deudor',
+      'valor', 'plazo_meses', 'dias', 'tasa_interes', 'factor', 'saldo_total', 'valor_ultimo_abono',
+      'tasa_descuento', 'tasa_factor', 'intereses_diarios', 'intereses_pagados', 'valor_factura',
+      'total_recaudo', 'valor_recaudado', 'rendimientos_proyectados', 'devolucion_descuento', 
+      'margen_reserva', 'valor_pagar_deudores', 'avg_tasa', 'total_val'
+    ];
+    return numericCols.includes(col);
+  }
+
+  roundValue(value: any): string {
+    if (value === null || value === undefined || value === '') return '-';
+    let cleanVal = value;
+    if (typeof value === 'string') {
+      cleanVal = value.replace(/,/g, '');
+    }
+    const num = Number(cleanVal);
+    if (isNaN(num)) return value;
+    return Math.round(num).toString();
+  }
+
+  formatPercentage(value: any): string {
+    if (value === null || value === undefined || value === '') return '-';
+    const num = Number(value);
+    if (isNaN(num)) return value;
+    return `${num}%`;
+  }
+
+  formatNit(value: any): string {
+    if (value === null || value === undefined || value === '') return '-';
+    const cleanStr = String(value).replace(/\D/g, ''); // Keep numbers only
+    if (cleanStr.length <= 1) return cleanStr;
+    const body = cleanStr.slice(0, -1);
+    const dv = cleanStr.slice(-1);
+    return `${body}-${dv}`;
   }
 }

@@ -38,3 +38,4 @@ n8n_data/
 insumos/
 *.log
 docker/
+memory.md
