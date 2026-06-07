@@ -141,6 +141,12 @@ export const routes: Routes = [
         data: { roles: ['cliente', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'] } 
     },
     { 
+        path: 'solicitudes-credito', 
+        loadComponent: () => import('./components/solicitudes-credito/solicitudes-credito.component').then(m => m.SolicitudesCreditoComponent), 
+        canActivate: [roleGuard], 
+        data: { roles: ['superadmin', 'gerente', 'coordinador_comercial', 'operativo'] } 
+    },
+    { 
         path: 'db-cleaner', 
         loadComponent: () => import('./components/db-cleaner/db-cleaner.component').then(m => m.DbCleanerComponent), 
         canActivate: [roleGuard], 

@@ -1,0 +1,402 @@
+<div class="view-container">
+  <header class="view-header">
+    <div class="title-area">
+      <h1>Registro de solicitudes de crédito</h1>
+      <p>Formalización de solicitudes a partir de visitas comerciales o creación manual.</p>
+    </div>
+    
+    <div class="header-actions">
+      <button class="btn-pro primary" (click)="onNewManualRequest()">
+        <span class="material-symbols-outlined">add</span> Nueva Solicitud de Crédito
+      </button>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <div class="tabs-nav">
+    <button class="tab-btn" [class.active]="activeTab === 'pendientes'" (click)="switchTab('pendientes')">
+      <span class="material-symbols-outlined">schedule</span> Solicitudes Pendientes
+    </button>
+    <button class="tab-btn" [class.active]="activeTab === 'registrar'" (click)="switchTab('registrar')">
+      <span class="material-symbols-outlined">edit_document</span> Registrar Solicitud
+    </button>
+  </div>
+
+  <!-- Content Areas -->
+  <div class="tab-content mt-4">
+
+    <!-- TAB 1: PENDIENTES POR REGISTRAR -->
+    <div *ngIf="activeTab === 'pendientes'">
+      <div class="content-card">
+        <h3 class="card-title">Solicitudes en cola pendientes de procesar</h3>
+        <p class="card-subtitle">Necesidades de crédito identificadas en visitas a clientes que requieren formalización.</p>
+        
+        <div class="table-container mt-4">
+          <table class="modern-table">
+            <thead>
+              <tr>
+                <th>ID Visita</th>
+                <th>Fecha</th>
+                <th>Nombre o Razón Social</th>
+                <th>Identificación</th>
+                <th>Tipo de Crédito</th>
+                <th>Monto Solicitado</th>
+                <th class="text-right">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let visit of pendingVisits">
+                <td class="id-cell">#{{ visit.id }}</td>
+                <td>{{ visit.fecha | date:'dd/MM/yyyy' }}</td>
+                <td><strong>{{ visit.cliente?.nombre || '-' }}</strong></td>
+                <td>
+                  <span class="badge-doc">{{ visit.cliente?.document_type?.codigo || 'NIT' }}</span>
+                  {{ formatDocNumber(visit.cliente?.numero_documento) }}
+                </td>
+                <td>{{ visit.tipo_credito?.nombre || '-' }}</td>
+                <td class="amount-cell">$ {{ (visit.monto_solicitado || 0) | number:'1.0-0':'es-CO' }}</td>
+                <td class="text-right">
+                  <button class="btn-pro primary sm" (click)="onRegisterVisit(visit)">
+                    <span class="material-symbols-outlined">login</span> Registrar
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="pendingVisits.length === 0 && !loadingPending">
+                <td colspan="7" class="text-center py-4 text-muted">No hay solicitudes de crédito pendientes por registrar.</td>
+              </tr>
+              <tr *ngIf="loadingPending">
+                <td colspan="7" class="text-center py-4">Cargando cola de solicitudes pendientes...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- HISTORIAL / TRAZABILIDAD -->
+      <div class="content-card mt-4">
+        <h3 class="card-title">Historial de Solicitudes Registradas</h3>
+        <p class="card-subtitle">Trazabilidad de solicitudes formalizadas, condiciones comerciales y usuarios que registraron.</p>
+
+        <div class="table-container mt-4">
+          <table class="modern-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Fecha Registro</th>
+                <th>Cliente</th>
+                <th>Tipo Crédito</th>
+                <th>Monto</th>
+                <th>Amortización</th>
+                <th>Registrado Por</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let req of historyRequests">
+                <td class="id-cell">#{{ req.id }}</td>
+                <td>{{ req.created_at | date:'dd/MM/yyyy HH:mm' }}</td>
+                <td>
+                  <div class="user-cell">
+                    <span class="name">{{ req.cliente?.nombre }}</span>
+                    <span class="subtext">{{ formatDocNumber(req.cliente?.numero_documento) }}</span>
+                  </div>
+                </td>
+                <td>{{ req.tipo_credito?.nombre }}</td>
+                <td class="amount-cell">$ {{ req.monto_solicitado | number:'1.0-0':'es-CO' }}</td>
+                <td>{{ req.amortizacion?.nombre }}</td>
+                <td>
+                  <div class="user-cell">
+                    <span class="name">{{ req.usuario_registra?.name }}</span>
+                    <span class="subtext">{{ req.usuario_registra?.email }}</span>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="historyRequests.length === 0">
+                <td colspan="7" class="text-center py-4 text-muted">Aún no se han registrado solicitudes formalizadas.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: FORMULARIO REGISTRAR SOLICITUD -->
+    <div *ngIf="activeTab === 'registrar'">
+      <form (ngSubmit)="submitRequest()" class="pro-form">
+        
+        <!-- SECTION 1: CLIENTE -->
+        <div class="content-card">
+          <h3 class="card-title text-primary"><span class="material-symbols-outlined">person</span> Información del Cliente</h3>
+          
+          <div class="form-grid mt-4">
+            <div class="form-group span-full" *ngIf="!isFromVisit">
+              <label>Asociar Cliente Existente</label>
+              <select [(ngModel)]="form.cliente_id" name="cliente_id" (change)="onClientChange()" class="pro-input">
+                <option value="">-- Crear solicitud para un cliente nuevo / completar manual --</option>
+                <option *ngFor="let c of activeClientes" [value]="c.id">
+                  {{ c.nombre }} ({{ c.numero_documento }})
+                </option>
+              </select>
+            </div>
+
+            <div class="form-group" *ngIf="isFromVisit">
+              <label>ID Visita de Origen</label>
+              <input type="text" [value]="'#' + selectedVisitId" disabled class="pro-input readonly-input" />
+            </div>
+
+            <div class="form-group">
+              <label>Tipo de Documento <span class="required">*</span></label>
+              <select [(ngModel)]="form.tipo_documento_id" name="tipo_documento_id" [disabled]="isFromVisit" (change)="onTipoPersonaChange()" required class="pro-input">
+                <option value="">Seleccione...</option>
+                <option *ngFor="let doc of documentTypes" [value]="doc.id">{{ doc.nombre }}</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Identificación / NIT <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.numero_documento" name="numero_documento" [disabled]="isFromVisit" required placeholder="Número de documento o NIT" class="pro-input" />
+            </div>
+
+            <div class="form-group">
+              <label>Tipo de Persona <span class="required">*</span></label>
+              <select [(ngModel)]="form.tipo_persona_id" name="tipo_persona_id" [disabled]="isFromVisit" (change)="onTipoPersonaChange()" required class="pro-input">
+                <option value="">Seleccione...</option>
+                <option *ngFor="let tp of documentTypes" [value]="tp.id">{{ tp.nombre }}</option>
+              </select>
+            </div>
+
+            <!-- NATURAL PERSON FIELDS -->
+            <ng-container *ngIf="!isPersonaJuridica()">
+              <div class="form-group">
+                <label>Nombres <span class="required">*</span></label>
+                <input type="text" [(ngModel)]="form.nombres" name="nombres" [disabled]="isFromVisit" required class="pro-input" />
+              </div>
+
+              <div class="form-group">
+                <label>Primer Apellido <span class="required">*</span></label>
+                <input type="text" [(ngModel)]="form.primer_apellido" name="primer_apellido" [disabled]="isFromVisit" required class="pro-input" />
+              </div>
+
+              <div class="form-group">
+                <label>Segundo Apellido</label>
+                <input type="text" [(ngModel)]="form.segundo_apellido" name="segundo_apellido" [disabled]="isFromVisit" class="pro-input" />
+              </div>
+
+              <div class="form-group">
+                <label>Correo Electrónico <span class="required">*</span></label>
+                <input type="email" [(ngModel)]="form.correo_electronico" name="correo_electronico" [disabled]="isFromVisit" required class="pro-input" />
+              </div>
+            </ng-container>
+
+            <!-- JURIDICA PERSON FIELDS -->
+            <ng-container *ngIf="isPersonaJuridica()">
+              <div class="form-group span-2">
+                <label>Nombre o Razón Social <span class="required">*</span></label>
+                <input type="text" [(ngModel)]="form.nombre_razon_social" name="nombre_razon_social" [disabled]="isFromVisit" required class="pro-input" />
+              </div>
+
+              <div class="form-group">
+                <label>Tipo de Empresa <span class="required">*</span></label>
+                <input type="text" [(ngModel)]="form.tipo_empresa" name="tipo_empresa" [disabled]="isFromVisit" required placeholder="Ej. S.A.S, Limitada" class="pro-input" />
+              </div>
+
+              <div class="form-group">
+                <label>Actividad Económica <span class="required">*</span></label>
+                <input type="text" [(ngModel)]="form.actividad_economica" name="actividad_economica" [disabled]="isFromVisit" required class="pro-input" />
+              </div>
+
+              <div class="form-group">
+                <label>Correo Electrónico Empresarial <span class="required">*</span></label>
+                <input type="email" [(ngModel)]="form.correo_electronico_empresarial" name="correo_electronico_empresarial" [disabled]="isFromVisit" required class="pro-input" />
+              </div>
+            </ng-container>
+
+            <div class="form-group">
+              <label>Teléfono de Contacto <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.telefono" name="telefono" [disabled]="isFromVisit" required class="pro-input" />
+            </div>
+
+            <div class="form-group span-2">
+              <label>Dirección <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.direccion" name="direccion" [disabled]="isFromVisit" required class="pro-input" />
+            </div>
+
+            <div class="form-group">
+              <label>País <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.pais" name="pais" [disabled]="isFromVisit" required class="pro-input" />
+            </div>
+
+            <div class="form-group">
+              <label>Departamento <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.departamento" name="departamento" [disabled]="isFromVisit" required class="pro-input" />
+            </div>
+
+            <div class="form-group">
+              <label>Ciudad <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.ciudad" name="ciudad" [disabled]="isFromVisit" required class="pro-input" />
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 2: REPRESENTANTE LEGAL (FOR JURIDICA) -->
+        <div class="content-card mt-4" *ngIf="isPersonaJuridica()">
+          <h3 class="card-title text-primary"><span class="material-symbols-outlined">supervisor_account</span> Información del Representante Legal</h3>
+          
+          <div class="form-grid mt-4">
+            <div class="form-group">
+              <label>Tipo de Documento <span class="required">*</span></label>
+              <select [(ngModel)]="form.rep_tipo_documento_id" name="rep_tipo_documento_id" [disabled]="isFromVisit" required class="pro-input">
+                <option value="">Seleccione...</option>
+                <option *ngFor="let doc of documentTypes" [value]="doc.id">{{ doc.nombre }}</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Número Documento <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.rep_numero_documento" name="rep_numero_documento" [disabled]="isFromVisit" required class="pro-input" />
+            </div>
+
+            <div class="form-group">
+              <label>Nombres <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.rep_nombres" name="rep_nombres" [disabled]="isFromVisit" required class="pro-input" />
+            </div>
+
+            <div class="form-group">
+              <label>Primer Apellido <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.rep_primer_apellido" name="rep_primer_apellido" [disabled]="isFromVisit" required class="pro-input" />
+            </div>
+
+            <div class="form-group">
+              <label>Segundo Apellido</label>
+              <input type="text" [(ngModel)]="form.rep_segundo_apellido" name="rep_segundo_apellido" [disabled]="isFromVisit" class="pro-input" />
+            </div>
+
+            <div class="form-group">
+              <label>Cargo / Rol <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.rep_cargo" name="rep_cargo" [disabled]="isFromVisit" required class="pro-input" />
+            </div>
+
+            <div class="form-group">
+              <label>Correo Electrónico <span class="required">*</span></label>
+              <input type="email" [(ngModel)]="form.rep_correo_electronico" name="rep_correo_electronico" [disabled]="isFromVisit" required class="pro-input" />
+            </div>
+
+            <div class="form-group">
+              <label>Teléfono <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.rep_telefono" name="rep_telefono" [disabled]="isFromVisit" required class="pro-input" />
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 3: CREDITO -->
+        <div class="content-card mt-4">
+          <h3 class="card-title text-primary"><span class="material-symbols-outlined">paid</span> Condiciones Financieras del Crédito</h3>
+          
+          <div class="form-grid mt-4">
+            <div class="form-group">
+              <label>Tipo de Crédito <span class="required">*</span></label>
+              <select [(ngModel)]="form.tipo_credito_id" name="tipo_credito_id" [disabled]="isFromVisit" required class="pro-input">
+                <option value="">Seleccione...</option>
+                <option *ngFor="let tc of tipoCreditos" [value]="tc.id">{{ tc.nombre }}</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Monto Solicitado <span class="required">*</span></label>
+              <input type="number" [(ngModel)]="form.monto_solicitado" name="monto_solicitado" [disabled]="isFromVisit" required placeholder="$ 0.00" class="pro-input" />
+            </div>
+
+            <div class="form-group">
+              <label>Plazo en Meses <span class="required">*</span></label>
+              <input type="number" [(ngModel)]="form.plazo_meses" name="plazo_meses" [disabled]="isFromVisit" required placeholder="Meses" class="pro-input" />
+            </div>
+
+            <div class="form-group">
+              <label>Amortización <span class="required">*</span></label>
+              <select [(ngModel)]="form.amortizacion_id" name="amortizacion_id" [disabled]="isFromVisit" required class="pro-input">
+                <option value="">Seleccione...</option>
+                <option *ngFor="let am of amortizaciones" [value]="am.id">{{ am.nombre }}</option>
+              </select>
+            </div>
+
+            <div class="form-group span-full">
+              <label>¿Para qué requiere el recurso? <span class="required">*</span></label>
+              <textarea [(ngModel)]="form.destino_recurso" name="destino_recurso" [disabled]="isFromVisit" required rows="2" class="pro-input textarea"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label>Garantía</label>
+              <input type="text" [(ngModel)]="form.garantia" name="garantia" [disabled]="isFromVisit" placeholder="Garantía ofrecida" class="pro-input" />
+            </div>
+
+            <div class="form-group">
+              <label>Fuente de Pago <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.fuente_pago" name="fuente_pago" [disabled]="isFromVisit" required placeholder="Ingresos ordinarios, etc." class="pro-input" />
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 4: NOTIFICACION & PRESET -->
+        <div class="content-card mt-4">
+          <h3 class="card-title text-primary"><span class="material-symbols-outlined">forward_to_inbox</span> Configuración de Notificación y Documentos</h3>
+          <p class="card-subtitle">Especifique el correo de destino, edite la plantilla de notificación y seleccione el preset de documentos requeridos.</p>
+          
+          <div class="form-grid mt-4">
+            <div class="form-group span-full">
+              <label>Destino de Notificación (Correo del Cliente) <span class="required">*</span></label>
+              <input type="email" [(ngModel)]="form.correo_notificacion" name="correo_notificacion" required class="pro-input" />
+            </div>
+
+            <div class="form-group span-full">
+              <label>Asunto del Correo <span class="required">*</span></label>
+              <input type="text" [(ngModel)]="form.asunto_notificacion" name="asunto_notificacion" required class="pro-input" />
+            </div>
+
+            <div class="form-group span-full">
+              <label>Mensaje de Acompañamiento <span class="required">*</span></label>
+              <textarea [(ngModel)]="form.mensaje_notificacion" name="mensaje_notificacion" required rows="4" class="pro-input textarea"></textarea>
+            </div>
+
+            <div class="form-group span-full">
+              <label>Seleccionar Preset de Documentación Requerida</label>
+              <select [(ngModel)]="selectedPresetId" name="selectedPresetId" (change)="onPresetChange()" class="pro-input">
+                <option value="">-- Sin preset (No requiere adjuntos en este correo) --</option>
+                <option *ngFor="let p of presets" [value]="p.id">{{ p.nombre }}</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Document table preview -->
+          <div class="preset-docs-container mt-4" *ngIf="selectedPresetDocs.length > 0">
+            <h4 class="docs-section-title">Documentos Requeridos por el Preset Seleccionado:</h4>
+            <div class="table-container mt-2">
+              <table class="modern-table minimal">
+                <thead>
+                  <tr>
+                    <th>Documento</th>
+                    <th>Estado de Adjunto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let doc of selectedPresetDocs">
+                    <td><strong>{{ doc.nombre }}</strong></td>
+                    <td><span class="status-pill warning">Pendiente de Carga</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUBMIT FOOTER -->
+        <div class="form-footer mt-4">
+          <button type="button" class="btn-pro secondary" (click)="resetForm(); switchTab('pendientes')">Cancelar</button>
+          <button type="submit" class="btn-pro primary" [disabled]="!isFormValid()">
+            <span class="material-symbols-outlined">send</span> Registrar y Enviar Notificación
+          </button>
+        </div>
+
+      </form>
+    </div>
+
+  </div>
+</div>

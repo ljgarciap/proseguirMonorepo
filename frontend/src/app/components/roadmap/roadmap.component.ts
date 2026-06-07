@@ -69,6 +69,15 @@ export class RoadmapComponent implements OnInit {
       status: 'completado'
     },
     {
+      name: 'Registro de Solicitudes de Crédito',
+      description: 'Formalización de solicitudes de crédito de clientes a partir de necesidades detectadas en visitas comerciales o de forma manual, vinculando presets de documentos.',
+      route: '/solicitudes-credito',
+      area: 'Operaciones',
+      roles: ['coordinador_comercial', 'gerente', 'operativo', 'superadmin'],
+      icon: 'assignment_turned_in',
+      status: 'completado'
+    },
+    {
       name: 'Base de Datos de Factoring',
       description: 'Historial completo de planillas importadas, control de cartera y seguimiento del ciclo de vida de cada operación.',
       route: '/sheets',

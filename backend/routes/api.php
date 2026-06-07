@@ -186,6 +186,16 @@ Route::prefix('creditos')->middleware('auth:api')->group(function () {
     Route::post('/{id}/transition', [CreditoOrdinarioController::class, 'transition']);
 });
 
+// Registro de Solicitudes de Crédito
+Route::prefix('solicitudes-credito')->middleware('auth:api')->group(function () {
+    Route::get('/pendientes', [\App\Http\Controllers\SolicitudCreditoController::class, 'indexPending'])
+        ->middleware('checkrole:superadmin,gerente,coordinador_comercial,operativo');
+    Route::get('/', [\App\Http\Controllers\SolicitudCreditoController::class, 'index'])
+        ->middleware('checkrole:superadmin,gerente,coordinador_comercial,operativo');
+    Route::post('/', [\App\Http\Controllers\SolicitudCreditoController::class, 'store'])
+        ->middleware('checkrole:superadmin,gerente,coordinador_comercial,operativo');
+});
+
 // Parámetros Genéricos (Superadmin)
 Route::prefix('parameters')->middleware(['auth:api'])->group(function () {
     Route::get('/{table}', [\App\Http\Controllers\ParameterController::class, 'index']);

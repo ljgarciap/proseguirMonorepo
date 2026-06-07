@@ -29,6 +29,9 @@ import { interval, Subscription } from 'rxjs';
             <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'])" routerLink="/creditos" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">payments</span> Crédito Ordinario
             </a>
+            <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'gerente', 'superadmin', 'operativo'])" routerLink="/solicitudes-credito" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">assignment_turned_in</span> Registro Solicitud Crédito
+            </a>
             <a *ngIf="authService.isAuthorized(['operativo'])" routerLink="/sheets" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">database</span> Base de Datos
             </a>
@@ -361,7 +364,9 @@ export class AppComponent implements OnInit, OnDestroy {
     this.checkPendingTasks();
     if (role === 'cliente') {
       this.router.navigate(['/client-upload']);
-    } else if (['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'].includes(role)) {
+    } else if (role === 'coordinador_comercial') {
+      this.router.navigate(['/solicitudes-credito']);
+    } else if (['oficial_cumplimiento', 'comite_credito', 'tesoreria'].includes(role)) {
       this.router.navigate(['/creditos']);
     } else {
       this.router.navigate(['/dashboard']);
