@@ -27,6 +27,8 @@ import Swal from 'sweetalert2';
             <tr>
               <th>Nombre Completo</th>
               <th>Correo Electrónico</th>
+              <th>Fecha de Creación</th>
+              <th>Última Modificación</th>
               <th>Activo</th>
               <th class="text-right">Acciones</th>
             </tr>
@@ -40,6 +42,8 @@ import Swal from 'sweetalert2';
                 </div>
               </td>
               <td>{{ dest.email }}</td>
+              <td class="timestamp">{{ dest.created_at | date:'dd/MM/yyyy HH:mm' }}</td>
+              <td class="timestamp">{{ dest.updated_at | date:'dd/MM/yyyy HH:mm' }}</td>
               <td>
                 <span class="pro-status cursor-pointer" 
                       [ngClass]="dest.activo ? 'validated' : 'rejected'" 
@@ -60,7 +64,7 @@ import Swal from 'sweetalert2';
               </td>
             </tr>
             <tr *ngIf="destinatarios.length === 0">
-              <td colspan="4" class="text-center" style="padding: 2rem; color: var(--text-muted);">
+              <td colspan="6" class="text-center" style="padding: 2rem; color: var(--text-muted);">
                 No hay destinatarios registrados en el sistema.
               </td>
             </tr>
@@ -82,6 +86,8 @@ import Swal from 'sweetalert2';
     .pro-status { font-size: 0.7rem; padding: 2px 8px; border-radius: 6px; font-weight: 800; text-transform: uppercase; transition: all 0.2s; }
     .pro-status.validated { background: #E6FFFA; color: #2C7A7B; border: 1px solid #B2F5EA; &:hover { background: #B2F5EA; } }
     .pro-status.rejected { background: #FFF5F5; color: #C53030; border: 1px solid #FED7D7; &:hover { background: #FED7D7; } }
+    
+    .timestamp { color: #64748B; font-size: 0.85rem; }
 
     .actions { display: flex; justify-content: flex-end; gap: 8px; }
     .text-center { text-align: center; }

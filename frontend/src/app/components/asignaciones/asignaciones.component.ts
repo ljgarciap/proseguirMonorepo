@@ -34,14 +34,16 @@ import Swal from 'sweetalert2';
           <tbody>
             <tr *ngFor="let asig of asignaciones">
               <td>
-                <span class="pro-badge info bold">#{{ asig.id }}</span>
+                <span class="pro-badge info bold cursor-pointer" (click)="viewAssignedRecipients(asig)" title="Ver destinatarios asociados">#{{ asig.id }}</span>
               </td>
-              <td style="font-weight: 600; color: var(--text-main);">
+              <td class="clickable-name" (click)="viewAssignedRecipients(asig)" title="Ver destinatarios asociados">
                 {{ asig.nombre }}
               </td>
               <td>
-                <span class="pro-status" 
-                      [ngClass]="asig.destinatarios_count > 0 ? 'validated' : 'pending'">
+                <span class="pro-status cursor-pointer" 
+                      [ngClass]="asig.destinatarios_count > 0 ? 'validated' : 'pending'"
+                      (click)="viewAssignedRecipients(asig)"
+                      title="Ver destinatarios asociados">
                   {{ asig.destinatarios_count }} Destinatario(s)
                 </span>
               </td>
@@ -79,6 +81,9 @@ import Swal from 'sweetalert2';
     .actions { display: flex; justify-content: flex-end; gap: 8px; }
     .text-center { text-align: center; }
     .bold { font-weight: 700; }
+    .cursor-pointer { cursor: pointer; }
+    .clickable-name { font-weight: 600; color: var(--primary); cursor: pointer; transition: color 0.2s; }
+    .clickable-name:hover { color: var(--secondary); text-decoration: underline; }
   `]
 })
 export class AsignacionesComponent implements OnInit {
@@ -297,6 +302,55 @@ export class AsignacionesComponent implements OnInit {
             Swal.fire('Error', err.error.message || 'No se pudo limpiar la asignación.', 'error');
           }
         });
+      }
+    });
+  }
+
+  viewAssignedRecipients(asig: any) {
+    const token = localStorage.getItem('auth_token');
+    this.http.get<any>(`${this.apiUrl}/${asig.id}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }).subscribe({
+      next: (data) => {
+        const list = data.asignados || [];
+        if (list.length === 0) {
+          Swal.fire({
+            title: `Destinatarios - ${asig.nombre}`,
+            text: 'Esta notificación no tiene destinatarios asignados actualmente.',
+            icon: 'info',
+            confirmButtonColor: '#1A3B8B'
+          });
+          return;
+        }
+
+        const htmlList = `
+          <div style="text-align: left; max-height: 300px; overflow-y: auto; padding: 5px;">
+            <ul style="list-style-type: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px;">
+              ${list.map((d: any) => `
+                <li style="padding: 10px; border-bottom: 1px solid #E2E8F0; display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #1A3B8B 0%, #2A52BE 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem;">
+                    ${d.nombre.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <strong style="color: #2D3748; display: block; font-size: 0.9rem;">${d.nombre}</strong>
+                    <span style="color: #718096; font-size: 0.8rem;">${d.email}</span>
+                  </div>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `;
+
+        Swal.fire({
+          title: `Destinatarios - ${asig.nombre}`,
+          html: htmlList,
+          confirmButtonText: 'Cerrar',
+          confirmButtonColor: '#1A3B8B',
+          width: '450px'
+        });
+      },
+      error: () => {
+        Swal.fire('Error', 'No se pudo cargar la lista de destinatarios.', 'error');
       }
     });
   }

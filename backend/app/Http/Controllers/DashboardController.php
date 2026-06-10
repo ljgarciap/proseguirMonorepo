@@ -124,7 +124,6 @@ class DashboardController extends Controller
             ->select('cliente', 'identificacion', \Illuminate\Support\Facades\DB::raw('COUNT(*) as total_ops'), \Illuminate\Support\Facades\DB::raw('SUM(saldo_capital) as saldo_total'))
             ->groupBy('cliente', 'identificacion')
             ->orderBy('saldo_total', 'desc')
-            ->limit(10)
             ->get();
 
         // Debtors in Mora (Aggregated per Client)
@@ -198,8 +197,8 @@ class DashboardController extends Controller
         $applyFilters = $this->getApplyFilters($fechaInicio, $fechaFin, $cliente);
         $factoringOpQuery = $applyFilters(\App\Models\OperacionFactoring::query(), 'created_at');
         $factoringOpCount = (clone $factoringOpQuery)->count();
-        $totalFinanced = (clone $factoringOpQuery)->sum('monto');
-        $totalDisbursed = (clone $factoringOpQuery)->sum('valor_desembolsado');
+        $totalFinanced = (clone $factoringOpQuery)->sum('valor_aprobado');
+        $totalDisbursed = (clone $factoringOpQuery)->sum('valor_aprobado') - (clone $factoringOpQuery)->sum('descuento_financiero');
         $totalReserva = (clone $factoringOpQuery)->sum('valor_reserva');
         $avgTasaFactoring = (clone $factoringOpQuery)->avg('tasa_descuento');
         
@@ -214,35 +213,33 @@ class DashboardController extends Controller
         // Vencimientos Factoring
         $vencimientos = (clone $factoringOpQuery)
             ->select('pagador', 'nit_pagador as identificacion', 'fecha_vencimiento', 'monto')
-            ->orderBy('fecha_vencimiento', 'asc')
             ->whereNotNull('fecha_vencimiento')
-            ->limit(10)
             ->get()
             ->map(function($v) {
-                $today = now();
+                $today = now()->startOfDay();
                 $fechaStr = $v->fecha_vencimiento;
                 $venc = null;
 
                 if ($fechaStr) {
                     if (strpos($fechaStr, '/') !== false) {
                         try {
-                            $venc = \Illuminate\Support\Carbon::createFromFormat('d/m/Y', $fechaStr);
+                            $venc = \Illuminate\Support\Carbon::createFromFormat('d/m/Y', $fechaStr)->startOfDay();
                         } catch (\Exception $e) {
                             try {
-                                $venc = \Illuminate\Support\Carbon::parse($fechaStr);
+                                $venc = \Illuminate\Support\Carbon::parse($fechaStr)->startOfDay();
                             } catch (\Exception $e2) {
-                                $venc = now();
+                                $venc = now()->startOfDay();
                             }
                         }
                     } else {
                         try {
-                            $venc = \Illuminate\Support\Carbon::parse($fechaStr);
+                            $venc = \Illuminate\Support\Carbon::parse($fechaStr)->startOfDay();
                         } catch (\Exception $e) {
-                            $venc = now();
+                            $venc = now()->startOfDay();
                         }
                     }
                 } else {
-                    $venc = now();
+                    $venc = now()->startOfDay();
                 }
 
                 $diff = $today->diffInDays($venc, false);
@@ -252,9 +249,15 @@ class DashboardController extends Controller
                     'fecha' => $fechaStr,
                     'monto' => $v->monto,
                     'dias' => (int)$diff,
-                    'estado' => $diff < 0 ? 'Vencido' : ($diff <= 15 ? 'Por Vencer' : 'Vigente')
+                    'estado' => $diff < 0 ? 'Vencido' : ($diff <= 5 ? 'Por Vencer' : 'Vigente')
                 ];
-            });
+            })
+            ->filter(function($v) {
+                return $v['dias'] >= 0 && $v['dias'] <= 5;
+            })
+            ->sortBy('dias')
+            ->take(10)
+            ->values();
 
         $pagosQuery = $applyFilters(\App\Models\PagoFactoring::query(), 'created_at');
         $pagosCount = (clone $pagosQuery)->count();

@@ -43,6 +43,60 @@ import Swal from 'sweetalert2';
         </div>
       </div>
 
+      <!-- ACTIVE DOCUMENT REQUEST CHECKLIST -->
+      <div class="active-request-card card mb-4 mt-2" *ngIf="activeRequest">
+        <h3 class="card-title text-primary">
+          <span class="material-symbols-outlined">playlist_add_check</span> Soportes Requeridos por Proseguir
+        </h3>
+        <p class="card-subtitle">A continuación se listan los documentos solicitados. Aquellos que posean plantilla descargable deben ser completados y firmados antes de cargarse en formato PDF.</p>
+        
+        <div class="items-list-vertical mt-3">
+          <div class="item-row" *ngFor="let item of activeRequest.items" [class.approved-row]="item.estado === 'aprobado'">
+            <div class="item-header-info">
+              <span class="material-symbols-outlined icon-doc">description</span>
+              <div class="title-details">
+                <span class="item-title">{{ item.requirement?.nombre }}</span>
+                <span class="item-desc" *ngIf="item.requirement?.descripcion">{{ item.requirement?.descripcion }}</span>
+                
+                <!-- Template box if requirement provides one -->
+                <div class="template-box-inline mt-1" *ngIf="item.requirement?.tiene_plantilla">
+                  <span class="material-symbols-outlined">download_for_offline</span>
+                  <span>Formato Proseguir: </span>
+                  <button type="button" class="btn-link-download" (click)="downloadTemplate(item.requirement.id, item.requirement.plantilla_nombre)">
+                    Descargar ({{ item.requirement.plantilla_nombre }})
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div class="item-status-block">
+              <span class="status-indicator-badge" [ngClass]="item.estado">
+                <span class="status-dot"></span>
+                {{ item.estado | uppercase }}
+              </span>
+
+              <!-- Upload action if not approved -->
+              <ng-container *ngIf="item.estado !== 'aprobado'">
+                <button type="button" class="btn-pro secondary sm upload-item-btn" (click)="itemFileInput.click()">
+                  <span class="material-symbols-outlined">upload</span> Cargar Sopo.
+                </button>
+                <input type="file" #itemFileInput (change)="onFileSelectedForItem($event, item.id)" hidden>
+              </ng-container>
+
+              <span *ngIf="item.estado === 'aprobado'" class="completado-text">
+                <span class="material-symbols-outlined">task_alt</span> Completado
+              </span>
+            </div>
+
+            <!-- Observations if rejected -->
+            <div class="item-observations" *ngIf="item.estado === 'rechazado' && item.observaciones">
+              <span class="material-symbols-outlined text-danger">error</span>
+              <p>Motivo Rechazo: {{ item.observaciones }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="history-section mt-4">
         <div class="section-header">
           <h3>Historial de Cargas</h3>
@@ -78,15 +132,20 @@ import Swal from 'sweetalert2';
                 </td>
                 <td class="text-muted">{{ upload.observations || 'Sin observaciones aún' }}</td>
                 <td class="text-center">
-                  <button *ngIf="upload.status === 'pendiente'" 
-                          class="btn-delete" 
-                          (click)="deleteUpload(upload.id)"
-                          title="Eliminar carga">
-                    <span class="material-symbols-outlined">delete</span>
-                  </button>
-                  <span *ngIf="upload.status !== 'pendiente'" class="text-muted" title="Ya está siendo procesado">
-                    <span class="material-symbols-outlined disabled-icon">lock</span>
-                  </span>
+                  <div class="actions-cell-inline">
+                    <button class="btn-view" (click)="viewFile(upload.id, upload.original_name)" title="Visualizar documento">
+                      <span class="material-symbols-outlined">visibility</span>
+                    </button>
+                    <button *ngIf="upload.status === 'pendiente'" 
+                            class="btn-delete" 
+                            (click)="deleteUpload(upload.id)"
+                            title="Eliminar carga">
+                      <span class="material-symbols-outlined">delete</span>
+                    </button>
+                    <span *ngIf="upload.status !== 'pendiente'" class="text-muted" title="Ya está siendo procesado">
+                      <span class="material-symbols-outlined disabled-icon">lock</span>
+                    </span>
+                  </div>
                 </td>
               </tr>
               <tr *ngIf="uploads.length === 0">
@@ -131,6 +190,7 @@ import Swal from 'sweetalert2';
     .pro-container { max-width: 1200px; margin: 0 auto; padding: 2.5rem 0; }
     .p-0 { padding: 0 !important; }
     .overflow-hidden { overflow: hidden; }
+    .mb-4 { margin-bottom: 1.5rem; }
     
     .view-header {
       display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem;
@@ -199,10 +259,24 @@ import Swal from 'sweetalert2';
 
     @keyframes slideIn { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .mt-4 { margin-top: 2rem; }
+    .mt-3 { margin-top: 1rem; }
+    .mt-2 { margin-top: 0.5rem; }
+    .mt-1 { margin-top: 0.25rem; }
     .bold { font-weight: 600; }
     .text-muted { color: var(--text-muted); font-style: italic; font-size: 0.85rem; }
     .text-center { text-align: center; }
+    .text-primary { color: #1e3a8a; }
     
+    .actions-cell-inline {
+      display: flex; gap: 8px; justify-content: center; align-items: center;
+    }
+
+    .btn-view {
+      background: none; border: none; color: #1A3B8B; cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.2s;
+      &:hover { background: #EBF4FF; transform: scale(1.1); }
+      .material-symbols-outlined { font-size: 20px; }
+    }
+
     .btn-delete {
       background: none; border: none; color: #ef4444; cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.2s;
       &:hover { background: #fee2e2; transform: scale(1.1); }
@@ -212,6 +286,189 @@ import Swal from 'sweetalert2';
     .disabled-icon {
       font-size: 18px; color: #cbd5e1; cursor: help;
     }
+
+    /* Checklist specific styles */
+    .active-request-card {
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      background: linear-gradient(180deg, #ffffff 0%, #f0f7ff 100%);
+      padding: 1.5rem;
+      border-radius: 16px;
+      box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.05);
+    }
+    
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .card-subtitle {
+      font-size: 0.875rem;
+      color: #64748b;
+      margin: 4px 0 0 0;
+    }
+
+    .items-list-vertical {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+      padding: 1rem;
+      border-radius: 12px;
+      background: white;
+      border: 1px solid #e2e8f0;
+      transition: all 0.2s;
+    }
+
+    .item-row:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+
+    .approved-row {
+      border-color: #bbf7d0;
+      background-color: #f6fdf9;
+    }
+
+    .item-header-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .icon-doc {
+      font-size: 24px;
+      color: #3b82f6;
+    }
+
+    .title-details {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .item-title {
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    .item-desc {
+      font-size: 0.8rem;
+      color: #64748b;
+    }
+
+    .template-box-inline {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.8rem;
+      color: #1e3a8a;
+      .material-symbols-outlined {
+        font-size: 16px;
+        color: #1d4ed8;
+      }
+    }
+
+    .btn-link-download {
+      background: none;
+      border: none;
+      padding: 0;
+      color: #1d4ed8;
+      font-weight: 700;
+      text-decoration: underline;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .item-status-block {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-indicator-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .status-indicator-badge.pendiente {
+      background: #fef3c7;
+      color: #d97706;
+      .status-dot { background: #f59e0b; }
+    }
+
+    .status-indicator-badge.subido {
+      background: #e0f2fe;
+      color: #0369a1;
+      .status-dot { background: #0ea5e9; }
+    }
+
+    .status-indicator-badge.validado {
+      background: #e0e7ff;
+      color: #4338ca;
+      .status-dot { background: #6366f1; }
+    }
+
+    .status-indicator-badge.aprobado {
+      background: #dcfce7;
+      color: #15803d;
+      .status-dot { background: #22c55e; }
+    }
+
+    .status-indicator-badge.rechazado {
+      background: #fee2e2;
+      color: #b91c1c;
+      .status-dot { background: #ef4444; }
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #94a3b8;
+    }
+
+    .completado-text {
+      color: #16a34a;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.9rem;
+      .material-symbols-outlined { font-size: 18px; }
+    }
+
+    .item-observations {
+      width: 100%;
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #fff5f5;
+      border: 1px solid #fed7d7;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      p { margin: 0; font-size: 0.8rem; color: #c53030; font-weight: 500; }
+      .material-symbols-outlined { font-size: 16px; color: #e53e3e; }
+    }
   `]
 })
 export class ClientUploadComponent implements OnInit {
@@ -219,6 +476,9 @@ export class ClientUploadComponent implements OnInit {
   uploads: any[] = [];
   isUploading = false;
   math = Math;
+  
+  // Active document request checklist
+  activeRequest: any = null;
 
   // Pagination
   currentPage: number = 1;
@@ -230,7 +490,14 @@ export class ClientUploadComponent implements OnInit {
   constructor(private http: HttpClient) {}
 
   ngOnInit(): void {
+    this.loadActiveRequest();
     this.loadUploads();
+  }
+
+  loadActiveRequest(): void {
+    this.http.get<any>(`${environment.apiUrl}/document-requests/active`).subscribe(response => {
+      this.activeRequest = response;
+    });
   }
 
   loadUploads(): void {
@@ -303,6 +570,59 @@ export class ClientUploadComponent implements OnInit {
     });
   }
 
+  onFileSelectedForItem(event: any, itemId: number): void {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      Swal.fire('Formato Inválido', 'Solo se permite subir archivos en formato PDF.', 'warning');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('document_request_item_id', itemId.toString());
+    formData.append('active_role', 'cliente');
+
+    Swal.fire({
+      title: 'Subiendo Documento...',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    this.http.post(`${environment.apiUrl}/uploads`, formData).subscribe({
+      next: () => {
+        Swal.fire('Carga Exitosa', 'El documento ha sido cargado para validación operativa.', 'success');
+        this.loadActiveRequest();
+        this.loadUploads();
+      },
+      error: (err) => {
+        Swal.fire('Error', err.error.message || 'No se pudo subir el archivo.', 'error');
+      }
+    });
+  }
+
+  downloadTemplate(reqId: number, originalName: string) {
+    this.http.get(`${environment.apiUrl}/document-requirements/${reqId}/download-template`, {
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = originalName || 'plantilla.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      },
+      error: () => {
+        Swal.fire('Error', 'No se pudo descargar el formato de plantilla.', 'error');
+      }
+    });
+  }
+
   deleteUpload(id: number): void {
     Swal.fire({
       title: '¿Estás seguro?',
@@ -317,6 +637,7 @@ export class ClientUploadComponent implements OnInit {
       if (result.isConfirmed) {
         this.http.delete(`${environment.apiUrl}/uploads/${id}`).subscribe({
           next: () => {
+            this.loadActiveRequest();
             this.loadUploads();
             Swal.fire('¡Eliminado!', 'El archivo ha sido borrado.', 'success');
           },
@@ -327,5 +648,29 @@ export class ClientUploadComponent implements OnInit {
       }
     });
   }
-}
 
+  viewFile(id: number, originalName: string): void {
+    this.http.get(`${environment.apiUrl}/uploads/${id}/download`, {
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob) => {
+        const fileType = blob.type;
+        const url = window.URL.createObjectURL(blob);
+        
+        if (fileType === 'application/pdf' || fileType.startsWith('image/')) {
+          window.open(url, '_blank');
+        } else {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = originalName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+      },
+      error: (err) => {
+        Swal.fire('Error', 'No se pudo cargar el archivo para visualización.', 'error');
+      }
+    });
+  }
+}

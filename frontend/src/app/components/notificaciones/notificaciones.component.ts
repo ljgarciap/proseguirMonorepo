@@ -27,6 +27,8 @@ import Swal from 'sweetalert2';
             <tr>
               <th>Nombre de Notificación</th>
               <th>Mensaje / Contenido</th>
+              <th>Fecha de Creación</th>
+              <th>Última Modificación</th>
               <th>Activa</th>
               <th class="text-right">Acciones</th>
             </tr>
@@ -39,9 +41,11 @@ import Swal from 'sweetalert2';
                   {{ notif.nombre }}
                 </div>
               </td>
-              <td style="max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" [title]="notif.mensaje">
+              <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" [title]="notif.mensaje">
                 {{ notif.mensaje }}
               </td>
+              <td class="timestamp">{{ notif.created_at | date:'dd/MM/yyyy HH:mm' }}</td>
+              <td class="timestamp">{{ notif.updated_at | date:'dd/MM/yyyy HH:mm' }}</td>
               <td>
                 <span class="pro-status cursor-pointer" 
                       [ngClass]="notif.activo ? 'validated' : 'rejected'" 
@@ -62,7 +66,7 @@ import Swal from 'sweetalert2';
               </td>
             </tr>
             <tr *ngIf="notificaciones.length === 0">
-              <td colspan="4" class="text-center" style="padding: 2rem; color: var(--text-muted);">
+              <td colspan="6" class="text-center" style="padding: 2rem; color: var(--text-muted);">
                 No hay notificaciones registradas en el sistema.
               </td>
             </tr>
@@ -84,6 +88,8 @@ import Swal from 'sweetalert2';
     .pro-status { font-size: 0.7rem; padding: 2px 8px; border-radius: 6px; font-weight: 800; text-transform: uppercase; transition: all 0.2s; }
     .pro-status.validated { background: #E6FFFA; color: #2C7A7B; border: 1px solid #B2F5EA; &:hover { background: #B2F5EA; } }
     .pro-status.rejected { background: #FFF5F5; color: #C53030; border: 1px solid #FED7D7; &:hover { background: #FED7D7; } }
+    
+    .timestamp { color: #64748B; font-size: 0.85rem; }
 
     .actions { display: flex; justify-content: flex-end; gap: 8px; }
     .text-center { text-align: center; }

@@ -22,7 +22,10 @@ class InternalDocumentController extends Controller
 
         if (!$isAdmin) {
             $query->where(function($q) use ($user, $roles) {
-                if (in_array('operativo', $roles)) $q->orWhere('sender_id', $user->id);
+                if (in_array('operativo', $roles)) {
+                    $q->orWhere('sender_id', $user->id)
+                      ->orWhere('target_role', 'operativo');
+                }
                 if (in_array('contable', $roles)) $q->orWhere('target_role', 'contable');
                 if (in_array('gerente', $roles)) $q->orWhere('target_role', 'gerente');
             });
@@ -39,18 +42,21 @@ class InternalDocumentController extends Controller
         $request->validate([
             'titulo' => 'required|string',
             'archivo' => 'required|file|max:10240', // Max 10MB
-            'target_role' => 'required|in:contable,gerente',
+            'target_role' => 'required|in:contable,gerente,operativo',
             'categoria_id' => 'required|exists:accounting_categories,id',
             'prioridad_id' => 'required|exists:accounting_priorities,id',
         ]);
 
-        $path = $request->file('archivo')->store('internal_docs', 'public');
+        $file = $request->file('archivo');
+        $path = $file->store('internal_docs', 'public');
+        $originalName = $file->getClientOriginalName();
 
         $doc = InternalDocument::create([
             'sender_id' => Auth::id(),
             'target_role' => $request->target_role,
             'titulo' => $request->titulo,
             'archivo_path' => $path,
+            'original_name' => $originalName,
             'categoria_id' => $request->categoria_id,
             'prioridad_id' => $request->prioridad_id,
             'mensaje' => $request->mensaje,
@@ -66,11 +72,20 @@ class InternalDocumentController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'estado' => 'required|in:visto,procesado,rechazado'
+            'estado' => 'required|in:visto,procesado,rechazado',
+            'motivo_rechazo' => 'nullable|string'
         ]);
 
         $doc = InternalDocument::findOrFail($id);
-        $doc->update(['estado' => $request->estado]);
+        
+        $updateData = ['estado' => $request->estado];
+        if ($request->estado === 'rechazado') {
+            $updateData['motivo_rechazo'] = $request->motivo_rechazo;
+        } else {
+            $updateData['motivo_rechazo'] = null;
+        }
+
+        $doc->update($updateData);
 
         return response()->json($doc);
     }

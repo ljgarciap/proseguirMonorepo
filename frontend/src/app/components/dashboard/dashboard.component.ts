@@ -165,7 +165,7 @@ Chart.register(...registerables);
               <div class="kpi-body">
                 <label>Valor Vencido</label>
                 <div class="value">{{ formatMoney(stats.cartera.total_vencido) }}</div>
-                <div class="footer">Pendiente por recaudar</div>
+                <div class="footer">Retraso <= 3 días</div>
               </div>
             </div>
             <div class="kpi-card pro-card red" (click)="navigateToSheets('cartera', '', 'mora')">
@@ -194,8 +194,9 @@ Chart.register(...registerables);
             </div>
 
             <div class="card table-container span-4">
-              <div class="card-header">
+              <div class="card-header" (click)="showClientsBalanceModal = true" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center;" title="Ver todos los clientes con saldo">
                 <h3>Top Clientes por Saldo</h3>
+                <span class="material-symbols-outlined" style="font-size: 20px; color: #718096;">open_in_new</span>
               </div>
               <table class="pro-table x-small">
                 <thead>
@@ -257,14 +258,15 @@ Chart.register(...registerables);
               <div class="kpi-icon"><span class="material-symbols-outlined">speed</span></div>
               <div class="kpi-body">
                 <label>Eficiencia de Cobro</label>
-                <div class="value">{{ stats.factoring.efficiency_score }} <small>días</small></div>
+                <div class="value">{{ math.round(stats.factoring.efficiency_score) }} <small>días</small></div>
               </div>
             </div>
-            <div class="kpi-card pro-card orange">
-              <div class="kpi-icon"><span class="material-symbols-outlined">price_check</span></div>
+            <div class="kpi-card pro-card orange" (click)="navigateToSheets('pagos')">
+              <div class="kpi-icon"><span class="material-symbols-outlined">receipt</span></div>
               <div class="kpi-body">
-                <label>Costo Pronto Pago</label>
-                <div class="value">{{ formatMoney(stats.factoring.early_payment_cost) }}</div>
+                <label>Facturas Canceladas</label>
+                <div class="value">{{ stats.factoring.pagos_count }}</div>
+                <div class="footer">Click para ver detalle</div>
               </div>
             </div>
             <div class="kpi-card pro-card purple">
@@ -364,6 +366,22 @@ Chart.register(...registerables);
                     <th class="text-right">Monto</th>
                   </tr>
                 </thead>
+                <tbody>
+                  <tr *ngFor="let v of stats.factoring.vencimientos">
+                    <td>
+                      <div class="payer-cell" [title]="'Vence en ' + v.dias + ' días (' + safeDate(v.fecha, 'dd/MM/yyyy') + ')'">
+                        <span class="name">{{ v.pagador }}</span>
+                        <span class="due-badge" [ngClass]="v.estado.toLowerCase().replace(' ', '-')">
+                          {{ v.dias === 0 ? 'Hoy' : (v.dias === 1 ? 'Mañana' : 'En ' + v.dias + ' días') }}
+                        </span>
+                      </div>
+                    </td>
+                    <td class="text-right bold text-nowrap" style="vertical-align: middle;">{{ formatMoney(v.monto) }}</td>
+                  </tr>
+                  <tr *ngIf="!stats.factoring?.vencimientos || stats.factoring.vencimientos.length === 0">
+                    <td colspan="2" class="text-center py-4 text-muted">No hay vencimientos próximos (5 días)</td>
+                  </tr>
+                </tbody>
               </table>
             </div>
 
@@ -388,6 +406,7 @@ Chart.register(...registerables);
                  <canvas baseChart
                   [data]="weightedRatesChartData"
                   [options]="pieChartOptions"
+                  (chartClick)="onWeightedRateClick($event)"
                   [type]="'doughnut'">
                 </canvas>
               </div>
@@ -605,6 +624,43 @@ Chart.register(...registerables);
 
       </div>
 
+      <!-- MODAL FOR ALL CLIENTS WITH BALANCE (SCRUM-66) -->
+      <div class="modal-backdrop" *ngIf="showClientsBalanceModal">
+        <div class="modal-card" style="max-width: 600px;">
+          <header class="modal-header">
+            <h3>Clientes con Saldo</h3>
+            <button class="btn-close" (click)="showClientsBalanceModal = false">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </header>
+          <main class="modal-body" style="padding: 1.5rem;">
+            <div class="search-wrapper mb-3" style="max-width: 100%; position: relative; margin-bottom: 1rem;">
+              <span class="material-symbols-outlined search-icon" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #a0aec0; pointer-events: none;">search</span>
+              <input type="text" [(ngModel)]="searchClientBalance" placeholder="Buscar cliente..." class="filter-input" style="width: 100%; padding: 0.5rem 0.5rem 0.5rem 2.2rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; outline: none;" />
+            </div>
+            <div style="max-height: 400px; overflow-y: auto;">
+              <table class="pro-table small" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                  <tr style="border-bottom: 2px solid #edf2f7; text-align: left;">
+                    <th style="padding: 8px; color: #4a5568; font-weight: 600;">Cliente</th>
+                    <th style="padding: 8px; text-align: right; color: #4a5568; font-weight: 600;">Saldo Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let c of filteredClientsBalance" (click)="showClientsBalanceModal = false; navigateToSheets('cartera', c.cliente)" class="clickable" style="cursor: pointer; border-bottom: 1px solid #edf2f7;">
+                    <td style="padding: 8px; color: #2d3748;">{{ c.cliente }}</td>
+                    <td style="padding: 8px; text-align: right; font-weight: 700; color: #1e40af;">{{ formatMoney(c.saldo_total) }}</td>
+                  </tr>
+                  <tr *ngIf="filteredClientsBalance.length === 0">
+                    <td colspan="2" class="text-center py-3" style="padding: 16px; text-align: center; color: #718096;">No se encontraron clientes con saldo.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </main>
+        </div>
+      </div>
+
       <div class="loading-overlay" *ngIf="isLoading && authService.getActiveRole() !== 'contable'">
         <div class="pro-spinner"></div>
         <p>Procesando Inteligencia Financiera...</p>
@@ -726,6 +782,7 @@ Chart.register(...registerables);
 
       .kpi-body {
         flex-grow: 1;
+        text-align: right;
         label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
         .value { font-size: 1.5rem; font-weight: 800; color: var(--text-main); margin: 2px 0; }
         .footer { font-size: 0.75rem; color: #718096; font-weight: 500; }
@@ -788,6 +845,63 @@ Chart.register(...registerables);
       border-radius: 50%; animation: spin 1s linear infinite;
     }
 
+    /* Modal Backdrop and Card */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(15, 23, 42, 0.3);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1100;
+    }
+
+    .modal-card {
+      background: white;
+      width: 90%;
+      max-width: 600px;
+      max-height: 90vh;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalSlideUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      h3 { margin: 0; font-size: 1.2rem; font-weight: 700; color: #0f172a; }
+    }
+
+    .btn-close {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      color: #64748b;
+      &:hover { color: #0f172a; }
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+    }
+
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     .spinning { animation: spin 1s linear infinite; }
 
@@ -804,6 +918,27 @@ Chart.register(...registerables);
     .shadow-sm { box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06); }
     .pulse { animation: alertPulse 1.5s infinite; }
     @keyframes alertPulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
+
+    .payer-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      .name { font-weight: 600; color: #2D3748; }
+      .due-badge {
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 4px;
+        width: fit-content;
+        text-transform: uppercase;
+        &.vencido { background: #FED7D7; color: #C53030; }
+        &.por-vencer { background: #FEEBC8; color: #C05621; }
+        &.vigente { background: #EBF8FF; color: #2B6CB0; }
+      }
+    }
+    .text-nowrap {
+      white-space: nowrap !important;
+    }
   `]
 })
 export class DashboardComponent implements OnInit {
@@ -812,7 +947,18 @@ export class DashboardComponent implements OnInit {
   currentTab: string = 'cartera';
   isRefreshing = false;
   isLoading = true;
+  math = Math;
   isGeneratingPdf = false;
+  showClientsBalanceModal = false;
+  searchClientBalance = '';
+
+  get filteredClientsBalance() {
+    const list = this.stats?.cartera?.client_ranking || [];
+    if (!this.searchClientBalance) return list;
+    const term = this.searchClientBalance.toLowerCase();
+    return list.filter((c: any) => c.cliente?.toLowerCase().includes(term));
+  }
+
   stats: any = {
     cartera: null,
     factoring: null,
@@ -1346,6 +1492,14 @@ export class DashboardComponent implements OnInit {
     }
   }
 
+  onWeightedRateClick(event: any) {
+    if (event.active && event.active.length > 0) {
+      const index = event.active[0].index;
+      const label = this.weightedRatesChartData.labels![index] as string;
+      this.navigateToSheets('op', label);
+    }
+  }
+
   navigateToSheets(category: string, filterText: string = '', filter: string = '') {
     this.router.navigate(['/sheets'], {
       queryParams: {
@@ -1399,18 +1553,27 @@ export class DashboardComponent implements OnInit {
     let cleanVal = value;
     if (typeof value === 'string') {
       // Strip out any existing currency symbols, commas, or spaces if n8n ingested it roughly
-      cleanVal = value.replace(/[\$,\s]/g, '');
+      cleanVal = value.replace(/[\$\.,\s]/g, '');
     }
 
-    const num = Number(cleanVal);
+    const num = Math.round(Number(cleanVal));
     if (isNaN(num)) return value; // Return original string if it is completely unparseable
 
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('es-CO', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'COP',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(num);
+  }
+
+  formatNit(value: any): string {
+    if (value === null || value === undefined || value === '') return '-';
+    const cleanStr = String(value).replace(/\D/g, ''); // Keep numbers only
+    if (cleanStr.length <= 1) return cleanStr;
+    const body = cleanStr.slice(0, -1);
+    const dv = cleanStr.slice(-1);
+    return `${body}-${dv}`;
   }
 
   safeDate(value: any, format: string): string {
