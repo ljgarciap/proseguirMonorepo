@@ -42,7 +42,7 @@ export const routes: Routes = [
         path: 'mandatos', 
         component: MandatosComponent, 
         canActivate: [roleGuard], 
-        data: { roles: ['cliente', 'superadmin', 'operativo'] } 
+        data: { roles: ['cliente', 'superadmin', 'operativo', 'gerente', 'contable'] } 
     },
     { 
         path: 'profile', 

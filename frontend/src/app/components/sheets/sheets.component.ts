@@ -187,10 +187,13 @@ import Swal from 'sweetalert2';
                       </div>
                     </ng-container>
 
-                    <!-- Rounded values (dias_vencido, plazo_meses, dias) -->
+                    <!-- Rounded values (dias_vencido, plazo_meses, dias, dias_cartera, dias_pagos, dias_sobrantes) -->
                     <span *ngSwitchCase="'dias_vencido'">{{ roundValue(row[col]) }}</span>
                     <span *ngSwitchCase="'plazo_meses'">{{ roundValue(row[col]) }}</span>
                     <span *ngSwitchCase="'dias'">{{ roundValue(row[col]) }}</span>
+                    <span *ngSwitchCase="'dias_cartera'">{{ roundValue(row[col]) }}</span>
+                    <span *ngSwitchCase="'dias_pagos'">{{ roundValue(row[col]) }}</span>
+                    <span *ngSwitchCase="'dias_sobrantes'">{{ roundValue(row[col]) }}</span>
 
                     <!-- Interest Rates (tasa_interes, tasa_descuento, tasa_factor, factor) -->
                     <span *ngSwitchCase="'tasa_interes'">{{ formatPercentage(row[col]) }}</span>
@@ -202,6 +205,7 @@ import Swal from 'sweetalert2';
                     <span *ngSwitchCase="'identificacion'">{{ formatNit(row[col]) }}</span>
                     <span *ngSwitchCase="'nit_cliente'">{{ formatNit(row[col]) }}</span>
                     <span *ngSwitchCase="'nit_pagador'">{{ formatNit(row[col]) }}</span>
+                    <span *ngSwitchCase="'nit'">{{ formatNit(row[col]) }}</span>
 
                     <!-- Currency Formatting -->
                     <!-- Cartera -->
@@ -212,14 +216,17 @@ import Swal from 'sweetalert2';
                     <span *ngSwitchCase="'saldo_total'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'valor_ultimo_abono'">{{ formatMoney(row[col]) }}</span>
                     
-                    <!-- Factoring OP -->
+                    <!-- Factoring OP / Pagos -->
                     <span *ngSwitchCase="'monto'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'valor_aprobado'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'valor_desembolsado'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'valor_reserva'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'saldo_pendiente'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'descuento_financiero'">{{ formatMoney(row[col]) }}</span>
-                    
+                    <span *ngSwitchCase="'valor_titulo'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'valor_nominal'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'monto_pagado'">{{ formatMoney(row[col]) }}</span>
+                    <span *ngSwitchCase="'saldo_restante'">{{ formatMoney(row[col]) }}</span>
                     <span *ngSwitchCase="'total_recaudado_comprobante'">{{ formatMoney(row[col]) }}</span>
                     
                     <!-- Pagos Compraventa -->
@@ -840,6 +847,13 @@ import Swal from 'sweetalert2';
           background: #fef2f2;
         }
       }
+
+      .text-right {
+        text-align: right !important;
+      }
+      th.text-right .th-content {
+        justify-content: flex-end !important;
+      }
     }
 
     /* Footer Pagination Styling */
@@ -1343,7 +1357,7 @@ export class SheetsComponent implements OnInit {
       cleanVal = value.replace(/[\$\.,\s]/g, '');
     }
 
-    const num = Number(cleanVal);
+    const num = Math.round(Number(cleanVal));
     if (isNaN(num)) return value;
 
     // Use es-CO formatting which defaults to $ symbol with point as thousands separator and comma as decimal separator.
@@ -1373,7 +1387,9 @@ export class SheetsComponent implements OnInit {
       'valor', 'plazo_meses', 'dias', 'tasa_interes', 'factor', 'saldo_total', 'valor_ultimo_abono',
       'tasa_descuento', 'tasa_factor', 'intereses_diarios', 'intereses_pagados', 'valor_factura',
       'total_recaudo', 'valor_recaudado', 'rendimientos_proyectados', 'devolucion_descuento', 
-      'margen_reserva', 'valor_pagar_deudores', 'avg_tasa', 'total_val'
+      'margen_reserva', 'valor_pagar_deudores', 'avg_tasa', 'total_val',
+      'valor_titulo', 'valor_nominal', 'monto_pagado', 'dias_cartera', 'saldo_restante',
+      'dias_pagos', 'dias_sobrantes'
     ];
     return numericCols.includes(col);
   }

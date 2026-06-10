@@ -20,6 +20,7 @@ export class SolicitudesCreditoComponent implements OnInit {
   tipoCreditos: any[] = [];
   amortizaciones: any[] = [];
   documentTypes: any[] = [];
+  tipoPersonas: any[] = [];
   presets: any[] = [];
   
   // Pending visits list
@@ -130,6 +131,8 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.http.get<any[]>(`${environment.apiUrl}/parameters/amortizaciones`).subscribe(data => this.amortizaciones = data);
     // Document Types
     this.http.get<any[]>(`${environment.apiUrl}/document-types`).subscribe(data => this.documentTypes = data);
+    // Tipo Personas (Natural / Jurídica)
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_personas`).subscribe(data => this.tipoPersonas = data);
     // Presets
     this.http.get<any[]>(`${environment.apiUrl}/document-presets`).subscribe(data => this.presets = data);
   }
@@ -276,15 +279,23 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.form.correo_notificacion = isJuridica ? this.form.correo_electronico_empresarial : this.form.correo_electronico;
   }
 
-  // Check if JURIDICA selected
+  // Check if JURIDICA selected — uses tipoPersonas list by tipo_persona_id,
+  // with fallback to NIT document type for pre-loaded visits.
   isPersonaJuridica(): boolean {
-    const selectedTp = this.documentTypes.find(t => t.id === Number(this.form.tipo_documento_id));
-    if (selectedTp && selectedTp.codigo === 'NIT') return true;
-    
-    // Check by tipo_persona relation if loaded
+    // When form comes from a visit, use the loaded client's tipo_persona relation
     const selectedClient = this.activeClientes.find(c => c.id === Number(this.form.cliente_id));
     if (selectedClient && selectedClient.tipo_persona?.codigo === 'JURIDICA') return true;
-    
+
+    // In manual mode, use the tipo_persona_id field against the tipoPersonas list
+    if (this.form.tipo_persona_id && this.tipoPersonas.length > 0) {
+      const selectedTp = this.tipoPersonas.find(tp => tp.id === Number(this.form.tipo_persona_id));
+      if (selectedTp && selectedTp.codigo === 'JURIDICA') return true;
+    }
+
+    // Fallback: if document type is NIT, treat as juridica
+    const selectedDocType = this.documentTypes.find(t => t.id === Number(this.form.tipo_documento_id));
+    if (selectedDocType && selectedDocType.codigo === 'NIT') return true;
+
     return false;
   }
 

@@ -35,9 +35,9 @@
           <table class="modern-table">
             <thead>
               <tr>
+                <th>Nombre o Razón Social</th>
                 <th>ID Visita</th>
                 <th>Fecha</th>
-                <th>Nombre o Razón Social</th>
                 <th>Identificación</th>
                 <th>Tipo de Crédito</th>
                 <th>Monto Solicitado</th>
@@ -46,9 +46,9 @@
             </thead>
             <tbody>
               <tr *ngFor="let visit of pendingVisits">
+                <td><strong>{{ visit.cliente?.nombre || '-' }}</strong></td>
                 <td class="id-cell">#{{ visit.id }}</td>
                 <td>{{ visit.fecha | date:'dd/MM/yyyy' }}</td>
-                <td><strong>{{ visit.cliente?.nombre || '-' }}</strong></td>
                 <td>
                   <span class="badge-doc">{{ visit.cliente?.document_type?.codigo || 'NIT' }}</span>
                   {{ formatDocNumber(visit.cliente?.numero_documento) }}
@@ -160,7 +160,7 @@
               <label>Tipo de Persona <span class="required">*</span></label>
               <select [(ngModel)]="form.tipo_persona_id" name="tipo_persona_id" [disabled]="isFromVisit" (change)="onTipoPersonaChange()" required class="pro-input">
                 <option value="">Seleccione...</option>
-                <option *ngFor="let tp of documentTypes" [value]="tp.id">{{ tp.nombre }}</option>
+                <option *ngFor="let tp of tipoPersonas" [value]="tp.id">{{ tp.nombre }}</option>
               </select>
             </div>
 

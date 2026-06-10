@@ -221,6 +221,14 @@ class SolicitudCreditoTest extends TestCase
             'estado' => 'pendiente'
         ]);
 
+        // Assert CreditoOrdinario BPMN process got initiated automatically
+        $this->assertDatabaseHas('credito_ordinarios', [
+            'cliente_id' => $user->id,
+            'monto' => 20000000.00,
+            'plazo_meses' => 12,
+            'estado' => 'revision_documental'
+        ]);
+
         // Assert Email was dispatched
         Mail::assertSent(SolicitudCreditoMail::class, function ($mail) {
             return $mail->hasTo('juan_modificado@test.com') && 

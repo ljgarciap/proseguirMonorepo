@@ -258,7 +258,7 @@ Chart.register(...registerables);
               <div class="kpi-icon"><span class="material-symbols-outlined">speed</span></div>
               <div class="kpi-body">
                 <label>Eficiencia de Cobro</label>
-                <div class="value">{{ stats.factoring.efficiency_score }} <small>días</small></div>
+                <div class="value">{{ math.round(stats.factoring.efficiency_score) }} <small>días</small></div>
               </div>
             </div>
             <div class="kpi-card pro-card orange" (click)="navigateToSheets('pagos')">
@@ -782,6 +782,7 @@ Chart.register(...registerables);
 
       .kpi-body {
         flex-grow: 1;
+        text-align: right;
         label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
         .value { font-size: 1.5rem; font-weight: 800; color: var(--text-main); margin: 2px 0; }
         .footer { font-size: 0.75rem; color: #718096; font-weight: 500; }
@@ -946,6 +947,7 @@ export class DashboardComponent implements OnInit {
   currentTab: string = 'cartera';
   isRefreshing = false;
   isLoading = true;
+  math = Math;
   isGeneratingPdf = false;
   showClientsBalanceModal = false;
   searchClientBalance = '';
@@ -1551,18 +1553,27 @@ export class DashboardComponent implements OnInit {
     let cleanVal = value;
     if (typeof value === 'string') {
       // Strip out any existing currency symbols, commas, or spaces if n8n ingested it roughly
-      cleanVal = value.replace(/[\$,\s]/g, '');
+      cleanVal = value.replace(/[\$\.,\s]/g, '');
     }
 
-    const num = Number(cleanVal);
+    const num = Math.round(Number(cleanVal));
     if (isNaN(num)) return value; // Return original string if it is completely unparseable
 
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('es-CO', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'COP',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(num);
+  }
+
+  formatNit(value: any): string {
+    if (value === null || value === undefined || value === '') return '-';
+    const cleanStr = String(value).replace(/\D/g, ''); // Keep numbers only
+    if (cleanStr.length <= 1) return cleanStr;
+    const body = cleanStr.slice(0, -1);
+    const dv = cleanStr.slice(-1);
+    return `${body}-${dv}`;
   }
 
   safeDate(value: any, format: string): string {

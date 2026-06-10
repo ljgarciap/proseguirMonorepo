@@ -26,7 +26,7 @@ class ClienteController extends Controller
             $query->where('tipo_personas.nombre', 'like', "%{$request->tipo_persona}%");
         }
         if ($request->filled('identificacion')) {
-            $query->where('clientes.identificacion', 'like', "%{$request->identificacion}%");
+            $query->where('clientes.numero_documento', 'like', "%{$request->identificacion}%");
         }
         if ($request->filled('activo')) {
             $val = filter_var($request->activo, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
