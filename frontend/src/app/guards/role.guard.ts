@@ -21,6 +21,10 @@ export const roleGuard: CanActivateFn = (route, state) => {
   const role = authService.getActiveRole();
   if (role === 'cliente') {
     router.navigate(['/client-upload']);
+  } else if (role === 'coordinador_comercial') {
+    router.navigate(['/solicitudes-credito']);
+  } else if (['oficial_cumplimiento', 'comite_credito', 'tesoreria'].includes(role || '')) {
+    router.navigate(['/creditos']);
   } else {
     router.navigate(['/dashboard']);
   }

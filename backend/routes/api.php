@@ -52,9 +52,22 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
         Route::delete('/history/by-upload/{uploadId}', [\App\Http\Controllers\HistoryController::class, 'deleteByUpload'])
             ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
 
+        Route::delete('/history/by-file', [\App\Http\Controllers\HistoryController::class, 'deleteByFile'])
+            ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
+
         // Usuarios (Superadmin only)
+        Route::post('users/{id}/restore', [\App\Http\Controllers\UserController::class, 'restore'])
+            ->middleware(['auth:api', 'checkrole:superadmin']);
         Route::apiResource('users', \App\Http\Controllers\UserController::class)
             ->middleware(['auth:api', 'checkrole:superadmin']);
+        
+        // Clientes (Superadmin, Gerente, Operativo)
+        Route::apiResource('clientes', \App\Http\Controllers\ClienteController::class)
+            ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
+        
+        // Visitas a Clientes (Superadmin, Gerente, Operativo)
+        Route::apiResource('visitas', \App\Http\Controllers\VisitaController::class)
+            ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
         
         // Destinatarios (Superadmin only)
         Route::apiResource('destinatarios', \App\Http\Controllers\DestinatarioController::class)
@@ -84,7 +97,7 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
             Route::post('/', [\App\Http\Controllers\ClientUploadController::class, 'store'])
                 ->middleware('checkrole:cliente');
             Route::get('/{id}/download', [\App\Http\Controllers\ClientUploadController::class, 'download'])
-                ->middleware('checkrole:operativo,gerente,superadmin');
+                ->middleware('checkrole:cliente,operativo,gerente,superadmin');
             Route::post('/{id}/validate', [\App\Http\Controllers\ClientUploadController::class, 'validateUpload'])
                 ->middleware('checkrole:operativo');
             Route::post('/{id}/approve', [\App\Http\Controllers\ClientUploadController::class, 'approveUpload'])
@@ -124,6 +137,14 @@ Route::post('/settlement/reconcile', [\App\Http\Controllers\SettlementController
 
 Route::post('/conciliacion-susuerte', [\App\Http\Controllers\ConciliationController::class, 'conciliate'])
     ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable']);
+
+// Conciliación Susuerte History and New Conciliation routes
+Route::get('/conciliaciones-susuerte/history', [\App\Http\Controllers\ConciliacionSusuerteController::class, 'history'])
+    ->middleware(['auth:api', 'checkrole:admin,operativo']);
+Route::post('/conciliaciones-susuerte/new', [\App\Http\Controllers\ConciliacionSusuerteController::class, 'newConciliation'])
+    ->middleware(['auth:api', 'checkrole:admin,operativo']);
+Route::put('/conciliaciones-susuerte/{id}', [\App\Http\Controllers\ConciliacionSusuerteController::class, 'update'])
+    ->middleware(['auth:api', 'checkrole:admin,operativo']);
 
 use App\Http\Controllers\PlanillaController;
 
@@ -165,6 +186,16 @@ Route::prefix('creditos')->middleware('auth:api')->group(function () {
     Route::post('/{id}/transition', [CreditoOrdinarioController::class, 'transition']);
 });
 
+// Registro de Solicitudes de Crédito
+Route::prefix('solicitudes-credito')->middleware('auth:api')->group(function () {
+    Route::get('/pendientes', [\App\Http\Controllers\SolicitudCreditoController::class, 'indexPending'])
+        ->middleware('checkrole:superadmin,gerente,coordinador_comercial,operativo');
+    Route::get('/', [\App\Http\Controllers\SolicitudCreditoController::class, 'index'])
+        ->middleware('checkrole:superadmin,gerente,coordinador_comercial,operativo');
+    Route::post('/', [\App\Http\Controllers\SolicitudCreditoController::class, 'store'])
+        ->middleware('checkrole:superadmin,gerente,coordinador_comercial,operativo');
+});
+
 // Parámetros Genéricos (Superadmin)
 Route::prefix('parameters')->middleware(['auth:api'])->group(function () {
     Route::get('/{table}', [\App\Http\Controllers\ParameterController::class, 'index']);
@@ -186,4 +217,33 @@ Route::prefix('db-cleaner')->middleware(['auth:api', 'checkrole:superadmin'])->g
     Route::post('/clear-tables', [\App\Http\Controllers\DbCleanerController::class, 'clearTables']);
     Route::post('/reset', [\App\Http\Controllers\DbCleanerController::class, 'resetDatabase']);
     Route::post('/repair', [\App\Http\Controllers\DbCleanerController::class, 'repairSchema']);
+});
+
+Route::get('/document-requirements/{id}/download-template', [\App\Http\Controllers\DocumentRequirementController::class, 'downloadTemplate'])
+    ->middleware(['auth:api']);
+
+// Requisitos de Documentos (Superadmin, Operativo)
+Route::prefix('document-requirements')->middleware(['auth:api', 'checkrole:superadmin,operativo'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\DocumentRequirementController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\DocumentRequirementController::class, 'store']);
+    Route::put('/{id}', [\App\Http\Controllers\DocumentRequirementController::class, 'update']);
+    Route::post('/{id}', [\App\Http\Controllers\DocumentRequirementController::class, 'update']); // Fallback for multipart form uploads in PHP
+    Route::delete('/{id}', [\App\Http\Controllers\DocumentRequirementController::class, 'destroy']);
+});
+
+// Presets de Documentos (Superadmin, Operativo)
+Route::prefix('document-presets')->middleware(['auth:api', 'checkrole:superadmin,operativo'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\DocumentPresetController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\DocumentPresetController::class, 'store']);
+    Route::put('/{id}', [\App\Http\Controllers\DocumentPresetController::class, 'update']);
+    Route::delete('/{id}', [\App\Http\Controllers\DocumentPresetController::class, 'destroy']);
+});
+
+// Solicitudes de Documentos a Clientes
+Route::prefix('document-requests')->middleware(['auth:api'])->group(function () {
+    Route::get('/active', [\App\Http\Controllers\DocumentRequestController::class, 'activeRequest']);
+    Route::get('/clients', [\App\Http\Controllers\DocumentRequestController::class, 'getClients'])->middleware('checkrole:superadmin,operativo');
+    Route::get('/', [\App\Http\Controllers\DocumentRequestController::class, 'index'])->middleware('checkrole:superadmin,operativo');
+    Route::post('/', [\App\Http\Controllers\DocumentRequestController::class, 'store'])->middleware('checkrole:superadmin,operativo');
+    Route::delete('/{id}', [\App\Http\Controllers\DocumentRequestController::class, 'destroy'])->middleware('checkrole:superadmin,operativo');
 });

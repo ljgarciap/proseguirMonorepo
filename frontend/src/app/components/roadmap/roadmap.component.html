@@ -1,0 +1,157 @@
+<div class="roadmap-container">
+  <div class="roadmap-header">
+    <div class="header-content">
+      <span class="material-symbols-outlined header-icon">route</span>
+      <div>
+        <h2>Roadmap del Sistema y Matriz de Roles</h2>
+        <p>Visión global e interactiva de todas las funcionalidades del software, sus rutas y la relación de permisos de acceso por rol.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters Bar -->
+  <div class="filters-card">
+    <div class="filters-grid">
+      <!-- Search -->
+      <div class="filter-group">
+        <label for="search">Buscar Funcionalidad</label>
+        <div class="search-input-wrapper">
+          <span class="material-symbols-outlined search-icon">search</span>
+          <input 
+            type="text" 
+            id="search" 
+            [(ngModel)]="searchQuery" 
+            (ngModelChange)="applyFilters()" 
+            placeholder="Ej: Conciliación, Crédito..."
+          >
+        </div>
+      </div>
+
+      <!-- Area Filter -->
+      <div class="filter-group">
+        <label for="area">Filtrar por Área</label>
+        <select id="area" [(ngModel)]="selectedArea" (ngModelChange)="applyFilters()">
+          <option *ngFor="let area of areas" [value]="area">{{ area }}</option>
+        </select>
+      </div>
+
+      <!-- Role Filter -->
+      <div class="filter-group">
+        <label for="role">Filtrar por Rol Involucrado</label>
+        <select id="role" [(ngModel)]="selectedRole" (ngModelChange)="applyFilters()">
+          <option value="Todos">Todos los roles</option>
+          <option *ngFor="let r of allRoles" [value]="r.key">{{ r.label }}</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Views Sections -->
+  <div class="roadmap-views-wrapper">
+    
+    <!-- Tab navigation -->
+    <div class="view-tabs">
+      <button class="tab-btn active">
+        <span class="material-symbols-outlined">grid_view</span> Mapa de Funcionalidades
+      </button>
+    </div>
+
+    <!-- Cards Grid -->
+    <div class="features-grid-view">
+      <div class="feature-card" *ngFor="let f of filteredFeatures">
+        <div class="card-top">
+          <div class="icon-title">
+            <span class="material-symbols-outlined feature-icon-bg">{{ f.icon }}</span>
+            <div>
+              <span class="feature-area-badge">{{ f.area }}</span>
+              <h3>{{ f.name }}</h3>
+            </div>
+          </div>
+          <span class="status-indicator completed">Activo</span>
+        </div>
+
+        <p class="feature-desc">{{ f.description }}</p>
+
+        <div class="feature-route-container">
+          <span class="material-symbols-outlined link-icon">link</span>
+          <code class="feature-route">{{ f.route }}</code>
+          <a [routerLink]="f.route" class="go-to-feature-btn" title="Ir a la funcionalidad">
+            <span class="material-symbols-outlined">arrow_forward</span>
+          </a>
+        </div>
+
+        <div class="card-footer-roles">
+          <label>Roles autorizados:</label>
+          <div class="roles-badges-wrap">
+            <span 
+              *ngFor="let r of getRolesForFeature(f)" 
+              class="role-badge" 
+              [style.background-color]="getRoleColor(r)"
+            >
+              {{ getRoleLabel(r) }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="no-results-card" *ngIf="filteredFeatures.length === 0">
+        <span class="material-symbols-outlined no-results-icon">info</span>
+        <h3>No se encontraron funcionalidades</h3>
+        <p>Prueba ajustando los filtros de búsqueda, área o rol.</p>
+      </div>
+    </div>
+
+    <!-- Interactive Matrix View -->
+    <div class="matrix-section-card">
+      <div class="matrix-header">
+        <span class="material-symbols-outlined">rule_folder</span>
+        <h3>Matriz General de Accesos y Permisos</h3>
+      </div>
+      
+      <div class="table-responsive">
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th class="sticky-col first-header">Funcionalidad (Módulo)</th>
+              <th *ngFor="let role of allRoles" class="role-header-col">
+                <span class="role-header-indicator" [style.background-color]="role.color"></span>
+                {{ role.label }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let f of features">
+              <td class="sticky-col feature-cell">
+                <div class="feature-cell-content">
+                  <span class="material-symbols-outlined cell-icon">{{ f.icon }}</span>
+                  <div>
+                    <span class="cell-feature-name">{{ f.name }}</span>
+                    <span class="cell-feature-area">{{ f.area }}</span>
+                  </div>
+                </div>
+              </td>
+              <td *ngFor="let role of allRoles" class="check-cell">
+                <span 
+                  *ngIf="isRoleInvolved(f, role.key)" 
+                  class="material-symbols-outlined check-active"
+                  [style.color]="role.color"
+                  title="Acceso Permitido"
+                >
+                  check_circle
+                </span>
+                <span 
+                  *ngIf="!isRoleInvolved(f, role.key)" 
+                  class="material-symbols-outlined check-inactive"
+                  title="Sin Acceso"
+                >
+                  cancel
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>

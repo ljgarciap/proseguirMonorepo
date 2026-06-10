@@ -45,6 +45,7 @@
               <span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle; color: #94a3b8;" *ngIf="sortColumn === 'categoria'">{{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
             </th>
             <th>Observaciones</th>
+            <th *ngIf="currentTab === 'procesados'">Motivo de Rechazo</th>
             <th (click)="sortBy('prioridad')" style="cursor: pointer; user-select: none;">
               Prioridad
               <span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle; color: #94a3b8;" *ngIf="sortColumn === 'prioridad'">{{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
@@ -79,7 +80,7 @@
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">Para:</span>
                   <span class="role-badge" [ngClass]="doc.target_role" style="font-size: 0.7rem; padding: 2px 8px;">
-                    {{ doc.target_role | uppercase }}
+                    {{ doc.target_role === 'contable' ? 'CONTABILIDAD' : (doc.target_role === 'gerente' ? 'GERENCIA PSL' : (doc.target_role === 'operativo' ? 'ÁREA ADMINISTRATIVA' : (doc.target_role | uppercase))) }}
                   </span>
                 </div>
               </div>
@@ -89,6 +90,9 @@
             </td>
             <td>
               <span class="obs-text" [title]="doc.mensaje">{{ doc.mensaje || '-' }}</span>
+            </td>
+            <td *ngIf="currentTab === 'procesados'">
+              <span class="obs-text text-danger" [title]="doc.motivo_rechazo">{{ doc.motivo_rechazo || '-' }}</span>
             </td>
             <td>
               <span class="prio-tag" [style.background]="doc.priority?.color">
@@ -136,7 +140,7 @@
             </td>
           </tr>
           <tr *ngIf="filteredDocuments.length === 0 && !loading">
-            <td colspan="8" class="empty-state">No se han encontrado documentos en esta vista.</td>
+            <td [attr.colspan]="currentTab === 'procesados' ? 9 : 8" class="empty-state">No se han encontrado documentos en esta vista.</td>
           </tr>
         </tbody>
       </table>

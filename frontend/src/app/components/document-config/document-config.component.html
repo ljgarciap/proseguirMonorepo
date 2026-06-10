@@ -1,0 +1,183 @@
+<div class="view-container">
+  <header class="view-header">
+    <div class="title-area">
+      <h1>Configuración de Documentación</h1>
+      <p>Configure los requisitos individuales de documentos y las plantillas predefinidas (presets) para solicitudes.</p>
+    </div>
+    <div class="header-actions">
+      <span class="role-indicator-badge">
+        <span class="material-symbols-outlined">settings_applications</span>
+        Configuración Paramétrica
+      </span>
+    </div>
+  </header>
+
+  <div class="pro-tabs">
+    <button class="tab-btn" [class.active]="currentTab === 'requirements'" (click)="currentTab = 'requirements'">
+      <span class="material-symbols-outlined">assignment</span> Requisitos de Documentos
+    </button>
+    <button class="tab-btn" [class.active]="currentTab === 'presets'" (click)="currentTab = 'presets'">
+      <span class="material-symbols-outlined">folder_special</span> Plantillas (Presets)
+    </button>
+  </div>
+
+  <!-- --- Tab: Requirements --- -->
+  <div *ngIf="currentTab === 'requirements'" class="tab-content">
+    <div class="card-header-flex">
+      <h3>Requisitos Registrados ({{ requirements.length }})</h3>
+      <button class="btn-pro primary" (click)="openNewRequirement()">
+        <span class="material-symbols-outlined">add</span> Agregar Requisito
+      </button>
+    </div>
+
+    <!-- Requirements Form (overlay/inline form) -->
+    <div class="form-overlay-card card" *ngIf="showRequirementForm">
+      <div class="card-title-bar">
+        <h4>{{ requirementForm.id ? 'Editar Requisito' : 'Nuevo Requisito de Documento' }}</h4>
+        <button class="btn-close" (click)="showRequirementForm = false">×</button>
+      </div>
+      <form (ngSubmit)="saveRequirement()" #reqForm="ngForm" class="inline-form-grid">
+        <div class="input-group">
+          <label>Nombre del Requisito</label>
+          <input type="text" [(ngModel)]="requirementForm.nombre" name="req_nombre" required placeholder="Ej: RUT, Cámara de Comercio">
+        </div>
+        <div class="input-group">
+          <label>Descripción / Instrucciones</label>
+          <input type="text" [(ngModel)]="requirementForm.descripcion" name="req_desc" placeholder="Instrucciones breves de carga...">
+        </div>
+        <div class="switch-group">
+          <label class="switch-label">
+            <input type="checkbox" [(ngModel)]="requirementForm.activo" name="req_activo">
+            Estado Activo
+          </label>
+        </div>
+        <div class="switch-group">
+          <label class="switch-label">
+            <input type="checkbox" [(ngModel)]="requirementForm.tiene_plantilla" name="req_tiene_plantilla">
+            ¿Proveer Formato/Plantilla para Diligenciar?
+          </label>
+        </div>
+        <div class="input-group" *ngIf="requirementForm.tiene_plantilla" style="grid-column: span 2;">
+          <label>Archivo de Plantilla (PDF / Word / Excel)</label>
+          <input type="file" (change)="onTemplateSelected($event)">
+          <div class="current-file-info" *ngIf="requirementForm.plantilla_nombre" style="margin-top: 4px; font-size: 0.8rem; color: #475569;">
+            Archivo actual: <b>{{ requirementForm.plantilla_nombre }}</b>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-pro secondary" (click)="showRequirementForm = false">Cancelar</button>
+          <button type="submit" class="btn-pro primary" [disabled]="!reqForm.form.valid || loading">Guardar</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Requirements Grid / List -->
+    <div class="requirements-grid mt-3">
+      <div class="requirement-item card" *ngFor="let req of requirements">
+        <div class="req-main-info">
+          <span class="material-symbols-outlined req-icon">article</span>
+          <div class="req-text">
+            <span class="req-title">{{ req.nombre }}</span>
+            <span class="req-desc">{{ req.descripcion || 'Sin descripción adicional' }}</span>
+            <div class="req-template-info" *ngIf="req.tiene_plantilla" style="margin-top: 6px; font-size: 0.8rem; color: #1d4ed8; display: flex; align-items: center; gap: 4px;">
+              <span class="material-symbols-outlined" style="font-size: 16px;">download_for_offline</span>
+              Plantilla: 
+              <button type="button" (click)="downloadTemplate(req.id, req.plantilla_nombre)" style="background: none; border: none; padding: 0; color: #1d4ed8; font-weight: 600; text-decoration: underline; cursor: pointer;">
+                {{ req.plantilla_nombre }}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="req-meta">
+          <span class="badge" [class.success]="req.activo" [class.danger]="!req.activo">
+            {{ req.activo ? 'Activo' : 'Inactivo' }}
+          </span>
+          <div class="actions-buttons">
+            <button class="btn-icon-only edit" (click)="editRequirement(req)" title="Editar">
+              <span class="material-symbols-outlined">edit</span>
+            </button>
+            <button class="btn-icon-only delete" (click)="deleteRequirement(req.id)" title="Eliminar">
+              <span class="material-symbols-outlined">delete</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="empty-state card" *ngIf="requirements.length === 0">
+        <span class="material-symbols-outlined">inventory_2</span>
+        <p>No hay requisitos de documentos creados. Agregue uno nuevo arriba.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- --- Tab: Presets --- -->
+  <div *ngIf="currentTab === 'presets'" class="tab-content">
+    <div class="card-header-flex">
+      <h3>Plantillas de Solicitud ({{ presets.length }})</h3>
+      <button class="btn-pro primary" (click)="openNewPreset()">
+        <span class="material-symbols-outlined">add</span> Crear Plantilla
+      </button>
+    </div>
+
+    <!-- Presets Form -->
+    <div class="form-overlay-card card" *ngIf="showPresetForm">
+      <div class="card-title-bar">
+        <h4>{{ presetForm.id ? 'Editar Plantilla' : 'Nueva Plantilla de Documentos' }}</h4>
+        <button class="btn-close" (click)="showPresetForm = false">×</button>
+      </div>
+      <form (ngSubmit)="savePreset()" #presForm="ngForm" class="preset-form-layout">
+        <div class="form-row-grid">
+          <div class="input-group">
+            <label>Nombre de la Plantilla</label>
+            <input type="text" [(ngModel)]="presetForm.nombre" name="pres_nombre" required placeholder="Ej: Persona Jurídica, Persona Natural">
+          </div>
+          <div class="input-group">
+            <label>Descripción</label>
+            <input type="text" [(ngModel)]="presetForm.descripcion" name="pres_desc" placeholder="Descripción breve...">
+          </div>
+        </div>
+
+        <div class="requirements-selection-section">
+          <h5>Seleccionar Requisitos Incluidos:</h5>
+          <div class="checkbox-grid">
+            <div class="checkbox-item" *ngFor="let req of requirements" [class.selected]="presetForm.requirements.includes(req.id)">
+              <label>
+                <input type="checkbox" [checked]="presetForm.requirements.includes(req.id)" (change)="toggleRequirementInPreset(req.id)">
+                <span>{{ req.nombre }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions mt-3">
+          <button type="button" class="btn-pro secondary" (click)="showPresetForm = false">Cancelar</button>
+          <button type="submit" class="btn-pro primary" [disabled]="!presForm.form.valid || loading">Guardar Plantilla</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Presets List -->
+    <div class="presets-list mt-3">
+      <div class="preset-item card" *ngFor="let preset of presets">
+        <div class="preset-details">
+          <h4>{{ preset.nombre }}</h4>
+          <p>{{ preset.descripcion || 'Sin descripción' }}</p>
+          <div class="preset-tags">
+            <span class="tag-badge" *ngFor="let req of preset.requirements">{{ req.nombre }}</span>
+          </div>
+        </div>
+        <div class="preset-actions">
+          <button class="btn-icon-only edit" (click)="editPreset(preset)" title="Editar">
+            <span class="material-symbols-outlined">edit</span>
+          </button>
+          <button class="btn-icon-only delete" (click)="deletePreset(preset.id)" title="Eliminar">
+            <span class="material-symbols-outlined">delete</span>
+          </button>
+        </div>
+      </div>
+      <div class="empty-state card" *ngIf="presets.length === 0">
+        <span class="material-symbols-outlined">inventory_2</span>
+        <p>No hay plantillas creadas. Agregue una nueva arriba.</p>
+      </div>
+    </div>
+  </div>
+</div>

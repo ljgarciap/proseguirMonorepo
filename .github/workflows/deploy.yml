@@ -2,7 +2,7 @@ name: CI/CD Pipeline - Proseguir Factoring
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, test ]
 
 jobs:
   test-backend:
@@ -54,11 +54,10 @@ jobs:
           cd frontend
           npm run test:ci
 
-  deploy:
+  deploy-prod:
     name: Production Deploy (CD)
     needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
-    # Solo despliega en push a la rama master, nunca en pull requests
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
       - name: Deploy to Server via SSH
@@ -79,6 +78,70 @@ jobs:
             # 2. Copiar archivos .env correctos de producción
             cp PROD.env .env
             cp frontend/.env.prod frontend/.env
+            
+            # 3. Reconstruir frontend y backend conservando volúmenes
+            docker compose up -d --build
+            
+            # Reiniciar Nginx para limpiar la caché DNS y evitar Error 502 Bad Gateway
+            docker compose restart backend_web
+            
+            # 4. Instalar/actualizar dependencias de Composer y Node.js en el backend
+            docker exec factoring_backend composer install --no-dev --optimize-autoloader
+            docker exec factoring_backend npm install pdfreader
+            
+            # 5. Migraciones incrementales de DB (SEGURAS, NO FRESH)
+            docker exec factoring_backend php artisan migrate --force
+            
+            # 6. Configurar seguridad Passport
+            docker exec factoring_backend php artisan passport:install --force --no-interaction
+            docker exec factoring_backend php artisan migrate --force
+            docker exec factoring_backend chown -R www-data:www-data storage
+            docker exec factoring_backend chmod 600 storage/oauth-private.key
+            docker exec factoring_backend chmod 600 storage/oauth-public.key
+            
+            # 7. Recrear el enlace simbólico de storage de forma relativa (Evita Error 403)
+            docker exec factoring_backend rm -f public/storage
+            docker exec factoring_backend ln -s ../storage/app/public public/storage
+            
+            # 8. Limpieza y caché para optimizar rendimiento Laravel
+            docker exec factoring_backend php artisan config:cache
+            docker exec factoring_backend php artisan route:cache
+            docker exec factoring_backend chmod -R 777 storage bootstrap/cache
+            docker exec factoring_backend chmod 600 storage/oauth-private.key storage/oauth-public.key
+
+  deploy-test:
+    name: Test Deploy (CD)
+    needs: [test-backend, test-frontend]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/test'
+    steps:
+      - name: Deploy to Test Server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TEST_SSH_HOST }}
+          username: ${{ secrets.TEST_SSH_USER }}
+          password: ${{ secrets.TEST_SSH_PASSWORD }}
+          port: ${{ secrets.TEST_SSH_PORT || 22 }}
+          script: |
+            set -e
+            cd /home/admpsl/apps/proseguir
+            
+            # 1. Sincronizar y actualizar código para rama test
+            git fetch origin
+            git reset --hard origin/test
+            
+            # 2. Copiar archivos .env correctos de pruebas (con fallback a producción si no existen específicos de test)
+            if [ -f TEST.env ]; then
+              cp TEST.env .env
+            else
+              cp PROD.env .env
+            fi
+
+            if [ -f frontend/.env.test ]; then
+              cp frontend/.env.test frontend/.env
+            else
+              cp frontend/.env.prod frontend/.env
+            fi
             
             # 3. Reconstruir frontend y backend conservando volúmenes
             docker compose up -d --build

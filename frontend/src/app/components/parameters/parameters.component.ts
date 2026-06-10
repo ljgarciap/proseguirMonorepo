@@ -24,6 +24,18 @@ export class ParametersComponent implements OnInit {
       { name: 'nombre', label: 'Nombre', type: 'text' },
       { name: 'color', label: 'Color', type: 'color' },
       { name: 'horas_vencimiento', label: 'Horas Venc.', type: 'number' }
+    ]},
+    { id: 'tipo_personas', label: 'Tipos de Persona', fields: [
+      { name: 'codigo', label: 'Código', type: 'text' },
+      { name: 'nombre', label: 'Nombre', type: 'text' }
+    ]},
+    { id: 'tipo_creditos', label: 'Tipos de Crédito', fields: [
+      { name: 'codigo', label: 'Código', type: 'text' },
+      { name: 'nombre', label: 'Nombre', type: 'text' }
+    ]},
+    { id: 'amortizaciones', label: 'Amortizaciones', fields: [
+      { name: 'codigo', label: 'Código', type: 'text' },
+      { name: 'nombre', label: 'Nombre', type: 'text' }
     ]}
   ];
 

@@ -46,7 +46,8 @@ class ClientUploadController extends Controller
     {
         $request->validate([
             'file' => 'required|file|max:102400', 
-            'active_role' => 'nullable|string'
+            'active_role' => 'nullable|string',
+            'document_request_item_id' => 'nullable|exists:document_request_items,id'
         ]);
 
         $file = $request->file('file');
@@ -59,6 +60,15 @@ class ClientUploadController extends Controller
             'original_name' => $file->getClientOriginalName(),
             'status' => 'pendiente',
         ]);
+
+        if ($request->filled('document_request_item_id')) {
+            $item = \App\Models\DocumentRequestItem::findOrFail($request->document_request_item_id);
+            $item->update([
+                'client_upload_id' => $upload->id,
+                'estado' => 'subido',
+                'observaciones' => null
+            ]);
+        }
 
         // REENVÍO INTERNO A n8n (Sin CORS, sin Firewall)
         try {
@@ -74,7 +84,7 @@ class ClientUploadController extends Controller
                     'upload_id' => $upload->id,
                     'user_id' => $upload->user_id,
                     'original_name' => $upload->original_name,
-                    'categoria' => $request->categoria // <--- ESTO FALTABA
+                    'categoria' => $request->categoria
                 ]);
                 \Illuminate\Support\Facades\Log::info("Respuesta de n8n: " . $response->status());
                 \Illuminate\Support\Facades\Log::info("[DEBUG] categoria enviada a n8n: " . ($request->categoria ?? 'NO_ENVIADA') . " | archivo: " . $upload->original_name);
@@ -111,6 +121,8 @@ class ClientUploadController extends Controller
             ]);
         }
 
+        $this->syncRequestItem($upload);
+
         return response()->json($upload);
     }
 
@@ -141,6 +153,8 @@ class ClientUploadController extends Controller
             ]);
         }
 
+        $this->syncRequestItem($upload);
+
         return response()->json($upload);
     }
 
@@ -160,10 +174,12 @@ class ClientUploadController extends Controller
         // Documentos Internos Pendientes
         $internalContable = \App\Models\InternalDocument::where('target_role', 'contable')->where('estado', 'pendiente')->count();
         $internalGerente = \App\Models\InternalDocument::where('target_role', 'gerente')->where('estado', 'pendiente')->count();
+        $internalOperativo = \App\Models\InternalDocument::where('target_role', 'operativo')->where('estado', 'pendiente')->count();
 
         // Documentos Internos por Vencer (< 2 horas)
         $expiringContable = 0;
         $expiringGerente = 0;
+        $expiringOperativo = 0;
         $pendingInternals = \App\Models\InternalDocument::with('priority')->where('estado', 'pendiente')->get();
         foreach ($pendingInternals as $doc) {
             if ($doc->priority && $doc->priority->horas_vencimiento) {
@@ -172,24 +188,38 @@ class ClientUploadController extends Controller
                 if ($hoursRemaining <= 2) {
                     if ($doc->target_role === 'contable') $expiringContable++;
                     if ($doc->target_role === 'gerente') $expiringGerente++;
+                    if ($doc->target_role === 'operativo') $expiringOperativo++;
                 }
             }
         }
+
+        $pendingMandates = \App\Models\Mandato::where('status', 'pendiente')->count();
 
         return response()->json([
             'operativo' => $operativoCount,
             'gerente' => $gerenteCount,
             'contable' => $internalContable,
             'internal_gerente' => $internalGerente,
+            'internal_operativo' => $internalOperativo,
             'expiring_contable' => $expiringContable,
             'expiring_gerente' => $expiringGerente,
-            'total' => $operativoCount + $gerenteCount + $internalContable + $internalGerente
+            'expiring_operativo' => $expiringOperativo,
+            'pending_mandates' => $pendingMandates,
+            'total' => $operativoCount + $gerenteCount + $internalContable + $internalGerente + $internalOperativo + $pendingMandates
         ]);
     }
 
-    public function download($id)
+    public function download(Request $request, $id)
     {
         $upload = ClientUpload::findOrFail($id);
+        $user = $request->user();
+
+        // Si es cliente, validar que sea su propio archivo
+        if (in_array('cliente', $user->roles) && count($user->roles) === 1) {
+            if ($upload->user_id !== $user->id) {
+                return response()->json(['message' => 'No tienes permiso para ver este archivo.'], 403);
+            }
+        }
         
         if (!Storage::exists($upload->filename)) {
             return response()->json(['message' => 'Archivo no encontrado físicamente en el servidor.'], 404);
@@ -213,6 +243,15 @@ class ClientUploadController extends Controller
             }
         }
 
+        // Restablecer item de solicitud asociado si existe
+        if ($upload->requestItem) {
+            $upload->requestItem->update([
+                'client_upload_id' => null,
+                'estado' => 'pendiente',
+                'observaciones' => null
+            ]);
+        }
+
         // Borrar archivo físico
         if (Storage::exists($upload->filename)) {
             Storage::delete($upload->filename);
@@ -221,5 +260,32 @@ class ClientUploadController extends Controller
         $upload->delete();
 
         return response()->json(['message' => 'Archivo eliminado correctamente']);
+    }
+
+    private function syncRequestItem(ClientUpload $upload)
+    {
+        $item = \App\Models\DocumentRequestItem::where('client_upload_id', $upload->id)->first();
+        if ($item) {
+            $nuevoEstado = 'pendiente';
+            if ($upload->status === 'pendiente') $nuevoEstado = 'subido';
+            elseif ($upload->status === 'validado') $nuevoEstado = 'validado';
+            elseif ($upload->status === 'aprobado') $nuevoEstado = 'aprobado';
+            elseif ($upload->status === 'rechazado') $nuevoEstado = 'rechazado';
+
+            $item->update([
+                'estado' => $nuevoEstado,
+                'observaciones' => $upload->observations
+            ]);
+
+            $request = $item->request;
+            if ($request) {
+                $pendingItems = $request->items()->where('estado', '!=', 'aprobado')->count();
+                if ($pendingItems === 0) {
+                    $request->update(['estado' => 'completado']);
+                } else {
+                    $request->update(['estado' => 'pendiente']);
+                }
+            }
+        }
     }
 }

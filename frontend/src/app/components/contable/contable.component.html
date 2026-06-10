@@ -78,8 +78,8 @@
             <th (click)="sort('pedido')" class="sortable">Pedido <span class="sort-icon" *ngIf="sortBy === 'pedido'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
             <th>NIT / Cliente</th>
             <th (click)="sort('fecha')" class="sortable">Emisión <span class="sort-icon" *ngIf="sortBy === 'fecha'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
-            <th>Vlr. Bruto</th>
-            <th>Total</th>
+            <th class="text-right">Vlr. Bruto</th>
+            <th class="text-right">Total</th>
             <th>Vínculo</th>
             <th>Estado</th>
           </tr>
@@ -96,8 +96,8 @@
               </div>
             </td>
             <td>{{ fact.fecha }}</td>
-            <td>{{ fact.vlr_bruto | currency }}</td>
-            <td class="total-cell">{{ fact.total | currency }}</td>
+            <td class="text-right">{{ fact.vlr_bruto | currency }}</td>
+            <td class="total-cell text-right">{{ fact.total | currency }}</td>
             <td>
               <div *ngIf="fact.reconciled_record" class="link-badge" title="Conciliado con Extracto">
                 <span class="icon">🔗</span>
@@ -120,7 +120,7 @@
             <th>Lote</th>
             <th (click)="sort('fecha')" class="sortable">Fecha <span class="sort-icon" *ngIf="sortBy === 'fecha'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
             <th (click)="sort('descripcion')" class="sortable">Descripción <span class="sort-icon" *ngIf="sortBy === 'descripcion'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
-            <th (click)="sort('valor')" class="sortable">Valor <span class="sort-icon" *ngIf="sortBy === 'valor'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
+            <th (click)="sort('valor')" class="sortable text-right">Valor <span class="sort-icon" *ngIf="sortBy === 'valor'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
             <th>Vínculo</th>
             <th>Estado</th>
           </tr>
@@ -130,7 +130,7 @@
             <td><span class="batch-label">#{{ banco.import_batch_id }}</span></td>
             <td>{{ banco.fecha }}</td>
             <td>{{ banco.descripcion }}</td>
-            <td class="total-cell">{{ banco.valor | currency }}</td>
+            <td class="total-cell text-right">{{ banco.valor | currency }}</td>
             <td>
               <div *ngIf="banco.reconciled_record" class="link-badge" title="Conciliado con Factura">
                 <span class="icon">📄</span>
@@ -155,8 +155,8 @@
             <th (click)="sort('comprobante')" class="sortable">Co <span class="sort-icon" *ngIf="sortBy === 'comprobante'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
             <th>Documento</th>
             <th>Detalle / Tercero</th>
-            <th>Débito</th>
-            <th>Crédito</th>
+            <th class="text-right">Débito</th>
+            <th class="text-right">Crédito</th>
           </tr>
         </thead>
         <tbody>
@@ -171,8 +171,8 @@
                 <span class="nit">{{ aux.tercero }}</span>
               </div>
             </td>
-            <td class="text-success">{{ aux.debito_local | currency }}</td>
-            <td class="text-danger">{{ aux.credito_local | currency }}</td>
+            <td class="text-success text-right">{{ aux.debito_local | currency }}</td>
+            <td class="text-danger text-right">{{ aux.credito_local | currency }}</td>
           </tr>
           <tr *ngIf="auxiliar.length === 0">
             <td colspan="7" class="empty-row">No hay registros auxiliares.</td>
@@ -188,7 +188,7 @@
             <th (click)="sort('fecha')" class="sortable">Fecha <span class="sort-icon" *ngIf="sortBy === 'fecha'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
             <th>Proveedor</th>
             <th>Concepto</th>
-            <th (click)="sort('valor')" class="sortable">Valor <span class="sort-icon" *ngIf="sortBy === 'valor'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
+            <th (click)="sort('valor')" class="sortable text-right">Valor <span class="sort-icon" *ngIf="sortBy === 'valor'">{{ sortDir === 'asc' ? '↑' : '↓' }}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -202,7 +202,7 @@
               </div>
             </td>
             <td class="concepto-cell">{{ gasto.concepto }}</td>
-            <td class="total-cell">{{ gasto.valor | currency }}</td>
+            <td class="total-cell text-right">{{ gasto.valor | currency }}</td>
           </tr>
           <tr *ngIf="gastos.length === 0">
             <td colspan="5" class="empty-row">No hay gastos registrados.</td>

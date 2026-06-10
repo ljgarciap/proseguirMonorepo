@@ -7,4 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class OperacionCartera extends Model
 {
     protected $guarded = [];
+
+    protected $casts = [
+        'dias_vencido' => 'integer',
+        'plazo_meses' => 'integer',
+    ];
 }

@@ -17,4 +17,8 @@ export class ConciliacionSusuerteService {
 
     return this.http.post<any>(this.apiUrl, formData);
   }
+
+  updateConciliation(id: number, details: any[]) {
+    return this.http.put<any>(`${environment.apiUrl}/conciliaciones-susuerte/${id}`, { details });
+  }
 }

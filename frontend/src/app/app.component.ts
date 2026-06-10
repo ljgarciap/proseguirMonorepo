@@ -29,6 +29,9 @@ import { interval, Subscription } from 'rxjs';
             <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'])" routerLink="/creditos" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">payments</span> Crédito Ordinario
             </a>
+            <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'gerente', 'superadmin', 'operativo'])" routerLink="/solicitudes-credito" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">assignment_turned_in</span> Registro Solicitud Crédito
+            </a>
             <a *ngIf="authService.isAuthorized(['operativo'])" routerLink="/sheets" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">database</span> Base de Datos
             </a>
@@ -50,20 +53,24 @@ import { interval, Subscription } from 'rxjs';
               </div>
             </a>
             <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])" routerLink="/mandatos" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">contract</span> Revisión Mandatos
+              <div class="nav-link-content">
+                <span class="material-symbols-outlined">contract</span> 
+                <span>Revisión Mandatos</span>
+                <span class="nav-badge" *ngIf="getMandatosBadge() > 0">{{ getMandatosBadge() }}</span>
+              </div>
             </a>
           </div>
 
           <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])">
             <label>Administración</label>
-            <a routerLink="/contable" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">account_balance_wallet</span> Contable
-            </a>
             <a routerLink="/conciliacion-susuerte" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">fact_check</span> Conciliación Susuerte
             </a>
-            <a routerLink="/planilla" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">agriculture</span> Planilla Fincas
+            <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'superadmin'])" routerLink="/clientes" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">group</span> Registro de Clientes
+            </a>
+            <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'superadmin'])" routerLink="/visitas" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">chat_bubble</span> Registro de Visita a Cliente
             </a>
           </div>
 
@@ -71,6 +78,16 @@ import { interval, Subscription } from 'rxjs';
             <label>Sistema</label>
             <a routerLink="/logs" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">shield_person</span> Auditoría
+            </a>
+          </div>
+
+          <div class="nav-section" *ngIf="authService.isAuthorized(['operativo', 'superadmin'])">
+            <label>Configuración Documentos</label>
+            <a routerLink="/document-requests" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">checklist</span> Solicitudes Documentos
+            </a>
+            <a routerLink="/document-config" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">settings_applications</span> Config Requisitos
             </a>
           </div>
 
@@ -84,6 +101,13 @@ import { interval, Subscription } from 'rxjs';
             </a>
             <a routerLink="/asignaciones" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">assignment_ind</span> Asignaciones
+            </a>
+          </div>
+
+          <div class="nav-section" *ngIf="authService.getActiveRole() === 'superadmin'">
+            <label>Planificación</label>
+            <a routerLink="/roadmap" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">route</span> Roadmap del Sistema
             </a>
           </div>
 
@@ -248,8 +272,28 @@ import { interval, Subscription } from 'rxjs';
 })
 export class AppComponent implements OnInit, OnDestroy {
   showUserMenu = false;
-  pendingCounts: { operativo: number, gerente: number, contable: number, internal_gerente: number, expiring_contable?: number, expiring_gerente?: number, total: number } = { 
-    operativo: 0, gerente: 0, contable: 0, internal_gerente: 0, expiring_contable: 0, expiring_gerente: 0, total: 0 
+  pendingCounts: { 
+    operativo: number, 
+    gerente: number, 
+    contable: number, 
+    internal_gerente: number, 
+    internal_operativo?: number,
+    expiring_contable?: number, 
+    expiring_gerente?: number, 
+    expiring_operativo?: number,
+    pending_mandates?: number,
+    total: number 
+  } = { 
+    operativo: 0, 
+    gerente: 0, 
+    contable: 0, 
+    internal_gerente: 0, 
+    internal_operativo: 0,
+    expiring_contable: 0, 
+    expiring_gerente: 0, 
+    expiring_operativo: 0,
+    pending_mandates: 0,
+    total: 0 
   };
   private pollingSub!: Subscription;
 
@@ -290,7 +334,16 @@ export class AppComponent implements OnInit, OnDestroy {
     const role = this.authService.getActiveRole();
     if (role === 'contable') return this.pendingCounts.contable;
     if (role === 'gerente') return this.pendingCounts.internal_gerente;
-    if (role === 'superadmin') return this.pendingCounts.contable + this.pendingCounts.internal_gerente;
+    if (role === 'operativo') return this.pendingCounts.internal_operativo || 0;
+    if (role === 'superadmin') return this.pendingCounts.contable + this.pendingCounts.internal_gerente + (this.pendingCounts.internal_operativo || 0);
+    return 0;
+  }
+
+  getMandatosBadge(): number {
+    const role = this.authService.getActiveRole();
+    if (role === 'operativo' || role === 'superadmin') {
+      return this.pendingCounts.pending_mandates || 0;
+    }
     return 0;
   }
 
@@ -298,7 +351,8 @@ export class AppComponent implements OnInit, OnDestroy {
     const role = this.authService.getActiveRole();
     if (role === 'contable') return (this.pendingCounts.expiring_contable || 0) > 0;
     if (role === 'gerente') return (this.pendingCounts.expiring_gerente || 0) > 0;
-    if (role === 'superadmin') return ((this.pendingCounts.expiring_contable || 0) + (this.pendingCounts.expiring_gerente || 0)) > 0;
+    if (role === 'operativo') return (this.pendingCounts.expiring_operativo || 0) > 0;
+    if (role === 'superadmin') return ((this.pendingCounts.expiring_contable || 0) + (this.pendingCounts.expiring_gerente || 0) + (this.pendingCounts.expiring_operativo || 0)) > 0;
     return false;
   }
 
@@ -310,7 +364,9 @@ export class AppComponent implements OnInit, OnDestroy {
     this.checkPendingTasks();
     if (role === 'cliente') {
       this.router.navigate(['/client-upload']);
-    } else if (['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'].includes(role)) {
+    } else if (role === 'coordinador_comercial') {
+      this.router.navigate(['/solicitudes-credito']);
+    } else if (['oficial_cumplimiento', 'comite_credito', 'tesoreria'].includes(role)) {
       this.router.navigate(['/creditos']);
     } else {
       this.router.navigate(['/dashboard']);

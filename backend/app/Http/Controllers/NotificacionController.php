@@ -28,8 +28,16 @@ class NotificacionController extends Controller
             'activo' => 'nullable|boolean'
         ]);
 
+        $nombreLower = strtolower(trim($request->nombre));
+        $exists = Notificacion::whereRaw('LOWER(nombre) = ?', [$nombreLower])->exists();
+        if ($exists) {
+            return response()->json([
+                'message' => 'Ya existe una notificación con este nombre (sin importar mayúsculas o minúsculas).'
+            ], 422);
+        }
+
         $notificacion = Notificacion::create([
-            'nombre' => $request->nombre,
+            'nombre' => trim($request->nombre),
             'mensaje' => $request->mensaje,
             'activo' => $request->has('activo') ? (bool)$request->activo : true
         ]);
@@ -56,8 +64,18 @@ class NotificacionController extends Controller
             'activo' => 'required|boolean'
         ]);
 
+        $nombreLower = strtolower(trim($request->nombre));
+        $exists = Notificacion::whereRaw('LOWER(nombre) = ?', [$nombreLower])
+            ->where('id', '!=', $notificacione->id)
+            ->exists();
+        if ($exists) {
+            return response()->json([
+                'message' => 'Ya existe una notificación con este nombre (sin importar mayúsculas o minúsculas).'
+            ], 422);
+        }
+
         $notificacione->update([
-            'nombre' => $request->nombre,
+            'nombre' => trim($request->nombre),
             'mensaje' => $request->mensaje,
             'activo' => (bool)$request->activo
         ]);

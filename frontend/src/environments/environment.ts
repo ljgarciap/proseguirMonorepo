@@ -1,5 +1,5 @@
 export const environment = {
-  production: true,
-  apiUrl: '/api',
-  n8nWebhookUrl: '/n8n/webhook/factoring-upload'
+  production: false,
+  apiUrl: 'http://localhost:8000/api',
+  n8nWebhookUrl: 'http://localhost:5678/webhook/factoring-upload'
 };
