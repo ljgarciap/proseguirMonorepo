@@ -48,6 +48,12 @@ export class MandatosComponent implements OnInit {
   currentPage: number = 1;
   itemsPerPage: number = 10;
 
+  // Modales y CRUD
+  showDetailModal = false;
+  showEditModal = false;
+  selectedMandato: any = null;
+  editForm: any = {};
+
   constructor(private http: HttpClient, public authService: AuthService) {}
 
   get filteredMandatos() {
@@ -304,5 +310,78 @@ export class MandatosComponent implements OnInit {
       factor_rep_legal_num_doc: '',
       factor_rep_legal_email: ''
     };
+  }
+
+  openDetail(m: any): void {
+    this.selectedMandato = m;
+    this.showDetailModal = true;
+  }
+
+  closeDetail(): void {
+    this.showDetailModal = false;
+    this.selectedMandato = null;
+  }
+
+  openEdit(m: any): void {
+    this.selectedMandato = m;
+    this.editForm = { ...m };
+    this.showEditModal = true;
+  }
+
+  closeEdit(): void {
+    this.showEditModal = false;
+    this.selectedMandato = null;
+  }
+
+  saveEdit(): void {
+    if (!this.selectedMandato) return;
+    this.loading = true;
+    this.http.put(`${environment.apiUrl}/mandatos/${this.selectedMandato.id}`, this.editForm).subscribe({
+      next: () => {
+        this.loading = false;
+        Swal.fire({
+          icon: 'success',
+          title: 'Mandato Actualizado',
+          text: 'La información del mandato se actualizó con éxito.',
+          confirmButtonColor: '#2563eb'
+        });
+        this.loadHistorial();
+        this.closeEdit();
+      },
+      error: (err) => {
+        this.loading = false;
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: err.error?.message || 'No se pudo actualizar el mandato.',
+          confirmButtonColor: '#ef4444'
+        });
+      }
+    });
+  }
+
+  deleteMandato(m: any): void {
+    Swal.fire({
+      title: '¿Eliminar Mandato?',
+      text: `Esta acción eliminará permanentemente el mandato de ${m.mandante_razon_social}.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, Eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#64748b'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.http.delete(`${environment.apiUrl}/mandatos/${m.id}`).subscribe({
+          next: () => {
+            Swal.fire('Eliminado', 'El mandato ha sido eliminado correctamente.', 'success');
+            this.loadHistorial();
+          },
+          error: (err) => {
+            Swal.fire('Error', err.error?.message || 'No se pudo eliminar el mandato.', 'error');
+          }
+        });
+      }
+    });
   }
 }
