@@ -90,7 +90,7 @@
             <td>{{ item['Description (Susuerte)'] }}</td>
             <td>{{ item['Description (Bank)'] }}</td>
             <td>
-              <input type="text" [(ngModel)]="item.Observations" placeholder="Agregar nota..." class="table-input" style="width: 100%; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px 8px; font-size: 0.85rem;" />
+              <input type="text" [(ngModel)]="item.Observations" (change)="saveStateToLocalStorage()" placeholder="Agregar nota..." class="table-input" style="width: 100%; border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px 8px; font-size: 0.85rem;" />
             </td>
           </tr>
           <tr *ngIf="filteredResults.length === 0">
