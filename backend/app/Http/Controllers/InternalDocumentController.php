@@ -22,12 +22,17 @@ class InternalDocumentController extends Controller
 
         if (!$isAdmin) {
             $query->where(function($q) use ($user, $roles) {
+                $q->where('sender_id', $user->id);
+                
                 if (in_array('operativo', $roles)) {
-                    $q->orWhere('sender_id', $user->id)
-                      ->orWhere('target_role', 'operativo');
+                    $q->orWhere('target_role', 'operativo');
                 }
-                if (in_array('contable', $roles)) $q->orWhere('target_role', 'contable');
-                if (in_array('gerente', $roles)) $q->orWhere('target_role', 'gerente');
+                if (in_array('contable', $roles)) {
+                    $q->orWhere('target_role', 'contable');
+                }
+                if (in_array('gerente', $roles)) {
+                    $q->orWhere('target_role', 'gerente');
+                }
             });
         }
 

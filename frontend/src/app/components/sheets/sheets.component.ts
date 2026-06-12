@@ -1351,17 +1351,32 @@ export class SheetsComponent implements OnInit {
   formatMoney(value: any): string {
     if (value === null || value === undefined || value === '') return '-';
 
-    let cleanVal = value;
-    if (typeof value === 'string') {
-      // Strip out currency symbols, commas, or spaces
-      cleanVal = value.replace(/[\$\.,\s]/g, '');
+    let num = Number(value);
+    if (isNaN(num)) {
+      let cleanVal = String(value).trim();
+      cleanVal = cleanVal.replace(/[\$]/g, '');
+      
+      if (cleanVal.includes(',') && cleanVal.includes('.')) {
+        cleanVal = cleanVal.replace(/\./g, '').replace(/,/g, '.');
+      } else if (cleanVal.includes(',')) {
+        const parts = cleanVal.split(',');
+        if (parts[parts.length - 1].length === 3) {
+          cleanVal = cleanVal.replace(/,/g, '');
+        } else {
+          cleanVal = cleanVal.replace(/,/g, '.');
+        }
+      } else if (cleanVal.includes('.')) {
+        const parts = cleanVal.split('.');
+        if (parts[parts.length - 1].length === 3) {
+          cleanVal = cleanVal.replace(/\./g, '');
+        }
+      }
+      num = Number(cleanVal);
     }
 
-    const num = Math.round(Number(cleanVal));
     if (isNaN(num)) return value;
 
-    // Use es-CO formatting which defaults to $ symbol with point as thousands separator and comma as decimal separator.
-    // However, since we want only integer/rounded currency representation, we force minimumFractionDigits to 0.
+    num = Math.round(num);
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',

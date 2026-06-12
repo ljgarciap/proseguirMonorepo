@@ -165,7 +165,7 @@ Chart.register(...registerables);
               <div class="kpi-body">
                 <label>Valor Vencido</label>
                 <div class="value">{{ formatMoney(stats.cartera.total_vencido) }}</div>
-                <div class="footer">Retraso <= 3 días</div>
+                <div class="footer">Retraso <= 30 días</div>
               </div>
             </div>
             <div class="kpi-card pro-card red" (click)="navigateToSheets('cartera', '', 'mora')">
@@ -1550,15 +1550,32 @@ export class DashboardComponent implements OnInit {
   formatMoney(value: any): string {
     if (value === null || value === undefined || value === '') return '-';
 
-    let cleanVal = value;
-    if (typeof value === 'string') {
-      // Strip out any existing currency symbols, commas, or spaces if n8n ingested it roughly
-      cleanVal = value.replace(/[\$\.,\s]/g, '');
+    let num = Number(value);
+    if (isNaN(num)) {
+      let cleanVal = String(value).trim();
+      cleanVal = cleanVal.replace(/[\$]/g, '');
+      
+      if (cleanVal.includes(',') && cleanVal.includes('.')) {
+        cleanVal = cleanVal.replace(/\./g, '').replace(/,/g, '.');
+      } else if (cleanVal.includes(',')) {
+        const parts = cleanVal.split(',');
+        if (parts[parts.length - 1].length === 3) {
+          cleanVal = cleanVal.replace(/,/g, '');
+        } else {
+          cleanVal = cleanVal.replace(/,/g, '.');
+        }
+      } else if (cleanVal.includes('.')) {
+        const parts = cleanVal.split('.');
+        if (parts[parts.length - 1].length === 3) {
+          cleanVal = cleanVal.replace(/\./g, '');
+        }
+      }
+      num = Number(cleanVal);
     }
 
-    const num = Math.round(Number(cleanVal));
     if (isNaN(num)) return value; // Return original string if it is completely unparseable
 
+    num = Math.round(num);
     return new Intl.NumberFormat('es-CO', {
       style: 'currency',
       currency: 'COP',
