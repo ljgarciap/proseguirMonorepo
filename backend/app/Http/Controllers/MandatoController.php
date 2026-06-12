@@ -65,4 +65,42 @@ class MandatoController extends Controller
 
         return response()->json($mandato, 201);
     }
+
+    public function update(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'mandante_razon_social' => 'required|string',
+            'mandante_tipo_documento' => 'required|string',
+            'mandante_numero_documento' => 'required|string',
+            'mandante_domicilio' => 'required|string',
+            'mandante_direccion' => 'required|string',
+            'mandante_telefono' => 'required|string',
+            'mandante_rep_legal_nombre' => 'required|string',
+            'mandante_rep_legal_tipo_doc' => 'required|string',
+            'mandante_rep_legal_num_doc' => 'required|string',
+            'mandante_rep_legal_email' => 'required|email',
+            'factor_razon_social' => 'required|string',
+            'factor_tipo_documento' => 'required|string',
+            'factor_numero_documento' => 'required|string',
+            'factor_rep_legal_nombre' => 'required|string',
+            'factor_rep_legal_tipo_doc' => 'required|string',
+            'factor_rep_legal_num_doc' => 'required|string',
+            'factor_rep_legal_email' => 'required|email',
+            'status' => 'nullable|string|in:pendiente,firmado,rechazado',
+            'observaciones' => 'nullable|string'
+        ]);
+
+        $mandato = Mandato::findOrFail($id);
+        $mandato->update($validated);
+
+        return response()->json($mandato);
+    }
+
+    public function destroy($id)
+    {
+        $mandato = Mandato::findOrFail($id);
+        $mandato->delete();
+
+        return response()->json(['message' => 'Mandato eliminado correctamente']);
+    }
 }

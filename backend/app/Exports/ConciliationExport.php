@@ -26,13 +26,13 @@ class ConciliationExport implements FromCollection, WithHeadings, ShouldAutoSize
     public function headings(): array
     {
         return [
-            'Status',
-            'Date (Susuerte)',
-            'Date (Bank)',
-            'Amount',
-            'Description (Susuerte)',
-            'Description (Bank)',
-            'Observations'
+            'Estado',
+            'Fecha (Susuerte)',
+            'Fecha (Banco)',
+            'Monto',
+            'Descripción (Susuerte)',
+            'Descripción (Banco)',
+            'Observaciones'
         ];
     }
 
