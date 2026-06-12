@@ -77,7 +77,9 @@ export class InternalDocsComponent implements OnInit {
       // 1. View / Role Filter
       let roleMatch = isSuperadmin;
       if (!isSuperadmin) {
-        if (activeRole === 'operativo' && (doc.sender?.email === userEmail || doc.target_role === 'operativo')) {
+        if (doc.sender?.email === userEmail) {
+          roleMatch = true;
+        } else if (activeRole === 'operativo' && doc.target_role === 'operativo') {
           roleMatch = true;
         } else if (activeRole === 'contable' && doc.target_role === 'contable') {
           roleMatch = true;
