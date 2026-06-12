@@ -212,3 +212,52 @@ h1, h2, h3, h4, h5, h6 {
   h1 { margin-bottom: 8px; color: var(--primary); }
   p { color: var(--text-muted); margin: 0; font-size: 0.95rem; }
 }
+
+/* --- Global Responsive Table Wrapper --- */
+.table-container, .pro-table-wrapper, .details-table-container {
+  width: 100% !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+}
+
+/* Force standard table sizes to prevent squishing on mobile */
+.modern-table, .pro-table, table {
+  min-width: 650px;
+  width: 100%;
+}
+
+/* --- Responsive Utilities (Mobile First & Adaptive) --- */
+@media (max-width: 768px) {
+  /* Collapse all display grid forms and panels to 1 column */
+  .form-grid, .grid-2, .grid-3, .grid-4, .meta-grid, .stats-grid, .row, .grid,
+  .dashboard-grid, .metrics-grid, .inputs-grid, .main-grid,
+  [style*="display: grid"], [style*="display:grid"] {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Flexbox forms & rows to columns */
+  .form-row, .flex-row, .actions-row, .buttons-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+  }
+
+  /* Modals responsiveness */
+  .modal-card, .modal-content, .modal-dialog {
+    width: 95% !important;
+    max-width: 95% !important;
+    margin: 10px auto !important;
+    padding: 15px !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+  }
+
+  /* Ensure inputs take full width */
+  .pro-input, input[type="text"], input[type="number"], input[type="date"], select, textarea {
+    width: 100% !important;
+  }
+}
+

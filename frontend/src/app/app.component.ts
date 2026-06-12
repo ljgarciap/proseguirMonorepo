@@ -14,8 +14,11 @@ import { interval, Subscription } from 'rxjs';
     template: `
     <!-- AUTHENTICATED LAYOUT -->
     <div class="app-layout" *ngIf="authService.isAuthenticated() && authService.getActiveRole()">
+      <!-- Sidebar Backdrop -->
+      <div class="sidebar-backdrop" *ngIf="isSidebarOpen" (click)="toggleSidebar()"></div>
+
       <!-- Sidebar -->
-      <aside class="sidebar">
+      <aside class="sidebar" [class.open]="isSidebarOpen">
         <div class="sidebar-header">
           <img src="assets/logopsl.png" alt="Proseguir" class="app-logo">
         </div>
@@ -177,6 +180,9 @@ import { interval, Subscription } from 'rxjs';
         </div>
 
         <header class="top-bar">
+          <button class="burger-menu-btn" (click)="toggleSidebar()">
+            <span class="material-symbols-outlined">menu</span>
+          </button>
           <div class="page-title">
             <h3>Sistema de Gestión de Liquidez</h3>
           </div>
@@ -268,10 +274,23 @@ import { interval, Subscription } from 'rxjs';
 
       .pulse { animation: alertPulse 1.5s infinite; }
       @keyframes alertPulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+      .burger-menu-btn { display: none; background: none; border: none; cursor: pointer; color: #4A5568; outline: none; padding: 4px; display: none; align-items: center; justify-content: center; .material-symbols-outlined { font-size: 28px; } }
+      .sidebar-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 99; animation: fadeIn 0.2s ease-out; }
+      
+      @media (max-width: 768px) {
+        .sidebar { position: fixed; top: 0; left: -260px; height: 100vh; transition: left 0.3s ease; z-index: 100; }
+        .sidebar.open { left: 0; }
+        .burger-menu-btn { display: flex !important; margin-right: 12px; }
+        .top-bar { padding: 0 1rem; }
+        .content-viewport { padding: 1rem; }
+        .pending-alert-bar { padding: 12px 1rem; flex-direction: column; gap: 8px; align-items: stretch; .alert-content { flex-direction: column; align-items: flex-start; text-align: left; } }
+      }
     `]
 })
 export class AppComponent implements OnInit, OnDestroy {
   showUserMenu = false;
+  isSidebarOpen = false;
   pendingCounts: { 
     operativo: number, 
     gerente: number, 
@@ -299,12 +318,20 @@ export class AppComponent implements OnInit, OnDestroy {
 
   constructor(public authService: AuthService, public router: Router, private http: HttpClient) {}
 
+  toggleSidebar() {
+    this.isSidebarOpen = !this.isSidebarOpen;
+  }
+
   ngOnInit() {
     this.checkPendingTasks();
     this.pollingSub = interval(30000).subscribe(() => {
       if (this.authService.isAuthenticated()) {
         this.checkPendingTasks();
       }
+    });
+
+    this.router.events.subscribe(() => {
+      this.isSidebarOpen = false;
     });
   }
 
