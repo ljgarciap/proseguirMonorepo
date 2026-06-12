@@ -159,6 +159,7 @@
               <th class="text-right">Monto</th>
               <th>Descripción Susuerte</th>
               <th>Descripción Banco</th>
+              <th>Observaciones</th>
             </tr>
           </thead>
           <tbody>
@@ -173,6 +174,7 @@
               <td class="total-cell text-right">{{ record.Amount | currency }}</td>
               <td>{{ record['Description (Susuerte)'] || '-' }}</td>
               <td>{{ record['Description (Bank)'] || '-' }}</td>
+              <td>{{ record.Observations || '-' }}</td>
             </tr>
           </tbody>
         </table>

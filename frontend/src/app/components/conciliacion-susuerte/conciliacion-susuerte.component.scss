@@ -8,7 +8,9 @@
 .search-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
   padding: 20px;
   background: white;
   border-radius: 16px;
@@ -16,6 +18,7 @@
   border: 1px solid #eef2f6;
 
   .page-info {
+    flex: 1 1 300px;
     .view-title {
       display: flex;
       align-items: center;
@@ -39,10 +42,16 @@
 }
 
 .actions-group {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: flex-end;
+  
   .upload-controls {
     display: flex;
     gap: 12px;
     align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 
     .file-input-group {
       display: flex;

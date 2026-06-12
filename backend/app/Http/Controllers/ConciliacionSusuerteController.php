@@ -50,7 +50,7 @@ class ConciliacionSusuerteController extends Controller
 
         return response()->json([
             'message' => 'Observaciones guardadas con éxito',
-            'download_url' => asset('storage/' . $fileName)
+            'download_url' => '/storage/' . $fileName
         ]);
     }
 }
