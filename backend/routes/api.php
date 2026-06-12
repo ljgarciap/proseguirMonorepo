@@ -140,11 +140,11 @@ Route::post('/conciliacion-susuerte', [\App\Http\Controllers\ConciliationControl
 
 // Conciliación Susuerte History and New Conciliation routes
 Route::get('/conciliaciones-susuerte/history', [\App\Http\Controllers\ConciliacionSusuerteController::class, 'history'])
-    ->middleware(['auth:api', 'checkrole:admin,operativo']);
+    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable,admin']);
 Route::post('/conciliaciones-susuerte/new', [\App\Http\Controllers\ConciliacionSusuerteController::class, 'newConciliation'])
-    ->middleware(['auth:api', 'checkrole:admin,operativo']);
+    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable,admin']);
 Route::put('/conciliaciones-susuerte/{id}', [\App\Http\Controllers\ConciliacionSusuerteController::class, 'update'])
-    ->middleware(['auth:api', 'checkrole:admin,operativo']);
+    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable,admin']);
 
 use App\Http\Controllers\PlanillaController;
 
