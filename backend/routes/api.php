@@ -217,7 +217,9 @@ Route::put('/datos-factor', [\App\Http\Controllers\DatosFactorController::class,
 Route::prefix('internal-docs')->middleware(['auth:api', 'checkrole:operativo,contable,gerente,superadmin'])->group(function () {
     Route::get('/', [\App\Http\Controllers\InternalDocumentController::class, 'index']);
     Route::post('/', [\App\Http\Controllers\InternalDocumentController::class, 'store']);
+    Route::patch('/bulk-status', [\App\Http\Controllers\InternalDocumentController::class, 'bulkUpdateStatus']);
     Route::patch('/{id}/status', [\App\Http\Controllers\InternalDocumentController::class, 'updateStatus']);
+    Route::delete('/bulk-delete', [\App\Http\Controllers\InternalDocumentController::class, 'bulkDestroy']);
     Route::delete('/{id}', [\App\Http\Controllers\InternalDocumentController::class, 'destroy']);
 });
 

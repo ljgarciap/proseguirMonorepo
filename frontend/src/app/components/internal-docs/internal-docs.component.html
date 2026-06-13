@@ -27,11 +27,32 @@
     </div>
   </div>
 
+  <div class="bulk-actions-bar" *ngIf="selectedDocIds.size > 0" style="display: flex; align-items: center; justify-content: space-between; background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 8px; padding: 10px 16px; margin-bottom: 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 8px; color: #0369a1; font-weight: 600; font-size: 0.9rem;">
+      <span class="material-symbols-outlined" style="font-size: 1.3rem;">check_box</span>
+      <span>{{ selectedDocIds.size }} documento(s) seleccionado(s)</span>
+    </div>
+    <div style="display: flex; gap: 10px;">
+      <button class="btn-pro success sm" (click)="bulkUpdateStatus('procesado')" style="display: inline-flex; align-items: center; gap: 6px;">
+        <span class="material-symbols-outlined" style="font-size: 1.1rem;">check_circle</span> Procesar en Bloque
+      </button>
+      <button class="btn-pro danger sm" (click)="bulkUpdateStatus('rechazado')" style="display: inline-flex; align-items: center; gap: 6px;">
+        <span class="material-symbols-outlined" style="font-size: 1.1rem;">cancel</span> Rechazar en Bloque
+      </button>
+      <button class="btn-pro danger sm" *ngIf="canDeleteSelected()" (click)="bulkDelete()" style="display: inline-flex; align-items: center; gap: 6px; background-color: #ef4444; border-color: #ef4444;">
+        <span class="material-symbols-outlined" style="font-size: 1.1rem;">delete</span> Eliminar en Bloque
+      </button>
+    </div>
+  </div>
+
   <div class="card p-0 overflow-hidden shadow-sm">
     <div class="table-scroll-wrapper">
       <table class="pro-table">
         <thead>
           <tr>
+            <th *ngIf="currentTab === 'pendientes'" style="width: 40px; text-align: center; padding-left: 1.5rem;">
+              <input type="checkbox" [checked]="isAllSelected()" (change)="toggleSelectAll()" style="cursor: pointer; width: 16px; height: 16px; accent-color: #3b82f6;">
+            </th>
             <th (click)="sortBy('titulo')" style="cursor: pointer; user-select: none;">
               Documento
               <span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle; color: #94a3b8;" *ngIf="sortColumn === 'titulo'">{{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
@@ -60,9 +81,19 @@
         </thead>
         <tbody>
           <tr *ngFor="let doc of pagedDocuments" [ngClass]="'row-' + getRemainingTime(doc).status">
+            <td *ngIf="currentTab === 'pendientes'" style="width: 40px; text-align: center; padding-left: 1.5rem;">
+              <input type="checkbox" 
+                     *ngIf="doc.estado === 'pendiente' && (doc.target_role === authService.getActiveRole() || doc.sender_id == currentUser?.id || authService.getActiveRole() === 'superadmin')"
+                     [checked]="isDocSelected(doc.id)" 
+                     (change)="toggleSelectDoc(doc.id)" 
+                     style="cursor: pointer; width: 16px; height: 16px; accent-color: #3b82f6;">
+            </td>
             <td>
               <div class="doc-cell">
-                <span class="name">{{ doc.titulo }}</span>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span class="material-symbols-outlined" *ngIf="doc.batch_id" style="font-size: 1.1rem; color: #6366f1; vertical-align: middle;" title="Documento cargado en lote (Lote: {{ doc.batch_id }})">inventory_2</span>
+                  <span class="name">{{ doc.titulo }}</span>
+                </div>
                 <span class="date">{{ doc.created_at | date:'medium' }}</span>
               </div>
             </td>
@@ -135,21 +166,37 @@
                   <button class="btn-pro danger sm icon-only" (click)="updateStatus(doc, 'rechazado')" title="Rechazar">
                     <span class="material-symbols-outlined">cancel</span>
                   </button>
+                  <button class="btn-pro primary sm icon-only" *ngIf="doc.batch_id" (click)="processBatch(doc.batch_id)" title="Procesar Lote Completo" style="background-color: #6366f1; border-color: #6366f1;">
+                    <span class="material-symbols-outlined">library_add_check</span>
+                  </button>
                 </ng-container>
               </div>
             </td>
           </tr>
           <tr *ngIf="filteredDocuments.length === 0 && !loading">
-            <td [attr.colspan]="currentTab === 'procesados' ? 9 : 8" class="empty-state">No se han encontrado documentos en esta vista.</td>
+            <td colspan="9" class="empty-state">No se han encontrado documentos en esta vista.</td>
           </tr>
         </tbody>
       </table>
     </div>
     
     <div class="pagination-footer" style="padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; background: #fafafa;">
-      <span style="color: #64748b; font-size: 0.85rem;">
-        Mostrando {{ showingFrom }} a {{ showingTo }} de {{ filteredDocuments.length }} documentos
-      </span>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="color: #64748b; font-size: 0.85rem;">
+          Mostrando {{ showingFrom }} a {{ showingTo }} de {{ filteredDocuments.length }} documentos
+        </span>
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #64748b;">
+          <span>| Mostrar</span>
+          <select [(ngModel)]="itemsPerPage" (ngModelChange)="currentPage = 1" style="padding: 2px 6px; border: 1px solid #cbd5e1; border-radius: 4px; outline: none; background: white; font-size: 0.85rem; cursor: pointer;">
+            <option [value]="5">5</option>
+            <option [value]="10">10</option>
+            <option [value]="25">25</option>
+            <option [value]="50">50</option>
+            <option [value]="100">100</option>
+          </select>
+          <span>por pág.</span>
+        </div>
+      </div>
       <div style="display: flex; gap: 8px; align-items: center;">
         <button class="btn-pro secondary sm" [disabled]="currentPage === 1" (click)="changePage(currentPage - 1)">Anterior</button>
         <span style="padding: 4px 12px; font-weight: 600; color: #334155; font-size: 0.85rem;">Página {{ currentPage }} de {{ totalPages || 1 }}</span>
