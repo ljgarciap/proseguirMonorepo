@@ -171,6 +171,19 @@
           <span class="error-msg" *ngIf="validationErrors['mandante_rep_legal_email']">{{ getFieldError('mandante_rep_legal_email') }}</span>
         </div>
       </div>
+
+      <div class="input-row">
+        <div class="input-group" [class.has-error]="validationErrors['monto_estimado_total']">
+          <label>Monto Estimado Total Operación</label>
+          <input type="text" [(ngModel)]="mandato.monto_estimado_total" name="monto_estimado_total" placeholder="Ej: $100.000.000">
+          <span class="error-msg" *ngIf="validationErrors['monto_estimado_total']">{{ getFieldError('monto_estimado_total') }}</span>
+        </div>
+        <div class="input-group" [class.has-error]="validationErrors['plazo_estimado']">
+          <label>Plazo Estimado por Operación</label>
+          <input type="text" [(ngModel)]="mandato.plazo_estimado" name="plazo_estimado" placeholder="Ej: 90 días">
+          <span class="error-msg" *ngIf="validationErrors['plazo_estimado']">{{ getFieldError('plazo_estimado') }}</span>
+        </div>
+      </div>
     </div>
 
     <!-- SECCIÓN FACTOR -->
@@ -361,6 +374,8 @@
               <div class="field"><span class="label">Rep. Legal:</span> <span class="val">{{ selectedMandato?.mandante_rep_legal_nombre }}</span></div>
               <div class="field"><span class="label">Doc Rep. Legal:</span> <span class="val">{{ selectedMandato?.mandante_rep_legal_tipo_doc }} - {{ selectedMandato?.mandante_rep_legal_num_doc }}</span></div>
               <div class="field"><span class="label">Email Rep. Legal:</span> <span class="val">{{ selectedMandato?.mandante_rep_legal_email }}</span></div>
+              <div class="field"><span class="label">Monto Estimado:</span> <span class="val">{{ selectedMandato?.monto_estimado_total || '-' }}</span></div>
+              <div class="field"><span class="label">Plazo Estimado:</span> <span class="val">{{ selectedMandato?.plazo_estimado || '-' }}</span></div>
             </div>
           </div>
           <!-- Factor section -->
@@ -459,6 +474,16 @@
               <div class="input-group-modal">
                 <label>Email Rep. Legal</label>
                 <input type="email" [(ngModel)]="editForm.mandante_rep_legal_email" name="edit_m_rep_e" required>
+              </div>
+            </div>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Monto Estimado Total Operación</label>
+                <input type="text" [(ngModel)]="editForm.monto_estimado_total" name="edit_monto_estimado_total">
+              </div>
+              <div class="input-group-modal">
+                <label>Plazo Estimado por Operación</label>
+                <input type="text" [(ngModel)]="editForm.plazo_estimado" name="edit_plazo_estimado">
               </div>
             </div>
           </div>
