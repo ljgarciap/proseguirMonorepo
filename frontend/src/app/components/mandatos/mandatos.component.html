@@ -4,12 +4,17 @@
     <p class="pro-subtitle">Complete y revise la información legal para la generación del contrato de mandato.</p>
   </div>
 
-  <div class="pro-tabs">
-    <button *ngIf="authService.isAuthorized(['cliente', 'superadmin'])" class="tab-btn" [class.active]="currentTab === 'diligenciar'" (click)="currentTab = 'diligenciar'">
-      <span class="material-symbols-outlined">edit_document</span> Diligenciar Nuevo
-    </button>
-    <button class="tab-btn" [class.active]="currentTab === 'historial'" (click)="currentTab = 'historial'">
-      <span class="material-symbols-outlined">history</span> Historial / Revisión
+  <div class="pro-tabs" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+    <div style="display: flex; gap: 8px;">
+      <button *ngIf="authService.isAuthorized(['cliente', 'superadmin'])" class="tab-btn" [class.active]="currentTab === 'diligenciar'" (click)="currentTab = 'diligenciar'">
+        <span class="material-symbols-outlined">edit_document</span> Diligenciar Nuevo
+      </button>
+      <button class="tab-btn" [class.active]="currentTab === 'historial'" (click)="currentTab = 'historial'">
+        <span class="material-symbols-outlined">history</span> Historial / Revisión
+      </button>
+    </div>
+    <button *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" class="tab-btn config-factor-btn" (click)="openFactorConfig()" style="background-color: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; display: flex; align-items: center; gap: 4px;">
+      <span class="material-symbols-outlined">settings</span> Configurar Factor
     </button>
   </div>
 
@@ -175,11 +180,10 @@
         <h2>Información del Factor</h2>
       </div>
 
-
       <div class="input-row">
         <div class="input-group full" [class.has-error]="validationErrors['factor_razon_social']">
           <label>Nombre / Razón Social Factor</label>
-          <input type="text" [(ngModel)]="mandato.factor_razon_social" name="f_rs" required placeholder="Ej: Factores y Servicios S.A.S.">
+          <input type="text" [(ngModel)]="mandato.factor_razon_social" name="f_rs" required placeholder="Ej: Factores y Servicios S.A.S." [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
           <span class="error-msg" *ngIf="validationErrors['factor_razon_social']">{{ getFieldError('factor_razon_social') }}</span>
         </div>
       </div>
@@ -187,7 +191,7 @@
       <div class="input-row">
         <div class="input-group" [class.has-error]="validationErrors['factor_tipo_documento']">
           <label>Tipo Documento</label>
-          <select [(ngModel)]="mandato.factor_tipo_documento" name="f_td" required>
+          <select [(ngModel)]="mandato.factor_tipo_documento" name="f_td" required [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
             <option value="" disabled selected>Seleccione...</option>
             <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
           </select>
@@ -195,7 +199,7 @@
         </div>
         <div class="input-group" [class.has-error]="validationErrors['factor_numero_documento']">
           <label>Número Documento</label>
-          <input type="text" [(ngModel)]="mandato.factor_numero_documento" name="f_nd" required placeholder="901.234.567-8">
+          <input type="text" [(ngModel)]="mandato.factor_numero_documento" name="f_nd" required placeholder="901.234.567-8" [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
           <span class="error-msg" *ngIf="validationErrors['factor_numero_documento']">{{ getFieldError('factor_numero_documento') }}</span>
         </div>
       </div>
@@ -205,7 +209,7 @@
       <div class="input-row">
         <div class="input-group full" [class.has-error]="validationErrors['factor_rep_legal_nombre']">
           <label>Nombre Representante Factor</label>
-          <input type="text" [(ngModel)]="mandato.factor_rep_legal_nombre" name="f_rep_n" required>
+          <input type="text" [(ngModel)]="mandato.factor_rep_legal_nombre" name="f_rep_n" required [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
           <span class="error-msg" *ngIf="validationErrors['factor_rep_legal_nombre']">{{ getFieldError('factor_rep_legal_nombre') }}</span>
         </div>
       </div>
@@ -213,14 +217,14 @@
       <div class="input-row">
         <div class="input-group" [class.has-error]="validationErrors['factor_rep_legal_tipo_doc']">
           <label>Tipo Doc. Rep.</label>
-          <select [(ngModel)]="mandato.factor_rep_legal_tipo_doc" name="f_rep_td" required>
+          <select [(ngModel)]="mandato.factor_rep_legal_tipo_doc" name="f_rep_td" required [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
             <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
           </select>
           <span class="error-msg" *ngIf="validationErrors['factor_rep_legal_tipo_doc']">{{ getFieldError('factor_rep_legal_tipo_doc') }}</span>
         </div>
         <div class="input-group" [class.has-error]="validationErrors['factor_rep_legal_num_doc']">
           <label>Número Doc. Rep.</label>
-          <input type="text" [(ngModel)]="mandato.factor_rep_legal_num_doc" name="f_rep_nd" required>
+          <input type="text" [(ngModel)]="mandato.factor_rep_legal_num_doc" name="f_rep_nd" required [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
           <span class="error-msg" *ngIf="validationErrors['factor_rep_legal_num_doc']">{{ getFieldError('factor_rep_legal_num_doc') }}</span>
         </div>
       </div>
@@ -228,7 +232,7 @@
       <div class="input-row">
         <div class="input-group full" [class.has-error]="validationErrors['factor_rep_legal_email']">
           <label>E-mail Representante Factor</label>
-          <input type="email" [(ngModel)]="mandato.factor_rep_legal_email" name="f_rep_e" required>
+          <input type="email" [(ngModel)]="mandato.factor_rep_legal_email" name="f_rep_e" required [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
           <span class="error-msg" *ngIf="validationErrors['factor_rep_legal_email']">{{ getFieldError('factor_rep_legal_email') }}</span>
         </div>
       </div>
@@ -525,6 +529,63 @@
         <div class="pro-modal-footer">
           <button type="button" class="btn-pro secondary" (click)="closeEdit()">Cancelar</button>
           <button type="submit" class="btn-pro primary" [disabled]="!editFormObj.form.valid || loading">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIGURACIÓN DEL FACTOR (PARAMÉTRICA) -->
+  <div class="pro-modal-overlay" *ngIf="showFactorModal" (click)="closeFactorConfig()">
+    <div class="pro-modal-card animate__animated animate__zoomIn" (click)="$event.stopPropagation()" style="max-width: 500px;">
+      <div class="pro-modal-header">
+        <h2>Configurar Información del Factor (Tabla Paramétrica)</h2>
+        <button class="close-btn" (click)="closeFactorConfig()">&times;</button>
+      </div>
+      <form (ngSubmit)="saveFactorConfig()" #factorFormObj="ngForm" class="pro-modal-body" style="display: flex; flex-direction: column; gap: 1rem;">
+        <div class="input-group-modal" style="width: 100%;">
+          <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">Nombre / Razón Social Factor</label>
+          <input type="text" [(ngModel)]="factorForm.razon_social" name="config_f_rs" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+        </div>
+        
+        <div style="display: flex; gap: 12px; width: 100%;">
+          <div class="input-group-modal" style="flex: 1;">
+            <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">Tipo Documento</label>
+            <select [(ngModel)]="factorForm.tipo_documento" name="config_f_td" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+              <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
+            </select>
+          </div>
+          <div class="input-group-modal" style="flex: 2;">
+            <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">Número Documento</label>
+            <input type="text" [(ngModel)]="factorForm.numero_documento" name="config_f_nd" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+          </div>
+        </div>
+
+        <div class="input-group-modal" style="width: 100%;">
+          <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">Nombre Representante Factor</label>
+          <input type="text" [(ngModel)]="factorForm.rep_legal_nombre" name="config_f_rep_n" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+        </div>
+
+        <div style="display: flex; gap: 12px; width: 100%;">
+          <div class="input-group-modal" style="flex: 1;">
+            <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">Tipo Doc. Rep.</label>
+            <select [(ngModel)]="factorForm.rep_legal_tipo_doc" name="config_f_rep_td" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+              <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
+            </select>
+          </div>
+          <div class="input-group-modal" style="flex: 2;">
+            <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">Número Doc. Rep.</label>
+            <input type="text" [(ngModel)]="factorForm.rep_legal_num_doc" name="config_f_rep_nd" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+          </div>
+        </div>
+
+        <div class="input-group-modal" style="width: 100%;">
+          <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">E-mail Representante Factor</label>
+          <input type="email" [(ngModel)]="factorForm.rep_legal_email" name="config_f_rep_e" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+        </div>
+        
+        <div class="pro-modal-footer" style="padding-top: 1rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn-pro secondary" (click)="closeFactorConfig()">Cancelar</button>
+          <button type="submit" class="btn-pro primary" [disabled]="!factorFormObj.form.valid || loading">Guardar Configuración</button>
         </div>
       </form>
     </div>

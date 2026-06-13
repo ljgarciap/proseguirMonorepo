@@ -206,6 +206,12 @@ Route::prefix('parameters')->middleware(['auth:api'])->group(function () {
     Route::delete('/{table}/{id}', [\App\Http\Controllers\ParameterController::class, 'destroy'])->middleware('checkrole:superadmin');
 });
 
+// Datos Factor (Mandatos)
+Route::get('/datos-factor', [\App\Http\Controllers\DatosFactorController::class, 'show'])
+    ->middleware(['auth:api', 'checkrole:cliente,operativo,gerente,superadmin']);
+Route::put('/datos-factor', [\App\Http\Controllers\DatosFactorController::class, 'update'])
+    ->middleware(['auth:api', 'checkrole:operativo,gerente,superadmin']);
+
 // Documentos Internos (Staff Flow)
 Route::prefix('internal-docs')->middleware(['auth:api', 'checkrole:operativo,contable,gerente,superadmin'])->group(function () {
     Route::get('/', [\App\Http\Controllers\InternalDocumentController::class, 'index']);
