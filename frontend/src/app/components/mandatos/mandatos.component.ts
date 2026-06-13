@@ -51,8 +51,11 @@ export class MandatosComponent implements OnInit {
   // Modales y CRUD
   showDetailModal = false;
   showEditModal = false;
+  showFactorModal = false;
   selectedMandato: any = null;
   editForm: any = {};
+  datosFactor: any = null;
+  factorForm: any = {};
 
   constructor(private http: HttpClient, public authService: AuthService) {}
 
@@ -85,12 +88,54 @@ export class MandatosComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.loadDatosFactor();
     if (!this.authService.isAuthorized(['cliente'])) {
       this.currentTab = 'historial';
     } else {
       this.loadActiveRequest();
     }
     this.loadHistorial();
+  }
+
+  loadDatosFactor(): void {
+    this.http.get<any>(`${environment.apiUrl}/datos-factor`).subscribe({
+      next: (res) => {
+        this.datosFactor = res;
+        this.mandato.factor_razon_social = res.razon_social;
+        this.mandato.factor_tipo_documento = res.tipo_documento;
+        this.mandato.factor_numero_documento = res.numero_documento;
+        this.mandato.factor_rep_legal_nombre = res.rep_legal_nombre;
+        this.mandato.factor_rep_legal_tipo_doc = res.rep_legal_tipo_doc;
+        this.mandato.factor_rep_legal_num_doc = res.rep_legal_num_doc;
+        this.mandato.factor_rep_legal_email = res.rep_legal_email;
+      }
+    });
+  }
+
+  openFactorConfig(): void {
+    this.factorForm = { ...this.datosFactor };
+    this.showFactorModal = true;
+  }
+
+  closeFactorConfig(): void {
+    this.showFactorModal = false;
+  }
+
+  saveFactorConfig(): void {
+    this.loading = true;
+    this.http.put(`${environment.apiUrl}/datos-factor`, this.factorForm).subscribe({
+      next: (res) => {
+        this.loading = false;
+        this.datosFactor = res;
+        this.loadDatosFactor();
+        this.closeFactorConfig();
+        Swal.fire('¡Éxito!', 'Información del Factor actualizada globalmente.', 'success');
+      },
+      error: (err) => {
+        this.loading = false;
+        Swal.fire('Error', err.error?.message || 'No se pudo actualizar la información del factor.', 'error');
+      }
+    });
   }
 
   loadActiveRequest(): void {
@@ -302,13 +347,13 @@ export class MandatosComponent implements OnInit {
       mandante_rep_legal_tipo_doc: 'CC',
       mandante_rep_legal_num_doc: '',
       mandante_rep_legal_email: '',
-      factor_razon_social: '',
-      factor_tipo_documento: '',
-      factor_numero_documento: '',
-      factor_rep_legal_nombre: '',
-      factor_rep_legal_tipo_doc: 'CC',
-      factor_rep_legal_num_doc: '',
-      factor_rep_legal_email: ''
+      factor_razon_social: this.datosFactor?.razon_social || '',
+      factor_tipo_documento: this.datosFactor?.tipo_documento || '',
+      factor_numero_documento: this.datosFactor?.numero_documento || '',
+      factor_rep_legal_nombre: this.datosFactor?.rep_legal_nombre || '',
+      factor_rep_legal_tipo_doc: this.datosFactor?.rep_legal_tipo_doc || 'CC',
+      factor_rep_legal_num_doc: this.datosFactor?.rep_legal_num_doc || '',
+      factor_rep_legal_email: this.datosFactor?.rep_legal_email || ''
     };
   }
 

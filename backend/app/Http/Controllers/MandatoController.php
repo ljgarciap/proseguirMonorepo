@@ -58,6 +58,17 @@ class MandatoController extends Controller
             'factor_rep_legal_email' => 'required|email',
         ]);
 
+        $factor = \App\Models\DatosFactor::first();
+        if ($factor) {
+            $validated['factor_razon_social'] = $factor->razon_social;
+            $validated['factor_tipo_documento'] = $factor->tipo_documento;
+            $validated['factor_numero_documento'] = $factor->numero_documento;
+            $validated['factor_rep_legal_nombre'] = $factor->rep_legal_nombre;
+            $validated['factor_rep_legal_tipo_doc'] = $factor->rep_legal_tipo_doc;
+            $validated['factor_rep_legal_num_doc'] = $factor->rep_legal_num_doc;
+            $validated['factor_rep_legal_email'] = $factor->rep_legal_email;
+        }
+
         $mandato = Mandato::create(array_merge($validated, [
             'user_id' => auth()->id(),
             'status' => 'pendiente'
