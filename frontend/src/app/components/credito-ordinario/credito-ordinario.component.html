@@ -90,6 +90,51 @@
         </div>
       </div>
 
+      <!-- Simplified Timeline Progress for Client and Management -->
+      <div class="card timeline-progress-card" *ngIf="activeRole === 'cliente' || activeRole === 'gerente' || activeRole === 'superadmin'">
+        <div class="timeline-progress-header">
+          <div class="header-main">
+            <span class="material-symbols-outlined icon-timeline">account_tree</span>
+            <div>
+              <h3>Estado de Progreso del Crédito</h3>
+              <p>Línea de hitos simplificada del proceso</p>
+            </div>
+          </div>
+          <span class="progress-percent">{{ getProgressPercent() }}% Completado</span>
+        </div>
+        <div class="progress-track-wrapper">
+          <div class="progress-track-line">
+            <div class="progress-track-fill" [style.width.%]="getProgressPercent()"></div>
+          </div>
+          <div class="progress-milestones">
+            <div class="milestone" [class.completed]="getStateIndex(selectedCredito.estado) >= 0">
+              <span class="milestone-dot"></span>
+              <span class="milestone-label">Registro</span>
+            </div>
+            <div class="milestone" [class.completed]="getStateIndex(selectedCredito.estado) >= 2">
+              <span class="milestone-dot"></span>
+              <span class="milestone-label">Análisis</span>
+            </div>
+            <div class="milestone" [class.completed]="getStateIndex(selectedCredito.estado) >= 4">
+              <span class="milestone-dot"></span>
+              <span class="milestone-label">Comité</span>
+            </div>
+            <div class="milestone" [class.completed]="getStateIndex(selectedCredito.estado) >= 5">
+              <span class="milestone-dot"></span>
+              <span class="milestone-label">Garantías</span>
+            </div>
+            <div class="milestone" [class.completed]="getStateIndex(selectedCredito.estado) >= 8">
+              <span class="milestone-dot"></span>
+              <span class="milestone-label">Desembolso</span>
+            </div>
+            <div class="milestone" [class.completed]="selectedCredito.estado === 'completado'">
+              <span class="milestone-dot"></span>
+              <span class="milestone-label">Fin</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- BPMN Stepper Map -->
       <div class="card bpmn-stepper-card">
         <h3>Mapa del Flujo del Proceso (BPMN)</h3>
@@ -403,158 +448,279 @@
         </div>
       </div>
 
-      <!-- Attached Documents Area -->
+      <!-- Attached Documents Area Grouped by BPMN Stage -->
       <div class="card documents-card">
-        <h3>Expediente de Documentos de Crédito</h3>
-        <p class="section-desc">Listado completo de soportes documentales generados y cargados a lo largo del proceso.</p>
+        <div class="documents-card-header">
+          <span class="material-symbols-outlined header-icon">folder_shared</span>
+          <div>
+            <h3>Expediente de Documentos de Crédito</h3>
+            <p class="section-desc">Requisitos documentales obligatorios agrupados por etapas del flujo BPMN.</p>
+          </div>
+        </div>
         
-        <div class="documents-grid">
-          <!-- Solicitud y Requisitos -->
-          <div class="doc-box">
-            <span class="material-symbols-outlined doc-icon">folder_zip</span>
-            <div class="doc-details">
-              <strong>Formulario y Requisitos del Cliente</strong>
-              <p class="desc">Formulario inicial y soportes comerciales.</p>
-              <div class="doc-footer" style="margin-top:8px;">
-                <span class="doc-tag" *ngIf="!selectedCredito.documentos?.formulario_solicitud">No requerido físicamente</span>
-                <a *ngIf="selectedCredito.documentos?.formulario_solicitud" [href]="selectedCredito.documentos.formulario_solicitud" target="_blank" class="btn-pro secondary sm">
-                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
-                </a>
+        <div class="stages-documents-container">
+          <!-- ETAPA 1 -->
+          <div class="stage-doc-group">
+            <h4>Etapa 1: Registro e Identificación <span class="stage-owner">Cliente / Comercial</span></h4>
+            <div class="documents-grid-grouped">
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new">description</span>
+                  <div class="doc-title-desc">
+                    <h5>Formulario y Requisitos del Cliente</h5>
+                    <p>Formulario inicial y soportes cargados por el asesor comercial o cliente.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.formulario_solicitud">Cargado</span>
+                  <span class="doc-status-pill warning" *ngIf="!selectedCredito.documentos?.formulario_solicitud">No requerido físicamente</span>
+                  <a *ngIf="selectedCredito.documentos?.formulario_solicitud" [href]="selectedCredito.documentos.formulario_solicitud" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver PDF
+                  </a>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- SARLAFT Sintesis -->
-          <div class="doc-box">
-            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.sarlft_sintesis">verified_user</span>
-            <div class="doc-details">
-              <strong>Síntesis SARLAFT</strong>
-              <p class="desc">Reporte del Oficial de Cumplimiento sobre listas restrictivas.</p>
-              <div class="doc-footer" style="margin-top:8px;">
-                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.sarlft_sintesis">Pendiente</span>
-                <a *ngIf="selectedCredito.documentos?.sarlft_sintesis" [href]="selectedCredito.documentos.sarlft_sintesis" target="_blank" class="btn-pro secondary sm">
-                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
-                </a>
+          <!-- ETAPA 2 -->
+          <div class="stage-doc-group">
+            <h4>Etapa 2: Análisis SARLAFT y Financiero <span class="stage-owner">Cumplimiento / Comercial</span></h4>
+            <div class="documents-grid-grouped">
+              <!-- Síntesis SARLAFT -->
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.sarlft_sintesis">verified_user</span>
+                  <div class="doc-title-desc">
+                    <h5>Síntesis SARLAFT</h5>
+                    <p>Reporte de validación de listas restrictivas. Responsable: Oficial de Cumplimiento.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.sarlft_sintesis">Cargado</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.sarlft_sintesis">Pendiente</span>
+                  
+                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'analisis_sarlaft_financiero' && (activeRole === 'oficial_cumplimiento' || activeRole === 'superadmin')">
+                    <input type="file" id="inline-file-sintesis" (change)="onFileUpload($event, 'sarlft_sintesis')" accept=".pdf" hidden>
+                    <label for="inline-file-sintesis" class="btn-inline-upload">Subir</label>
+                  </div>
+                  
+                  <a *ngIf="selectedCredito.documentos?.sarlft_sintesis" [href]="selectedCredito.documentos.sarlft_sintesis" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  </a>
+                </div>
+              </div>
+
+              <!-- Reporte Datacrédito -->
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.sarlft_datacredito">credit_card</span>
+                  <div class="doc-title-desc">
+                    <h5>Reporte Centrales Datacrédito</h5>
+                    <p>Informe crediticio de centrales. Responsable: Oficial de Cumplimiento.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.sarlft_datacredito">Cargado</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.sarlft_datacredito">Pendiente</span>
+                  
+                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'analisis_sarlaft_financiero' && (activeRole === 'oficial_cumplimiento' || activeRole === 'superadmin')">
+                    <input type="file" id="inline-file-datacredito" (change)="onFileUpload($event, 'sarlft_datacredito')" accept=".pdf" hidden>
+                    <label for="inline-file-datacredito" class="btn-inline-upload">Subir</label>
+                  </div>
+
+                  <a *ngIf="selectedCredito.documentos?.sarlft_datacredito" [href]="selectedCredito.documentos.sarlft_datacredito" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  </a>
+                </div>
+              </div>
+
+              <!-- Análisis Financiero -->
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.analisis_financiero">analytics</span>
+                  <div class="doc-title-desc">
+                    <h5>Análisis Financiero de Solicitud</h5>
+                    <p>Cálculo de capacidad de endeudamiento. Responsable: Coordinador Comercial.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.analisis_financiero">Cargado</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.analisis_financiero">Pendiente</span>
+                  
+                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'analisis_sarlaft_financiero' && (activeRole === 'coordinador_comercial' || activeRole === 'superadmin')">
+                    <input type="file" id="inline-file-analisis" (change)="onFileUpload($event, 'analisis_financiero')" accept=".pdf" hidden>
+                    <label for="inline-file-analisis" class="btn-inline-upload">Subir</label>
+                  </div>
+
+                  <a *ngIf="selectedCredito.documentos?.analisis_financiero" [href]="selectedCredito.documentos.analisis_financiero" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  </a>
+                </div>
+              </div>
+
+              <!-- Presentación del Comité -->
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.presentacion_comite">presentation_play</span>
+                  <div class="doc-title-desc">
+                    <h5>Presentación para Comité de Crédito</h5>
+                    <p>Ficha y propuesta de otorgamiento de crédito. Responsable: Coordinador Comercial.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.presentacion_comite">Cargado</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.presentacion_comite">Pendiente</span>
+                  
+                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'analisis_sarlaft_financiero' && (activeRole === 'coordinador_comercial' || activeRole === 'superadmin')">
+                    <input type="file" id="inline-file-presentacion" (change)="onFileUpload($event, 'presentacion_comite')" accept=".pdf" hidden>
+                    <label for="inline-file-presentacion" class="btn-inline-upload">Subir</label>
+                  </div>
+
+                  <a *ngIf="selectedCredito.documentos?.presentacion_comite" [href]="selectedCredito.documentos.presentacion_comite" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  </a>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- SARLAFT Datacredito -->
-          <div class="doc-box">
-            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.sarlft_datacredito">credit_card</span>
-            <div class="doc-details">
-              <strong>Reporte Centrales Datacrédito</strong>
-              <p class="desc">Reporte crediticio de centrales de información.</p>
-              <div class="doc-footer" style="margin-top:8px;">
-                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.sarlft_datacredito">Pendiente</span>
-                <a *ngIf="selectedCredito.documentos?.sarlft_datacredito" [href]="selectedCredito.documentos.sarlft_datacredito" target="_blank" class="btn-pro secondary sm">
-                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
-                </a>
+          <!-- ETAPA 3 -->
+          <div class="stage-doc-group">
+            <h4>Etapa 3: Comité de Crédito <span class="stage-owner">Comité de Crédito</span></h4>
+            <div class="documents-grid-grouped">
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.acta_comite_firmada">assignment_turned_in</span>
+                  <div class="doc-title-desc">
+                    <h5>Acta de Comité Firmada</h5>
+                    <p>Soporte decisorio firmado. Responsable: Miembros del Comité de Crédito.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.acta_comite_firmada">Cargado</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.acta_comite_firmada">Pendiente</span>
+                  
+                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'comite_evaluacion' && (activeRole === 'comite_credito' || activeRole === 'superadmin')">
+                    <input type="file" id="inline-file-acta" (change)="onFileUpload($event, 'acta_comite_firmada')" accept=".pdf" hidden>
+                    <label for="inline-file-acta" class="btn-inline-upload">Subir</label>
+                  </div>
+
+                  <a *ngIf="selectedCredito.documentos?.acta_comite_firmada" [href]="selectedCredito.documentos.acta_comite_firmada" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  </a>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Analisis Financiero -->
-          <div class="doc-box">
-            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.analisis_financiero">analytics</span>
-            <div class="doc-details">
-              <strong>Análisis Financiero de Solicitud</strong>
-              <p class="desc">Cálculo de capacidad de pago y endeudamiento comercial.</p>
-              <div class="doc-footer" style="margin-top:8px;">
-                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.analisis_financiero">Pendiente</span>
-                <a *ngIf="selectedCredito.documentos?.analisis_financiero" [href]="selectedCredito.documentos.analisis_financiero" target="_blank" class="btn-pro secondary sm">
-                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
-                </a>
+          <!-- ETAPA 4 -->
+          <div class="stage-doc-group">
+            <h4>Etapa 4: Formalización de Garantías <span class="stage-owner">Cliente / Dirección Administrativa</span></h4>
+            <div class="documents-grid-grouped">
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.garantias_firmadas">draw</span>
+                  <div class="doc-title-desc">
+                    <h5>Pagarés y Garantías Firmadas</h5>
+                    <p>Documentos jurídicos formalizados por el cliente. Validación: Dirección Administrativa.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.garantias_firmadas">Cargado</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.garantias_firmadas">Pendiente</span>
+                  
+                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'formalizacion_garantias' && (activeRole === 'cliente' || activeRole === 'coordinador_comercial' || activeRole === 'superadmin')">
+                    <input type="file" id="inline-file-garantias" (change)="onFileUpload($event, 'garantias_firmadas')" accept=".pdf" hidden>
+                    <label for="inline-file-garantias" class="btn-inline-upload">Subir</label>
+                  </div>
+
+                  <a *ngIf="selectedCredito.documentos?.garantias_firmadas" [href]="selectedCredito.documentos.garantias_firmadas" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  </a>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Presentacion del Comité -->
-          <div class="doc-box">
-            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.presentacion_comite">presentation_play</span>
-            <div class="doc-details">
-              <strong>Presentación para Comité de Crédito</strong>
-              <p class="desc">Ficha y propuesta de otorgamiento de crédito.</p>
-              <div class="doc-footer" style="margin-top:8px;">
-                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.presentacion_comite">Pendiente</span>
-                <a *ngIf="selectedCredito.documentos?.presentacion_comite" [href]="selectedCredito.documentos.presentacion_comite" target="_blank" class="btn-pro secondary sm">
-                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
-                </a>
+          <!-- ETAPA 5 -->
+          <div class="stage-doc-group">
+            <h4>Etapa 5: Registro y Aprobación Core CYF <span class="stage-owner">Comercial / Dirección Administrativa / Gerente</span></h4>
+            <div class="documents-grid-grouped">
+              <!-- Registro CYF -->
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.registro_cyf">account_balance</span>
+                  <div class="doc-title-desc">
+                    <h5>Registro core CYF</h5>
+                    <p>Soporte de cargue en el core financiero. Responsable: Coordinador Comercial.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.registro_cyf">Cargado</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.registro_cyf">Pendiente</span>
+                  
+                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'aprobacion_registro_cyf' && (activeRole === 'coordinador_comercial' || activeRole === 'superadmin')">
+                    <input type="file" id="inline-file-cyf" (change)="onFileUpload($event, 'registro_cyf')" accept=".pdf" hidden>
+                    <label for="inline-file-cyf" class="btn-inline-upload">Subir</label>
+                  </div>
+
+                  <a *ngIf="selectedCredito.documentos?.registro_cyf" [href]="selectedCredito.documentos.registro_cyf" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  </a>
+                </div>
+              </div>
+
+              <!-- Egreso Desembolso -->
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.desembolso_egreso">request_quote</span>
+                  <div class="doc-title-desc">
+                    <h5>Egreso y Liquidación Desembolso</h5>
+                    <p>Instrucción de pago y liquidación. Responsable: Dirección Administrativa.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.desembolso_egreso">Cargado</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.desembolso_egreso">Pendiente</span>
+                  
+                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'desembolso_ingreso' && (activeRole === 'operativo' || activeRole === 'superadmin')">
+                    <input type="file" id="inline-file-desembolso" (change)="onFileUpload($event, 'desembolso_egreso')" accept=".pdf" hidden>
+                    <label for="inline-file-desembolso" class="btn-inline-upload">Subir</label>
+                  </div>
+
+                  <a *ngIf="selectedCredito.documentos?.desembolso_egreso" [href]="selectedCredito.documentos.desembolso_egreso" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  </a>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Acta Comité -->
-          <div class="doc-box">
-            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.acta_comite_firmada">assignment_turned_in</span>
-            <div class="doc-details">
-              <strong>Acta de Comité Firmada</strong>
-              <p class="desc">Soporte decisorio firmado por miembros de Comité.</p>
-              <div class="doc-footer" style="margin-top:8px;">
-                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.acta_comite_firmada">Pendiente</span>
-                <a *ngIf="selectedCredito.documentos?.acta_comite_firmada" [href]="selectedCredito.documentos.acta_comite_firmada" target="_blank" class="btn-pro secondary sm">
-                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
-                </a>
-              </div>
-            </div>
-          </div>
+          <!-- ETAPA 6 -->
+          <div class="stage-doc-group">
+            <h4>Etapa 6: Cierre y Pago <span class="stage-owner">Tesorería</span></h4>
+            <div class="documents-grid-grouped">
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.comprobante_transferencia">payments</span>
+                  <div class="doc-title-desc">
+                    <h5>Comprobante de Transferencia</h5>
+                    <p>Soporte de transferencia bancaria al cliente. Responsable: Tesorería.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.comprobante_transferencia">Cargado</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.comprobante_transferencia">Pendiente</span>
+                  
+                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'ejecucion_transferencia' && (activeRole === 'tesoreria' || activeRole === 'superadmin')">
+                    <input type="file" id="inline-file-transferencia" (change)="onFileUpload($event, 'comprobante_transferencia')" accept=".pdf" hidden>
+                    <label for="inline-file-transferencia" class="btn-inline-upload">Subir</label>
+                  </div>
 
-          <!-- Garantias Firmadas -->
-          <div class="doc-box">
-            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.garantias_firmadas">draw</span>
-            <div class="doc-details">
-              <strong>Pagarés y Garantías Firmadas</strong>
-              <p class="desc">Documentos jurídicos y pagarés del crédito.</p>
-              <div class="doc-footer" style="margin-top:8px;">
-                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.garantias_firmadas">Pendiente</span>
-                <a *ngIf="selectedCredito.documentos?.garantias_firmadas" [href]="selectedCredito.documentos.garantias_firmadas" target="_blank" class="btn-pro secondary sm">
-                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <!-- CYF Registro -->
-          <div class="doc-box">
-            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.registro_cyf">account_balance</span>
-            <div class="doc-details">
-              <strong>Registro core CYF</strong>
-              <p class="desc">Soporte de cargue en el sistema financiero.</p>
-              <div class="doc-footer" style="margin-top:8px;">
-                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.registro_cyf">Pendiente</span>
-                <a *ngIf="selectedCredito.documentos?.registro_cyf" [href]="selectedCredito.documentos.registro_cyf" target="_blank" class="btn-pro secondary sm">
-                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <!-- Desembolso Egreso -->
-          <div class="doc-box">
-            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.desembolso_egreso">request_quote</span>
-            <div class="doc-details">
-              <strong>Egreso y Liquidación Desembolso</strong>
-              <p class="desc">Documento de egreso y autorización de pago.</p>
-              <div class="doc-footer" style="margin-top:8px;">
-                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.desembolso_egreso">Pendiente</span>
-                <a *ngIf="selectedCredito.documentos?.desembolso_egreso" [href]="selectedCredito.documentos.desembolso_egreso" target="_blank" class="btn-pro secondary sm">
-                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
-                </a>
-              </div>
-            </div>
-          </div>
-
-          <!-- Comprobante Transferencia -->
-          <div class="doc-box">
-            <span class="material-symbols-outlined doc-icon" [class.success]="selectedCredito.documentos?.comprobante_transferencia">payments</span>
-            <div class="doc-details">
-              <strong>Comprobante de Transferencia</strong>
-              <p class="desc">Transferencia bancaria al cliente.</p>
-              <div class="doc-footer" style="margin-top:8px;">
-                <span class="doc-tag error" *ngIf="!selectedCredito.documentos?.comprobante_transferencia">Pendiente</span>
-                <a *ngIf="selectedCredito.documentos?.comprobante_transferencia" [href]="selectedCredito.documentos.comprobante_transferencia" target="_blank" class="btn-pro secondary sm">
-                  <span class="material-symbols-outlined">open_in_new</span> Ver Archivo
-                </a>
+                  <a *ngIf="selectedCredito.documentos?.comprobante_transferencia" [href]="selectedCredito.documentos.comprobante_transferencia" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  </a>
+                </div>
               </div>
             </div>
           </div>
