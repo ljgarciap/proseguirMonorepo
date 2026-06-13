@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Mandato;
+use App\Exports\MandatoExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class MandatoController extends Controller
 {
@@ -105,6 +107,21 @@ class MandatoController extends Controller
         $mandato->update($validated);
 
         return response()->json($mandato);
+    }
+
+    public function export($id)
+    {
+        $user = auth()->user();
+        $roles = $user->roles ?? [];
+        $isAdminOrOpOrStaff = in_array('superadmin', $roles) || in_array('operativo', $roles) || in_array('gerente', $roles) || in_array('contable', $roles);
+
+        $mandato = Mandato::findOrFail($id);
+        if (!$isAdminOrOpOrStaff && $mandato->user_id !== $user->id) {
+            abort(403, 'No autorizado.');
+        }
+
+        $filename = "mandato_" . $mandato->mandante_numero_documento . "_" . now()->format('Y-m-d') . ".xlsx";
+        return Excel::download(new MandatoExport($mandato), $filename);
     }
 
     public function destroy($id)

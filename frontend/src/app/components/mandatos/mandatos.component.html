@@ -268,7 +268,7 @@
               <th>Factor</th>
               <th>Estado</th>
               <th>Observaciones</th>
-              <th *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" class="text-right" style="padding-right: 1.5rem;">Acciones</th>
+              <th class="text-right" style="padding-right: 1.5rem;">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -290,18 +290,21 @@
               <td>
                 <span class="obs-text" [title]="m.observaciones">{{ m.observaciones || '-' }}</span>
               </td>
-              <td *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" class="text-right" style="padding-right: 1.5rem;">
+              <td class="text-right" style="padding-right: 1.5rem;">
                 <div class="actions" style="display: flex; gap: 0.25rem; justify-content: flex-end;">
                   <button class="btn-pro secondary sm icon-only" (click)="openDetail(m)" title="Ver Resumen" style="background: #e2e8f0; color: #475569;">
                     <span class="material-symbols-outlined">visibility</span>
                   </button>
-                  <button class="btn-pro secondary sm icon-only" (click)="openEdit(m)" title="Editar Mandato" style="background: #e2e8f0; color: #475569;">
+                  <button *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" class="btn-pro secondary sm icon-only" (click)="openEdit(m)" title="Editar Mandato" style="background: #e2e8f0; color: #475569;">
                     <span class="material-symbols-outlined">edit</span>
                   </button>
-                  <button class="btn-pro danger sm icon-only" (click)="deleteMandato(m)" title="Eliminar Mandato">
+                  <button *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" class="btn-pro danger sm icon-only" (click)="deleteMandato(m)" title="Eliminar Mandato">
                     <span class="material-symbols-outlined">delete</span>
                   </button>
-                  <ng-container *ngIf="m.status === 'pendiente'">
+                  <button *ngIf="m.status === 'firmado'" class="btn-pro success sm icon-only" (click)="downloadExcel(m)" title="Descargar Excel" style="background: #16a34a; color: white;">
+                    <span class="material-symbols-outlined">download</span>
+                  </button>
+                  <ng-container *ngIf="m.status === 'pendiente' && authService.isAuthorized(['operativo', 'superadmin'])">
                     <button class="btn-pro success sm icon-only" (click)="updateMandatoStatus(m, 'firmado')" title="Aprobar Mandato">
                       <span class="material-symbols-outlined">check_circle</span>
                     </button>

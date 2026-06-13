@@ -176,6 +176,7 @@ Route::prefix('mandatos')->middleware('auth:api')->group(function () {
     Route::post('/', [MandatoController::class, 'store'])->middleware('checkrole:cliente');
     Route::get('/', [MandatoController::class, 'index'])->middleware('checkrole:cliente,gerente,operativo,superadmin');
     Route::patch('/{id}/status', [MandatoController::class, 'updateStatus'])->middleware('checkrole:operativo,superadmin');
+    Route::get('/{id}/export', [MandatoController::class, 'export'])->middleware('checkrole:cliente,gerente,operativo,contable,superadmin');
     Route::put('/{id}', [MandatoController::class, 'update'])->middleware('checkrole:operativo,superadmin');
     Route::delete('/{id}', [MandatoController::class, 'destroy'])->middleware('checkrole:operativo,superadmin');
 });
