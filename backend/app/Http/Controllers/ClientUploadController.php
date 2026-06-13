@@ -61,6 +61,10 @@ class ClientUploadController extends Controller
             'status' => 'pendiente',
         ]);
 
+        if ($request->filled('categoria')) {
+            \Illuminate\Support\Facades\Cache::put("pending_upload_{$request->categoria}", $upload->id, 300);
+        }
+
         if ($request->filled('document_request_item_id')) {
             $item = \App\Models\DocumentRequestItem::findOrFail($request->document_request_item_id);
             $item->update([

@@ -46,8 +46,11 @@ class N8nWebhookController extends Controller
         $originalName = null;
         $clientUploadId = null;
 
-        // 1. Intentamos obtener por upload_id
+        // 1. Intentamos obtener por upload_id o por cache de categoría
         $uploadId = $request->input('upload_id') ?? $request->query('upload_id');
+        if (!$uploadId) {
+            $uploadId = \Illuminate\Support\Facades\Cache::get("pending_upload_{$categoria}");
+        }
         if ($uploadId) {
             $upload = \App\Models\ClientUpload::find($uploadId);
             if ($upload) {

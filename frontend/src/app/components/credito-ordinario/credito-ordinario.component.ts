@@ -86,6 +86,16 @@ export class CreditoOrdinarioComponent implements OnInit {
     return this.bpmnSteps.findIndex(step => step.key === state);
   }
 
+  getProgressPercent(): number {
+    if (!this.selectedCredito) return 0;
+    const currentStatus = this.selectedCredito.estado;
+    if (currentStatus === 'completado') return 100;
+    if (currentStatus === 'rechazado') return 0;
+    const idx = this.getStateIndex(currentStatus);
+    if (idx < 0) return 0;
+    return Math.round(((idx + 1) / this.bpmnSteps.length) * 100);
+  }
+
   // Determine class for a stepper node
   getStepClass(stepKey: string): string {
     if (!this.selectedCredito) return '';
