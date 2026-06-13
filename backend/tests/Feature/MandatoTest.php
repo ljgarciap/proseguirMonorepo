@@ -64,6 +64,8 @@ class MandatoTest extends TestCase
             'factor_rep_legal_tipo_doc' => 'CC',
             'factor_rep_legal_num_doc' => '789',
             'factor_rep_legal_email' => 'rep@factor.com',
+            'monto_estimado_total' => '100000000',
+            'plazo_estimado' => '90 dias',
         ];
 
         $response = $this->postJson('/api/mandatos', $payload);
@@ -71,6 +73,8 @@ class MandatoTest extends TestCase
         $response->assertStatus(201);
         $this->assertDatabaseHas('mandatos', [
             'mandante_razon_social' => 'Empresa Mandante',
+            'monto_estimado_total' => '100000000',
+            'plazo_estimado' => '90 dias',
             'status' => 'pendiente'
         ]);
     }

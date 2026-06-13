@@ -31,7 +31,9 @@ export class MandatosComponent implements OnInit {
     factor_rep_legal_nombre: '',
     factor_rep_legal_tipo_doc: 'CC',
     factor_rep_legal_num_doc: '',
-    factor_rep_legal_email: ''
+    factor_rep_legal_email: '',
+    monto_estimado_total: '',
+    plazo_estimado: ''
   };
 
   documentTypes = ['CC', 'CE', 'NIT', 'PAS', 'PEP'];
@@ -371,7 +373,9 @@ export class MandatosComponent implements OnInit {
       factor_rep_legal_nombre: this.datosFactor?.rep_legal_nombre || '',
       factor_rep_legal_tipo_doc: this.datosFactor?.rep_legal_tipo_doc || 'CC',
       factor_rep_legal_num_doc: this.datosFactor?.rep_legal_num_doc || '',
-      factor_rep_legal_email: this.datosFactor?.rep_legal_email || ''
+      factor_rep_legal_email: this.datosFactor?.rep_legal_email || '',
+      monto_estimado_total: '',
+      plazo_estimado: ''
     };
   }
 

@@ -58,6 +58,8 @@ class MandatoController extends Controller
             'factor_rep_legal_tipo_doc' => 'required|string',
             'factor_rep_legal_num_doc' => 'required|string',
             'factor_rep_legal_email' => 'required|email',
+            'monto_estimado_total' => 'nullable|string',
+            'plazo_estimado' => 'nullable|string',
         ]);
 
         $factor = \App\Models\DatosFactor::first();
@@ -100,7 +102,9 @@ class MandatoController extends Controller
             'factor_rep_legal_num_doc' => 'required|string',
             'factor_rep_legal_email' => 'required|email',
             'status' => 'nullable|string|in:pendiente,firmado,rechazado',
-            'observaciones' => 'nullable|string'
+            'observaciones' => 'nullable|string',
+            'monto_estimado_total' => 'nullable|string',
+            'plazo_estimado' => 'nullable|string',
         ]);
 
         $mandato = Mandato::findOrFail($id);
