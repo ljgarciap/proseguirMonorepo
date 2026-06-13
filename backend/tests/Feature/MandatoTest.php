@@ -151,4 +151,36 @@ class MandatoTest extends TestCase
             'id' => $mandato->id
         ]);
     }
+
+    public function test_admin_can_export_mandate(): void
+    {
+        $mandato = Mandato::create([
+            'user_id' => $this->cliente->id,
+            'mandante_razon_social' => 'Empresa Mandante',
+            'mandante_tipo_documento' => 'CC',
+            'mandante_numero_documento' => '123',
+            'mandante_domicilio' => 'Domicilio Mandante',
+            'mandante_direccion' => 'Calle 123',
+            'mandante_telefono' => '555-1234',
+            'mandante_rep_legal_nombre' => 'Rep Mandante',
+            'mandante_rep_legal_tipo_doc' => 'CC',
+            'mandante_rep_legal_num_doc' => '456',
+            'mandante_rep_legal_email' => 'rep@mandante.com',
+            'factor_razon_social' => 'Empresa Factor',
+            'factor_tipo_documento' => 'NIT',
+            'factor_numero_documento' => '999',
+            'factor_rep_legal_nombre' => 'Rep Factor',
+            'factor_rep_legal_tipo_doc' => 'CC',
+            'factor_rep_legal_num_doc' => '789',
+            'factor_rep_legal_email' => 'rep@factor.com',
+            'status' => 'firmado'
+        ]);
+
+        Passport::actingAs($this->operativo);
+
+        $response = $this->get("/api/mandatos/{$mandato->id}/export");
+
+        $response->assertStatus(200);
+        $response->assertHeader('content-type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }
 }

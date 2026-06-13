@@ -246,6 +246,24 @@ export class MandatosComponent implements OnInit {
     });
   }
 
+  downloadExcel(mandato: any): void {
+    const url = `${environment.apiUrl}/mandatos/${mandato.id}/export`;
+    this.http.get(url, { responseType: 'blob' }).subscribe({
+      next: (blob: Blob) => {
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        const today = new Date().toISOString().slice(0, 10);
+        link.download = `mandato_${mandato.mandante_numero_documento}_${today}.xlsx`;
+        link.click();
+        window.URL.revokeObjectURL(downloadUrl);
+      },
+      error: (err) => {
+        Swal.fire('Error', 'No se pudo descargar el archivo Excel.', 'error');
+      }
+    });
+  }
+
   onSubmit(): void {
     this.loading = true;
     this.validationErrors = {};
