@@ -214,7 +214,7 @@ Route::put('/datos-factor', [\App\Http\Controllers\DatosFactorController::class,
     ->middleware(['auth:api', 'checkrole:operativo,gerente,superadmin']);
 
 // Documentos Internos (Staff Flow)
-Route::prefix('internal-docs')->middleware(['auth:api', 'checkrole:operativo,contable,gerente,superadmin'])->group(function () {
+Route::prefix('internal-docs')->middleware(['auth:api', 'checkrole:operativo,contable,gerente,superadmin,coordinador_comercial'])->group(function () {
     Route::get('/', [\App\Http\Controllers\InternalDocumentController::class, 'index']);
     Route::post('/', [\App\Http\Controllers\InternalDocumentController::class, 'store']);
     Route::patch('/bulk-status', [\App\Http\Controllers\InternalDocumentController::class, 'bulkUpdateStatus']);
