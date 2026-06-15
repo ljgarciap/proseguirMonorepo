@@ -88,6 +88,59 @@
       </div>
     </div>
 
+    <!-- SECCIÓN DE CARGA MÚLTIPLE GENERAL (Para Mandato) -->
+    <div class="document-checklist-card card full-width" style="margin-bottom: 2rem; padding: 2rem; border-color: #e2e8f0; background-color: #f8fafc;">
+      <div class="card-header-flex-client" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem;">
+        <div>
+          <h2 style="font-size: 1.2rem; font-weight: 700; margin: 0; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+            <span class="material-symbols-outlined" style="color: #2563eb; font-size: 24px;">upload_file</span>
+            Carga de Documentos y Soportes (PDF)
+          </h2>
+          <p style="color: #64748b; font-size: 0.85rem; margin: 4px 0 0 0;">
+            Adjunte aquí todos los soportes documentales de su mandato. Podrá ver el estado y progreso en la pestaña "Mis Cargas".
+          </p>
+        </div>
+        <div>
+          <button type="button" class="btn-pro primary" (click)="genFileInput.click()" style="background-color: #2563eb; border-color: #2563eb; padding: 0.5rem 1.25rem; border-radius: 0.5rem; color: white; display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; border: none;">
+            <span class="material-symbols-outlined" style="font-size: 20px;">add_circle</span>
+            Seleccionar Archivos
+          </button>
+          <input type="file" #genFileInput (change)="onGeneralFilesSelected($event)" accept=".pdf" multiple hidden>
+        </div>
+      </div>
+
+      <!-- Selected files list -->
+      <div *ngIf="selectedFiles.length > 0" class="checklist-grid-client" style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem;">
+        <div class="checklist-item-client card" *ngFor="let file of selectedFiles; let idx = index" style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: center; padding: 0.75rem 1.25rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: white;">
+          <div class="item-info" style="display: flex; gap: 10px; align-items: center;">
+            <span class="material-symbols-outlined" style="font-size: 22px; color: #e2e8f0; background: #64748b; border-radius: 4px; padding: 2px;">picture_as_pdf</span>
+            <div style="display: flex; flex-direction: column;">
+              <span style="font-weight: 600; color: #334155; font-size: 0.9rem;">{{ file.name }}</span>
+              <span style="font-size: 0.75rem; color: #94a3b8;">{{ (file.size / 1024 / 1024) | number:'1.1-2' }} MB</span>
+            </div>
+          </div>
+          <button type="button" (click)="removeSelectedFile(idx)" style="background: none; border: none; color: #ef4444; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px;">
+            <span class="material-symbols-outlined" style="font-size: 20px;">delete</span>
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="selectedFiles.length > 0" style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn-pro secondary" (click)="selectedFiles = []" [disabled]="isUploadingGeneral" style="padding: 0.5rem 1.25rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; border: 1px solid #cbd5e1; background: white; color: #475569;">
+          Cancelar
+        </button>
+        <button type="button" class="btn-pro primary" (click)="uploadGeneralFiles()" [disabled]="isUploadingGeneral" style="background-color: #16a34a; border-color: #16a34a; padding: 0.5rem 1.25rem; border-radius: 0.5rem; color: white; font-weight: 600; cursor: pointer; border: none; display: flex; align-items: center; gap: 6px;">
+          <span class="material-symbols-outlined" style="font-size: 18px;">cloud_upload</span>
+          {{ isUploadingGeneral ? 'Subiendo...' : 'Iniciar Carga' }}
+        </button>
+      </div>
+
+      <div *ngIf="selectedFiles.length === 0" style="text-align: center; padding: 2rem; border: 2px dashed #cbd5e1; border-radius: 0.875rem; color: #94a3b8;">
+        <span class="material-symbols-outlined" style="font-size: 40px; margin-bottom: 0.5rem; display: block; color: #cbd5e1;">cloud_upload</span>
+        <p style="margin: 0; font-size: 0.875rem; font-weight: 500;">No hay archivos seleccionados para cargar. Presione "Seleccionar Archivos" para comenzar.</p>
+      </div>
+    </div>
+
     <!-- SECCIÓN MANDANTE -->
     <div class="form-card mandante-card">
       <div class="card-header">

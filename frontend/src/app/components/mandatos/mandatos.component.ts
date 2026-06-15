@@ -50,6 +50,10 @@ export class MandatosComponent implements OnInit {
   currentPage: number = 1;
   itemsPerPage: number = 10;
 
+  // Carga Múltiple de Archivos (General)
+  selectedFiles: File[] = [];
+  isUploadingGeneral = false;
+
   // Modales y CRUD
   showDetailModal = false;
   showEditModal = false;
@@ -177,6 +181,56 @@ export class MandatosComponent implements OnInit {
         Swal.fire('Error', err.error?.message || 'No se pudo subir el archivo.', 'error');
       }
     });
+  }
+
+  onGeneralFilesSelected(event: any): void {
+    if (event.target.files) {
+      for (let i = 0; i < event.target.files.length; i++) {
+        const file = event.target.files[i];
+        if (file.type !== 'application/pdf') {
+          Swal.fire('Formato no permitido', 'Únicamente se permiten archivos en formato PDF.', 'error');
+          continue;
+        }
+        this.selectedFiles.push(file);
+      }
+    }
+  }
+
+  removeSelectedFile(index: number): void {
+    this.selectedFiles.splice(index, 1);
+  }
+
+  uploadGeneralFiles(): void {
+    if (this.selectedFiles.length === 0) return;
+
+    this.isUploadingGeneral = true;
+    Swal.fire({
+      title: 'Subiendo Documentos...',
+      text: 'Por favor espere mientras se cargan los archivos.',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    const uploadPromises = this.selectedFiles.map(file => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('active_role', 'cliente');
+      formData.append('category', 'mandatos');
+      return this.http.post(`${environment.apiUrl}/uploads`, formData).toPromise();
+    });
+
+    Promise.all(uploadPromises)
+      .then(() => {
+        this.isUploadingGeneral = false;
+        this.selectedFiles = [];
+        Swal.fire('Carga Exitosa', 'Todos los documentos han sido cargados para validación.', 'success');
+      })
+      .catch((err) => {
+        this.isUploadingGeneral = false;
+        Swal.fire('Error', err.error?.message || 'Ocurrió un error al subir algunos archivos.', 'error');
+      });
   }
 
   getApprovedCount(): number {
