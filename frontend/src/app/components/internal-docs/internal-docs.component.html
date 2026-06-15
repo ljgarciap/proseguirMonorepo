@@ -131,7 +131,9 @@
               </span>
             </td>
             <td>
-              <span class="status-pill" [ngClass]="doc.estado">{{ doc.estado | titlecase }}</span>
+              <span class="status-pill" [ngClass]="doc.estado">
+                {{ doc.estado === 'visto_bueno' ? 'Visto Bueno' : (doc.estado | titlecase) }}
+              </span>
             </td>
             <td>
               <div class="sla-badge" [ngClass]="getRemainingTime(doc).status" *ngIf="getRemainingTime(doc).status !== 'none'">
@@ -159,14 +161,39 @@
                 </ng-container>
                 
                 <!-- Quick Status Actions for Receivers -->
-                <ng-container *ngIf="doc.target_role === authService.getActiveRole() && doc.estado === 'pendiente'">
+                <!-- Scenario A: Regular Receivers or Gerente processing direct pending documents -->
+                <ng-container *ngIf="doc.target_role === authService.getActiveRole() && doc.estado === 'pendiente' && !(authService.getActiveRole() === 'operativo' && doc.target_role === 'gerente')">
                   <button class="btn-pro success sm icon-only" (click)="updateStatus(doc, 'procesado')" title="Marcar como Procesado">
                     <span class="material-symbols-outlined">check_circle</span>
                   </button>
                   <button class="btn-pro danger sm icon-only" (click)="updateStatus(doc, 'rechazado')" title="Rechazar">
                     <span class="material-symbols-outlined">cancel</span>
                   </button>
-                  <button class="btn-pro primary sm icon-only" *ngIf="doc.batch_id" (click)="processBatch(doc.batch_id)" title="Procesar Lote Completo" style="background-color: #6366f1; border-color: #6366f1;">
+                </ng-container>
+
+                <!-- Scenario B: Operativo giving visto_bueno on coordinator documents targeting gerente -->
+                <ng-container *ngIf="authService.getActiveRole() === 'operativo' && doc.target_role === 'gerente' && doc.estado === 'pendiente' && doc.sender?.roles?.includes('coordinador_comercial')">
+                  <button class="btn-pro success sm icon-only" (click)="updateStatus(doc, 'visto_bueno')" title="Dar Visto Bueno" style="background-color: #0284c7; border-color: #0284c7;">
+                    <span class="material-symbols-outlined">thumb_up</span>
+                  </button>
+                  <button class="btn-pro danger sm icon-only" (click)="updateStatus(doc, 'rechazado')" title="Rechazar">
+                    <span class="material-symbols-outlined">cancel</span>
+                  </button>
+                </ng-container>
+
+                <!-- Scenario C: Gerente approving documents that have visto_bueno -->
+                <ng-container *ngIf="authService.getActiveRole() === 'gerente' && doc.target_role === 'gerente' && doc.estado === 'visto_bueno'">
+                  <button class="btn-pro success sm icon-only" (click)="updateStatus(doc, 'procesado')" title="Aprobar y Procesar">
+                    <span class="material-symbols-outlined">check_circle</span>
+                  </button>
+                  <button class="btn-pro danger sm icon-only" (click)="updateStatus(doc, 'rechazado')" title="Rechazar">
+                    <span class="material-symbols-outlined">cancel</span>
+                  </button>
+                </ng-container>
+
+                <!-- Batch Actions (Only if regular pending) -->
+                <ng-container *ngIf="doc.target_role === authService.getActiveRole() && doc.estado === 'pendiente' && doc.batch_id">
+                  <button class="btn-pro primary sm icon-only" (click)="processBatch(doc.batch_id)" title="Procesar Lote Completo" style="background-color: #6366f1; border-color: #6366f1;">
                     <span class="material-symbols-outlined">library_add_check</span>
                   </button>
                 </ng-container>

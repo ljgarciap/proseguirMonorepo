@@ -26,12 +26,31 @@ class InternalDocumentController extends Controller
                 
                 if (in_array('operativo', $roles)) {
                     $q->orWhere('target_role', 'operativo');
+                    // Operativo can also see pending documents sent by coordinador_comercial targeting gerente
+                    $q->orWhere(function($sub) {
+                        $sub->where('target_role', 'gerente')
+                            ->where('estado', 'pendiente')
+                            ->whereHas('sender', function($qu) {
+                                $qu->whereJsonContains('roles', 'coordinador_comercial');
+                            });
+                    });
                 }
                 if (in_array('contable', $roles)) {
                     $q->orWhere('target_role', 'contable');
                 }
                 if (in_array('gerente', $roles)) {
-                    $q->orWhere('target_role', 'gerente');
+                    // Gerente sees target gerente. But if sent by coordinador_comercial, only show if not pending (needs visto_bueno first)
+                    $q->orWhere(function($sub) {
+                        $sub->where('target_role', 'gerente')
+                            ->where(function($stateSub) {
+                                $stateSub->where('estado', '!=', 'pendiente')
+                                    ->orWhere(function($orSub) {
+                                        $orSub->whereDoesntHave('sender', function($qu) {
+                                            $qu->whereJsonContains('roles', 'coordinador_comercial');
+                                        });
+                                    });
+                            });
+                    });
                 }
             });
         }
@@ -112,7 +131,7 @@ class InternalDocumentController extends Controller
         $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'exists:internal_documents,id',
-            'estado' => 'required|in:visto,procesado,rechazado',
+            'estado' => 'required|in:visto,visto_bueno,procesado,rechazado',
             'motivo_rechazo' => 'nullable|string'
         ]);
 
@@ -137,7 +156,7 @@ class InternalDocumentController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $request->validate([
-            'estado' => 'required|in:visto,procesado,rechazado',
+            'estado' => 'required|in:visto,visto_bueno,procesado,rechazado',
             'motivo_rechazo' => 'nullable|string'
         ]);
 

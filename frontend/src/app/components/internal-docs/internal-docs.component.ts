@@ -80,21 +80,30 @@ export class InternalDocsComponent implements OnInit {
       if (!isSuperadmin) {
         if (doc.sender?.email === userEmail) {
           roleMatch = true;
-        } else if (activeRole === 'operativo' && doc.target_role === 'operativo') {
-          roleMatch = true;
+        } else if (activeRole === 'operativo') {
+          if (doc.target_role === 'operativo') {
+            roleMatch = true;
+          } else if (doc.target_role === 'gerente' && doc.estado === 'pendiente' && doc.sender?.roles?.includes('coordinador_comercial')) {
+            roleMatch = true;
+          }
         } else if (activeRole === 'contable' && doc.target_role === 'contable') {
           roleMatch = true;
-        } else if (activeRole === 'gerente' && doc.target_role === 'gerente') {
-          roleMatch = true;
+        } else if (activeRole === 'gerente') {
+          if (doc.target_role === 'gerente') {
+            const isFromCoordinator = doc.sender?.roles?.includes('coordinador_comercial');
+            if (!isFromCoordinator || doc.estado !== 'pendiente') {
+              roleMatch = true;
+            }
+          }
         }
       }
 
       // 2. Tab Filter
       let tabMatch = false;
       if (this.currentTab === 'pendientes') {
-        tabMatch = doc.estado === 'pendiente';
+        tabMatch = doc.estado === 'pendiente' || doc.estado === 'visto_bueno' || doc.estado === 'visto';
       } else {
-        tabMatch = doc.estado !== 'pendiente';
+        tabMatch = doc.estado === 'procesado' || doc.estado === 'rechazado';
       }
 
       // 3. Search Filter
