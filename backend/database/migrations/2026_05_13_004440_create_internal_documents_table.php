@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('archivo_path');
             $table->foreignId('categoria_id')->constrained('accounting_categories')->onDelete('cascade');
             $table->foreignId('prioridad_id')->constrained('accounting_priorities')->onDelete('cascade');
-            $table->enum('estado', ['pendiente', 'visto', 'procesado', 'rechazado'])->default('pendiente');
+            $table->enum('estado', ['pendiente', 'visto', 'visto_bueno', 'procesado', 'rechazado'])->default('pendiente');
             $table->text('mensaje')->nullable();
             $table->timestamps();
         });

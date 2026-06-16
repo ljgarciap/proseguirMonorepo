@@ -9,6 +9,7 @@ class ClientUpload extends Model
     protected $fillable = [
         'user_id',
         'upload_role',
+        'category',
         'filename',
         'original_name',
         'status',

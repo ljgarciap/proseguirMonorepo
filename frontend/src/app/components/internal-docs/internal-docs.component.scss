@@ -91,12 +91,12 @@
 
 .obs-text {
   display: block;
-  max-width: 200px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: 250px;
+  white-space: normal;
+  word-break: break-word;
   color: #64748b;
   font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 .prio-tag {
@@ -118,6 +118,7 @@
   
   &.pendiente { background: #fffbeb; color: #d97706; }
   &.visto { background: #eff6ff; color: #2563eb; }
+  &.visto_bueno { background: #e0f2fe; color: #0284c7; }
   &.procesado { background: #f0fdf4; color: #16a34a; }
   &.rechazado { background: #fef2f2; color: #dc2626; }
 }

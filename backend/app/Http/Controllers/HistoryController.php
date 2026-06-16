@@ -241,11 +241,13 @@ class HistoryController extends Controller
 
         // Find all uploads matching filename, original_name or base name
         $nameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
-        $uploadIds = \App\Models\ClientUpload::where('filename', $filename)
+        $uploads = \App\Models\ClientUpload::where('filename', $filename)
             ->orWhere('original_name', $filename)
             ->orWhere('filename', 'like', '%' . basename($filename))
             ->orWhere('original_name', 'like', $nameWithoutExt . '.%')
-            ->pluck('id');
+            ->get();
+
+        $uploadIds = $uploads->pluck('id');
 
         $tables = [
             \App\Models\OperacionCartera::class,
@@ -257,11 +259,30 @@ class HistoryController extends Controller
         ];
 
         $deletedTotal = 0;
-        if ($uploadIds->isNotEmpty()) {
-            foreach ($tables as $modelClass) {
-                $deletedTotal += $modelClass::whereIn('client_upload_id', $uploadIds)->delete();
+
+        \Illuminate\Support\Facades\DB::transaction(function() use ($uploads, $uploadIds, $tables, &$deletedTotal, $filename) {
+            // Delete operational records
+            if ($uploadIds->isNotEmpty()) {
+                foreach ($tables as $modelClass) {
+                    $deletedTotal += $modelClass::whereIn('client_upload_id', $uploadIds)->delete();
+                }
             }
-        }
+
+            // Delete SystemLogs
+            \App\Models\SystemLog::where('filename', $filename)
+                ->orWhere('original_name', $filename)
+                ->orWhereIn('filename', $uploads->pluck('filename'))
+                ->orWhereIn('original_name', $uploads->pluck('original_name'))
+                ->delete();
+
+            // Delete physical files and ClientUploads
+            foreach ($uploads as $upload) {
+                if (\Illuminate\Support\Facades\Storage::exists($upload->filename)) {
+                    \Illuminate\Support\Facades\Storage::delete($upload->filename);
+                }
+                $upload->delete();
+            }
+        });
 
         return response()->json([
             'message' => 'Limpieza masiva completada',

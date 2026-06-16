@@ -29,7 +29,9 @@ class Mandato extends Model
         'factor_rep_legal_num_doc',
         'factor_rep_legal_email',
         'status',
-        'observaciones'
+        'observaciones',
+        'monto_estimado_total',
+        'plazo_estimado'
     ];
 
     public function user()

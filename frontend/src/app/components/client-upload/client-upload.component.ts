@@ -107,6 +107,7 @@ import Swal from 'sweetalert2';
             <thead>
               <tr>
                 <th>Archivo</th>
+                <th>Tipo de Solicitud</th>
                 <th>Fecha de Carga</th>
                 <th>Estado</th>
                 <th>Observaciones Operativas</th>
@@ -120,6 +121,11 @@ import Swal from 'sweetalert2';
                     <span class="material-symbols-outlined">draft</span>
                     {{ upload.original_name }}
                   </div>
+                </td>
+                <td>
+                  <span class="category-badge" [ngClass]="upload.category || 'general'">
+                    {{ upload.category === 'mandatos' ? 'Diligenciamiento Mandato' : (upload.category === 'credito_ordinario' ? 'Crédito Ordinario' : 'General') }}
+                  </span>
                 </td>
                 <td>{{ upload.created_at | date:'medium' }}</td>
                 <td>
@@ -468,6 +474,27 @@ import Swal from 'sweetalert2';
       gap: 8px;
       p { margin: 0; font-size: 0.8rem; color: #c53030; font-weight: 500; }
       .material-symbols-outlined { font-size: 16px; color: #e53e3e; }
+    }
+
+    .category-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .category-badge.mandatos {
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+    .category-badge.credito_ordinario {
+      background: #f3e8ff;
+      color: #6b21a8;
+    }
+    .category-badge.general {
+      background: #f1f5f9;
+      color: #475569;
     }
   `]
 })
