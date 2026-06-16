@@ -176,6 +176,9 @@ Route::prefix('mandatos')->middleware('auth:api')->group(function () {
     Route::post('/', [MandatoController::class, 'store'])->middleware('checkrole:cliente');
     Route::get('/', [MandatoController::class, 'index'])->middleware('checkrole:cliente,gerente,operativo,superadmin');
     Route::patch('/{id}/status', [MandatoController::class, 'updateStatus'])->middleware('checkrole:operativo,superadmin');
+    Route::get('/{id}/export', [MandatoController::class, 'export'])->middleware('checkrole:cliente,gerente,operativo,contable,superadmin');
+    Route::put('/{id}', [MandatoController::class, 'update'])->middleware('checkrole:operativo,superadmin');
+    Route::delete('/{id}', [MandatoController::class, 'destroy'])->middleware('checkrole:operativo,superadmin');
 });
 
 // Créditos Ordinarios (Proceso BPMN)
@@ -204,11 +207,19 @@ Route::prefix('parameters')->middleware(['auth:api'])->group(function () {
     Route::delete('/{table}/{id}', [\App\Http\Controllers\ParameterController::class, 'destroy'])->middleware('checkrole:superadmin');
 });
 
+// Datos Factor (Mandatos)
+Route::get('/datos-factor', [\App\Http\Controllers\DatosFactorController::class, 'show'])
+    ->middleware(['auth:api', 'checkrole:cliente,operativo,gerente,superadmin']);
+Route::put('/datos-factor', [\App\Http\Controllers\DatosFactorController::class, 'update'])
+    ->middleware(['auth:api', 'checkrole:operativo,gerente,superadmin']);
+
 // Documentos Internos (Staff Flow)
-Route::prefix('internal-docs')->middleware(['auth:api', 'checkrole:operativo,contable,gerente,superadmin'])->group(function () {
+Route::prefix('internal-docs')->middleware(['auth:api', 'checkrole:operativo,contable,gerente,superadmin,coordinador_comercial'])->group(function () {
     Route::get('/', [\App\Http\Controllers\InternalDocumentController::class, 'index']);
     Route::post('/', [\App\Http\Controllers\InternalDocumentController::class, 'store']);
+    Route::patch('/bulk-status', [\App\Http\Controllers\InternalDocumentController::class, 'bulkUpdateStatus']);
     Route::patch('/{id}/status', [\App\Http\Controllers\InternalDocumentController::class, 'updateStatus']);
+    Route::delete('/bulk-delete', [\App\Http\Controllers\InternalDocumentController::class, 'bulkDestroy']);
     Route::delete('/{id}', [\App\Http\Controllers\InternalDocumentController::class, 'destroy']);
 });
 

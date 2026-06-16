@@ -47,7 +47,8 @@ class ClientUploadController extends Controller
         $request->validate([
             'file' => 'required|file|max:102400', 
             'active_role' => 'nullable|string',
-            'document_request_item_id' => 'nullable|exists:document_request_items,id'
+            'document_request_item_id' => 'nullable|exists:document_request_items,id',
+            'category' => 'nullable|string'
         ]);
 
         $file = $request->file('file');
@@ -56,10 +57,15 @@ class ClientUploadController extends Controller
         $upload = ClientUpload::create([
             'user_id' => $request->user()->id,
             'upload_role' => $request->active_role ?? 'cliente',
+            'category' => $request->category,
             'filename' => $path,
             'original_name' => $file->getClientOriginalName(),
             'status' => 'pendiente',
         ]);
+
+        if ($request->filled('categoria')) {
+            \Illuminate\Support\Facades\Cache::put("pending_upload_{$request->categoria}", $upload->id, 300);
+        }
 
         if ($request->filled('document_request_item_id')) {
             $item = \App\Models\DocumentRequestItem::findOrFail($request->document_request_item_id);

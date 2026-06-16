@@ -31,7 +31,9 @@ export class MandatosComponent implements OnInit {
     factor_rep_legal_nombre: '',
     factor_rep_legal_tipo_doc: 'CC',
     factor_rep_legal_num_doc: '',
-    factor_rep_legal_email: ''
+    factor_rep_legal_email: '',
+    monto_estimado_total: '',
+    plazo_estimado: ''
   };
 
   documentTypes = ['CC', 'CE', 'NIT', 'PAS', 'PEP'];
@@ -47,6 +49,19 @@ export class MandatosComponent implements OnInit {
   searchText: string = '';
   currentPage: number = 1;
   itemsPerPage: number = 10;
+
+  // Carga Múltiple de Archivos (General)
+  selectedFiles: File[] = [];
+  isUploadingGeneral = false;
+
+  // Modales y CRUD
+  showDetailModal = false;
+  showEditModal = false;
+  showFactorModal = false;
+  selectedMandato: any = null;
+  editForm: any = {};
+  datosFactor: any = null;
+  factorForm: any = {};
 
   constructor(private http: HttpClient, public authService: AuthService) {}
 
@@ -79,12 +94,54 @@ export class MandatosComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.loadDatosFactor();
     if (!this.authService.isAuthorized(['cliente'])) {
       this.currentTab = 'historial';
     } else {
       this.loadActiveRequest();
     }
     this.loadHistorial();
+  }
+
+  loadDatosFactor(): void {
+    this.http.get<any>(`${environment.apiUrl}/datos-factor`).subscribe({
+      next: (res) => {
+        this.datosFactor = res;
+        this.mandato.factor_razon_social = res.razon_social;
+        this.mandato.factor_tipo_documento = res.tipo_documento;
+        this.mandato.factor_numero_documento = res.numero_documento;
+        this.mandato.factor_rep_legal_nombre = res.rep_legal_nombre;
+        this.mandato.factor_rep_legal_tipo_doc = res.rep_legal_tipo_doc;
+        this.mandato.factor_rep_legal_num_doc = res.rep_legal_num_doc;
+        this.mandato.factor_rep_legal_email = res.rep_legal_email;
+      }
+    });
+  }
+
+  openFactorConfig(): void {
+    this.factorForm = { ...this.datosFactor };
+    this.showFactorModal = true;
+  }
+
+  closeFactorConfig(): void {
+    this.showFactorModal = false;
+  }
+
+  saveFactorConfig(): void {
+    this.loading = true;
+    this.http.put(`${environment.apiUrl}/datos-factor`, this.factorForm).subscribe({
+      next: (res) => {
+        this.loading = false;
+        this.datosFactor = res;
+        this.loadDatosFactor();
+        this.closeFactorConfig();
+        Swal.fire('¡Éxito!', 'Información del Factor actualizada globalmente.', 'success');
+      },
+      error: (err) => {
+        this.loading = false;
+        Swal.fire('Error', err.error?.message || 'No se pudo actualizar la información del factor.', 'error');
+      }
+    });
   }
 
   loadActiveRequest(): void {
@@ -124,6 +181,56 @@ export class MandatosComponent implements OnInit {
         Swal.fire('Error', err.error?.message || 'No se pudo subir el archivo.', 'error');
       }
     });
+  }
+
+  onGeneralFilesSelected(event: any): void {
+    if (event.target.files) {
+      for (let i = 0; i < event.target.files.length; i++) {
+        const file = event.target.files[i];
+        if (file.type !== 'application/pdf') {
+          Swal.fire('Formato no permitido', 'Únicamente se permiten archivos en formato PDF.', 'error');
+          continue;
+        }
+        this.selectedFiles.push(file);
+      }
+    }
+  }
+
+  removeSelectedFile(index: number): void {
+    this.selectedFiles.splice(index, 1);
+  }
+
+  uploadGeneralFiles(): void {
+    if (this.selectedFiles.length === 0) return;
+
+    this.isUploadingGeneral = true;
+    Swal.fire({
+      title: 'Subiendo Documentos...',
+      text: 'Por favor espere mientras se cargan los archivos.',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    const uploadPromises = this.selectedFiles.map(file => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('active_role', 'cliente');
+      formData.append('category', 'mandatos');
+      return this.http.post(`${environment.apiUrl}/uploads`, formData).toPromise();
+    });
+
+    Promise.all(uploadPromises)
+      .then(() => {
+        this.isUploadingGeneral = false;
+        this.selectedFiles = [];
+        Swal.fire('Carga Exitosa', 'Todos los documentos han sido cargados para validación.', 'success');
+      })
+      .catch((err) => {
+        this.isUploadingGeneral = false;
+        Swal.fire('Error', err.error?.message || 'Ocurrió un error al subir algunos archivos.', 'error');
+      });
   }
 
   getApprovedCount(): number {
@@ -191,6 +298,24 @@ export class MandatosComponent implements OnInit {
       },
       error: (err) => {
         Swal.fire('Error', 'No se pudo actualizar el estado.', 'error');
+      }
+    });
+  }
+
+  downloadExcel(mandato: any): void {
+    const url = `${environment.apiUrl}/mandatos/${mandato.id}/export`;
+    this.http.get(url, { responseType: 'blob' }).subscribe({
+      next: (blob: Blob) => {
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        const today = new Date().toISOString().slice(0, 10);
+        link.download = `mandato_${mandato.mandante_numero_documento}_${today}.xlsx`;
+        link.click();
+        window.URL.revokeObjectURL(downloadUrl);
+      },
+      error: (err) => {
+        Swal.fire('Error', 'No se pudo descargar el archivo Excel.', 'error');
       }
     });
   }
@@ -296,13 +421,88 @@ export class MandatosComponent implements OnInit {
       mandante_rep_legal_tipo_doc: 'CC',
       mandante_rep_legal_num_doc: '',
       mandante_rep_legal_email: '',
-      factor_razon_social: '',
-      factor_tipo_documento: '',
-      factor_numero_documento: '',
-      factor_rep_legal_nombre: '',
-      factor_rep_legal_tipo_doc: 'CC',
-      factor_rep_legal_num_doc: '',
-      factor_rep_legal_email: ''
+      factor_razon_social: this.datosFactor?.razon_social || '',
+      factor_tipo_documento: this.datosFactor?.tipo_documento || '',
+      factor_numero_documento: this.datosFactor?.numero_documento || '',
+      factor_rep_legal_nombre: this.datosFactor?.rep_legal_nombre || '',
+      factor_rep_legal_tipo_doc: this.datosFactor?.rep_legal_tipo_doc || 'CC',
+      factor_rep_legal_num_doc: this.datosFactor?.rep_legal_num_doc || '',
+      factor_rep_legal_email: this.datosFactor?.rep_legal_email || '',
+      monto_estimado_total: '',
+      plazo_estimado: ''
     };
+  }
+
+  openDetail(m: any): void {
+    this.selectedMandato = m;
+    this.showDetailModal = true;
+  }
+
+  closeDetail(): void {
+    this.showDetailModal = false;
+    this.selectedMandato = null;
+  }
+
+  openEdit(m: any): void {
+    this.selectedMandato = m;
+    this.editForm = { ...m };
+    this.showEditModal = true;
+  }
+
+  closeEdit(): void {
+    this.showEditModal = false;
+    this.selectedMandato = null;
+  }
+
+  saveEdit(): void {
+    if (!this.selectedMandato) return;
+    this.loading = true;
+    this.http.put(`${environment.apiUrl}/mandatos/${this.selectedMandato.id}`, this.editForm).subscribe({
+      next: () => {
+        this.loading = false;
+        Swal.fire({
+          icon: 'success',
+          title: 'Mandato Actualizado',
+          text: 'La información del mandato se actualizó con éxito.',
+          confirmButtonColor: '#2563eb'
+        });
+        this.loadHistorial();
+        this.closeEdit();
+      },
+      error: (err) => {
+        this.loading = false;
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: err.error?.message || 'No se pudo actualizar el mandato.',
+          confirmButtonColor: '#ef4444'
+        });
+      }
+    });
+  }
+
+  deleteMandato(m: any): void {
+    Swal.fire({
+      title: '¿Eliminar Mandato?',
+      text: `Esta acción eliminará permanentemente el mandato de ${m.mandante_razon_social}.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, Eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#64748b'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.http.delete(`${environment.apiUrl}/mandatos/${m.id}`).subscribe({
+          next: () => {
+            Swal.fire('Eliminado', 'El mandato ha sido eliminado correctamente.', 'success');
+            this.loadHistorial();
+          },
+          error: (err) => {
+            Swal.fire('Error', err.error?.message || 'No se pudo eliminar el mandato.', 'error');
+          }
+        });
+      }
+    });
   }
 }

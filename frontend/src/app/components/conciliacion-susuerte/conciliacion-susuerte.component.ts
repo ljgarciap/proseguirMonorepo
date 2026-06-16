@@ -206,4 +206,21 @@ export class ConciliacionSusuerteComponent implements OnInit {
       }
     });
   }
+
+  deleteRow(item: any) {
+    Swal.fire({
+      title: '¿Eliminar fila?',
+      text: 'Esta fila se eliminará de la vista y del archivo descargable una vez que guardes las observaciones.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#ef4444'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.results = this.results.filter(r => r !== item);
+        this.saveStateToLocalStorage();
+      }
+    });
+  }
 }

@@ -4,12 +4,17 @@
     <p class="pro-subtitle">Complete y revise la información legal para la generación del contrato de mandato.</p>
   </div>
 
-  <div class="pro-tabs">
-    <button *ngIf="authService.isAuthorized(['cliente', 'superadmin'])" class="tab-btn" [class.active]="currentTab === 'diligenciar'" (click)="currentTab = 'diligenciar'">
-      <span class="material-symbols-outlined">edit_document</span> Diligenciar Nuevo
-    </button>
-    <button class="tab-btn" [class.active]="currentTab === 'historial'" (click)="currentTab = 'historial'">
-      <span class="material-symbols-outlined">history</span> Historial / Revisión
+  <div class="pro-tabs" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+    <div style="display: flex; gap: 8px;">
+      <button *ngIf="authService.isAuthorized(['cliente', 'superadmin'])" class="tab-btn" [class.active]="currentTab === 'diligenciar'" (click)="currentTab = 'diligenciar'">
+        <span class="material-symbols-outlined">edit_document</span> Diligenciar Nuevo
+      </button>
+      <button class="tab-btn" [class.active]="currentTab === 'historial'" (click)="currentTab = 'historial'">
+        <span class="material-symbols-outlined">history</span> Historial / Revisión
+      </button>
+    </div>
+    <button *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" class="tab-btn config-factor-btn" (click)="openFactorConfig()" style="background-color: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; display: flex; align-items: center; gap: 4px;">
+      <span class="material-symbols-outlined">settings</span> Configurar Factor
     </button>
   </div>
 
@@ -80,6 +85,59 @@
             <p style="margin: 0; font-size: 0.8rem; color: #991b1b; font-weight: 500;">Rechazado: {{ item.observaciones }} (Por favor cargue un nuevo archivo)</p>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN DE CARGA MÚLTIPLE GENERAL (Para Mandato) -->
+    <div class="document-checklist-card card full-width" style="margin-bottom: 2rem; padding: 2rem; border-color: #e2e8f0; background-color: #f8fafc;">
+      <div class="card-header-flex-client" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem;">
+        <div>
+          <h2 style="font-size: 1.2rem; font-weight: 700; margin: 0; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+            <span class="material-symbols-outlined" style="color: #2563eb; font-size: 24px;">upload_file</span>
+            Carga de Documentos y Soportes (PDF)
+          </h2>
+          <p style="color: #64748b; font-size: 0.85rem; margin: 4px 0 0 0;">
+            Adjunte aquí todos los soportes documentales de su mandato. Podrá ver el estado y progreso en la pestaña "Mis Cargas".
+          </p>
+        </div>
+        <div>
+          <button type="button" class="btn-pro primary" (click)="genFileInput.click()" style="background-color: #2563eb; border-color: #2563eb; padding: 0.5rem 1.25rem; border-radius: 0.5rem; color: white; display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; border: none;">
+            <span class="material-symbols-outlined" style="font-size: 20px;">add_circle</span>
+            Seleccionar Archivos
+          </button>
+          <input type="file" #genFileInput (change)="onGeneralFilesSelected($event)" accept=".pdf" multiple hidden>
+        </div>
+      </div>
+
+      <!-- Selected files list -->
+      <div *ngIf="selectedFiles.length > 0" class="checklist-grid-client" style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem;">
+        <div class="checklist-item-client card" *ngFor="let file of selectedFiles; let idx = index" style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: center; padding: 0.75rem 1.25rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; background: white;">
+          <div class="item-info" style="display: flex; gap: 10px; align-items: center;">
+            <span class="material-symbols-outlined" style="font-size: 22px; color: #e2e8f0; background: #64748b; border-radius: 4px; padding: 2px;">picture_as_pdf</span>
+            <div style="display: flex; flex-direction: column;">
+              <span style="font-weight: 600; color: #334155; font-size: 0.9rem;">{{ file.name }}</span>
+              <span style="font-size: 0.75rem; color: #94a3b8;">{{ (file.size / 1024 / 1024) | number:'1.1-2' }} MB</span>
+            </div>
+          </div>
+          <button type="button" (click)="removeSelectedFile(idx)" style="background: none; border: none; color: #ef4444; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px;">
+            <span class="material-symbols-outlined" style="font-size: 20px;">delete</span>
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="selectedFiles.length > 0" style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn-pro secondary" (click)="selectedFiles = []" [disabled]="isUploadingGeneral" style="padding: 0.5rem 1.25rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; border: 1px solid #cbd5e1; background: white; color: #475569;">
+          Cancelar
+        </button>
+        <button type="button" class="btn-pro primary" (click)="uploadGeneralFiles()" [disabled]="isUploadingGeneral" style="background-color: #16a34a; border-color: #16a34a; padding: 0.5rem 1.25rem; border-radius: 0.5rem; color: white; font-weight: 600; cursor: pointer; border: none; display: flex; align-items: center; gap: 6px;">
+          <span class="material-symbols-outlined" style="font-size: 18px;">cloud_upload</span>
+          {{ isUploadingGeneral ? 'Subiendo...' : 'Iniciar Carga' }}
+        </button>
+      </div>
+
+      <div *ngIf="selectedFiles.length === 0" style="text-align: center; padding: 2rem; border: 2px dashed #cbd5e1; border-radius: 0.875rem; color: #94a3b8;">
+        <span class="material-symbols-outlined" style="font-size: 40px; margin-bottom: 0.5rem; display: block; color: #cbd5e1;">cloud_upload</span>
+        <p style="margin: 0; font-size: 0.875rem; font-weight: 500;">No hay archivos seleccionados para cargar. Presione "Seleccionar Archivos" para comenzar.</p>
       </div>
     </div>
 
@@ -166,6 +224,19 @@
           <span class="error-msg" *ngIf="validationErrors['mandante_rep_legal_email']">{{ getFieldError('mandante_rep_legal_email') }}</span>
         </div>
       </div>
+
+      <div class="input-row">
+        <div class="input-group" [class.has-error]="validationErrors['monto_estimado_total']">
+          <label>Monto Estimado Total Operación</label>
+          <input type="text" [(ngModel)]="mandato.monto_estimado_total" name="monto_estimado_total" placeholder="Ej: $100.000.000">
+          <span class="error-msg" *ngIf="validationErrors['monto_estimado_total']">{{ getFieldError('monto_estimado_total') }}</span>
+        </div>
+        <div class="input-group" [class.has-error]="validationErrors['plazo_estimado']">
+          <label>Plazo Estimado por Operación</label>
+          <input type="text" [(ngModel)]="mandato.plazo_estimado" name="plazo_estimado" placeholder="Ej: 90 días">
+          <span class="error-msg" *ngIf="validationErrors['plazo_estimado']">{{ getFieldError('plazo_estimado') }}</span>
+        </div>
+      </div>
     </div>
 
     <!-- SECCIÓN FACTOR -->
@@ -175,11 +246,10 @@
         <h2>Información del Factor</h2>
       </div>
 
-
       <div class="input-row">
         <div class="input-group full" [class.has-error]="validationErrors['factor_razon_social']">
           <label>Nombre / Razón Social Factor</label>
-          <input type="text" [(ngModel)]="mandato.factor_razon_social" name="f_rs" required placeholder="Ej: Factores y Servicios S.A.S.">
+          <input type="text" [(ngModel)]="mandato.factor_razon_social" name="f_rs" required placeholder="Ej: Factores y Servicios S.A.S." [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
           <span class="error-msg" *ngIf="validationErrors['factor_razon_social']">{{ getFieldError('factor_razon_social') }}</span>
         </div>
       </div>
@@ -187,7 +257,7 @@
       <div class="input-row">
         <div class="input-group" [class.has-error]="validationErrors['factor_tipo_documento']">
           <label>Tipo Documento</label>
-          <select [(ngModel)]="mandato.factor_tipo_documento" name="f_td" required>
+          <select [(ngModel)]="mandato.factor_tipo_documento" name="f_td" required [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
             <option value="" disabled selected>Seleccione...</option>
             <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
           </select>
@@ -195,7 +265,7 @@
         </div>
         <div class="input-group" [class.has-error]="validationErrors['factor_numero_documento']">
           <label>Número Documento</label>
-          <input type="text" [(ngModel)]="mandato.factor_numero_documento" name="f_nd" required placeholder="901.234.567-8">
+          <input type="text" [(ngModel)]="mandato.factor_numero_documento" name="f_nd" required placeholder="901.234.567-8" [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
           <span class="error-msg" *ngIf="validationErrors['factor_numero_documento']">{{ getFieldError('factor_numero_documento') }}</span>
         </div>
       </div>
@@ -205,7 +275,7 @@
       <div class="input-row">
         <div class="input-group full" [class.has-error]="validationErrors['factor_rep_legal_nombre']">
           <label>Nombre Representante Factor</label>
-          <input type="text" [(ngModel)]="mandato.factor_rep_legal_nombre" name="f_rep_n" required>
+          <input type="text" [(ngModel)]="mandato.factor_rep_legal_nombre" name="f_rep_n" required [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
           <span class="error-msg" *ngIf="validationErrors['factor_rep_legal_nombre']">{{ getFieldError('factor_rep_legal_nombre') }}</span>
         </div>
       </div>
@@ -213,14 +283,14 @@
       <div class="input-row">
         <div class="input-group" [class.has-error]="validationErrors['factor_rep_legal_tipo_doc']">
           <label>Tipo Doc. Rep.</label>
-          <select [(ngModel)]="mandato.factor_rep_legal_tipo_doc" name="f_rep_td" required>
+          <select [(ngModel)]="mandato.factor_rep_legal_tipo_doc" name="f_rep_td" required [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
             <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
           </select>
           <span class="error-msg" *ngIf="validationErrors['factor_rep_legal_tipo_doc']">{{ getFieldError('factor_rep_legal_tipo_doc') }}</span>
         </div>
         <div class="input-group" [class.has-error]="validationErrors['factor_rep_legal_num_doc']">
           <label>Número Doc. Rep.</label>
-          <input type="text" [(ngModel)]="mandato.factor_rep_legal_num_doc" name="f_rep_nd" required>
+          <input type="text" [(ngModel)]="mandato.factor_rep_legal_num_doc" name="f_rep_nd" required [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
           <span class="error-msg" *ngIf="validationErrors['factor_rep_legal_num_doc']">{{ getFieldError('factor_rep_legal_num_doc') }}</span>
         </div>
       </div>
@@ -228,7 +298,7 @@
       <div class="input-row">
         <div class="input-group full" [class.has-error]="validationErrors['factor_rep_legal_email']">
           <label>E-mail Representante Factor</label>
-          <input type="email" [(ngModel)]="mandato.factor_rep_legal_email" name="f_rep_e" required>
+          <input type="email" [(ngModel)]="mandato.factor_rep_legal_email" name="f_rep_e" required [disabled]="!authService.isAuthorized(['operativo', 'superadmin'])">
           <span class="error-msg" *ngIf="validationErrors['factor_rep_legal_email']">{{ getFieldError('factor_rep_legal_email') }}</span>
         </div>
       </div>
@@ -264,7 +334,7 @@
               <th>Factor</th>
               <th>Estado</th>
               <th>Observaciones</th>
-              <th *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" class="text-right" style="padding-right: 1.5rem;">Acciones</th>
+              <th class="text-right" style="padding-right: 1.5rem;">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -286,14 +356,28 @@
               <td>
                 <span class="obs-text" [title]="m.observaciones">{{ m.observaciones || '-' }}</span>
               </td>
-              <td *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" class="text-right" style="padding-right: 1.5rem;">
-                <div class="actions" *ngIf="m.status === 'pendiente'">
-                  <button class="btn-pro success sm icon-only" (click)="updateMandatoStatus(m, 'firmado')" title="Aprobar Mandato">
-                    <span class="material-symbols-outlined">check_circle</span>
+              <td class="text-right" style="padding-right: 1.5rem;">
+                <div class="actions" style="display: flex; gap: 0.25rem; justify-content: flex-end;">
+                  <button class="btn-pro secondary sm icon-only" (click)="openDetail(m)" title="Ver Resumen" style="background: #e2e8f0; color: #475569;">
+                    <span class="material-symbols-outlined">visibility</span>
                   </button>
-                  <button class="btn-pro danger sm icon-only" (click)="updateMandatoStatus(m, 'rechazado')" title="Rechazar Mandato">
-                    <span class="material-symbols-outlined">cancel</span>
+                  <button *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" class="btn-pro secondary sm icon-only" (click)="openEdit(m)" title="Editar Mandato" style="background: #e2e8f0; color: #475569;">
+                    <span class="material-symbols-outlined">edit</span>
                   </button>
+                  <button *ngIf="authService.isAuthorized(['operativo', 'superadmin'])" class="btn-pro danger sm icon-only" (click)="deleteMandato(m)" title="Eliminar Mandato">
+                    <span class="material-symbols-outlined">delete</span>
+                  </button>
+                  <button *ngIf="m.status === 'firmado'" class="btn-pro success sm icon-only" (click)="downloadExcel(m)" title="Descargar Excel" style="background: #16a34a; color: white;">
+                    <span class="material-symbols-outlined">download</span>
+                  </button>
+                  <ng-container *ngIf="m.status === 'pendiente' && authService.isAuthorized(['operativo', 'superadmin'])">
+                    <button class="btn-pro success sm icon-only" (click)="updateMandatoStatus(m, 'firmado')" title="Aprobar Mandato">
+                      <span class="material-symbols-outlined">check_circle</span>
+                    </button>
+                    <button class="btn-pro danger sm icon-only" (click)="updateMandatoStatus(m, 'rechazado')" title="Rechazar Mandato">
+                      <span class="material-symbols-outlined">cancel</span>
+                    </button>
+                  </ng-container>
                 </div>
               </td>
             </tr>
@@ -322,4 +406,269 @@
     </div>
   </div>
 
+  <!-- MODAL DE DETALLE -->
+  <div class="pro-modal-overlay" *ngIf="showDetailModal" (click)="closeDetail()">
+    <div class="pro-modal-card animate__animated animate__zoomIn" (click)="$event.stopPropagation()">
+      <div class="pro-modal-header">
+        <h2>Detalles del Mandato</h2>
+        <button class="close-btn" (click)="closeDetail()">&times;</button>
+      </div>
+      <div class="pro-modal-body">
+        <div class="detail-grid">
+          <!-- Mandante section -->
+          <div class="detail-section">
+            <h3><span class="material-symbols-outlined">corporate_fare</span> Información del Mandante</h3>
+            <div class="detail-fields">
+              <div class="field"><span class="label">Razón Social:</span> <span class="val">{{ selectedMandato?.mandante_razon_social }}</span></div>
+              <div class="field"><span class="label">Documento:</span> <span class="val">{{ selectedMandato?.mandante_tipo_documento }} - {{ selectedMandato?.mandante_numero_documento }}</span></div>
+              <div class="field"><span class="label">Domicilio:</span> <span class="val">{{ selectedMandato?.mandante_domicilio }}</span></div>
+              <div class="field"><span class="label">Dirección:</span> <span class="val">{{ selectedMandato?.mandante_direccion }}</span></div>
+              <div class="field"><span class="label">Teléfono:</span> <span class="val">{{ selectedMandato?.mandante_telefono }}</span></div>
+              <div class="field"><span class="label">Rep. Legal:</span> <span class="val">{{ selectedMandato?.mandante_rep_legal_nombre }}</span></div>
+              <div class="field"><span class="label">Doc Rep. Legal:</span> <span class="val">{{ selectedMandato?.mandante_rep_legal_tipo_doc }} - {{ selectedMandato?.mandante_rep_legal_num_doc }}</span></div>
+              <div class="field"><span class="label">Email Rep. Legal:</span> <span class="val">{{ selectedMandato?.mandante_rep_legal_email }}</span></div>
+              <div class="field"><span class="label">Monto Estimado:</span> <span class="val">{{ selectedMandato?.monto_estimado_total || '-' }}</span></div>
+              <div class="field"><span class="label">Plazo Estimado:</span> <span class="val">{{ selectedMandato?.plazo_estimado || '-' }}</span></div>
+            </div>
+          </div>
+          <!-- Factor section -->
+          <div class="detail-section">
+            <h3><span class="material-symbols-outlined">payments</span> Información del Factor</h3>
+            <div class="detail-fields">
+              <div class="field"><span class="label">Razón Social:</span> <span class="val">{{ selectedMandato?.factor_razon_social }}</span></div>
+              <div class="field"><span class="label">Documento:</span> <span class="val">{{ selectedMandato?.factor_tipo_documento }} - {{ selectedMandato?.factor_numero_documento }}</span></div>
+              <div class="field"><span class="label">Rep. Legal:</span> <span class="val">{{ selectedMandato?.factor_rep_legal_nombre }}</span></div>
+              <div class="field"><span class="label">Doc Rep. Legal:</span> <span class="val">{{ selectedMandato?.factor_rep_legal_tipo_doc }} - {{ selectedMandato?.factor_rep_legal_num_doc }}</span></div>
+              <div class="field"><span class="label">Email Rep. Legal:</span> <span class="val">{{ selectedMandato?.factor_rep_legal_email }}</span></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="status-box">
+          <span class="label">Estado Actual:</span>
+          <span class="status-pill" [ngClass]="selectedMandato?.status">{{ selectedMandato?.status | titlecase }}</span>
+        </div>
+        <div class="obs-box" *ngIf="selectedMandato?.observaciones">
+          <span class="label">Observaciones:</span>
+          <p class="obs-val">{{ selectedMandato?.observaciones }}</p>
+        </div>
+      </div>
+      <div class="pro-modal-footer">
+        <button class="btn-pro secondary" (click)="closeDetail()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE EDICIÓN -->
+  <div class="pro-modal-overlay" *ngIf="showEditModal" (click)="closeEdit()">
+    <div class="pro-modal-card large animate__animated animate__zoomIn" (click)="$event.stopPropagation()">
+      <div class="pro-modal-header">
+        <h2>Editar Mandato</h2>
+        <button class="close-btn" (click)="closeEdit()">&times;</button>
+      </div>
+      <form (ngSubmit)="saveEdit()" #editFormObj="ngForm" class="pro-modal-body">
+        <div class="edit-modal-grid">
+          <!-- Mandante section -->
+          <div class="form-section-card">
+            <h3>Información del Mandante</h3>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Razón Social</label>
+                <input type="text" [(ngModel)]="editForm.mandante_razon_social" name="edit_m_rs" required>
+              </div>
+            </div>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Tipo Doc</label>
+                <select [(ngModel)]="editForm.mandante_tipo_documento" name="edit_m_td" required>
+                  <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
+                </select>
+              </div>
+              <div class="input-group-modal">
+                <label>No. Documento</label>
+                <input type="text" [(ngModel)]="editForm.mandante_numero_documento" name="edit_m_nd" required>
+              </div>
+            </div>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Domicilio</label>
+                <input type="text" [(ngModel)]="editForm.mandante_domicilio" name="edit_m_dom" required>
+              </div>
+            </div>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Dirección</label>
+                <input type="text" [(ngModel)]="editForm.mandante_direccion" name="edit_m_dir" required>
+              </div>
+              <div class="input-group-modal">
+                <label>Teléfono</label>
+                <input type="text" [(ngModel)]="editForm.mandante_telefono" name="edit_m_tel" required>
+              </div>
+            </div>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Nombre Rep. Legal</label>
+                <input type="text" [(ngModel)]="editForm.mandante_rep_legal_nombre" name="edit_m_rep_n" required>
+              </div>
+            </div>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Tipo Doc Rep.</label>
+                <select [(ngModel)]="editForm.mandante_rep_legal_tipo_doc" name="edit_m_rep_td" required>
+                  <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
+                </select>
+              </div>
+              <div class="input-group-modal">
+                <label>No. Doc Rep.</label>
+                <input type="text" [(ngModel)]="editForm.mandante_rep_legal_num_doc" name="edit_m_rep_nd" required>
+              </div>
+            </div>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Email Rep. Legal</label>
+                <input type="email" [(ngModel)]="editForm.mandante_rep_legal_email" name="edit_m_rep_e" required>
+              </div>
+            </div>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Monto Estimado Total Operación</label>
+                <input type="text" [(ngModel)]="editForm.monto_estimado_total" name="edit_monto_estimado_total">
+              </div>
+              <div class="input-group-modal">
+                <label>Plazo Estimado por Operación</label>
+                <input type="text" [(ngModel)]="editForm.plazo_estimado" name="edit_plazo_estimado">
+              </div>
+            </div>
+          </div>
+
+          <!-- Factor section -->
+          <div class="form-section-card">
+            <h3>Información del Factor</h3>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Razón Social Factor</label>
+                <input type="text" [(ngModel)]="editForm.factor_razon_social" name="edit_f_rs" required>
+              </div>
+            </div>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Tipo Doc Factor</label>
+                <select [(ngModel)]="editForm.factor_tipo_documento" name="edit_f_td" required>
+                  <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
+                </select>
+              </div>
+              <div class="input-group-modal">
+                <label>No. Doc Factor</label>
+                <input type="text" [(ngModel)]="editForm.factor_numero_documento" name="edit_f_nd" required>
+              </div>
+            </div>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Nombre Rep. Factor</label>
+                <input type="text" [(ngModel)]="editForm.factor_rep_legal_nombre" name="edit_f_rep_n" required>
+              </div>
+            </div>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Tipo Doc Rep. Factor</label>
+                <select [(ngModel)]="editForm.factor_rep_legal_tipo_doc" name="edit_f_rep_td" required>
+                  <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
+                </select>
+              </div>
+              <div class="input-group-modal">
+                <label>No. Doc Rep. Factor</label>
+                <input type="text" [(ngModel)]="editForm.factor_rep_legal_num_doc" name="edit_f_rep_nd" required>
+              </div>
+            </div>
+            <div class="input-row-modal">
+              <div class="input-group-modal">
+                <label>Email Rep. Factor</label>
+                <input type="email" [(ngModel)]="editForm.factor_rep_legal_email" name="edit_f_rep_e" required>
+              </div>
+            </div>
+            
+            <!-- Estado / Observaciones -->
+            <div class="input-row-modal" style="margin-top: 1.5rem;">
+              <div class="input-group-modal">
+                <label>Estado</label>
+                <select [(ngModel)]="editForm.status" name="edit_status" required>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="firmado">Firmado</option>
+                  <option value="rechazado">Rechazado</option>
+                </select>
+              </div>
+            </div>
+            <div class="input-row-modal">
+              <div class="input-group-modal" style="width: 100%;">
+                <label>Observaciones</label>
+                <textarea [(ngModel)]="editForm.observaciones" name="edit_obs" rows="3" style="width: 100%; padding: 0.5rem; border-radius: 8px; border: 1px solid #e2e8f0; font-family: inherit; font-size: 0.9rem;"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="pro-modal-footer">
+          <button type="button" class="btn-pro secondary" (click)="closeEdit()">Cancelar</button>
+          <button type="submit" class="btn-pro primary" [disabled]="!editFormObj.form.valid || loading">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL DE CONFIGURACIÓN DEL FACTOR (PARAMÉTRICA) -->
+  <div class="pro-modal-overlay" *ngIf="showFactorModal" (click)="closeFactorConfig()">
+    <div class="pro-modal-card animate__animated animate__zoomIn" (click)="$event.stopPropagation()" style="max-width: 500px;">
+      <div class="pro-modal-header">
+        <h2>Configurar Información del Factor (Tabla Paramétrica)</h2>
+        <button class="close-btn" (click)="closeFactorConfig()">&times;</button>
+      </div>
+      <form (ngSubmit)="saveFactorConfig()" #factorFormObj="ngForm" class="pro-modal-body" style="display: flex; flex-direction: column; gap: 1rem;">
+        <div class="input-group-modal" style="width: 100%;">
+          <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">Nombre / Razón Social Factor</label>
+          <input type="text" [(ngModel)]="factorForm.razon_social" name="config_f_rs" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+        </div>
+        
+        <div style="display: flex; gap: 12px; width: 100%;">
+          <div class="input-group-modal" style="flex: 1;">
+            <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">Tipo Documento</label>
+            <select [(ngModel)]="factorForm.tipo_documento" name="config_f_td" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+              <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
+            </select>
+          </div>
+          <div class="input-group-modal" style="flex: 2;">
+            <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">Número Documento</label>
+            <input type="text" [(ngModel)]="factorForm.numero_documento" name="config_f_nd" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+          </div>
+        </div>
+
+        <div class="input-group-modal" style="width: 100%;">
+          <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">Nombre Representante Factor</label>
+          <input type="text" [(ngModel)]="factorForm.rep_legal_nombre" name="config_f_rep_n" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+        </div>
+
+        <div style="display: flex; gap: 12px; width: 100%;">
+          <div class="input-group-modal" style="flex: 1;">
+            <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">Tipo Doc. Rep.</label>
+            <select [(ngModel)]="factorForm.rep_legal_tipo_doc" name="config_f_rep_td" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+              <option *ngFor="let t of documentTypes" [value]="t">{{t}}</option>
+            </select>
+          </div>
+          <div class="input-group-modal" style="flex: 2;">
+            <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">Número Doc. Rep.</label>
+            <input type="text" [(ngModel)]="factorForm.rep_legal_num_doc" name="config_f_rep_nd" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+          </div>
+        </div>
+
+        <div class="input-group-modal" style="width: 100%;">
+          <label style="font-weight: 600; font-size: 0.85rem; color: #475569; display: block; margin-bottom: 4px;">E-mail Representante Factor</label>
+          <input type="email" [(ngModel)]="factorForm.rep_legal_email" name="config_f_rep_e" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+        </div>
+        
+        <div class="pro-modal-footer" style="padding-top: 1rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn-pro secondary" (click)="closeFactorConfig()">Cancelar</button>
+          <button type="submit" class="btn-pro primary" [disabled]="!factorFormObj.form.valid || loading">Guardar Configuración</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
