@@ -1,0 +1,308 @@
+# Diagramas de Arquitectura y Procesos (Importables a Draw.io)
+
+> [!TIP]
+> Puedes importar cualquiera de estos diagramas directamente a Draw.io yendo a:
+> **Arrange -> Insert -> Advanced -> Mermaid** e ingresando el código correspondiente.
+
+---
+
+## 🏛️ 1. Topología del Sistema e Integración de Servicios
+
+```mermaid
+graph TD
+    subgraph Cliente
+        Angular[Angular Web App Frontend]
+    end
+
+    subgraph Nginx Proxy (Puerto 80)
+        Proxy[Nginx Reverse Proxy]
+    end
+
+    subgraph Docker Network
+        Laravel[Laravel API Backend]
+        DB[(MySQL Database)]
+        n8n[n8n Automation Engine]
+        Storage[(Public/Private Storage)]
+    end
+
+    subgraph Servicios Externos
+        Mistral[Mistral AI API]
+        SMTP[SMTP Mail Server]
+    end
+
+    Angular -->|Petición HTTPS /api| Proxy
+    Angular -->|Acceso Webhook /n8n| Proxy
+    Proxy -->|Redirección Puerto 80/9000| Laravel
+    Proxy -->|Redirección Puerto 5678| n8n
+
+    Laravel -->|Lectura / Escritura| DB
+    Laravel -->|Subida Soportes / Llaves RSA| Storage
+    Laravel -->|Disparador Webhook / Interno| n8n
+    n8n -->|Procesamiento Webhook / HTTP| Laravel
+
+    n8n -->|Extracción OCR / JSON| Mistral
+    Laravel -->|Envío de Notificaciones| SMTP
+```
+
+---
+
+## 📊 2. Modelo de Datos y Entidades de los 3 Frentes
+
+```mermaid
+erDiagram
+    USERS ||--o{ MANDATOS : "crea"
+    USERS ||--o{ INTERNAL_DOCUMENTS : "envia"
+    USERS ||--o{ SOLICITUDES_CREDITO : "registra como staff"
+    USERS ||--o{ CREDITO_ORDINARIOS : "asociado como cliente"
+    
+    DATOS_FACTOR ||--o{ MANDATOS : "se asocia a"
+    
+    CLIENTES ||--o{ SOLICITUDES_CREDITO : "aplica"
+    CLIENTES ||--o{ VISITAS : "tiene"
+    
+    VISITAS ||--o| SOLICITUDES_CREDITO : "genera"
+    
+    SOLICITUDES_CREDITO ||--o| CREDITO_ORDINARIOS : "inicia workflow"
+    SOLICITUDES_CREDITO }o--|| TIPO_CREDITOS : "tipo"
+    SOLICITUDES_CREDITO }o--|| AMORTIZACIONES : "amortizacion"
+    SOLICITUDES_CREDITO }o--|| DOCUMENT_PRESETS : "documentos requeridos"
+    
+    DOCUMENT_PRESETS ||--|{ DOCUMENT_REQUIREMENTS : "contiene"
+    DOCUMENT_REQUESTS ||--|{ DOCUMENT_REQUEST_ITEMS : "detalla"
+    
+    USERS ||--o{ DOCUMENT_REQUESTS : "gestiona"
+
+    USERS {
+        int id PK
+        string name
+        string email
+        string password
+        json roles
+        string numero_documento
+    }
+
+    DATOS_FACTOR {
+        int id PK
+        string razon_social
+        string tipo_documento
+        string numero_documento
+        string rep_legal_nombre
+        string rep_legal_tipo_doc
+        string rep_legal_num_doc
+        string rep_legal_email
+    }
+
+    MANDATOS {
+        int id PK
+        int user_id FK
+        string mandante_razon_social
+        string mandante_tipo_documento
+        string mandante_numero_documento
+        string mandante_direccion
+        string mandante_telefono
+        string mandante_rep_legal_nombre
+        string mandante_rep_legal_email
+        string factor_razon_social
+        string factor_numero_documento
+        string status "pendiente, firmado, rechazado"
+        string observaciones
+        string monto_estimado_total
+        string plazo_estimado
+    }
+
+    INTERNAL_DOCUMENTS {
+        int id PK
+        int sender_id FK
+        string batch_id "UUID para carga multiple"
+        string target_role "contable, gerente, operativo"
+        string titulo
+        string archivo_path
+        string original_name
+        int categoria_id FK
+        int prioridad_id FK
+        string estado "pendiente, visto, visto_bueno, procesado, rechazado"
+        string motivo_rechazo
+    }
+
+    SOLICITUDES_CREDITO {
+        int id PK
+        int visita_id FK
+        int cliente_id FK
+        int usuario_registra_id FK
+        int tipo_credito_id FK
+        decimal monto_solicitado
+        int plazo_meses
+        int amortizacion_id FK
+        string destino_recurso
+        string garantia
+        string fuente_pago
+        string correo_notificacion
+        int document_preset_id FK
+    }
+
+    CREDITO_ORDINARIOS {
+        int id PK
+        string numero_solicitud
+        int cliente_id FK "Users ID"
+        decimal monto
+        int plazo_meses
+        string estado "revision_documental, comite_evaluacion, desembolso, completado..."
+        json documentos
+        json historial_estados
+    }
+```
+
+---
+
+## 🔄 3. Diagrama de Proceso BPMN de Crédito Ordinario
+
+Este diagrama representa el flujo exacto del diagrama de carriles (swimlanes) oficial para el Crédito Ordinario.
+
+```mermaid
+graph TD
+    %% Roles / Carriles
+    subgraph Cliente_Lane [Cliente]
+        Start([Inicio]) --> RadSol[Radicar Solicitud de Crédito]
+        RadSol -->|1. Formulario<br>2. Identidad<br>3. EEFF<br>4. Certificados| RevDoc
+        
+        CompSol[Completar solicitud y/o documentación]
+        FirmaGar[Firma de Garantías]
+    end
+
+    subgraph Coord_Comercial [Coordinador Comercial]
+        RevDoc[Revisión de Solicitud y Documentación]
+        Gate1{¿Documentación Completa?}
+        
+        RevDoc --> Gate1
+        Gate1 -->|No| CompSol
+        CompSol --> RevDoc
+        
+        Gate1 -->|Sí| AlmacenExp[Almacenar Expediente]
+        Gate1 -->|Sí| SendNotifClient[Envío de Notificación a Cliente]
+        
+        AlmacenExp --> EvalSarlaft
+        AlmacenExp --> AnalisFinan[Análisis Financiero]
+        
+        ElabPres[Elaboración de Presentación para Comité]
+        AnalisFinan --> ElabPres
+        
+        FormGar[Formalización de Garantías]
+        RegCYF[Registro de Crédito en CYF]
+    end
+
+    subgraph Cumplimiento_Lane [Oficial de Cumplimiento]
+        EvalSarlaft[Evaluación SARLAFT]
+        EvalSarlaft --> ElabPres
+    end
+
+    subgraph Gerente_Lane [Gerente]
+        RevPres[Revisión e Aprobación de Presentación]
+        Gate2{¿Aprobada por Gerente?}
+        
+        ElabPres --> RevPres
+        RevPres --> Gate2
+        Gate2 -->|No| AnalisFinan
+        Gate2 -->|Sí| ComiteDecis
+        
+        AprobRegCYF[Aprobación de Registro de Operación]
+        Gate4{¿Aprobado?}
+        
+        RegCYF --> AprobRegCYF
+        AprobRegCYF --> Gate4
+        Gate4 -->|No| RegCYF
+        
+        AprobDesCYF[Aprobación de Desembolso en CYF]
+    end
+
+    subgraph Comite_Lane [Comité de Crédito]
+        ComiteDecis[Comité y Decisión]
+        Gate3{¿Decisión?}
+        
+        ComiteDecis --> Gate3
+        Gate3 -->|Aprobado| FormGar
+        Gate3 -->|Devuelto| RevPres
+        Gate3 -->|Rechazado| EndRechazado([Fin: Crédito Rechazado])
+    end
+
+    subgraph Admin_Lane [Dirección Administrativa]
+        RevGar[Revisión de Garantías]
+        Gate3Gar{¿Garantías Correctas?}
+        
+        FormGar --> FirmaGar
+        FirmaGar -->|Garantías Firmadas| RevGar
+        RevGar --> Gate3Gar
+        Gate3Gar -->|No| FormGar
+        
+        Gate3Gar -->|Sí| RegCYF
+        
+        Gate4 -->|Sí| IngDesCYF[Ingreso de Desembolso en CYF]
+        IngDesCYF --> AprobDesCYF
+        
+        AprobDesCYF -->|Aprobado| NotifTesoreria[Notificación a Tesorería]
+    end
+
+    subgraph Tesoreria_Lane [Tesorería]
+        NotifTesoreria --> EjecTrans[Ejecutar Transferencia Bancaria]
+        EjecTrans -->|Soporte Transferencia| NotifClientFinal[Notificar al Cliente]
+        NotifClientFinal --> EndCompletado([Fin: Crédito Completado])
+    end
+
+    %% Estilos de Nodos
+    style Start fill:#4CAF50,stroke:#388E3C,stroke-width:2px,color:#fff
+    style EndRechazado fill:#F44336,stroke:#D32F2F,stroke-width:2px,color:#fff
+    style EndCompletado fill:#2196F3,stroke:#1976D2,stroke-width:2px,color:#fff
+```
+
+---
+
+## 📑 4. Diagrama de Proceso: Gestión de Mandatos (Frente 1)
+
+Este flujo (no cubierto en el diagrama BPMN adjunto de Créditos Ordinarios) representa la vía independiente para crear y firmar Mandatos legales.
+
+```mermaid
+graph TD
+    Start([Inicio Mandato]) --> SolMand[Cliente solicita Mandato en Angular]
+    SolMand --> GetFactor[Sistema consulta parámetros en datos_factor]
+    GetFactor --> AutoMerge[Fusión automática de datos de Mandante y Factor]
+    AutoMerge --> CreatePend[Creación de Mandato en estado 'pendiente']
+    
+    CreatePend --> StaffIndex[Staff visualiza en bandeja de Mandatos]
+    StaffIndex --> Accion{¿Firmar o Rechazar?}
+    
+    Accion -->|Firmar| FirmarMand[Estado cambia a 'firmado' + Observaciones]
+    Accion -->|Rechazar| RechazarMand[Estado cambia a 'rechazado' + Motivo]
+    
+    FirmarMand --> ExportExcel[Disponible para exportación Excel / Descarga]
+    RechazarMand --> SolMand
+    ExportExcel --> End([Fin Proceso Mandato])
+```
+
+---
+
+## ✉️ 5. Diagrama de Proceso: Flujo de Documentos Internos (Frente 2)
+
+Este flujo representa la regla de negocio y escalación de visibilidad de soportes y documentos contables cargados por coordinadores.
+
+```mermaid
+graph TD
+    Start([Inicio Documento]) --> Upload[Coordinador Comercial sube documentos]
+    Upload --> CheckMultiple{¿Es lote?}
+    CheckMultiple -->|Sí| BatchID[Asignación de batch_id agrupador]
+    CheckMultiple -->|No| NoBatchID[Creación individual]
+    
+    BatchID & NoBatchID --> PendState[Documento en estado 'pendiente']
+    
+    subgraph Visibilidad Escalada
+        PendState --> OptSeen[Visible solo para Staff Operativo]
+        OptSeen --> VistoBueno[Operativo valida y marca 'visto_bueno']
+        
+        VistoBueno --> GerenteSeen[Visible para Gerente]
+        GerenteSeen --> GerenteAction{¿Procesar o Rechazar?}
+    end
+    
+    GerenteAction -->|Procesar| Procesado[Estado cambia a 'procesado']
+    GerenteAction -->|Rechazar| Rechazado[Estado cambia a 'rechazado' + Motivo]
+    
+    Procesado --> End([Fin Proceso Documento])
+    Rechazado --> End
+```

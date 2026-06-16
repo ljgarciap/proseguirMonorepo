@@ -55,15 +55,20 @@ class CreditoOrdinarioController extends Controller
 
         $numeroSolicitud = 'CO-' . date('Y') . '-' . Str::upper(Str::random(4)) . rand(10, 99);
 
-        // Inicializar documentos vacíos
+        // Inicializar documentos vacíos conforme al flujo BPMN
         $documentos = [
             'formulario_solicitud' => null,
             'documentos_identidad' => null,
+            'estados_financieros' => null,
+            'certificados_laborales' => null,
             'sarlft_sintesis' => null,
             'sarlft_datacredito' => null,
             'analisis_financiero' => null,
             'presentacion_comite' => null,
             'acta_comite_firmada' => null,
+            'pagare_borrador' => null,
+            'carta_instrucciones_borrador' => null,
+            'contrato_borrador' => null,
             'garantias_firmadas' => null,
             'registro_cyf' => null,
             'desembolso_egreso' => null,
@@ -114,7 +119,7 @@ class CreditoOrdinarioController extends Controller
         $activeRole = $request->header('X-Active-Role') ?? (($user->roles && is_array($user->roles)) ? ($user->roles[0] ?? 'cliente') : 'cliente');
         
         $request->validate([
-            'accion' => 'required|string|in:aprobar,rechazar,completar,subir_archivo',
+            'accion' => 'required|string|in:aprobar,rechazar,completar,subir_archivo,devolver',
             'comentario' => 'nullable|string',
             'archivo' => 'nullable|string', // base64 representation of the file
             'archivo_nombre' => 'nullable|string',
@@ -186,9 +191,50 @@ class CreditoOrdinarioController extends Controller
             } elseif ($estadoActual === 'comite_evaluacion') {
                 $estadoNuevo = 'rechazado';
                 $comentario = 'Crédito rechazado formalmente por el Comité de Crédito. ' . $comentario;
+            } elseif ($estadoActual === 'formalizacion_garantias') {
+                // If Dirección Administrativa rejects/returns garantías, keep state but clear the signed file
+                $estadoNuevo = 'formalizacion_garantias';
+                $documentos['garantias_firmadas'] = null;
+                $credito->documentos = $documentos;
+                $comentario = 'Garantías rechazadas por Dirección Administrativa. Deben ser corregidas y firmadas nuevamente. ' . $comentario;
+            } elseif ($estadoActual === 'aprobacion_registro_cyf') {
+                // If Gerente rejects CYF registration, keep state but clear the file so it can be re-registered
+                $estadoNuevo = 'aprobacion_registro_cyf';
+                $documentos['registro_cyf'] = null;
+                $credito->documentos = $documentos;
+                $comentario = 'Registro de Crédito en CYF rechazado por Gerencia. Debe registrarse nuevamente. ' . $comentario;
+            } elseif ($estadoActual === 'desembolso_aprobacion') {
+                // If Gerente rejects desembolso approval, return to Ingreso Desembolso in CYF
+                $estadoNuevo = 'desembolso_ingreso';
+                $documentos['desembolso_egreso'] = null;
+                $credito->documentos = $documentos;
+                $comentario = 'Aprobación de desembolso rechazada por Gerencia. Retorna a Dirección Administrativa. ' . $comentario;
             } else {
                 $estadoNuevo = 'rechazado';
                 $comentario = 'Crédito rechazado en etapa: ' . $estadoActual . '. ' . $comentario;
+            }
+        } elseif ($accion === 'devolver') {
+            if ($estadoActual === 'comite_evaluacion') {
+                // Returns to Gerente Presentation approval (Revision e Aprobacion de Presentacion)
+                $estadoNuevo = 'aprobacion_presentacion';
+                $comentario = 'Crédito devuelto por el Comité para corrección de la presentación. ' . $comentario;
+            } elseif ($estadoActual === 'formalizacion_garantias') {
+                $estadoNuevo = 'formalizacion_garantias';
+                $documentos['garantias_firmadas'] = null;
+                $credito->documentos = $documentos;
+                $comentario = 'Garantías devueltas por Dirección Administrativa para corrección. ' . $comentario;
+            } elseif ($estadoActual === 'aprobacion_registro_cyf') {
+                $estadoNuevo = 'aprobacion_registro_cyf';
+                $documentos['registro_cyf'] = null;
+                $credito->documentos = $documentos;
+                $comentario = 'Registro de CYF devuelto para corrección. ' . $comentario;
+            } elseif ($estadoActual === 'desembolso_aprobacion') {
+                $estadoNuevo = 'desembolso_ingreso';
+                $documentos['desembolso_egreso'] = null;
+                $credito->documentos = $documentos;
+                $comentario = 'Desembolso devuelto por Gerencia. Retorna a Dirección Administrativa para corregir egreso. ' . $comentario;
+            } else {
+                return response()->json(['message' => 'La acción devolver no está soportada en esta etapa.'], 422);
             }
         } elseif ($accion === 'completar') {
             if ($estadoActual === 'revision_documental') {
@@ -231,6 +277,8 @@ class CreditoOrdinarioController extends Controller
                     if ($accion === 'aprobar' && !empty($documentos['acta_comite_firmada'])) {
                         $estadoNuevo = 'formalizacion_garantias';
                         $comentario = 'Crédito aprobado por el Comité y Acta firmada cargada. Pasa a formalización de garantías.';
+                    } elseif ($accion === 'subir_archivo') {
+                        $comentario = 'Acta de Comité firmada cargada correctamente.';
                     } else {
                         $comentario = 'Para aprobar el crédito en Comité, es obligatorio cargar el Acta de Comité firmada.';
                         return response()->json(['message' => $comentario], 422);
@@ -265,11 +313,14 @@ class CreditoOrdinarioController extends Controller
                     break;
 
                 case 'desembolso_ingreso':
-                    if (!empty($documentos['desembolso_egreso'])) {
+                    if ($accion === 'aprobar' && !empty($documentos['desembolso_egreso'])) {
                         $estadoNuevo = 'desembolso_aprobacion';
                         $comentario = 'Operación de desembolso registrada en CYF por Dirección Administrativa. Esperando aprobación de desembolso por Gerencia.';
+                    } elseif ($accion === 'subir_archivo') {
+                        $comentario = 'Comprobante o instrucción de egreso de CYF cargado correctamente.';
                     } else {
-                        $comentario = 'Es necesario cargar el comprobante o instrucción de egreso de CYF.';
+                        $comentario = 'Es necesario cargar el comprobante o instrucción de egreso de CYF para proceder.';
+                        return response()->json(['message' => $comentario], 422);
                     }
                     break;
 
@@ -281,9 +332,11 @@ class CreditoOrdinarioController extends Controller
                     break;
 
                 case 'ejecucion_transferencia':
-                    if (!empty($documentos['comprobante_transferencia'])) {
+                    if ($accion === 'aprobar' && !empty($documentos['comprobante_transferencia'])) {
                         $estadoNuevo = 'completado';
                         $comentario = 'Transferencia bancaria ejecutada por Tesorería y soporte de pago enviado al cliente. ¡Proceso BPMN Completado con Éxito!';
+                    } elseif ($accion === 'subir_archivo') {
+                        $comentario = 'Comprobante de transferencia bancaria cargado correctamente.';
                     } else {
                         $comentario = 'Es obligatorio cargar el comprobante de transferencia bancaria para finalizar.';
                         return response()->json(['message' => $comentario], 422);

@@ -323,6 +323,9 @@
                 <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Crédito formalmente aprobado por el Comité de Créditos.')">
                   <span class="material-symbols-outlined">check_circle</span> Aprobar Crédito Ordinario
                 </button>
+                <button class="btn-pro warning" (click)="executeTransition('devolver', 'Crédito devuelto por el Comité para ajuste de presentación.')">
+                  <span class="material-symbols-outlined">assignment_return</span> Devolver a Gerencia
+                </button>
                 <button class="btn-pro danger" (click)="executeTransition('rechazar', 'Crédito rechazado formalmente en sesión del Comité.')">
                   <span class="material-symbols-outlined">cancel</span> Rechazar Crédito
                 </button>
@@ -333,11 +336,55 @@
             <div *ngIf="selectedCredito.estado === 'formalizacion_garantias'">
               <p class="action-instructions">Etapa de formalización de garantías. Sigue los pasos según tu rol:</p>
               
-              <div class="guarantees-layout">
+              <div class="guarantees-layout" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                <!-- Comercial uploads drafts -->
+                <div class="guarantee-box" [class.highlight]="activeRole === 'coordinador_comercial' || activeRole === 'superadmin'">
+                  <h5>📄 Minutas / Borradores de Garantías (Comercial)</h5>
+                  <p>Cargue de borradores para firma del cliente.</p>
+                  <div class="upload-controls-vertical" style="display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Pagare -->
+                    <div class="upload-item-sm" style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 4px;">
+                      <span style="font-size: 0.85em; font-weight: 500;">1. Pagaré:</span>
+                      <div style="display: flex; gap: 5px; align-items: center;">
+                        <input type="file" id="file-pagare-draft" (change)="onFileUpload($event, 'pagare_borrador')" 
+                               [disabled]="!(activeRole === 'coordinador_comercial' || activeRole === 'superadmin')" accept=".pdf" hidden>
+                        <label for="file-pagare-draft" class="btn-inline-upload" style="padding: 2px 8px; font-size: 0.8em; margin: 0;">Subir</label>
+                        <a *ngIf="selectedCredito.documentos?.pagare_borrador" [href]="selectedCredito.documentos.pagare_borrador" target="_blank" title="Descargar" style="color: #3182CE; display: flex; align-items: center;">
+                          <span class="material-symbols-outlined" style="font-size: 1.2em;">download</span>
+                        </a>
+                      </div>
+                    </div>
+                    <!-- Carta de Instrucciones -->
+                    <div class="upload-item-sm" style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 4px;">
+                      <span style="font-size: 0.85em; font-weight: 500;">2. Carta Inst:</span>
+                      <div style="display: flex; gap: 5px; align-items: center;">
+                        <input type="file" id="file-carta-draft" (change)="onFileUpload($event, 'carta_instrucciones_borrador')" 
+                               [disabled]="!(activeRole === 'coordinador_comercial' || activeRole === 'superadmin')" accept=".pdf" hidden>
+                        <label for="file-carta-draft" class="btn-inline-upload" style="padding: 2px 8px; font-size: 0.8em; margin: 0;">Subir</label>
+                        <a *ngIf="selectedCredito.documentos?.carta_instrucciones_borrador" [href]="selectedCredito.documentos.carta_instrucciones_borrador" target="_blank" title="Descargar" style="color: #3182CE; display: flex; align-items: center;">
+                          <span class="material-symbols-outlined" style="font-size: 1.2em;">download</span>
+                        </a>
+                      </div>
+                    </div>
+                    <!-- Contrato -->
+                    <div class="upload-item-sm" style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 4px;">
+                      <span style="font-size: 0.85em; font-weight: 500;">3. Contrato:</span>
+                      <div style="display: flex; gap: 5px; align-items: center;">
+                        <input type="file" id="file-contrato-draft" (change)="onFileUpload($event, 'contrato_borrador')" 
+                               [disabled]="!(activeRole === 'coordinador_comercial' || activeRole === 'superadmin')" accept=".pdf" hidden>
+                        <label for="file-contrato-draft" class="btn-inline-upload" style="padding: 2px 8px; font-size: 0.8em; margin: 0;">Subir</label>
+                        <a *ngIf="selectedCredito.documentos?.contrato_borrador" [href]="selectedCredito.documentos.contrato_borrador" target="_blank" title="Descargar" style="color: #3182CE; display: flex; align-items: center;">
+                          <span class="material-symbols-outlined" style="font-size: 1.2em;">download</span>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- Cliente / Comercial load -->
                 <div class="guarantee-box">
                   <h5>✍️ Carga de Garantías Firmadas</h5>
-                  <p>El cliente o comercial debe cargar las garantías formalizadas y firmadas en formato PDF.</p>
+                  <p>El cliente o comercial debe descargar los borradores, firmarlos y cargar las garantías formalizadas completas en un solo PDF.</p>
                   <input type="file" id="file-garantias" (change)="onFileUpload($event, 'garantias_firmadas')" 
                          [disabled]="!(activeRole === 'cliente' || activeRole === 'coordinador_comercial' || activeRole === 'superadmin')" accept=".pdf" class="file-input-hide">
                   <label for="file-garantias" class="btn-pro secondary sm btn-upload">
@@ -350,13 +397,20 @@
                 <!-- Dirección Administrativa approval -->
                 <div class="guarantee-box" [class.highlight]="activeRole === 'operativo' || activeRole === 'superadmin'">
                   <h5>🏢 Revisión y Registro (Dir. Administrativa)</h5>
-                  <p>El rol operativo de Dirección Administrativa debe revisar los documentos de garantías cargados y proceder con su registro formal.</p>
+                  <p>El rol operativo de Dirección Administrativa debe revisar las garantías cargadas, verificar firmas y proceder con el registro formal.</p>
                   
-                  <button class="btn-pro primary" 
-                          [disabled]="!selectedCredito.documentos?.garantias_firmadas || !(activeRole === 'operativo' || activeRole === 'superadmin')"
-                          (click)="executeTransition('aprobar', 'Garantías revisadas, registradas y validadas por Dirección Administrativa.')">
-                    Aprobar y Registrar Garantías
-                  </button>
+                  <div class="flex-actions-inline" style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="btn-pro primary" 
+                            [disabled]="!selectedCredito.documentos?.garantias_firmadas || !(activeRole === 'operativo' || activeRole === 'superadmin')"
+                            (click)="executeTransition('aprobar', 'Garantías revisadas, registradas y validadas por Dirección Administrativa.')">
+                      Aprobar
+                    </button>
+                    <button class="btn-pro danger" 
+                            [disabled]="!selectedCredito.documentos?.garantias_firmadas || !(activeRole === 'operativo' || activeRole === 'superadmin')"
+                            (click)="executeTransition('rechazar', 'Garantías rechazadas por Dirección Administrativa para corrección.')">
+                      Rechazar
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -382,11 +436,18 @@
                   <h5>👔 Aprobación del Registro (Gerencia)</h5>
                   <p>La Gerencia Financiera debe aprobar el registro core de la operación.</p>
                   
-                  <button class="btn-pro primary" 
-                          [disabled]="!selectedCredito.documentos?.registro_cyf || !(activeRole === 'gerente' || activeRole === 'superadmin')"
-                          (click)="executeTransition('aprobar', 'Registro core CYF verificado y aprobado por Gerencia.')">
-                    Aprobar Registro CYF
-                  </button>
+                  <div class="flex-actions-inline" style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="btn-pro primary" 
+                            [disabled]="!selectedCredito.documentos?.registro_cyf || !(activeRole === 'gerente' || activeRole === 'superadmin')"
+                            (click)="executeTransition('aprobar', 'Registro core CYF verificado y aprobado por Gerencia.')">
+                      Aprobar
+                    </button>
+                    <button class="btn-pro danger" 
+                            [disabled]="!selectedCredito.documentos?.registro_cyf || !(activeRole === 'gerente' || activeRole === 'superadmin')"
+                            (click)="executeTransition('rechazar', 'Registro core CYF rechazado por Gerencia.')">
+                      Rechazar
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -417,9 +478,14 @@
             <!-- Stage 9: desembolso_aprobacion (Gerencia) -->
             <div *ngIf="selectedCredito.estado === 'desembolso_aprobacion'">
               <p class="action-instructions">Como <strong>Gerencia</strong>, debes dar la autorización final al desembolso financiero y firma de soporte bancario.</p>
-              <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Operación de desembolso autorizada. Enviada a Tesorería para transferencia bancaria.')">
-                <span class="material-symbols-outlined">task_alt</span> Autorizar y Firmar Desembolso
-              </button>
+              <div class="flex-actions" style="display: flex; gap: 10px;">
+                <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Operación de desembolso autorizada. Enviada a Tesorería para transferencia bancaria.')">
+                  <span class="material-symbols-outlined">task_alt</span> Autorizar y Firmar Desembolso
+                </button>
+                <button class="btn-pro danger" (click)="executeTransition('rechazar', 'Desembolso rechazado por Gerencia. Se devuelve para corrección de egreso.')">
+                  <span class="material-symbols-outlined">cancel</span> Rechazar y Devolver
+                </button>
+              </div>
             </div>
 
             <!-- Stage 10: ejecucion_transferencia (Tesorería) -->
@@ -463,19 +529,98 @@
           <div class="stage-doc-group">
             <h4>Etapa 1: Registro e Identificación <span class="stage-owner">Cliente / Comercial</span></h4>
             <div class="documents-grid-grouped">
+              <!-- Formulario de Solicitud -->
               <div class="doc-box-new">
                 <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new">description</span>
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.formulario_solicitud">description</span>
                   <div class="doc-title-desc">
-                    <h5>Formulario y Requisitos del Cliente</h5>
-                    <p>Formulario inicial y soportes cargados por el asesor comercial o cliente.</p>
+                    <h5>Formulario de Solicitud</h5>
+                    <p>Formulario de solicitud del cliente diligenciado.</p>
                   </div>
                 </div>
                 <div class="doc-action-status">
                   <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.formulario_solicitud">Cargado</span>
-                  <span class="doc-status-pill warning" *ngIf="!selectedCredito.documentos?.formulario_solicitud">No requerido físicamente</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.formulario_solicitud">Pendiente</span>
+                  
+                  <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
+                    <input type="file" id="inline-file-formulario" (change)="onFileUpload($event, 'formulario_solicitud')" accept=".pdf" hidden>
+                    <label for="inline-file-formulario" class="btn-inline-upload">Subir</label>
+                  </div>
+                  
                   <a *ngIf="selectedCredito.documentos?.formulario_solicitud" [href]="selectedCredito.documentos.formulario_solicitud" target="_blank" class="btn-view-doc">
-                    <span class="material-symbols-outlined">open_in_new</span> Ver PDF
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  </a>
+                </div>
+              </div>
+
+              <!-- Documentos de Identidad -->
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.documentos_identidad">badge</span>
+                  <div class="doc-title-desc">
+                    <h5>Documentos de Identidad</h5>
+                    <p>Copia de Cédula de Ciudadanía o NIT del cliente.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.documentos_identidad">Cargado</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.documentos_identidad">Pendiente</span>
+                  
+                  <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
+                    <input type="file" id="inline-file-identidad" (change)="onFileUpload($event, 'documentos_identidad')" accept=".pdf" hidden>
+                    <label for="inline-file-identidad" class="btn-inline-upload">Subir</label>
+                  </div>
+                  
+                  <a *ngIf="selectedCredito.documentos?.documentos_identidad" [href]="selectedCredito.documentos.documentos_identidad" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  </a>
+                </div>
+              </div>
+
+              <!-- Estados Financieros -->
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.estados_financieros">account_balance_wallet</span>
+                  <div class="doc-title-desc">
+                    <h5>Estados Financieros</h5>
+                    <p>Balance y Estados Financieros firmados por contador.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.estados_financieros">Cargado</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.estados_financieros">Pendiente</span>
+                  
+                  <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
+                    <input type="file" id="inline-file-financieros" (change)="onFileUpload($event, 'estados_financieros')" accept=".pdf" hidden>
+                    <label for="inline-file-financieros" class="btn-inline-upload">Subir</label>
+                  </div>
+                  
+                  <a *ngIf="selectedCredito.documentos?.estados_financieros" [href]="selectedCredito.documentos.estados_financieros" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  </a>
+                </div>
+              </div>
+
+              <!-- Certificados Laborales -->
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.certificados_laborales">badge</span>
+                  <div class="doc-title-desc">
+                    <h5>Certificados Laborales / Comerciales</h5>
+                    <p>Soporte de ingresos o referencias de la empresa.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.certificados_laborales">Cargado</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.certificados_laborales">Pendiente</span>
+                  
+                  <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
+                    <input type="file" id="inline-file-laborales" (change)="onFileUpload($event, 'certificados_laborales')" accept=".pdf" hidden>
+                    <label for="inline-file-laborales" class="btn-inline-upload">Subir</label>
+                  </div>
+                  
+                  <a *ngIf="selectedCredito.documentos?.certificados_laborales" [href]="selectedCredito.documentos.certificados_laborales" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
                   </a>
                 </div>
               </div>
@@ -617,6 +762,59 @@
           <div class="stage-doc-group">
             <h4>Etapa 4: Formalización de Garantías <span class="stage-owner">Cliente / Dirección Administrativa</span></h4>
             <div class="documents-grid-grouped">
+              <!-- Borradores (Pagaré, Carta Inst, Contrato) -->
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.pagare_borrador">description</span>
+                  <div class="doc-title-desc">
+                    <h5>Pagaré (Borrador)</h5>
+                    <p>Plantilla de Pagaré para firma. Responsable de carga: Comercial.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.pagare_borrador">Disponible</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.pagare_borrador">Pendiente</span>
+                  <a *ngIf="selectedCredito.documentos?.pagare_borrador" [href]="selectedCredito.documentos.pagare_borrador" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Descargar
+                  </a>
+                </div>
+              </div>
+
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.carta_instrucciones_borrador">description</span>
+                  <div class="doc-title-desc">
+                    <h5>Carta de Instrucciones (Borrador)</h5>
+                    <p>Plantilla de Carta de Instrucciones para firma. Responsable de carga: Comercial.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.carta_instrucciones_borrador">Disponible</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.carta_instrucciones_borrador">Pendiente</span>
+                  <a *ngIf="selectedCredito.documentos?.carta_instrucciones_borrador" [href]="selectedCredito.documentos.carta_instrucciones_borrador" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Descargar
+                  </a>
+                </div>
+              </div>
+
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.contrato_borrador">description</span>
+                  <div class="doc-title-desc">
+                    <h5>Contrato (Borrador)</h5>
+                    <p>Plantilla de Contrato para firma. Responsable de carga: Comercial.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.contrato_borrador">Disponible</span>
+                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.contrato_borrador">Pendiente</span>
+                  <a *ngIf="selectedCredito.documentos?.contrato_borrador" [href]="selectedCredito.documentos.contrato_borrador" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> Descargar
+                  </a>
+                </div>
+              </div>
+
+              <!-- Garantías Firmadas -->
               <div class="doc-box-new">
                 <div class="doc-main-info">
                   <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.garantias_firmadas">draw</span>
