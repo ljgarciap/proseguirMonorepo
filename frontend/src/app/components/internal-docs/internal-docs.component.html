@@ -80,127 +80,255 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let doc of pagedDocuments" [ngClass]="'row-' + getRemainingTime(doc).status">
-            <td *ngIf="currentTab === 'pendientes'" style="width: 40px; text-align: center; padding-left: 1.5rem;">
-              <input type="checkbox" 
-                     *ngIf="doc.estado === 'pendiente' && (doc.target_role === authService.getActiveRole() || doc.sender_id == currentUser?.id || authService.getActiveRole() === 'superadmin')"
-                     [checked]="isDocSelected(doc.id)" 
-                     (change)="toggleSelectDoc(doc.id)" 
-                     style="cursor: pointer; width: 16px; height: 16px; accent-color: #3b82f6;">
-            </td>
-            <td>
-              <div class="doc-cell">
-                <div style="display: flex; align-items: center; gap: 6px;">
-                  <span class="material-symbols-outlined" *ngIf="doc.batch_id" style="font-size: 1.1rem; color: #6366f1; vertical-align: middle;" title="Documento cargado en lote (Lote: {{ doc.batch_id }})">inventory_2</span>
-                  <span class="name">{{ doc.titulo }}</span>
+          <ng-container *ngFor="let item of pagedDocuments">
+            <!-- Folder Row -->
+            <tr *ngIf="item.isFolder" class="folder-row" [ngClass]="'row-' + getRemainingTime(item).status">
+              <td *ngIf="currentTab === 'pendientes'" style="width: 40px; text-align: center; padding-left: 1.5rem;">
+                <input type="checkbox" 
+                       [checked]="isFolderSelected(item)" 
+                       [indeterminate]="isFolderIndeterminate(item)"
+                       (change)="toggleSelectFolder(item, $event)" 
+                       style="cursor: pointer; width: 16px; height: 16px; accent-color: #3b82f6;">
+              </td>
+              <td (click)="toggleBatch(item.batch_id, $event)" style="cursor: pointer;">
+                <div class="doc-cell">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="material-symbols-outlined toggle-icon" style="color: #64748b; font-size: 1.2rem; transition: transform 0.2s;" [style.transform]="isBatchExpanded(item.batch_id) ? 'rotate(90deg)' : 'none'">
+                      chevron_right
+                    </span>
+                    <span class="material-symbols-outlined" style="font-size: 1.3rem; color: #f59e0b; vertical-align: middle;">folder</span>
+                    <strong class="name">{{ item.titulo }}</strong>
+                    <span class="badge" style="background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                      {{ item.children.length }} arch.
+                    </span>
+                  </div>
+                  <span class="date">{{ item.created_at | date:'medium' }}</span>
                 </div>
-                <span class="date">{{ doc.created_at | date:'medium' }}</span>
-              </div>
-            </td>
-            <td>
-              <div style="display: flex; flex-direction: column; gap: 6px;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">De:</span>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <div class="avatar-sm" style="width: 24px; height: 24px; font-size: 0.7rem; background: #e2e8f0; color: #475569;">
-                      {{ doc.sender?.name?.charAt(0) }}
+              </td>
+              <td>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">De:</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <div class="avatar-sm" style="width: 24px; height: 24px; font-size: 0.7rem; background: #e2e8f0; color: #475569;">
+                        {{ item.sender?.name?.charAt(0) }}
+                      </div>
+                      <strong style="font-size: 0.85rem; color: #334155;">{{ item.sender?.name }}</strong>
                     </div>
-                    <strong style="font-size: 0.85rem; color: #334155;">{{ doc.sender?.name }}</strong>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">Para:</span>
+                    <span class="role-badge" [ngClass]="item.target_role" style="font-size: 0.7rem; padding: 2px 8px;">
+                      {{ item.target_role === 'contable' ? 'CONTABILIDAD' : (item.target_role === 'gerente' ? 'GERENCIA PSL' : (item.target_role === 'operativo' ? 'ÁREA ADMINISTRATIVA' : (item.target_role | uppercase))) }}
+                    </span>
                   </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">Para:</span>
-                  <span class="role-badge" [ngClass]="doc.target_role" style="font-size: 0.7rem; padding: 2px 8px;">
-                    {{ doc.target_role === 'contable' ? 'CONTABILIDAD' : (doc.target_role === 'gerente' ? 'GERENCIA PSL' : (doc.target_role === 'operativo' ? 'ÁREA ADMINISTRATIVA' : (doc.target_role | uppercase))) }}
-                  </span>
-                </div>
-              </div>
-            </td>
-            <td>
-              <span class="cat-label">{{ doc.category?.nombre }}</span>
-            </td>
-            <td>
-              <span class="obs-text" [title]="doc.mensaje">{{ doc.mensaje || '-' }}</span>
-            </td>
-            <td *ngIf="currentTab === 'procesados'">
-              <span class="obs-text text-danger" [title]="doc.motivo_rechazo">{{ doc.motivo_rechazo || '-' }}</span>
-            </td>
-            <td>
-              <span class="prio-tag" [style.background]="doc.priority?.color">
-                {{ doc.priority?.nombre }}
-              </span>
-            </td>
-            <td>
-              <span class="status-pill" [ngClass]="doc.estado">
-                {{ doc.estado === 'visto_bueno' ? 'Visto Bueno' : (doc.estado | titlecase) }}
-              </span>
-            </td>
-            <td>
-              <div class="sla-badge" [ngClass]="getRemainingTime(doc).status" *ngIf="getRemainingTime(doc).status !== 'none'">
-                <span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 4px; vertical-align: middle;">
-                  {{ getRemainingTime(doc).status === 'expired' ? 'error' : 'timer' }}
+              </td>
+              <td>
+                <span class="cat-label">{{ item.category?.nombre }}</span>
+              </td>
+              <td>
+                <span class="obs-text" [title]="item.mensaje">{{ item.mensaje || '-' }}</span>
+              </td>
+              <td *ngIf="currentTab === 'procesados'">
+                <span class="obs-text text-danger" [title]="item.children[0]?.motivo_rechazo">{{ item.children[0]?.motivo_rechazo || '-' }}</span>
+              </td>
+              <td>
+                <span class="prio-tag" [style.background]="item.priority?.color">
+                  {{ item.priority?.nombre }}
                 </span>
-                {{ getRemainingTime(doc).text }}
-              </div>
-              <span *ngIf="getRemainingTime(doc).status === 'none'" style="color: #94a3b8; font-size: 0.8rem;">N/A</span>
-            </td>
-            <td class="text-right" style="padding-right: 1.5rem;">
-              <div class="actions">
-                <button class="btn-pro secondary sm icon-only" (click)="openViewer(doc)" title="Visualizar">
-                  <span class="material-symbols-outlined">visibility</span>
-                </button>
-                <button class="btn-pro secondary sm icon-only" (click)="downloadFile(doc)" title="Descargar">
-                  <span class="material-symbols-outlined">download</span>
-                </button>
-                
-                <!-- Sender Actions (Delete if pending and not acting as receiver) -->
-                <ng-container *ngIf="doc.sender_id == currentUser?.id && doc.target_role !== authService.getActiveRole() && doc.estado === 'pendiente'">
-                  <button class="btn-pro danger sm icon-only" (click)="deleteDocument(doc)" title="Eliminar Documento">
+              </td>
+              <td>
+                <span class="status-pill" [ngClass]="item.estado">
+                  {{ item.estado === 'visto_bueno' ? 'Visto Bueno' : (item.estado | titlecase) }}
+                </span>
+              </td>
+              <td>
+                <div class="sla-badge" [ngClass]="getRemainingTime(item).status" *ngIf="getRemainingTime(item).status !== 'none'">
+                  <span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 4px; vertical-align: middle;">
+                    {{ getRemainingTime(item).status === 'expired' ? 'error' : 'timer' }}
+                  </span>
+                  {{ getRemainingTime(item).text }}
+                </div>
+                <span *ngIf="getRemainingTime(item).status === 'none'" style="color: #94a3b8; font-size: 0.8rem;">N/A</span>
+              </td>
+              <td class="text-right" style="padding-right: 1.5rem;">
+                <div class="actions">
+                  <button class="btn-pro secondary sm icon-only" (click)="downloadFolder(item)" title="Descargar Carpeta Completa">
+                    <span class="material-symbols-outlined">download_for_offline</span>
+                  </button>
+                  <button class="btn-pro danger sm icon-only" *ngIf="folderHasAction(item, 'delete')" (click)="deleteFolder(item)" title="Eliminar Carpeta Completa">
                     <span class="material-symbols-outlined">delete</span>
                   </button>
-                </ng-container>
-                
-                <!-- Quick Status Actions for Receivers -->
-                <!-- Scenario A: Regular Receivers or Gerente processing direct pending documents -->
-                <ng-container *ngIf="doc.target_role === authService.getActiveRole() && doc.estado === 'pendiente' && !(authService.getActiveRole() === 'operativo' && doc.target_role === 'gerente')">
-                  <button class="btn-pro success sm icon-only" (click)="updateStatus(doc, 'procesado')" title="Marcar como Procesado">
+                  <button class="btn-pro success sm icon-only" *ngIf="folderHasAction(item, 'process')" (click)="updateFolderStatus(item, 'procesado')" title="Procesar Carpeta">
                     <span class="material-symbols-outlined">check_circle</span>
                   </button>
-                  <button class="btn-pro danger sm icon-only" (click)="updateStatus(doc, 'rechazado')" title="Rechazar">
-                    <span class="material-symbols-outlined">cancel</span>
-                  </button>
-                </ng-container>
-
-                <!-- Scenario B: Operativo giving visto_bueno on coordinator documents targeting gerente -->
-                <ng-container *ngIf="authService.getActiveRole() === 'operativo' && doc.target_role === 'gerente' && doc.estado === 'pendiente' && doc.sender?.roles?.includes('coordinador_comercial')">
-                  <button class="btn-pro success sm icon-only" (click)="updateStatus(doc, 'visto_bueno')" title="Dar Visto Bueno" style="background-color: #0284c7; border-color: #0284c7;">
+                  <button class="btn-pro success sm icon-only" *ngIf="folderHasAction(item, 'visto_bueno')" (click)="updateFolderStatus(item, 'visto_bueno')" title="Dar Visto Bueno a Carpeta" style="background-color: #0284c7; border-color: #0284c7;">
                     <span class="material-symbols-outlined">thumb_up</span>
                   </button>
-                  <button class="btn-pro danger sm icon-only" (click)="updateStatus(doc, 'rechazado')" title="Rechazar">
-                    <span class="material-symbols-outlined">cancel</span>
-                  </button>
-                </ng-container>
-
-                <!-- Scenario C: Gerente approving documents that have visto_bueno -->
-                <ng-container *ngIf="authService.getActiveRole() === 'gerente' && doc.target_role === 'gerente' && doc.estado === 'visto_bueno'">
-                  <button class="btn-pro success sm icon-only" (click)="updateStatus(doc, 'procesado')" title="Aprobar y Procesar">
+                  <button class="btn-pro success sm icon-only" *ngIf="folderHasAction(item, 'approve')" (click)="updateFolderStatus(item, 'procesado')" title="Aprobar Carpeta">
                     <span class="material-symbols-outlined">check_circle</span>
                   </button>
-                  <button class="btn-pro danger sm icon-only" (click)="updateStatus(doc, 'rechazado')" title="Rechazar">
+                  <button class="btn-pro danger sm icon-only" *ngIf="folderHasAction(item, 'reject')" (click)="updateFolderStatus(item, 'rechazado')" title="Rechazar Carpeta">
                     <span class="material-symbols-outlined">cancel</span>
                   </button>
-                </ng-container>
+                </div>
+              </td>
+            </tr>
 
-                <!-- Batch Actions (Only if regular pending) -->
-                <ng-container *ngIf="doc.target_role === authService.getActiveRole() && doc.estado === 'pendiente' && doc.batch_id">
-                  <button class="btn-pro primary sm icon-only" (click)="processBatch(doc.batch_id)" title="Procesar Lote Completo" style="background-color: #6366f1; border-color: #6366f1;">
-                    <span class="material-symbols-outlined">library_add_check</span>
+            <!-- Expanded Child Rows -->
+            <ng-container *ngIf="item.isFolder && isBatchExpanded(item.batch_id)">
+              <tr *ngFor="let child of item.children" class="child-row" [ngClass]="'row-' + getRemainingTime(child).status">
+                <td *ngIf="currentTab === 'pendientes'" style="width: 40px; text-align: center; padding-left: 1.5rem;">
+                  <input type="checkbox" 
+                         *ngIf="child.estado === 'pendiente' && (child.target_role === authService.getActiveRole() || child.sender_id == currentUser?.id || authService.getActiveRole() === 'superadmin')"
+                         [checked]="isDocSelected(child.id)" 
+                         (change)="toggleSelectDoc(child.id)" 
+                         style="cursor: pointer; width: 16px; height: 16px; accent-color: #3b82f6;">
+                </td>
+                <td>
+                  <div class="doc-cell" style="padding-left: 1.5rem; position: relative;">
+                    <span class="child-tree-line"></span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #64748b; vertical-align: middle;">description</span>
+                      <span class="name" style="font-weight: 500; font-size: 0.85rem; color: #475569;">{{ child.original_name }}</span>
+                    </div>
+                  </div>
+                </td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td *ngIf="currentTab === 'procesados'">
+                  <span class="obs-text text-danger" [title]="child.motivo_rechazo">{{ child.motivo_rechazo || '-' }}</span>
+                </td>
+                <td></td>
+                <td>
+                  <span class="status-pill" [ngClass]="child.estado" style="font-size: 0.7rem; padding: 2px 8px;">
+                    {{ child.estado === 'visto_bueno' ? 'Visto Bueno' : (child.estado | titlecase) }}
+                  </span>
+                </td>
+                <td></td>
+                <td class="text-right" style="padding-right: 1.5rem;">
+                  <div class="actions">
+                    <button class="btn-pro secondary sm icon-only" (click)="openViewer(child)" title="Visualizar">
+                      <span class="material-symbols-outlined" style="font-size: 1rem;">visibility</span>
+                    </button>
+                    <button class="btn-pro secondary sm icon-only" (click)="downloadFile(child)" title="Descargar">
+                      <span class="material-symbols-outlined" style="font-size: 1rem;">download</span>
+                    </button>
+                    <button class="btn-pro danger sm icon-only" *ngIf="docHasAction(child, 'delete')" (click)="deleteDocument(child)" title="Eliminar Documento">
+                      <span class="material-symbols-outlined" style="font-size: 1rem;">delete</span>
+                    </button>
+                    <button class="btn-pro success sm icon-only" *ngIf="docHasAction(child, 'process')" (click)="updateStatus(child, 'procesado')" title="Marcar como Procesado">
+                      <span class="material-symbols-outlined" style="font-size: 1rem;">check_circle</span>
+                    </button>
+                    <button class="btn-pro success sm icon-only" *ngIf="docHasAction(child, 'visto_bueno')" (click)="updateStatus(child, 'visto_bueno')" title="Dar Visto Bueno" style="background-color: #0284c7; border-color: #0284c7;">
+                      <span class="material-symbols-outlined" style="font-size: 1rem;">thumb_up</span>
+                    </button>
+                    <button class="btn-pro success sm icon-only" *ngIf="docHasAction(child, 'approve')" (click)="updateStatus(child, 'procesado')" title="Aprobar y Procesar">
+                      <span class="material-symbols-outlined" style="font-size: 1rem;">check_circle</span>
+                    </button>
+                    <button class="btn-pro danger sm icon-only" *ngIf="docHasAction(child, 'reject')" (click)="updateStatus(child, 'rechazado')" title="Rechazar">
+                      <span class="material-symbols-outlined" style="font-size: 1rem;">cancel</span>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </ng-container>
+
+            <!-- Single Document Row -->
+            <tr *ngIf="!item.isFolder" [ngClass]="'row-' + getRemainingTime(item).status">
+              <td *ngIf="currentTab === 'pendientes'" style="width: 40px; text-align: center; padding-left: 1.5rem;">
+                <input type="checkbox" 
+                       *ngIf="item.estado === 'pendiente' && (item.target_role === authService.getActiveRole() || item.sender_id == currentUser?.id || authService.getActiveRole() === 'superadmin')"
+                       [checked]="isDocSelected(item.id)" 
+                       (change)="toggleSelectDoc(item.id)" 
+                       style="cursor: pointer; width: 16px; height: 16px; accent-color: #3b82f6;">
+              </td>
+              <td>
+                <div class="doc-cell">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #64748b; vertical-align: middle;">description</span>
+                    <span class="name">{{ item.titulo }}</span>
+                  </div>
+                  <span class="date">{{ item.created_at | date:'medium' }}</span>
+                </div>
+              </td>
+              <td>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">De:</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <div class="avatar-sm" style="width: 24px; height: 24px; font-size: 0.7rem; background: #e2e8f0; color: #475569;">
+                        {{ item.sender?.name?.charAt(0) }}
+                      </div>
+                      <strong style="font-size: 0.85rem; color: #334155;">{{ item.sender?.name }}</strong>
+                    </div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">Para:</span>
+                    <span class="role-badge" [ngClass]="item.target_role" style="font-size: 0.7rem; padding: 2px 8px;">
+                      {{ item.target_role === 'contable' ? 'CONTABILIDAD' : (item.target_role === 'gerente' ? 'GERENCIA PSL' : (item.target_role === 'operativo' ? 'ÁREA ADMINISTRATIVA' : (item.target_role | uppercase))) }}
+                    </span>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="cat-label">{{ item.category?.nombre }}</span>
+              </td>
+              <td>
+                <span class="obs-text" [title]="item.mensaje">{{ item.mensaje || '-' }}</span>
+              </td>
+              <td *ngIf="currentTab === 'procesados'">
+                <span class="obs-text text-danger" [title]="item.motivo_rechazo">{{ item.motivo_rechazo || '-' }}</span>
+              </td>
+              <td>
+                <span class="prio-tag" [style.background]="item.priority?.color">
+                  {{ item.priority?.nombre }}
+                </span>
+              </td>
+              <td>
+                <span class="status-pill" [ngClass]="item.estado">
+                  {{ item.estado === 'visto_bueno' ? 'Visto Bueno' : (item.estado | titlecase) }}
+                </span>
+              </td>
+              <td>
+                <div class="sla-badge" [ngClass]="getRemainingTime(item).status" *ngIf="getRemainingTime(item).status !== 'none'">
+                  <span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 4px; vertical-align: middle;">
+                    {{ getRemainingTime(item).status === 'expired' ? 'error' : 'timer' }}
+                  </span>
+                  {{ getRemainingTime(item).text }}
+                </div>
+                <span *ngIf="getRemainingTime(item).status === 'none'" style="color: #94a3b8; font-size: 0.8rem;">N/A</span>
+              </td>
+              <td class="text-right" style="padding-right: 1.5rem;">
+                <div class="actions">
+                  <button class="btn-pro secondary sm icon-only" (click)="openViewer(item)" title="Visualizar">
+                    <span class="material-symbols-outlined">visibility</span>
                   </button>
-                </ng-container>
-              </div>
-            </td>
-          </tr>
-          <tr *ngIf="filteredDocuments.length === 0 && !loading">
+                  <button class="btn-pro secondary sm icon-only" (click)="downloadFile(item)" title="Descargar">
+                    <span class="material-symbols-outlined">download</span>
+                  </button>
+                  <button class="btn-pro danger sm icon-only" *ngIf="docHasAction(item, 'delete')" (click)="deleteDocument(item)" title="Eliminar Documento">
+                    <span class="material-symbols-outlined">delete</span>
+                  </button>
+                  <button class="btn-pro success sm icon-only" *ngIf="docHasAction(item, 'process')" (click)="updateStatus(item, 'procesado')" title="Marcar como Procesado">
+                    <span class="material-symbols-outlined">check_circle</span>
+                  </button>
+                  <button class="btn-pro success sm icon-only" *ngIf="docHasAction(item, 'visto_bueno')" (click)="updateStatus(item, 'visto_bueno')" title="Dar Visto Bueno" style="background-color: #0284c7; border-color: #0284c7;">
+                    <span class="material-symbols-outlined">thumb_up</span>
+                  </button>
+                  <button class="btn-pro success sm icon-only" *ngIf="docHasAction(item, 'approve')" (click)="updateStatus(item, 'procesado')" title="Aprobar y Procesar">
+                    <span class="material-symbols-outlined">check_circle</span>
+                  </button>
+                  <button class="btn-pro danger sm icon-only" *ngIf="docHasAction(item, 'reject')" (click)="updateStatus(item, 'rechazado')" title="Rechazar">
+                    <span class="material-symbols-outlined">cancel</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
+          <tr *ngIf="groupedDocuments.length === 0 && !loading">
             <td colspan="9" class="empty-state">No se han encontrado documentos en esta vista.</td>
           </tr>
         </tbody>
@@ -210,7 +338,7 @@
     <div class="pagination-footer" style="padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; background: #fafafa;">
       <div style="display: flex; align-items: center; gap: 12px;">
         <span style="color: #64748b; font-size: 0.85rem;">
-          Mostrando {{ showingFrom }} a {{ showingTo }} de {{ filteredDocuments.length }} documentos
+          Mostrando {{ showingFrom }} a {{ showingTo }} de {{ groupedDocuments.length }} elementos ({{ filteredDocuments.length }} documentos en total)
         </span>
         <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #64748b;">
           <span>| Mostrar</span>
