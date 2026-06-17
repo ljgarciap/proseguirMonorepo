@@ -20,6 +20,7 @@ export class InternalDocsComponent implements OnInit {
   priorities: any[] = [];
   selectedDocIds = new Set<number>();
   loading = false;
+  expandedBatches = new Set<string>();
 
   // Tabs
   currentTab: 'pendientes' | 'procesados' = 'pendientes';
@@ -145,21 +146,81 @@ export class InternalDocsComponent implements OnInit {
     }
   }
 
+  getFolderTitle(doc: any): string {
+    if (doc.batch_id && doc.original_name && doc.titulo) {
+      const suffix = ' - ' + doc.original_name;
+      if (doc.titulo.endsWith(suffix)) {
+        return doc.titulo.substring(0, doc.titulo.length - suffix.length);
+      }
+    }
+    return doc.titulo;
+  }
+
+  get groupedDocuments(): any[] {
+    const grouped: any[] = [];
+    const batchMap = new Map<string, any>();
+
+    for (const doc of this.filteredDocuments) {
+      const hasMultiBatch = doc.batch_id && this.documents.filter(d => d.batch_id === doc.batch_id).length > 1;
+
+      if (hasMultiBatch) {
+        let folder = batchMap.get(doc.batch_id!);
+        if (!folder) {
+          folder = {
+            isFolder: true,
+            batch_id: doc.batch_id,
+            titulo: this.getFolderTitle(doc),
+            created_at: doc.created_at,
+            sender: doc.sender,
+            target_role: doc.target_role,
+            category: doc.category,
+            mensaje: doc.mensaje,
+            priority: doc.priority,
+            estado: doc.estado,
+            children: []
+          };
+          batchMap.set(doc.batch_id!, folder);
+          grouped.push(folder);
+        }
+        folder.children.push(doc);
+      } else {
+        grouped.push(doc);
+      }
+    }
+
+    // Consolidated status
+    for (const folder of batchMap.values()) {
+      const states = folder.children.map((c: any) => c.estado);
+      const uniqueStates = Array.from(new Set(states));
+      if (uniqueStates.length === 1) {
+        folder.estado = uniqueStates[0];
+      } else if (uniqueStates.includes('pendiente')) {
+        folder.estado = 'pendiente';
+      } else if (uniqueStates.includes('visto_bueno')) {
+        folder.estado = 'visto_bueno';
+      } else {
+        folder.estado = uniqueStates[0];
+      }
+    }
+
+    return grouped;
+  }
+
   get pagedDocuments() {
     const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-    return this.filteredDocuments.slice(startIndex, startIndex + this.itemsPerPage);
+    return this.groupedDocuments.slice(startIndex, startIndex + this.itemsPerPage);
   }
 
   get totalPages() {
-    return Math.ceil(this.filteredDocuments.length / this.itemsPerPage);
+    return Math.ceil(this.groupedDocuments.length / this.itemsPerPage);
   }
 
   get showingFrom() {
-    return this.filteredDocuments.length === 0 ? 0 : (this.currentPage - 1) * this.itemsPerPage + 1;
+    return this.groupedDocuments.length === 0 ? 0 : (this.currentPage - 1) * this.itemsPerPage + 1;
   }
 
   get showingTo() {
-    return Math.min(this.currentPage * this.itemsPerPage, this.filteredDocuments.length);
+    return Math.min(this.currentPage * this.itemsPerPage, this.groupedDocuments.length);
   }
 
   // SLA Calculation
@@ -385,6 +446,176 @@ export class InternalDocsComponent implements OnInit {
     const docs = this.filteredDocuments.filter(doc => doc.estado === 'pendiente' && (doc.target_role === this.authService.getActiveRole() || doc.sender_id == this.currentUser?.id || this.authService.getActiveRole() === 'superadmin'));
     if (docs.length === 0) return false;
     return docs.every(doc => this.selectedDocIds.has(doc.id));
+  }
+
+  toggleBatch(batchId: string, event: Event): void {
+    event.stopPropagation();
+    if (this.expandedBatches.has(batchId)) {
+      this.expandedBatches.delete(batchId);
+    } else {
+      this.expandedBatches.add(batchId);
+    }
+  }
+
+  isBatchExpanded(batchId: string): boolean {
+    return this.expandedBatches.has(batchId);
+  }
+
+  isFolderSelected(folder: any): boolean {
+    if (!folder.children || folder.children.length === 0) return false;
+    return folder.children.every((child: any) => this.selectedDocIds.has(child.id));
+  }
+
+  isFolderIndeterminate(folder: any): boolean {
+    if (!folder.children || folder.children.length === 0) return false;
+    const selectedCount = folder.children.filter((child: any) => this.selectedDocIds.has(child.id)).length;
+    return selectedCount > 0 && selectedCount < folder.children.length;
+  }
+
+  toggleSelectFolder(folder: any, event: any): void {
+    const checked = event.target.checked;
+    folder.children.forEach((child: any) => {
+      if (checked) {
+        if (child.estado === 'pendiente' && (child.target_role === this.authService.getActiveRole() || child.sender_id == this.currentUser?.id || this.authService.getActiveRole() === 'superadmin')) {
+          this.selectedDocIds.add(child.id);
+        }
+      } else {
+        this.selectedDocIds.delete(child.id);
+      }
+    });
+  }
+
+  docHasAction(doc: any, type: 'process' | 'visto_bueno' | 'approve' | 'delete' | 'reject'): boolean {
+    const activeRole = this.authService.getActiveRole();
+    const isSuperadmin = activeRole === 'superadmin';
+    
+    switch (type) {
+      case 'delete':
+        if (isSuperadmin) return true;
+        return doc.sender_id == this.currentUser?.id && doc.target_role !== activeRole && doc.estado === 'pendiente';
+      case 'process':
+        return doc.target_role === activeRole && doc.estado === 'pendiente' && !(activeRole === 'operativo' && doc.target_role === 'gerente');
+      case 'visto_bueno':
+        return activeRole === 'operativo' && doc.target_role === 'gerente' && doc.estado === 'pendiente' && doc.sender?.roles?.includes('coordinador_comercial');
+      case 'approve':
+        return activeRole === 'gerente' && doc.target_role === 'gerente' && doc.estado === 'visto_bueno';
+      case 'reject':
+        const canProc = doc.target_role === activeRole && doc.estado === 'pendiente' && !(activeRole === 'operativo' && doc.target_role === 'gerente');
+        const canVB = activeRole === 'operativo' && doc.target_role === 'gerente' && doc.estado === 'pendiente' && doc.sender?.roles?.includes('coordinador_comercial');
+        const canApp = activeRole === 'gerente' && doc.target_role === 'gerente' && doc.estado === 'visto_bueno';
+        return canProc || canVB || canApp;
+      default:
+        return false;
+    }
+  }
+
+  folderHasAction(folder: any, type: 'process' | 'visto_bueno' | 'approve' | 'delete' | 'reject'): boolean {
+    return folder.children && folder.children.some((child: any) => this.docHasAction(child, type));
+  }
+
+  deleteFolder(folder: any) {
+    const ids = folder.children.map((child: any) => child.id);
+    if (ids.length === 0) return;
+
+    Swal.fire({
+      title: '¿Eliminar carpeta completa?',
+      text: `Esta acción eliminará todos los ${ids.length} documentos de la carpeta "${folder.titulo}" y no se puede deshacer.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar todo',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.loading = true;
+        this.http.delete(`${environment.apiUrl}/internal-docs/bulk-delete`, {
+          body: { ids }
+        }).subscribe({
+          next: () => {
+            this.loading = false;
+            ids.forEach((id: number) => this.selectedDocIds.delete(id));
+            Swal.fire('Eliminados', 'La carpeta y sus documentos han sido eliminados.', 'success');
+            this.loadDocuments();
+          },
+          error: (err) => {
+            this.loading = false;
+            Swal.fire('Error', err.error?.message || 'No se pudieron eliminar los documentos.', 'error');
+          }
+        });
+      }
+    });
+  }
+
+  updateFolderStatus(folder: any, status: string) {
+    let validChildren = folder.children;
+    if (status === 'procesado') {
+      validChildren = folder.children.filter((child: any) => this.docHasAction(child, 'process') || this.docHasAction(child, 'approve'));
+    } else if (status === 'visto_bueno') {
+      validChildren = folder.children.filter((child: any) => this.docHasAction(child, 'visto_bueno'));
+    } else if (status === 'rechazado') {
+      validChildren = folder.children.filter((child: any) => this.docHasAction(child, 'reject'));
+    }
+
+    const ids = validChildren.map((child: any) => child.id);
+    if (ids.length === 0) return;
+
+    if (status === 'rechazado') {
+      Swal.fire({
+        title: 'Motivo de Rechazo de la Carpeta',
+        input: 'textarea',
+        inputPlaceholder: 'Escriba el motivo del rechazo para todos los documentos de la carpeta...',
+        showCancelButton: true,
+        confirmButtonText: 'Confirmar Rechazo',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#d33',
+        inputValidator: (value) => {
+          if (!value || !value.trim()) {
+            return '¡Debe escribir un motivo de rechazo!';
+          }
+          return null;
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          this.executeBulkUpdate(ids, 'rechazado', result.value);
+        }
+      });
+    } else if (status === 'visto_bueno') {
+      Swal.fire({
+        title: '¿Dar Visto Bueno a la carpeta completa?',
+        text: `Se dará visto bueno a los ${ids.length} documentos pendientes de la carpeta "${folder.titulo}".`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, dar Visto Bueno',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          this.executeBulkUpdate(ids, 'visto_bueno');
+        }
+      });
+    } else {
+      Swal.fire({
+        title: '¿Procesar carpeta completa?',
+        text: `Se marcarán como procesados los ${ids.length} documentos de la carpeta "${folder.titulo}".`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, procesar todo',
+        cancelButtonText: 'Cancelar'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          this.executeBulkUpdate(ids, 'procesado');
+        }
+      });
+    }
+  }
+
+  downloadFolder(folder: any) {
+    if (!folder.children || folder.children.length === 0) return;
+    folder.children.forEach((child: any, index: number) => {
+      setTimeout(() => {
+        this.downloadFile(child);
+      }, index * 250);
+    });
   }
 
   canDeleteSelected(): boolean {
