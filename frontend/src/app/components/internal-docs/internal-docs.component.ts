@@ -27,6 +27,8 @@ export class InternalDocsComponent implements OnInit {
 
   // Table Controls
   searchTerm = '';
+  filterStartDate = '';
+  filterEndDate = '';
   sortColumn = 'created_at';
   sortDirection: 'desc' | 'asc' = 'desc';
   currentPage = 1;
@@ -120,7 +122,24 @@ export class InternalDocsComponent implements OnInit {
         );
       }
 
-      return roleMatch && tabMatch && searchMatch;
+      // 4. Date Range Filter
+      let dateMatch = true;
+      if (this.filterStartDate || this.filterEndDate) {
+        // Obtenemos el timestamp del campo last_modified (que añadimos en el backend)
+        const docDate = new Date(doc.last_modified).getTime();
+        
+        if (this.filterStartDate) {
+          const start = new Date(this.filterStartDate + 'T00:00:00').getTime();
+          if (docDate < start) dateMatch = false;
+        }
+        
+        if (this.filterEndDate) {
+          const end = new Date(this.filterEndDate + 'T23:59:59').getTime();
+          if (docDate > end) dateMatch = false;
+        }
+      }
+
+      return roleMatch && tabMatch && searchMatch && dateMatch;
     });
 
     // 4. Sorting
@@ -268,6 +287,8 @@ export class InternalDocsComponent implements OnInit {
     this.currentTab = tab;
     this.currentPage = 1;
     this.searchTerm = '';
+    this.filterStartDate = '';
+    this.filterEndDate = '';
   }
 
   async openUploadModal() {

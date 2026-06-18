@@ -21,9 +21,24 @@
       </button>
     </div>
     
-    <div class="search-box" style="position: relative; margin-bottom: 6px;">
-      <span class="material-symbols-outlined" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 1.2rem;">search</span>
-      <input type="text" [(ngModel)]="searchTerm" (ngModelChange)="currentPage = 1" placeholder="Buscar documento..." style="padding: 8px 12px 8px 36px; border: 1px solid #cbd5e1; border-radius: 8px; width: 250px; outline: none; font-size: 0.9rem;">
+    <div class="filters-container" style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+      <!-- Date Range Filters -->
+      <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #64748b;">
+        <span>Desde:</span>
+        <input type="date" [(ngModel)]="filterStartDate" (ngModelChange)="currentPage = 1" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; font-size: 0.85rem; background: white;">
+        <span>Hasta:</span>
+        <input type="date" [(ngModel)]="filterEndDate" (ngModelChange)="currentPage = 1" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; font-size: 0.85rem; background: white;">
+        
+        <button *ngIf="filterStartDate || filterEndDate" class="btn-pro secondary sm" (click)="filterStartDate = ''; filterEndDate = ''; currentPage = 1;" style="padding: 4px 8px; height: 32px;" title="Limpiar filtros de fecha">
+          <span class="material-symbols-outlined" style="font-size: 1.1rem; vertical-align: middle;">backspace</span>
+        </button>
+      </div>
+
+      <!-- General Search Input -->
+      <div class="search-box" style="position: relative;">
+        <span class="material-symbols-outlined" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 1.2rem;">search</span>
+        <input type="text" [(ngModel)]="searchTerm" (ngModelChange)="currentPage = 1" placeholder="Buscar documento..." style="padding: 8px 12px 8px 36px; border: 1px solid #cbd5e1; border-radius: 8px; width: 220px; outline: none; font-size: 0.9rem;">
+      </div>
     </div>
   </div>
 
@@ -102,7 +117,10 @@
                       {{ item.children.length }} arch.
                     </span>
                   </div>
-                  <span class="date" [title]="'Última acción: ' + (item.last_modified | date:'medium')">Modificado: {{ item.last_modified | date:'medium' }}</span>
+                  <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px;">
+                    <span class="date" style="font-size: 0.75rem; color: #64748b;">Creado: {{ item.created_at | date:'medium' }}</span>
+                    <span class="date" style="font-size: 0.75rem; color: #3b82f6;" [title]="'Última acción: ' + (item.last_modified | date:'medium')">Modificado: {{ item.last_modified | date:'medium' }}</span>
+                  </div>
                 </div>
               </td>
               <td>
@@ -193,6 +211,10 @@
                       <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #64748b; vertical-align: middle;">description</span>
                       <span class="name" style="font-weight: 500; font-size: 0.85rem; color: #475569;">{{ child.original_name }}</span>
                     </div>
+                    <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 2px; padding-left: 1.5rem;">
+                      <span class="date" style="font-size: 0.7rem; color: #64748b;">Creado: {{ child.created_at | date:'medium' }}</span>
+                      <span class="date" style="font-size: 0.7rem; color: #3b82f6;" [title]="'Última acción: ' + (child.last_modified | date:'medium')">Modificado: {{ child.last_modified | date:'medium' }}</span>
+                    </div>
                   </div>
                 </td>
                 <td></td>
@@ -251,7 +273,10 @@
                     <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #64748b; vertical-align: middle;">description</span>
                     <span class="name">{{ item.titulo }}</span>
                   </div>
-                  <span class="date" [title]="'Última acción: ' + (item.last_modified | date:'medium')">Modificado: {{ item.last_modified | date:'medium' }}</span>
+                  <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px;">
+                    <span class="date" style="font-size: 0.75rem; color: #64748b;">Creado: {{ item.created_at | date:'medium' }}</span>
+                    <span class="date" style="font-size: 0.75rem; color: #3b82f6;" [title]="'Última acción: ' + (item.last_modified | date:'medium')">Modificado: {{ item.last_modified | date:'medium' }}</span>
+                  </div>
                 </div>
               </td>
               <td>
