@@ -102,7 +102,7 @@
                       {{ item.children.length }} arch.
                     </span>
                   </div>
-                  <span class="date">{{ item.created_at | date:'medium' }}</span>
+                  <span class="date" [title]="'Última acción: ' + (item.last_modified | date:'medium')">Modificado: {{ item.last_modified | date:'medium' }}</span>
                 </div>
               </td>
               <td>
@@ -251,7 +251,7 @@
                     <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #64748b; vertical-align: middle;">description</span>
                     <span class="name">{{ item.titulo }}</span>
                   </div>
-                  <span class="date">{{ item.created_at | date:'medium' }}</span>
+                  <span class="date" [title]="'Última acción: ' + (item.last_modified | date:'medium')">Modificado: {{ item.last_modified | date:'medium' }}</span>
                 </div>
               </td>
               <td>

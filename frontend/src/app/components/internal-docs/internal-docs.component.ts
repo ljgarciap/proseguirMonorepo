@@ -38,6 +38,7 @@ export class InternalDocsComponent implements OnInit {
   viewerUrl: string | null = null;
   isImage = false;
   isExcel = false;
+  isWord = false;
 
   currentUser: any = null;
 
@@ -820,6 +821,14 @@ export class InternalDocsComponent implements OnInit {
     this.viewerUrl = `${baseUrl}/storage/${doc.archivo_path}`;
     this.isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.archivo_path);
     this.isExcel = /\.(xls|xlsx|csv)$/i.test(doc.archivo_path);
+    this.isWord = /\.(doc|docx)$/i.test(doc.archivo_path);
+    
+    if (this.isWord) {
+      // Usar Google Docs Viewer oficial para previsualizar archivos Word
+      const encodedUrl = encodeURIComponent(this.viewerUrl);
+      this.viewerUrl = `https://docs.google.com/gview?url=${encodedUrl}&embedded=true`;
+    }
+    
     this.showViewer = true;
   }
 
@@ -827,16 +836,35 @@ export class InternalDocsComponent implements OnInit {
     this.showViewer = false;
     this.selectedDoc = null;
     this.viewerUrl = null;
+    this.isWord = false;
   }
 
   downloadFile(doc: any) {
     const baseUrl = environment.apiUrl.replace('/api', '');
     const url = `${baseUrl}/storage/${doc.archivo_path}`;
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = doc.titulo;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    
+    // Hacemos un GET como Blob para forzar al navegador a respetar el nombre original
+    this.http.get(url, { responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = doc.original_name || doc.titulo;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      },
+      error: (err) => {
+        console.error('Error al descargar el archivo:', err);
+        // Fallback clásico en caso de error
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = doc.original_name || doc.titulo;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    });
   }
 }
