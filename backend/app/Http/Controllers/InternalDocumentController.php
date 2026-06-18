@@ -138,7 +138,7 @@ class InternalDocumentController extends Controller
         $docs = InternalDocument::whereIn('id', $request->ids)->get();
 
         foreach ($docs as $doc) {
-            $updateData = ['estado' => $request->estado];
+            $updateData = ['estado' => $request->estado, 'last_action_at' => now()];
             if ($request->estado === 'rechazado') {
                 $updateData['motivo_rechazo'] = $request->motivo_rechazo;
             } else {
@@ -151,7 +151,7 @@ class InternalDocumentController extends Controller
     }
 
     /**
-     * Actualizar estado del documento (visto, procesado, rechazado)
+     * Actualizar estado del documento (visto, visto_bueno, procesado, rechazado)
      */
     public function updateStatus(Request $request, $id)
     {
@@ -162,7 +162,7 @@ class InternalDocumentController extends Controller
 
         $doc = InternalDocument::findOrFail($id);
         
-        $updateData = ['estado' => $request->estado];
+        $updateData = ['estado' => $request->estado, 'last_action_at' => now()];
         if ($request->estado === 'rechazado') {
             $updateData['motivo_rechazo'] = $request->motivo_rechazo;
         } else {
