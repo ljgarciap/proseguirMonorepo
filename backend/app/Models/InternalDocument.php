@@ -8,6 +8,17 @@ class InternalDocument extends Model
 {
     protected $guarded = [];
 
+    protected $casts = [
+        'last_action_at' => 'datetime',
+    ];
+
+    protected $appends = ['last_modified'];
+
+    public function getLastModifiedAttribute()
+    {
+        return $this->last_action_at ?? $this->updated_at ?? $this->created_at;
+    }
+
     public function sender()
     {
         return $this->belongsTo(User::class, 'sender_id');

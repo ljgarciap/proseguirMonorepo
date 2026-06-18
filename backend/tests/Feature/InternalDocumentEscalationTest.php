@@ -98,6 +98,8 @@ class InternalDocumentEscalationTest extends TestCase
         ]);
         $response->assertStatus(200);
         $this->assertEquals('visto_bueno', $response->json('estado'));
+        $this->assertNotNull($response->json('last_action_at'));
+        $this->assertNotNull($response->json('last_modified'));
 
         // 5. Manager SHOULD now see the document in index
         Passport::actingAs($this->gerente);
@@ -105,6 +107,7 @@ class InternalDocumentEscalationTest extends TestCase
         $response->assertStatus(200);
         $this->assertCount(1, $response->json());
         $this->assertEquals($docId, $response->json('0.id'));
+        $this->assertNotNull($response->json('0.last_action_at'));
 
         // 6. Manager approves and processes it finally
         $response = $this->patchJson("/api/internal-docs/{$docId}/status", [
