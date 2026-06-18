@@ -117,7 +117,10 @@
                       {{ item.children.length }} arch.
                     </span>
                   </div>
-                  <span class="date" [title]="'Última acción: ' + (item.last_modified | date:'medium')">Modificado: {{ item.last_modified | date:'medium' }}</span>
+                  <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px;">
+                    <span class="date" style="font-size: 0.75rem; color: #64748b;">Creado: {{ item.created_at | date:'medium' }}</span>
+                    <span class="date" style="font-size: 0.75rem; color: #3b82f6;" [title]="'Última acción: ' + (item.last_modified | date:'medium')">Modificado: {{ item.last_modified | date:'medium' }}</span>
+                  </div>
                 </div>
               </td>
               <td>
@@ -208,6 +211,10 @@
                       <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #64748b; vertical-align: middle;">description</span>
                       <span class="name" style="font-weight: 500; font-size: 0.85rem; color: #475569;">{{ child.original_name }}</span>
                     </div>
+                    <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 2px; padding-left: 1.5rem;">
+                      <span class="date" style="font-size: 0.7rem; color: #64748b;">Creado: {{ child.created_at | date:'medium' }}</span>
+                      <span class="date" style="font-size: 0.7rem; color: #3b82f6;" [title]="'Última acción: ' + (child.last_modified | date:'medium')">Modificado: {{ child.last_modified | date:'medium' }}</span>
+                    </div>
                   </div>
                 </td>
                 <td></td>
@@ -266,7 +273,10 @@
                     <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #64748b; vertical-align: middle;">description</span>
                     <span class="name">{{ item.titulo }}</span>
                   </div>
-                  <span class="date" [title]="'Última acción: ' + (item.last_modified | date:'medium')">Modificado: {{ item.last_modified | date:'medium' }}</span>
+                  <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px;">
+                    <span class="date" style="font-size: 0.75rem; color: #64748b;">Creado: {{ item.created_at | date:'medium' }}</span>
+                    <span class="date" style="font-size: 0.75rem; color: #3b82f6;" [title]="'Última acción: ' + (item.last_modified | date:'medium')">Modificado: {{ item.last_modified | date:'medium' }}</span>
+                  </div>
                 </div>
               </td>
               <td>
