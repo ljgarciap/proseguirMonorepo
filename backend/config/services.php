@@ -40,4 +40,13 @@ return [
         'webhook_url' => env('N8N_INTERNAL_WEBHOOK_URL'),
     ],
 
+    'mistral' => [
+        'api_key' => env('MISTRAL_API_KEY'),
+        'api_url' => env('MISTRAL_API_URL', 'https://api.mistral.ai'),
+    ],
+
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+    ],
+
 ];

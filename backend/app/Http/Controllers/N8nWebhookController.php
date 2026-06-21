@@ -193,6 +193,7 @@ class N8nWebhookController extends Controller
                     // Remove only non-existent columns to avoid DB errors
                     $cleanedRow = collect($row)->except(['operacion', 'saldo_total'])->toArray();
                     $cleanedRow['client_upload_id'] = $clientUploadId;
+                    $cleanedRow = $this->sanitizeRowForDb($cleanedRow);
                     OperacionCartera::create($cleanedRow);
                 }
                 break;
@@ -213,6 +214,7 @@ class N8nWebhookController extends Controller
                     $row['intereses_diarios'] = (($valorAprobado * $tasa) / 30) / 100;
                     $row['client_upload_id'] = $clientUploadId;
 
+                    $row = $this->sanitizeRowForDb($row);
                     OperacionFactoring::create($row);
                 }
                 break;
@@ -251,6 +253,7 @@ class N8nWebhookController extends Controller
                     }
 
                     $row['estado_liquidacion'] = 'pendiente';
+                    $row = $this->sanitizeRowForDb($row);
                     PagoFactoring::create($row);
                 }
                 break;
@@ -259,6 +262,7 @@ class N8nWebhookController extends Controller
                     if (isset($row['emisor']) && isset($row['emisor_nit'])) {
                         $row['emisor_nit'] = \App\Services\ClientMasterService::masterClient($row['emisor'], $row['emisor_nit']);
                     }
+                    $row = $this->sanitizeRowForDb($row);
                     OperacionConfirming::create($row);
                 }
                 break;
@@ -267,6 +271,7 @@ class N8nWebhookController extends Controller
                     if (isset($row['vendedor']) && isset($row['nit_vendedor'])) {
                         $row['nit_vendedor'] = \App\Services\ClientMasterService::masterClient($row['vendedor'], $row['nit_vendedor']);
                     }
+                    $row = $this->sanitizeRowForDb($row);
                     Compraventa::create($row);
                 }
                 break;
@@ -279,12 +284,34 @@ class N8nWebhookController extends Controller
                         $row['nit_cliente'] = \App\Services\ClientMasterService::masterClient($row['cliente'], $row['nit_cliente'] ?? null);
                     }
                     $row['client_upload_id'] = $clientUploadId;
+                    $row = $this->sanitizeRowForDb($row);
                     PagoCompraventa::create($row);
                 }
                 break;
             default:
                 throw new \Exception('Categoría no válida');
         }
+    }
+
+    private function sanitizeRowForDb(array $row): array
+    {
+        foreach ($row as $key => $value) {
+            if (is_array($value)) {
+                $isSimple = true;
+                foreach ($value as $item) {
+                    if (is_array($item) || is_object($item)) {
+                        $isSimple = false;
+                        break;
+                    }
+                }
+                if ($isSimple && count($value) > 0) {
+                    $row[$key] = implode(', ', $value);
+                } else {
+                    $row[$key] = json_encode($value);
+                }
+            }
+        }
+        return $row;
     }
 
     /**

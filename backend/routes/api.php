@@ -94,6 +94,7 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
         // Uploads group with granular auth
         Route::prefix('uploads')->middleware(['auth:api', 'checkrole'])->group(function () {
             Route::get('/', [\App\Http\Controllers\ClientUploadController::class, 'index']);
+            Route::get('/recent-ocr', [\App\Http\Controllers\ClientUploadController::class, 'recentOcr']);
             Route::post('/', [\App\Http\Controllers\ClientUploadController::class, 'store'])
                 ->middleware('checkrole:cliente');
             Route::get('/{id}/download', [\App\Http\Controllers\ClientUploadController::class, 'download'])
