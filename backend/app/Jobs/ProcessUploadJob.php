@@ -589,9 +589,16 @@ class ProcessUploadJob implements ShouldQueue
                         $listaGarantias = is_array($data['garantia']) && !\Illuminate\Support\Arr::isAssoc($data['garantia']) ? $data['garantia'] : [$data['garantia']];
                         $garantiasText = [];
                         foreach ($listaGarantias as $i => $g) {
-                            $tipo = $g['tipo'] ?? '';
-                            $det = $g['detalle'] ?? '';
-                            $garantiasText[] = "Garantía " . ($i + 1) . ": {$tipo} - {$det}";
+                            if (!is_array($g)) {
+                                $tipoStr = '';
+                                $detStr = is_string($g) ? $g : json_encode($g);
+                            } else {
+                                $tipo = $g['tipo'] ?? '';
+                                $det = $g['detalle'] ?? '';
+                                $tipoStr = is_array($tipo) ? json_encode($tipo) : (string)$tipo;
+                                $detStr = is_array($det) ? json_encode($det) : (string)$det;
+                            }
+                            $garantiasText[] = "Garantía " . ($i + 1) . ": {$tipoStr} - {$detStr}";
                         }
                         $detalleUnificado = implode(' | ', $garantiasText);
                     }
@@ -607,11 +614,22 @@ class ProcessUploadJob implements ShouldQueue
                         $tipoG = null;
                         if (!empty($data['garantia'])) {
                             if (is_array($data['garantia']) && !\Illuminate\Support\Arr::isAssoc($data['garantia'])) {
-                                $estadoG = $data['garantia'][0]['estado'] ?? null;
-                                $tipoG = $data['garantia'][0]['tipo'] ?? null;
+                                $gFirst = $data['garantia'][0] ?? null;
                             } else {
-                                $estadoG = $data['garantia']['estado'] ?? null;
-                                $tipoG = $data['garantia']['tipo'] ?? null;
+                                $gFirst = $data['garantia'];
+                            }
+                            if (is_array($gFirst)) {
+                                $estadoG = $gFirst['estado'] ?? null;
+                                $tipoG = $gFirst['tipo'] ?? null;
+                            } else {
+                                $estadoG = null;
+                                $tipoG = is_string($gFirst) ? $gFirst : json_encode($gFirst);
+                            }
+                            if (is_array($estadoG)) {
+                                $estadoG = json_encode($estadoG);
+                            }
+                            if (is_array($tipoG)) {
+                                $tipoG = json_encode($tipoG);
                             }
                         }
 

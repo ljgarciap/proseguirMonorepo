@@ -58,7 +58,7 @@ class OcrMigrationTest extends TestCase
         $this->assertNotNull($upload);
 
         Queue::assertPushed(ProcessUploadJob::class, function ($job) use ($upload) {
-            return $job->timeout === 240;
+            return $job->timeout === 360;
         });
     }
 

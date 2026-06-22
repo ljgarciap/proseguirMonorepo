@@ -46,6 +46,27 @@ services:
     networks:
       - factoring_network
 
+  queue:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: factoring_queue
+    restart: always
+    command: php artisan queue:work --tries=3
+    volumes:
+      - ./backend:/var/www/html
+      - ./.env:/var/www/html/.env
+    environment:
+      - DB_HOST=db
+      - DB_DATABASE=factoring_db
+      - DB_USERNAME=root
+      - DB_PASSWORD=${DB_PASSWORD:-root}
+    depends_on:
+      - db
+      - backend
+    networks:
+      - factoring_network
+
   frontend:
     build:
       context: ./frontend

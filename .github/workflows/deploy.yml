@@ -109,6 +109,9 @@ jobs:
             docker exec factoring_backend chmod -R 777 storage bootstrap/cache
             docker exec factoring_backend chmod 600 storage/oauth-private.key storage/oauth-public.key
 
+            # 9. Reiniciar el worker de la cola para aplicar cambios de código
+            docker exec factoring_queue php artisan queue:restart || true
+
   deploy-test:
     name: Test Deploy (CD)
     needs: [test-backend, test-frontend]
@@ -172,3 +175,6 @@ jobs:
             docker exec factoring_backend php artisan route:cache
             docker exec factoring_backend chmod -R 777 storage bootstrap/cache
             docker exec factoring_backend chmod 600 storage/oauth-private.key storage/oauth-public.key
+
+            # 9. Reiniciar el worker de la cola para aplicar cambios de código
+            docker exec factoring_queue php artisan queue:restart || true
