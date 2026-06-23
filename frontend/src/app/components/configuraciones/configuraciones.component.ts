@@ -277,7 +277,6 @@ export class ConfiguracionesComponent implements OnInit {
         cfg.tiene_valor = res.tiene_valor;
         cfg.updated_by = res.updated_by;
         cfg.updated_at = res.updated_at;
-        cfg.mostrarValor = false;
         cfg.valor = cfg.es_secreto ? null : cfg.valorTemporal ?? null;
         cfg.guardado = true;
         setTimeout(() => { cfg.guardado = false; }, 3000);
