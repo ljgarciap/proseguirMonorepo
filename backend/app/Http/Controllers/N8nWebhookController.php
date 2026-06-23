@@ -174,117 +174,146 @@ class N8nWebhookController extends Controller
         // 3. Apply Batch Consensus for Identifiers (Nombre -> NIT)
         $data = $this->applyConsensus($data, $categoria);
 
-        switch ($categoria) {
-            case 'cartera':
-                foreach ($data as $row) {
-                    if (isset($row['actividad_economica'])) {
-                        $row['sector_economico'] = \App\Services\IntelligentMapper::mapActivityToSector($row['actividad_economica']);
-                    }
-                    
-                    // Master client data
-                    if (isset($row['cliente']) && isset($row['identificacion'])) {
-                        $row['identificacion'] = \App\Services\ClientMasterService::masterClient($row['cliente'], $row['identificacion'], [
-                            'ciudad' => $row['ciudad'] ?? null,
-                            'sector_economico' => $row['sector_economico'] ?? null,
-                            'actividad_economica' => $row['actividad_economica'] ?? null,
-                        ]);
-                    }
-
-                    // Remove only non-existent columns to avoid DB errors
-                    $cleanedRow = collect($row)->except(['operacion', 'saldo_total'])->toArray();
-                    $cleanedRow['client_upload_id'] = $clientUploadId;
-                    OperacionCartera::create($cleanedRow);
-                }
-                break;
-            case 'op':
-                foreach ($data as $row) {
-                    // Filter out dummy/empty rows (like example row #84)
-                    if (empty($row['monto']) || (float)$row['monto'] <= 0) {
-                        continue;
-                    }
-
-                    if (isset($row['cliente']) && isset($row['nit_cliente'])) {
-                        $row['nit_cliente'] = \App\Services\ClientMasterService::masterClient($row['cliente'], $row['nit_cliente']);
-                    }
-
-                    // Calculation: intereses_diarios = ((valor_aprobado * tasa_descuento) / 30) / 100
-                    $valorAprobado = (float)($row['valor_aprobado'] ?? 0);
-                    $tasa = (float)($row['tasa_descuento'] ?? 0);
-                    $row['intereses_diarios'] = (($valorAprobado * $tasa) / 30) / 100;
-                    $row['client_upload_id'] = $clientUploadId;
-
-                    OperacionFactoring::create($row);
-                }
-                break;
-            case 'pagos':
-                foreach ($data as $row) {
-                    if (isset($row['cliente']) && isset($row['nit'])) {
-                        $row['nit'] = \App\Services\ClientMasterService::masterClient($row['cliente'], $row['nit']);
-                    }
-
-                    // Pre-calculation of days if dates are present
-                    try {
-                        $fPagoStr = $row['fecha_pago'] ?? null;
-                        $fFinalStr = $row['fecha_final'] ?? null;
-                        $fInicialStr = $row['fecha_inicial'] ?? null;
-
-                        if ($fPagoStr && $fFinalStr) {
-                            // Helper to parse dates in d/m/Y or fallback to parse
-                            $parseDate = function($dateStr) {
-                                if (str_contains($dateStr, '/')) {
-                                    return \Carbon\Carbon::createFromFormat('d/m/Y', $dateStr);
-                                }
-                                return \Carbon\Carbon::parse($dateStr);
-                            };
-
-                            $fechaPago = $parseDate($fPagoStr);
-                            $fechaFinal = $parseDate($fFinalStr);
-                            $fechaInicial = $fInicialStr ? $parseDate($fInicialStr) : null;
-
-                            $row['dias_sobrantes'] = $fechaPago->diffInDays($fechaFinal, false);
-                            if ($fechaInicial) {
-                                $row['dias_pagos'] = $fechaInicial->diffInDays($fechaPago);
-                            }
+        \Illuminate\Support\Facades\DB::transaction(function () use ($data, $categoria, $clientUploadId) {
+            switch ($categoria) {
+                case 'cartera':
+                    foreach ($data as $row) {
+                        if (isset($row['actividad_economica'])) {
+                            $row['sector_economico'] = \App\Services\IntelligentMapper::mapActivityToSector($row['actividad_economica']);
                         }
-                    } catch (\Exception $e) {
-                        // Log error if needed: \Log::error("Date parsing failed: " . $e->getMessage());
-                    }
+                        
+                        // Master client data
+                        if (isset($row['cliente']) && isset($row['identificacion'])) {
+                            $row['identificacion'] = \App\Services\ClientMasterService::masterClient($row['cliente'], $row['identificacion'], [
+                                'ciudad' => $row['ciudad'] ?? null,
+                                'sector_economico' => $row['sector_economico'] ?? null,
+                                'actividad_economica' => $row['actividad_economica'] ?? null,
+                            ]);
+                        }
 
-                    $row['estado_liquidacion'] = 'pendiente';
-                    PagoFactoring::create($row);
-                }
-                break;
-            case 'opf':
-                foreach ($data as $row) {
-                    if (isset($row['emisor']) && isset($row['emisor_nit'])) {
-                        $row['emisor_nit'] = \App\Services\ClientMasterService::masterClient($row['emisor'], $row['emisor_nit']);
+                        // Remove only non-existent columns to avoid DB errors
+                        $cleanedRow = collect($row)->except(['operacion', 'saldo_total'])->toArray();
+                        $cleanedRow['client_upload_id'] = $clientUploadId;
+                        $cleanedRow = $this->sanitizeRowForDb($cleanedRow);
+                        OperacionCartera::create($cleanedRow);
                     }
-                    OperacionConfirming::create($row);
-                }
-                break;
-            case 'compraventa':
-                foreach ($data as $row) {
-                    if (isset($row['vendedor']) && isset($row['nit_vendedor'])) {
-                        $row['nit_vendedor'] = \App\Services\ClientMasterService::masterClient($row['vendedor'], $row['nit_vendedor']);
+                    break;
+                case 'op':
+                    foreach ($data as $row) {
+                        // Filter out dummy/empty rows (like example row #84)
+                        if (empty($row['monto']) || (float)$row['monto'] <= 0) {
+                            continue;
+                        }
+
+                        if (isset($row['cliente']) && isset($row['nit_cliente'])) {
+                            $row['nit_cliente'] = \App\Services\ClientMasterService::masterClient($row['cliente'], $row['nit_cliente']);
+                        }
+
+                        // Calculation: intereses_diarios = ((valor_aprobado * tasa_descuento) / 30) / 100
+                        $valorAprobado = (float)($row['valor_aprobado'] ?? 0);
+                        $tasa = (float)($row['tasa_descuento'] ?? 0);
+                        $row['intereses_diarios'] = (($valorAprobado * $tasa) / 30) / 100;
+                        $row['client_upload_id'] = $clientUploadId;
+
+                        $row = $this->sanitizeRowForDb($row);
+                        OperacionFactoring::create($row);
                     }
-                    Compraventa::create($row);
-                }
-                break;
-            case 'pagos_compraventa':
-                foreach ($data as $row) {
-                    if (isset($row['pagador'])) {
-                        $row['nit_pagador'] = \App\Services\ClientMasterService::masterClient($row['pagador'], $row['nit_pagador'] ?? null);
+                    break;
+                case 'pagos':
+                    foreach ($data as $row) {
+                        if (isset($row['cliente']) && isset($row['nit'])) {
+                            $row['nit'] = \App\Services\ClientMasterService::masterClient($row['cliente'], $row['nit']);
+                        }
+
+                        // Pre-calculation of days if dates are present
+                        try {
+                            $fPagoStr = $row['fecha_pago'] ?? null;
+                            $fFinalStr = $row['fecha_final'] ?? null;
+                            $fInicialStr = $row['fecha_inicial'] ?? null;
+
+                            if ($fPagoStr && $fFinalStr) {
+                                // Helper to parse dates in d/m/Y or fallback to parse
+                                $parseDate = function($dateStr) {
+                                    if (str_contains($dateStr, '/')) {
+                                        return \Carbon\Carbon::createFromFormat('d/m/Y', $dateStr);
+                                    }
+                                    return \Carbon\Carbon::parse($dateStr);
+                                };
+
+                                $fechaPago = $parseDate($fPagoStr);
+                                $fechaFinal = $parseDate($fFinalStr);
+                                $fechaInicial = $fInicialStr ? $parseDate($fInicialStr) : null;
+
+                                $row['dias_sobrantes'] = $fechaPago->diffInDays($fechaFinal, false);
+                                if ($fechaInicial) {
+                                    $row['dias_pagos'] = $fechaInicial->diffInDays($fechaPago);
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            // Log error if needed: \Log::error("Date parsing failed: " . $e->getMessage());
+                        }
+
+                        $row['estado_liquidacion'] = 'pendiente';
+                        $row = $this->sanitizeRowForDb($row);
+                        PagoFactoring::create($row);
                     }
-                    if (isset($row['cliente'])) {
-                        $row['nit_cliente'] = \App\Services\ClientMasterService::masterClient($row['cliente'], $row['nit_cliente'] ?? null);
+                    break;
+                case 'opf':
+                    foreach ($data as $row) {
+                        if (isset($row['emisor']) && isset($row['emisor_nit'])) {
+                            $row['emisor_nit'] = \App\Services\ClientMasterService::masterClient($row['emisor'], $row['emisor_nit']);
+                        }
+                        $row = $this->sanitizeRowForDb($row);
+                        OperacionConfirming::create($row);
                     }
-                    $row['client_upload_id'] = $clientUploadId;
-                    PagoCompraventa::create($row);
+                    break;
+                case 'compraventa':
+                    foreach ($data as $row) {
+                        if (isset($row['vendedor']) && isset($row['nit_vendedor'])) {
+                            $row['nit_vendedor'] = \App\Services\ClientMasterService::masterClient($row['vendedor'], $row['nit_vendedor']);
+                        }
+                        $row = $this->sanitizeRowForDb($row);
+                        Compraventa::create($row);
+                    }
+                    break;
+                case 'pagos_compraventa':
+                    foreach ($data as $row) {
+                        if (isset($row['pagador'])) {
+                            $row['nit_pagador'] = \App\Services\ClientMasterService::masterClient($row['pagador'], $row['nit_pagador'] ?? null);
+                        }
+                        if (isset($row['cliente'])) {
+                            $row['nit_cliente'] = \App\Services\ClientMasterService::masterClient($row['cliente'], $row['nit_cliente'] ?? null);
+                        }
+                        $row['client_upload_id'] = $clientUploadId;
+                        $row = $this->sanitizeRowForDb($row);
+                        PagoCompraventa::create($row);
+                    }
+                    break;
+                default:
+                    throw new \Exception('Categoría no válida');
+            }
+        });
+    }
+
+    private function sanitizeRowForDb(array $row): array
+    {
+        foreach ($row as $key => $value) {
+            if (is_array($value)) {
+                $isSimple = true;
+                foreach ($value as $item) {
+                    if (is_array($item) || is_object($item)) {
+                        $isSimple = false;
+                        break;
+                    }
                 }
-                break;
-            default:
-                throw new \Exception('Categoría no válida');
+                if ($isSimple && count($value) > 0) {
+                    $row[$key] = implode(', ', $value);
+                } else {
+                    $row[$key] = json_encode($value);
+                }
+            }
         }
+        return $row;
     }
 
     /**

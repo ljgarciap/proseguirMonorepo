@@ -15,7 +15,9 @@ class ClientUpload extends Model
         'status',
         'observations',
         'validated_by',
-        'approved_by'
+        'approved_by',
+        'ocr_status',
+        'ocr_message'
     ];
 
     public function user()
