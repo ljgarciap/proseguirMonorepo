@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\ConfiguracionService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -11,7 +12,7 @@ class GeminiService
 
     public function __construct()
     {
-        $this->apiKey = config('services.gemini.api_key') ?? '';
+        $this->apiKey = ConfiguracionService::get('GEMINI_API_KEY', config('services.gemini.api_key')) ?? '';
     }
 
     /**

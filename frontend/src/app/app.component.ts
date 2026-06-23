@@ -125,6 +125,9 @@ import { interval, Subscription } from 'rxjs';
             <a routerLink="/db-cleaner" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">restart_alt</span> Limpieza BD
             </a>
+            <a routerLink="/configuraciones" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">key</span> Configuraciones
+            </a>
           </div>
 
           <div class="nav-section" *ngIf="authService.isAuthorized(['cliente'])">

@@ -224,6 +224,12 @@ Route::prefix('internal-docs')->middleware(['auth:api', 'checkrole:operativo,con
     Route::delete('/{id}', [\App\Http\Controllers\InternalDocumentController::class, 'destroy']);
 });
 
+// Configuraciones del Sistema (Superadmin)
+Route::prefix('configuraciones')->middleware(['auth:api', 'checkrole:superadmin'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\ConfiguracionController::class, 'index']);
+    Route::put('/{id}', [\App\Http\Controllers\ConfiguracionController::class, 'update']);
+});
+
 // Limpieza de Base de Datos (Superadmin)
 Route::prefix('db-cleaner')->middleware(['auth:api', 'checkrole:superadmin'])->group(function () {
     Route::post('/clear-tables', [\App\Http\Controllers\DbCleanerController::class, 'clearTables']);

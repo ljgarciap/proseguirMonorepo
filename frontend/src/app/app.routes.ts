@@ -146,11 +146,17 @@ export const routes: Routes = [
         canActivate: [roleGuard], 
         data: { roles: ['superadmin', 'gerente', 'coordinador_comercial', 'operativo'] } 
     },
-    { 
-        path: 'db-cleaner', 
-        loadComponent: () => import('./components/db-cleaner/db-cleaner.component').then(m => m.DbCleanerComponent), 
-        canActivate: [roleGuard], 
-        data: { roles: ['superadmin'] } 
+    {
+        path: 'db-cleaner',
+        loadComponent: () => import('./components/db-cleaner/db-cleaner.component').then(m => m.DbCleanerComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
+    },
+    {
+        path: 'configuraciones',
+        loadComponent: () => import('./components/configuraciones/configuraciones.component').then(m => m.ConfiguracionesComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
     },
     { 
         path: 'document-requests', 

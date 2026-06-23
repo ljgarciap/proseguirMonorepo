@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\ConfiguracionService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -12,8 +13,8 @@ class MistralService
 
     public function __construct()
     {
-        $this->apiKey = config('services.mistral.api_key') ?? '';
-        $this->apiUrl = config('services.mistral.api_url', 'https://api.mistral.ai');
+        $this->apiKey = ConfiguracionService::get('MISTRAL_API_KEY', config('services.mistral.api_key')) ?? '';
+        $this->apiUrl = ConfiguracionService::get('MISTRAL_API_URL', config('services.mistral.api_url', 'https://api.mistral.ai'));
     }
 
     /**
