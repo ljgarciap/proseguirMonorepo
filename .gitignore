@@ -33,6 +33,12 @@ frontend/src/environments/environment.prod.ts
 
 # Docker & Deployment
 .env
+TEST.env
+PROD.env
+LOCAL.env
+frontend/.env.test
+frontend/.env.prod
+frontend/.env.local
 db_data/
 n8n_data/
 insumos/
