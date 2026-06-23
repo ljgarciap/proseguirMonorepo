@@ -18,6 +18,7 @@ class DocumentTypeSeeder extends Seeder
             ['nombre' => 'Cédula de Extranjería', 'codigo' => 'CE'],
             ['nombre' => 'Tarjeta de Identidad', 'codigo' => 'TI'],
             ['nombre' => 'PEP', 'codigo' => 'PEP'],
+            ['nombre' => 'Número de Identificación Tributaria', 'codigo' => 'NIT'],
         ];
 
         foreach ($types as $type) {
