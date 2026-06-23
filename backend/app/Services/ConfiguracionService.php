@@ -12,10 +12,14 @@ class ConfiguracionService
 
     public static function get(string $clave, mixed $default = null): mixed
     {
-        return Cache::remember(self::CACHE_PREFIX . $clave, self::CACHE_TTL, function () use ($clave, $default) {
-            $config = Configuracion::where('clave', $clave)->first();
-            return $config?->valor ?? $default;
-        });
+        try {
+            return Cache::remember(self::CACHE_PREFIX . $clave, self::CACHE_TTL, function () use ($clave, $default) {
+                $config = Configuracion::where('clave', $clave)->first();
+                return $config?->valor ?? $default;
+            });
+        } catch (\Exception $e) {
+            return $default;
+        }
     }
 
     public static function set(string $clave, mixed $valor, int $userId): void
