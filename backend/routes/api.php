@@ -10,13 +10,6 @@ Route::post('/webhook/n8n/{categoria}', [\App\Http\Controllers\N8nWebhookControl
 Route::post('/login', [AuthController::class, 'login']);
 
 
-Route::get('/test-zia', function (Request $request) {
-    return response()->json([
-        'mensaje' => 'Si esto sale 200, ya lo tenemos',
-        'user' => $request->user('api')
-    ]);
-})->middleware('auth:api');
-
 Route::get('/me', [AuthController::class, 'me'])->middleware('auth:api');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:api');
 Route::post('/change-password', [AuthController::class, 'changePassword'])->middleware('auth:api');
@@ -106,15 +99,6 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
             Route::delete('/{id}', [\App\Http\Controllers\ClientUploadController::class, 'destroy'])
                 ->middleware('checkrole:cliente,superadmin');
         });
-
-Route::get('/debug-passport', function (Illuminate\Http\Request $request) {
-    return [
-        'user' => $request->user('api') ? $request->user('api')->email : 'NADIE',
-        'auth_header' => $request->header('Authorization'),
-        'all_headers' => $request->headers->all(),
-        'guard_api_driver' => config('auth.guards.api.driver'),
-    ];
-});
 
 use App\Http\Controllers\ContableImportController;
 use App\Http\Controllers\ContableController;
