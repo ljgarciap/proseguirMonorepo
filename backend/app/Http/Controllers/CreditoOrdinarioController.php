@@ -7,7 +7,6 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class CreditoOrdinarioController extends Controller
 {
@@ -84,11 +83,10 @@ class CreditoOrdinarioController extends Controller
         $activeRole = $this->resolveActiveRole($request);
         
         $request->validate([
-            'accion' => 'required|string|in:aprobar,rechazar,completar,subir_archivo,devolver',
-            'comentario' => 'nullable|string',
-            'archivo' => 'nullable|string', // base64 representation of the file
-            'archivo_nombre' => 'nullable|string',
-            'campo_documento' => 'nullable|string' // field in the documentos array
+            'accion'          => 'required|string|in:aprobar,rechazar,completar,subir_archivo,devolver',
+            'comentario'      => 'nullable|string',
+            'archivo'         => 'nullable|file|mimes:pdf|max:102400',
+            'campo_documento' => 'nullable|string',
         ]);
 
         $accion = $request->accion;
@@ -127,22 +125,14 @@ class CreditoOrdinarioController extends Controller
         $documentos = $credito->documentos ?? [];
 
         // 1. Manejo de Carga de Archivos
-        if ($request->has('archivo') && $request->filled('archivo') && $request->filled('campo_documento')) {
-            $base64File = $request->archivo;
-            $fileName = $request->archivo_nombre ?? 'documento_' . Str::random(10) . '.pdf';
-            
-            // Decodificar base64
-            if (preg_match('/^data:application\/pdf;base64,/', $base64File)) {
-                $base64File = substr($base64File, strpos($base64File, ',') + 1);
-            }
-            $fileData = base64_decode($base64File);
-            
-            $path = 'credito_documentos/' . $credito->id . '/' . $fileName;
-            Storage::disk('public')->put($path, $fileData);
-            
-            $campoDoc = $request->campo_documento;
-            $documentos[$campoDoc] = Storage::url($path);
-            $credito->documentos = $documentos;
+        if ($request->hasFile('archivo') && $request->filled('campo_documento')) {
+            $file     = $request->file('archivo');
+            $fileName = $file->getClientOriginalName();
+            $path     = $file->storeAs('credito_documentos/' . $credito->id, $fileName, 'public');
+
+            $campoDoc              = $request->campo_documento;
+            $documentos[$campoDoc] = Storage::disk('public')->url($path);
+            $credito->documentos   = $documentos;
             $credito->save();
 
             $comentario .= " (Archivo '$fileName' cargado correctamente en '$campoDoc').";
