@@ -17,7 +17,7 @@ class CreditoOrdinarioController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $activeRole = $request->header('X-Active-Role') ?? (($user->roles && is_array($user->roles)) ? ($user->roles[0] ?? 'cliente') : 'cliente');
+        $activeRole = $this->resolveActiveRole($request);
         
         $query = CreditoOrdinario::with('cliente');
 
@@ -41,7 +41,7 @@ class CreditoOrdinarioController extends Controller
         ]);
 
         $user = Auth::user();
-        $activeRole = $request->header('X-Active-Role') ?? (($user->roles && is_array($user->roles)) ? ($user->roles[0] ?? 'cliente') : 'cliente');
+        $activeRole = $this->resolveActiveRole($request);
 
         // Determinar el cliente
         $clienteId = $request->cliente_id;
@@ -81,7 +81,7 @@ class CreditoOrdinarioController extends Controller
     {
         $credito = CreditoOrdinario::findOrFail($id);
         $user = Auth::user();
-        $activeRole = $request->header('X-Active-Role') ?? (($user->roles && is_array($user->roles)) ? ($user->roles[0] ?? 'cliente') : 'cliente');
+        $activeRole = $this->resolveActiveRole($request);
         
         $request->validate([
             'accion' => 'required|string|in:aprobar,rechazar,completar,subir_archivo,devolver',
@@ -326,5 +326,18 @@ class CreditoOrdinarioController extends Controller
         $credito->save();
 
         return response()->json($credito->load('cliente'));
+    }
+
+    private function resolveActiveRole(Request $request): string
+    {
+        $user      = Auth::user();
+        $userRoles = is_array($user->roles) ? $user->roles : [];
+        $header    = $request->header('X-Active-Role');
+
+        if ($header && (in_array($header, $userRoles) || in_array('superadmin', $userRoles))) {
+            return $header;
+        }
+
+        return $userRoles[0] ?? 'cliente';
     }
 }
