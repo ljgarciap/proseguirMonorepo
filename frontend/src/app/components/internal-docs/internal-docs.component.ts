@@ -53,8 +53,8 @@ export class InternalDocsComponent implements OnInit {
   }
 
   loadInitialData() {
-    this.http.get<any[]>(`${environment.apiUrl}/parameters/accounting_categories`).subscribe(res => this.categories = res);
-    this.http.get<any[]>(`${environment.apiUrl}/parameters/accounting_priorities`).subscribe(res => this.priorities = res);
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/accounting_categories`).subscribe({ next: res => this.categories = res, error: () => {} });
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/accounting_priorities`).subscribe({ next: res => this.priorities = res, error: () => {} });
   }
 
   loadDocuments() {

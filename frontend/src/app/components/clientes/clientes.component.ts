@@ -786,8 +786,8 @@ export class ClientesComponent implements OnInit {
   }
 
   loadParameters() {
-    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_personas`).subscribe(data => this.tipoPersonas = data);
-    this.http.get<any[]>(`${environment.apiUrl}/document-types`).subscribe(data => this.documentTypes = data);
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_personas`).subscribe({ next: data => this.tipoPersonas = data, error: () => {} });
+    this.http.get<any[]>(`${environment.apiUrl}/document-types`).subscribe({ next: data => this.documentTypes = data, error: () => {} });
   }
 
   applyFilters() {

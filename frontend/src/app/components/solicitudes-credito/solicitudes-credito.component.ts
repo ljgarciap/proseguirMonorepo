@@ -124,17 +124,17 @@ export class SolicitudesCreditoComponent implements OnInit {
 
   loadDropdowns() {
     // Clientes
-    this.http.get<any[]>(`${environment.apiUrl}/clientes?activo=true`).subscribe(data => this.activeClientes = data);
+    this.http.get<any[]>(`${environment.apiUrl}/clientes?activo=true`).subscribe({ next: data => this.activeClientes = data, error: () => {} });
     // Tipos Credito
-    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_creditos`).subscribe(data => this.tipoCreditos = data);
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_creditos`).subscribe({ next: data => this.tipoCreditos = data, error: () => {} });
     // Amortizaciones
-    this.http.get<any[]>(`${environment.apiUrl}/parameters/amortizaciones`).subscribe(data => this.amortizaciones = data);
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/amortizaciones`).subscribe({ next: data => this.amortizaciones = data, error: () => {} });
     // Document Types
-    this.http.get<any[]>(`${environment.apiUrl}/document-types`).subscribe(data => this.documentTypes = data);
+    this.http.get<any[]>(`${environment.apiUrl}/document-types`).subscribe({ next: data => this.documentTypes = data, error: () => {} });
     // Tipo Personas (Natural / Jurídica)
-    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_personas`).subscribe(data => this.tipoPersonas = data);
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_personas`).subscribe({ next: data => this.tipoPersonas = data, error: () => {} });
     // Presets
-    this.http.get<any[]>(`${environment.apiUrl}/document-presets`).subscribe(data => this.presets = data);
+    this.http.get<any[]>(`${environment.apiUrl}/document-presets`).subscribe({ next: data => this.presets = data, error: () => {} });
   }
 
   switchTab(tab: 'pendientes' | 'registrar') {

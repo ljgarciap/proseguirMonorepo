@@ -703,12 +703,12 @@ export class VisitasComponent implements OnInit {
 
   loadActiveClientes() {
     // Only load active clients for visits selection
-    this.http.get<any[]>(`${environment.apiUrl}/clientes?activo=true`).subscribe(data => this.activeClientes = data);
+    this.http.get<any[]>(`${environment.apiUrl}/clientes?activo=true`).subscribe({ next: data => this.activeClientes = data, error: () => {} });
   }
 
   loadParameters() {
-    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_creditos`).subscribe(data => this.tipoCreditos = data);
-    this.http.get<any[]>(`${environment.apiUrl}/parameters/amortizaciones`).subscribe(data => this.amortizaciones = data);
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_creditos`).subscribe({ next: data => this.tipoCreditos = data, error: () => {} });
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/amortizaciones`).subscribe({ next: data => this.amortizaciones = data, error: () => {} });
   }
 
   applyFilters() {
