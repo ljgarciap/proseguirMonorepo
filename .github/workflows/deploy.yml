@@ -77,7 +77,11 @@ jobs:
             
             # 2. Copiar archivos .env correctos de producción
             cp PROD.env .env
-            cp frontend/.env.prod frontend/.env
+            if [ -f frontend/.env.prod ]; then
+              cp frontend/.env.prod frontend/.env
+            else
+              cp frontend/.env.prod.example frontend/.env
+            fi
             
             # 3. Reconstruir frontend y backend conservando volúmenes
             docker compose up -d --build
