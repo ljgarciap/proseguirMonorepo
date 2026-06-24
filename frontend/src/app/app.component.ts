@@ -139,7 +139,7 @@ import { interval, Subscription } from 'rxjs';
               <span class="material-symbols-outlined">description</span> Diligenciar Mandato
             </a>
             <a routerLink="/creditos" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">payments</span> Crédito Ordinario
+              <span class="material-symbols-outlined">payments</span> Mis Créditos
             </a>
           </div>
 

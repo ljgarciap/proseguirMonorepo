@@ -91,18 +91,21 @@ jobs:
             
             # 5. Migraciones incrementales de DB (SEGURAS, NO FRESH)
             docker exec factoring_backend php artisan migrate --force
-            
+
+            # 5b. Seeder idempotente de configuraciones (updateOrCreate, seguro en cada deploy)
+            docker exec factoring_backend php artisan db:seed --class=ConfiguracionSeeder --force
+
             # 6. Configurar seguridad Passport
             docker exec factoring_backend php artisan passport:install --no-interaction
             docker exec factoring_backend php artisan migrate --force
             docker exec factoring_backend chown -R www-data:www-data storage
             docker exec factoring_backend chmod 600 storage/oauth-private.key
             docker exec factoring_backend chmod 600 storage/oauth-public.key
-            
+
             # 7. Recrear el enlace simbólico de storage de forma relativa (Evita Error 403)
             docker exec factoring_backend rm -f public/storage
             docker exec factoring_backend ln -s ../storage/app/public public/storage
-            
+
             # 8. Limpieza y caché para optimizar rendimiento Laravel
             docker exec factoring_backend php artisan config:cache
             docker exec factoring_backend php artisan route:cache
@@ -158,18 +161,21 @@ jobs:
             
             # 5. Migraciones incrementales de DB (SEGURAS, NO FRESH)
             docker exec factoring_backend php artisan migrate --force
-            
+
+            # 5b. Seeder idempotente de configuraciones (updateOrCreate, seguro en cada deploy)
+            docker exec factoring_backend php artisan db:seed --class=ConfiguracionSeeder --force
+
             # 6. Configurar seguridad Passport
             docker exec factoring_backend php artisan passport:install --no-interaction
             docker exec factoring_backend php artisan migrate --force
             docker exec factoring_backend chown -R www-data:www-data storage
             docker exec factoring_backend chmod 600 storage/oauth-private.key
             docker exec factoring_backend chmod 600 storage/oauth-public.key
-            
+
             # 7. Recrear el enlace simbólico de storage de forma relativa (Evita Error 403)
             docker exec factoring_backend rm -f public/storage
             docker exec factoring_backend ln -s ../storage/app/public public/storage
-            
+
             # 8. Limpieza y caché para optimizar rendimiento Laravel
             docker exec factoring_backend php artisan config:cache
             docker exec factoring_backend php artisan route:cache

@@ -45,7 +45,23 @@ const GRUPO_LABELS: Record<string, string> = {
       <p>Cargando configuraciones...</p>
     </div>
 
-    <div *ngIf="!cargando">
+    <div class="error-state" *ngIf="errorCarga">
+      <span class="material-symbols-outlined">error_outline</span>
+      <p>No se pudieron cargar las configuraciones.</p>
+      <button class="btn-retry" (click)="cargar()">
+        <span class="material-symbols-outlined">refresh</span> Reintentar
+      </button>
+    </div>
+
+    <div *ngIf="!cargando && !errorCarga && grupos.length === 0">
+      <div class="empty-state">
+        <span class="material-symbols-outlined">settings_suggest</span>
+        <p>No hay configuraciones registradas en la base de datos.</p>
+        <small>Ejecuta el seeder: <code>php artisan db:seed --class=ConfiguracionSeeder --force</code></small>
+      </div>
+    </div>
+
+    <div *ngIf="!cargando && !errorCarga && grupos.length > 0">
       <div class="grupo-section" *ngFor="let grupo of grupos">
         <div class="grupo-header">
           <span class="material-symbols-outlined">{{ getGrupoIcon(grupo) }}</span>
@@ -135,6 +151,17 @@ const GRUPO_LABELS: Record<string, string> = {
     </div>
   `,
   styles: [`
+    .error-state, .empty-state { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 4rem; color: #718096; text-align: center;
+      .material-symbols-outlined { font-size: 48px; color: #FC8181; }
+      p { margin: 0; font-size: 1rem; }
+      small { font-size: 0.8rem; color: #A0AEC0; code { background: #EDF2F7; padding: 2px 6px; border-radius: 4px; font-family: monospace; } }
+    }
+    .empty-state .material-symbols-outlined { color: #A0AEC0; }
+    .btn-retry { display: flex; align-items: center; gap: 6px; padding: 8px 18px; background: #EBF8FF; color: #2B6CB0; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      .material-symbols-outlined { font-size: 18px; }
+      &:hover { background: #BEE3F8; }
+    }
+
     .page-header { margin-bottom: 2rem;
       h2 { margin: 0 0 0.25rem; font-size: 1.5rem; color: #1A202C; }
       p { margin: 0; color: #718096; font-size: 0.9rem; }
@@ -217,6 +244,7 @@ export class ConfiguracionesComponent implements OnInit {
   configs: Configuracion[] = [];
   grupos: string[] = [];
   cargando = true;
+  errorCarga = false;
 
   constructor(private http: HttpClient) {}
 
@@ -226,13 +254,17 @@ export class ConfiguracionesComponent implements OnInit {
 
   cargar() {
     this.cargando = true;
+    this.errorCarga = false;
     this.http.get<Configuracion[]>(`${environment.apiUrl}/configuraciones`).subscribe({
       next: (data) => {
         this.configs = data.map(c => ({ ...c, editando: false, valorTemporal: '', guardando: false, guardado: false }));
         this.grupos = [...new Set(this.configs.map(c => c.grupo))];
         this.cargando = false;
       },
-      error: () => { this.cargando = false; }
+      error: () => {
+        this.cargando = false;
+        this.errorCarga = true;
+      }
     });
   }
 
