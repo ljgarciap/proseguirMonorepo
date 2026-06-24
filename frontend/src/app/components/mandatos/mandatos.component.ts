@@ -245,8 +245,9 @@ export class MandatosComponent implements OnInit {
   }
 
   loadHistorial(): void {
-    this.http.get<any[]>(`${environment.apiUrl}/mandatos`).subscribe(res => {
-      this.historialMandatos = res;
+    this.http.get<any>(`${environment.apiUrl}/mandatos?perPage=200`).subscribe({
+      next: (res) => { this.historialMandatos = res.data ?? res; },
+      error: () => {}
     });
   }
 

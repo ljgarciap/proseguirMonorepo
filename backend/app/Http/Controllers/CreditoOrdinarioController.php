@@ -53,49 +53,14 @@ class CreditoOrdinarioController extends Controller
             $clienteId = $clientePrueba ? $clientePrueba->id : $user->id;
         }
 
-        $numeroSolicitud = 'CO-' . date('Y') . '-' . Str::upper(Str::random(4)) . rand(10, 99);
-
-        // Inicializar documentos vacíos conforme al flujo BPMN
-        $documentos = [
-            'formulario_solicitud' => null,
-            'documentos_identidad' => null,
-            'estados_financieros' => null,
-            'certificados_laborales' => null,
-            'sarlft_sintesis' => null,
-            'sarlft_datacredito' => null,
-            'analisis_financiero' => null,
-            'presentacion_comite' => null,
-            'acta_comite_firmada' => null,
-            'pagare_borrador' => null,
-            'carta_instrucciones_borrador' => null,
-            'contrato_borrador' => null,
-            'garantias_firmadas' => null,
-            'registro_cyf' => null,
-            'desembolso_egreso' => null,
-            'comprobante_transferencia' => null,
-        ];
-
-        // Crear historial inicial
-        $historial = [
-            [
-                'fecha' => now()->toIso8601String(),
-                'usuario' => $user->name,
-                'rol' => $activeRole,
-                'estado_anterior' => 'ninguno',
-                'estado_nuevo' => 'revision_documental',
-                'comentario' => 'Solicitud de crédito ordinario registrada e iniciada en revisión documental.'
-            ]
-        ];
-
-        $credito = CreditoOrdinario::create([
-            'numero_solicitud' => $numeroSolicitud,
-            'cliente_id' => $clienteId,
-            'monto' => $request->monto,
-            'plazo_meses' => $request->plazo_meses,
-            'estado' => 'revision_documental',
-            'documentos' => $documentos,
-            'historial_estados' => $historial
-        ]);
+        $credito = CreditoOrdinario::iniciar(
+            clienteId:   $clienteId,
+            monto:       $request->monto,
+            plazoMeses:  $request->plazo_meses,
+            usuario:     $user->name,
+            rol:         $activeRole,
+            comentario:  'Solicitud de crédito ordinario registrada e iniciada en revisión documental.'
+        );
 
         return response()->json($credito->load('cliente'), 201);
     }
