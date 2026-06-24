@@ -13,7 +13,6 @@ Este archivo documenta solo lo específico de este proyecto.
 | Backend | Laravel (PHP 8.4) + Laravel Passport (OAuth2) |
 | Frontend | Angular 17 |
 | Base de datos | MySQL 8.0 |
-| Automatización | n8n |
 | Servidor web | Nginx (proxy inverso, puerto 80) |
 | Infraestructura | Docker Compose (monorepo) |
 | CI/CD | GitHub Actions → push a `master` despliega a producción |
@@ -27,10 +26,11 @@ Proseguir/
 ├── backend/        ← Laravel (PHP 8.4)
 ├── frontend/       ← Angular 17
 ├── nginx/          ← configuración del proxy
-├── workflow/       ← backup del flujo n8n
 ├── docker-compose.yml
 └── memory/         ← estado persistente del proyecto
 ```
+
+> `workflow/` (backup n8n) puede eliminarse — n8n fue removido del stack en F9.
 
 ---
 
@@ -43,7 +43,6 @@ Proseguir/
 | `factoring_backend_web` | Nginx proxy |
 | `factoring_queue` | Laravel queue worker |
 | `factoring_frontend` | Angular (servido por Nginx) |
-| `factoring_n8n` | ~~Motor de automatización n8n~~ (F9: pendiente de eliminar) |
 
 ---
 
@@ -52,17 +51,25 @@ Proseguir/
 | Origen | Destino | URL |
 |---|---|---|
 | Frontend | API | `http://auto.proseguirliquidez.com/api` |
-| Frontend | n8n | `http://auto.proseguirliquidez.com/n8n` |
-| Laravel | n8n | `http://factoring_n8n:5678` (red Docker interna) |
-| n8n | Laravel | `http://factoring_backend_web/api` (red Docker interna) |
+
+---
+
+## Pipeline OCR
+
+Los archivos subidos por clientes pasan por `ProcessUploadJob` (cola Laravel):
+1. **Gemini** (primario) — API key gestionada en `/configuraciones` (clave `GEMINI_API_KEY`)
+2. **Mistral** (fallback) — API key gestionada en `/configuraciones` (clave `MISTRAL_API_KEY`)
+
+Las API keys **no van en `.env`** — se cargan desde la tabla `configuraciones` en BD.
 
 ---
 
 ## Git y CI/CD
 
 - Rama principal: `master` — push directo → CI/CD automático a producción
+- Rama de QA: `test` — CI corre tests + despliega a servidor test
 - **Nunca** hacer `git pull` ni migraciones manualmente en el servidor
-- PRs a `master` → solo corren tests (no despliegan)
+- PRs a `master` → requieren aprobación QA en `test` primero
 - Commits en español, formato: `tipo(scope): descripción`
 
 ---
@@ -73,6 +80,7 @@ Proseguir/
 - Al reconstruir contenedores, siempre reiniciar `backend_web` después para evitar 502 por caché DNS de Nginx
 - El enlace simbólico de storage debe ser **relativo**: `ln -s ../storage/app/public public/storage` (no absoluto)
 - El script de extracción de PDF es `extract_pdf.cjs` (CommonJS, no `.js`) para evitar errores ESM
+- Uploads de CreditoOrdinario son `multipart/form-data` (no base64) — el campo se llama `archivo` y acepta solo PDF ≤ 100 MB
 
 ---
 
