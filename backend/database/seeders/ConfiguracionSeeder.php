@@ -32,21 +32,6 @@ class ConfiguracionSeeder extends Seeder
                 'grupo'       => 'ia_providers',
                 'es_secreto'  => false,
             ],
-            // Integraciones
-            [
-                'clave'       => 'N8N_API_TOKEN',
-                'valor'       => env('N8N_API_TOKEN'),
-                'descripcion' => 'Token de autenticación para webhooks de n8n',
-                'grupo'       => 'integraciones',
-                'es_secreto'  => true,
-            ],
-            [
-                'clave'       => 'N8N_INTERNAL_WEBHOOK_URL',
-                'valor'       => env('N8N_INTERNAL_WEBHOOK_URL'),
-                'descripcion' => 'URL interna del webhook de n8n (red Docker)',
-                'grupo'       => 'integraciones',
-                'es_secreto'  => false,
-            ],
             // Email
             [
                 'clave'       => 'MAIL_HOST',

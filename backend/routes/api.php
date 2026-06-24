@@ -4,9 +4,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 
-Route::post('/webhook/n8n/{categoria}', [\App\Http\Controllers\N8nWebhookController::class, 'handle'])
-    ->middleware(\App\Http\Middleware\VerifyN8nToken::class);
-
 Route::post('/login', [AuthController::class, 'login']);
 
 

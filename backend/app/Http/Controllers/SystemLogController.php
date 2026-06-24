@@ -83,8 +83,7 @@ class SystemLogController extends Controller
         }
 
         try {
-            $webhookController = new \App\Http\Controllers\N8nWebhookController();
-            $webhookController->processData($data, $log->categoria, $log->filename);
+            (new \App\Services\OcrPersistenceService())->processData($data, $log->categoria, $log->filename);
 
             \App\Models\SystemLog::create([
                 'categoria' => $log->categoria,

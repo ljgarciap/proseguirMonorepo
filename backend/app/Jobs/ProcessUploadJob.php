@@ -13,7 +13,7 @@ use App\Models\ClientUpload;
 use App\Models\SystemLog;
 use App\Services\MistralService;
 use App\Services\GeminiService;
-use App\Http\Controllers\N8nWebhookController;
+use App\Services\OcrPersistenceService;
 
 class ProcessUploadJob implements ShouldQueue
 {
@@ -106,8 +106,7 @@ class ProcessUploadJob implements ShouldQueue
                 'ocr_message' => "Extracción completada con {$processedBy}. Guardando datos..."
             ]);
 
-            $controller = new N8nWebhookController();
-            $controller->processData($allRows, $this->categoria, $upload->filename, $upload->id);
+            (new OcrPersistenceService())->processData($allRows, $this->categoria, $upload->filename, $upload->id);
 
             // Log Success
             SystemLog::create([

@@ -81,7 +81,7 @@ class ClientUploadController extends Controller
             ]);
         }
 
-        // Dispatch OCR processing job locally (replacing n8n)
+        // Dispatch OCR processing job
         try {
             if ($category) {
                 \App\Jobs\ProcessUploadJob::dispatch($upload->id, $category);
