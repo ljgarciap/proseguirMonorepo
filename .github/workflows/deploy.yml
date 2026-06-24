@@ -93,7 +93,7 @@ jobs:
             docker exec factoring_backend php artisan migrate --force
             
             # 6. Configurar seguridad Passport
-            docker exec factoring_backend php artisan passport:install --force --no-interaction
+            docker exec factoring_backend php artisan passport:install --no-interaction
             docker exec factoring_backend php artisan migrate --force
             docker exec factoring_backend chown -R www-data:www-data storage
             docker exec factoring_backend chmod 600 storage/oauth-private.key
@@ -160,7 +160,7 @@ jobs:
             docker exec factoring_backend php artisan migrate --force
             
             # 6. Configurar seguridad Passport
-            docker exec factoring_backend php artisan passport:install --force --no-interaction
+            docker exec factoring_backend php artisan passport:install --no-interaction
             docker exec factoring_backend php artisan migrate --force
             docker exec factoring_backend chown -R www-data:www-data storage
             docker exec factoring_backend chmod 600 storage/oauth-private.key
