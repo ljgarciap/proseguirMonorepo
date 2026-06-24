@@ -120,13 +120,12 @@ Route::post('/settlement/reconcile', [\App\Http\Controllers\SettlementController
 Route::post('/conciliacion-susuerte', [\App\Http\Controllers\ConciliationController::class, 'conciliate'])
     ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable']);
 
-// Conciliación Susuerte History and New Conciliation routes
-Route::get('/conciliaciones-susuerte/history', [\App\Http\Controllers\ConciliacionSusuerteController::class, 'history'])
-    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable,admin']);
-Route::post('/conciliaciones-susuerte/new', [\App\Http\Controllers\ConciliacionSusuerteController::class, 'newConciliation'])
-    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable,admin']);
-Route::put('/conciliaciones-susuerte/{id}', [\App\Http\Controllers\ConciliacionSusuerteController::class, 'update'])
-    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable,admin']);
+Route::get('/conciliaciones-susuerte/history', [\App\Http\Controllers\ConciliationController::class, 'history'])
+    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable']);
+Route::post('/conciliaciones-susuerte/new', [\App\Http\Controllers\ConciliationController::class, 'newConciliation'])
+    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable']);
+Route::put('/conciliaciones-susuerte/{id}', [\App\Http\Controllers\ConciliationController::class, 'update'])
+    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable']);
 
 use App\Http\Controllers\PlanillaController;
 

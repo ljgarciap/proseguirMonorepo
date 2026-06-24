@@ -19,6 +19,36 @@ class ConciliationController extends Controller
         $this->service = $service;
     }
 
+    public function history(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $perPage = $request->query('per_page', 15);
+        $data = ConciliacionSusuerte::where('user_id', Auth::id())
+            ->orderBy('conciliated_at', 'desc')
+            ->paginate($perPage);
+        return response()->json($data);
+    }
+
+    public function newConciliation(): \Illuminate\Http\JsonResponse
+    {
+        return response()->json(['message' => 'Nueva conciliación iniciada']);
+    }
+
+    public function update(Request $request, $id): \Illuminate\Http\JsonResponse
+    {
+        $request->validate(['details' => 'required|array']);
+
+        $conciliacion = ConciliacionSusuerte::findOrFail($id);
+        $conciliacion->update(['details' => $request->input('details')]);
+
+        $fileName = 'conciliacion_' . $conciliacion->conciliated_at->format('Ymd_His') . '.xlsx';
+        Excel::store(new ConciliationExport($conciliacion->details), $fileName, 'public');
+
+        return response()->json([
+            'message'      => 'Observaciones guardadas con éxito',
+            'download_url' => '/storage/' . $fileName,
+        ]);
+    }
+
     public function conciliate(Request $request)
     {
         $request->validate([
