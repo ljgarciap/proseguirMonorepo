@@ -201,7 +201,7 @@ class ClienteController extends Controller
         }
 
         // If email exists on another user, prevent collision (use document-based mock email if empty)
-        $email = $email ?: ($cleanPassword . '@proseguir.com');
+        $email = $email ?: ($cliente->numero_documento . '@noreply.proseguir.local');
 
         $userData = [
             'name' => $cliente->nombre,

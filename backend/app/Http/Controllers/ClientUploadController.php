@@ -15,7 +15,7 @@ class ClientUploadController extends Controller
         $query = ClientUpload::with(['user', 'validator', 'approver']);
 
         // Roles Filtering
-        if (in_array('cliente', $user->roles) && count($user->roles) === 1) {
+        if (in_array('cliente', $user->roles) && !array_intersect($user->roles, ['superadmin', 'gerente', 'operativo', 'contable', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'])) {
             $query->where('user_id', $user->id);
         } else {
             // Operativos/Gerentes/Superadmins: solo deben ver lo que se subió CON ROL de cliente
@@ -110,7 +110,7 @@ class ClientUploadController extends Controller
         $query = ClientUpload::query();
 
         // Si es cliente, solo ve los suyos
-        if (in_array('cliente', $user->roles) && count($user->roles) === 1) {
+        if (in_array('cliente', $user->roles) && !array_intersect($user->roles, ['superadmin', 'gerente', 'operativo', 'contable', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'])) {
             $query->where('user_id', $user->id);
         }
 
@@ -192,7 +192,7 @@ class ClientUploadController extends Controller
         
         $baseQuery = ClientUpload::where('upload_role', 'cliente');
 
-        if (in_array('cliente', $user->roles) && count($user->roles) === 1) {
+        if (in_array('cliente', $user->roles) && !array_intersect($user->roles, ['superadmin', 'gerente', 'operativo', 'contable', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'])) {
             $baseQuery->where('user_id', $user->id);
         }
 
@@ -243,7 +243,7 @@ class ClientUploadController extends Controller
         $user = $request->user();
 
         // Si es cliente, validar que sea su propio archivo
-        if (in_array('cliente', $user->roles) && count($user->roles) === 1) {
+        if (in_array('cliente', $user->roles) && !array_intersect($user->roles, ['superadmin', 'gerente', 'operativo', 'contable', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'])) {
             if ($upload->user_id !== $user->id) {
                 return response()->json(['message' => 'No tienes permiso para ver este archivo.'], 403);
             }
