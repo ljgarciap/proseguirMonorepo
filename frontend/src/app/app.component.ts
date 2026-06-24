@@ -130,7 +130,7 @@ import { interval, Subscription } from 'rxjs';
             </a>
           </div>
 
-          <div class="nav-section" *ngIf="authService.getActiveRole() === 'cliente'">
+          <div class="nav-section" *ngIf="authService.isAuthorized(['cliente'])">
             <label>Portal Cliente</label>
             <a routerLink="/client-upload" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">folder_shared</span> Mis Cargas
