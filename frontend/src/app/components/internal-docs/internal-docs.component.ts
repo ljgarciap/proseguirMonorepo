@@ -87,6 +87,8 @@ export class InternalDocsComponent implements OnInit {
         } else if (activeRole === 'operativo') {
           if (doc.target_role === 'operativo') {
             roleMatch = true;
+          } else if (doc.sender?.roles?.includes('operativo')) {
+            roleMatch = true;
           } else if (doc.target_role === 'gerente' && doc.estado === 'pendiente' && doc.sender?.roles?.includes('coordinador_comercial')) {
             roleMatch = true;
           }

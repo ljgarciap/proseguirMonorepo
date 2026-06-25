@@ -148,6 +148,27 @@ class InternalDocumentEscalationTest extends TestCase
         $this->assertEquals('gerente', $response->json('0.target_role'));
     }
 
+    public function test_operativo_sees_outgoing_docs_sent_by_operativo_role(): void
+    {
+        $operativo2 = $this->makeUser('operativo', 'op2');
+        $contable   = $this->makeUser('contable', 'c1');
+
+        // Operativo sends a doc to Contabilidad
+        Passport::actingAs($this->operativo);
+        $this->postJson('/api/internal-docs', $this->makeDoc(['target_role' => 'contable']))->assertStatus(201);
+
+        // A different operativo user should also see that outgoing doc
+        Passport::actingAs($operativo2);
+        $response = $this->getJson('/api/internal-docs')->assertStatus(200);
+        $this->assertCount(1, $response->json());
+        $this->assertEquals('contable', $response->json('0.target_role'));
+
+        // Contable should see it (it's targeted to them)
+        Passport::actingAs($contable);
+        $response = $this->getJson('/api/internal-docs')->assertStatus(200);
+        $this->assertCount(1, $response->json());
+    }
+
     public function test_three_step_escalated_approval_workflow(): void
     {
         // 1. Coordinator uploads document targeting Manager

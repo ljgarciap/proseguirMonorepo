@@ -26,6 +26,10 @@ class InternalDocumentController extends Controller
                 
                 if (in_array('operativo', $roles)) {
                     $q->orWhere('target_role', 'operativo');
+                    // Operativo sees outgoing docs sent by anyone with operativo role
+                    $q->orWhereHas('sender', function($qu) {
+                        $qu->whereJsonContains('roles', 'operativo');
+                    });
                     // Operativo can also see pending documents sent by coordinador_comercial targeting gerente
                     $q->orWhere(function($sub) {
                         $sub->where('target_role', 'gerente')
