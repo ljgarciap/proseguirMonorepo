@@ -62,6 +62,113 @@ class InternalDocumentEscalationTest extends TestCase
         $this->prioridad = AccountingPriority::create(['nombre' => 'Baja', 'horas_vencimiento' => 24, 'color' => '#ffffff']);
     }
 
+    private function makeDoc(array $overrides = []): array
+    {
+        $file = UploadedFile::fake()->create('doc.pdf', 100, 'application/pdf');
+        return array_merge([
+            'titulo'       => 'Test Doc',
+            'archivo'      => $file,
+            'target_role'  => 'gerente',
+            'categoria_id' => $this->categoria->id,
+            'prioridad_id' => $this->prioridad->id,
+        ], $overrides);
+    }
+
+    private function makeUser(string $role, string $suffix): \App\Models\User
+    {
+        return \App\Models\User::create([
+            'name'               => ucfirst($role) . ' ' . $suffix,
+            'email'              => "{$role}.{$suffix}@test.com",
+            'password'           => bcrypt('password'),
+            'numero_documento'   => crc32($role . $suffix),
+            'tipo_documento_id'  => $this->docCC->id,
+            'roles'              => [$role],
+        ]);
+    }
+
+    public function test_superadmin_sees_all_documents(): void
+    {
+        $superadmin = $this->makeUser('superadmin', 'sa1');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson('/api/internal-docs', $this->makeDoc(['target_role' => 'gerente']))->assertStatus(201);
+        $this->postJson('/api/internal-docs', $this->makeDoc(['target_role' => 'operativo']))->assertStatus(201);
+
+        Passport::actingAs($superadmin);
+        $response = $this->getJson('/api/internal-docs')->assertStatus(200);
+        $this->assertCount(2, $response->json());
+    }
+
+    public function test_contable_sees_only_contable_targeted_docs(): void
+    {
+        $contable = $this->makeUser('contable', 'c1');
+
+        Passport::actingAs($this->operativo);
+        $this->postJson('/api/internal-docs', $this->makeDoc(['target_role' => 'contable']))->assertStatus(201);
+        $this->postJson('/api/internal-docs', $this->makeDoc(['target_role' => 'gerente']))->assertStatus(201);
+
+        Passport::actingAs($contable);
+        $response = $this->getJson('/api/internal-docs')->assertStatus(200);
+        $this->assertCount(1, $response->json());
+        $this->assertEquals('contable', $response->json('0.target_role'));
+    }
+
+    public function test_operativo_sees_directly_targeted_docs(): void
+    {
+        Passport::actingAs($this->gerente);
+        $this->postJson('/api/internal-docs', $this->makeDoc(['target_role' => 'operativo']))->assertStatus(201);
+
+        Passport::actingAs($this->operativo);
+        $response = $this->getJson('/api/internal-docs')->assertStatus(200);
+        $this->assertCount(1, $response->json());
+        $this->assertEquals('operativo', $response->json('0.target_role'));
+    }
+
+    public function test_sender_sees_own_documents(): void
+    {
+        Passport::actingAs($this->coordinador);
+        $this->postJson('/api/internal-docs', $this->makeDoc(['target_role' => 'gerente']))->assertStatus(201);
+
+        // Coordinador sees their own doc via sender_id (pending so gerente can't see it yet)
+        $response = $this->getJson('/api/internal-docs')->assertStatus(200);
+        $this->assertCount(1, $response->json());
+        $this->assertEquals($this->coordinador->id, $response->json('0.sender_id'));
+    }
+
+    public function test_gerente_sees_non_coordinator_docs_without_escalation(): void
+    {
+        // Operativo (not coordinador_comercial) sends to gerente
+        Passport::actingAs($this->operativo);
+        $this->postJson('/api/internal-docs', $this->makeDoc(['target_role' => 'gerente']))->assertStatus(201);
+
+        // Gerente SHOULD see it immediately — no escalation needed for non-coordinator senders
+        Passport::actingAs($this->gerente);
+        $response = $this->getJson('/api/internal-docs')->assertStatus(200);
+        $this->assertCount(1, $response->json());
+        $this->assertEquals('gerente', $response->json('0.target_role'));
+    }
+
+    public function test_operativo_sees_outgoing_docs_sent_by_operativo_role(): void
+    {
+        $operativo2 = $this->makeUser('operativo', 'op2');
+        $contable   = $this->makeUser('contable', 'c1');
+
+        // Operativo sends a doc to Contabilidad
+        Passport::actingAs($this->operativo);
+        $this->postJson('/api/internal-docs', $this->makeDoc(['target_role' => 'contable']))->assertStatus(201);
+
+        // A different operativo user should also see that outgoing doc
+        Passport::actingAs($operativo2);
+        $response = $this->getJson('/api/internal-docs')->assertStatus(200);
+        $this->assertCount(1, $response->json());
+        $this->assertEquals('contable', $response->json('0.target_role'));
+
+        // Contable should see it (it's targeted to them)
+        Passport::actingAs($contable);
+        $response = $this->getJson('/api/internal-docs')->assertStatus(200);
+        $this->assertCount(1, $response->json());
+    }
+
     public function test_three_step_escalated_approval_workflow(): void
     {
         // 1. Coordinator uploads document targeting Manager
