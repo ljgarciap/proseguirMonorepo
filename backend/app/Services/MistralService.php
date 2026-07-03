@@ -120,7 +120,7 @@ class MistralService
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . $this->apiKey,
             'Content-Type' => 'application/json',
-        ])->post($this->apiUrl . '/v1/chat/completions', [
+        ])->timeout(240)->post($this->apiUrl . '/v1/chat/completions', [
             'model' => 'mistral-small-latest',
             'messages' => [
                 [
