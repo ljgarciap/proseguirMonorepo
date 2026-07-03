@@ -78,10 +78,20 @@ class ConfiguracionSeeder extends Seeder
         ];
 
         foreach ($configs as $config) {
-            Configuracion::updateOrCreate(
-                ['clave' => $config['clave']],
-                $config
-            );
+            $existing = Configuracion::where('clave', $config['clave'])->first();
+
+            if ($existing) {
+                // No se toca 'valor': puede haber sido configurado manualmente desde
+                // /configuraciones y este seeder corre en cada deploy (ver deploy.yml).
+                // Sobreescribirlo con env() aquí borraría esa configuración en cada release.
+                $existing->update([
+                    'descripcion' => $config['descripcion'],
+                    'grupo'       => $config['grupo'],
+                    'es_secreto'  => $config['es_secreto'],
+                ]);
+            } else {
+                Configuracion::create($config);
+            }
         }
     }
 }
