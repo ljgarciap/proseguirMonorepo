@@ -86,7 +86,7 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
             Route::get('/', [\App\Http\Controllers\ClientUploadController::class, 'index']);
             Route::get('/recent-ocr', [\App\Http\Controllers\ClientUploadController::class, 'recentOcr']);
             Route::post('/', [\App\Http\Controllers\ClientUploadController::class, 'store'])
-                ->middleware('checkrole:cliente');
+                ->middleware('checkrole:cliente,operativo');
             Route::get('/{id}/download', [\App\Http\Controllers\ClientUploadController::class, 'download'])
                 ->middleware('checkrole:cliente,operativo,gerente,superadmin');
             Route::post('/{id}/validate', [\App\Http\Controllers\ClientUploadController::class, 'validateUpload'])
