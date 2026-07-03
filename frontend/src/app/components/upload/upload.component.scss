@@ -103,6 +103,70 @@
   }
 }
 
+.file-list {
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.6rem 0.8rem;
+    border-radius: 6px;
+    background-color: #f8f9fa;
+    border: 1px solid #eaeaea;
+    font-size: 0.85rem;
+
+    &.exitoso {
+      background-color: #d1f2eb;
+      border-color: #16a085;
+    }
+
+    &.error {
+      background-color: #fadbd8;
+      border-color: #c0392b;
+    }
+
+    &.subiendo {
+      background-color: #ebf5fb;
+      border-color: #2980b9;
+    }
+  }
+
+  .file-name {
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #2d3436;
+    font-weight: 600;
+  }
+
+  .file-status {
+    color: #636e72;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .btn-remove {
+    background: none;
+    border: none;
+    color: #b2bec3;
+    cursor: pointer;
+    font-size: 0.9rem;
+    padding: 0 0.3rem;
+
+    &:hover {
+      color: #c0392b;
+    }
+  }
+}
+
 .submit-button {
   width: 100%;
   padding: 1rem;

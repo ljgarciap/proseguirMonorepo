@@ -322,6 +322,14 @@ class ProcessUploadJob implements ShouldQueue
 
             case 'pagos_compraventa':
                 return 'Analiza el documento de Pagos Compra Venta Pagador de Proseguir. Extrae la información de cabecera y cada fila de la liquidación.
+
+                REGLA CRÍTICA - "Días Adicionales": cada factura (Op#/IdTítulo) puede tener, inmediatamente debajo, una fila etiquetada "Días Adicionales :" que representa un pago tardío. Cuando exista esa fila para una factura, DEBES fusionarla con la fila principal en un solo registro así:
+                - Fec_Final: usa la Fec Final de la fila "Días Adicionales" (no la de la fila principal), porque es la fecha real en que se pagó.
+                - Dias: usa el valor de Días de la fila "Días Adicionales" (no el de la fila principal).
+                - Valor_Descuento: SUMA el Valor Descuento de la fila principal MÁS el Valor Descuento de la fila "Días Adicionales".
+                - El resto de columnas (Saldo_Capital, Capital_Pagado, Descuento_Mora_Causado_No_Pagado, Rec_Descuento_Mora_Causado_Np, Total_Pagado, Saldo_Despues_Pago) se toman de la fila principal.
+                Si una factura NO tiene fila "Días Adicionales" debajo, usa los valores de la fila principal tal cual. NUNCA generes un registro separado solo para una fila "Días Adicionales" — siempre debe quedar fusionada con su factura.
+
                 Esquema JSON requerido:
                 {
                   "pago_ref": "Pago Ref exacto a la derecha de PAGO Nº. (ej: REF-1-95)",
@@ -339,12 +347,12 @@ class ProcessUploadJob implements ShouldQueue
                       "Op": "Número de operación (Op#)",
                       "Id_Titulo": "ID del título (IdTitulo)",
                       "Valor_Factura": "Valor factura",
-                      "Fec_Inicial": "Fecha inicial (DD/MM/YYYY)",
-                      "Fec_Final": "Fecha final (DD/MM/YYYY)",
-                      "Dias": "Días",
+                      "Fec_Inicial": "Fecha inicial de la fila principal (DD/MM/YYYY)",
+                      "Fec_Final": "Fecha final ya fusionada según la regla de Días Adicionales (DD/MM/YYYY)",
+                      "Dias": "Días ya fusionados según la regla de Días Adicionales",
                       "Factor": "Factor",
                       "Saldo_Capital": "Saldo capital",
-                      "Valor_Descuento": "Valor descuento",
+                      "Valor_Descuento": "Valor descuento ya fusionado (fila principal + Días Adicionales si existe)",
                       "Capital_Pagado": "Capital pagado",
                       "Descuento_Mora_Causado_No_Pagado": "Descuento/Mora Causado No Pagado",
                       "Rec_Descuento_Mora_Causado_Np": "Rec. Descuento/Mora Causado NP",
@@ -837,11 +845,19 @@ class ProcessUploadJob implements ShouldQueue
                 break;
 
             case 'pagos_compraventa':
-                $prompt = "Analiza este documento de 'PAGOS COMPRA VENTA PAGADOR' de Proseguir. Extrae TODOS los registros de la tabla 'Liquidación' y los campos de la cabecera.\n\nINSTRUCCIONES CRÍTICAS DE CABECERA:\n1. PAGO REF: El valor exacto a la derecha de 'PAGO Nº.' (ej: REF-1-95). NO lo confundas con el NIT.\n2. FECHA RECAUDO: Busca 'Fecha Recaudo:' en el centro del encabezado (ej: 09/10/2025). IGNORA 'Fecha Impresión' y 'Hora Impresión' que están arriba a la derecha.\n3. NIT PAGADOR: El número con guion (ej: 900715610-7) que aparece a la derecha de 'Pagador: BGREEN S A S' bajo la columna 'C.C. / NIT:'.\n4. NIT CLIENTE: El número con guion (ej: 901228343-1) que aparece a la derecha de 'Cliente: LIQUITECH SAS' bajo la columna 'C.C. / NIT:'.\n5. ESTADO: El valor a la derecha de 'ESTADO:' (ej: VALIDADA).\n\nINSTRUCCIONES DE TABLA 'Liquidación':\nExtrae CADA fila de la tabla. No te detengas en la primera. Mapea:\n- op: Columna 'Op#'\n- id_titulo: Columna 'IdTitulo'\n- valor_factura: Columna 'Valor Factura'\n- fec_inicial: Columna 'Fec Inicial'\n- fec_final: Columna 'Fec Final'\n- dias: Columna 'Dias'\n- factor: Columna 'Factor'\n- saldo_capital: Columna 'Saldo Capital'\n- valor_descuento: Columna 'Valor Descuento'\n- capital_pagado: Columna 'Capital Pagado'\n- descuento_mora_causado_np: Columna 'Descuento /Mora Causado No Pagado'\n- rec_descuento_mora_np: Columna 'Rec. Descuento/ Mora Causado NP'\n- total_pagado: Columna 'Total Pagado' (Importante: este es el valor individual por fila)\n- saldo_despues_pago: Columna 'Saldo Después del Pago'\n\nJSON REQUERIDO:\n{\n  \"pago_ref\": \"\",\n  \"pagador\": { \"nombre\": \"\", \"nit\": \"\" },\n  \"cliente\": { \"nombre\": \"\", \"nit\": \"\" },\n  \"concepto\": \"\",\n  \"estado\": \"\",\n  \"fecha_recaudo\": \"\",\n  \"detalle_operaciones\": [\n    {\n      \"op\": \"\", \"id_titulo\": \"\", \"valor_factura\": \"\", \"fec_inicial\": \"\", \"fec_final\": \"\", \"dias\": \"\", \"factor\": \"\", \"saldo_capital\": \"\", \"valor_descuento\": \"\", \"capital_pagado\": \"\", \"descuento_mora_causado_np\": \"\", \"rec_descuento_mora_np\": \"\", \"total_pagado\": \"\", \"saldo_despues_pago\": \"\"\n    }\n  ]\n}";
+                $prompt = "Analiza este documento de 'PAGOS COMPRA VENTA PAGADOR' de Proseguir. Extrae TODOS los registros de la tabla 'Liquidación' y los campos de la cabecera.\n\nINSTRUCCIONES CRÍTICAS DE CABECERA:\n1. PAGO REF: El valor exacto a la derecha de 'PAGO Nº.' (ej: REF-1-95). NO lo confundas con el NIT.\n2. FECHA RECAUDO: Busca 'Fecha Recaudo:' en el centro del encabezado (ej: 09/10/2025). IGNORA 'Fecha Impresión' y 'Hora Impresión' que están arriba a la derecha.\n3. NIT PAGADOR: El número con guion (ej: 900715610-7) que aparece a la derecha de 'Pagador: BGREEN S A S' bajo la columna 'C.C. / NIT:'.\n4. NIT CLIENTE: El número con guion (ej: 901228343-1) que aparece a la derecha de 'Cliente: LIQUITECH SAS' bajo la columna 'C.C. / NIT:'.\n5. ESTADO: El valor a la derecha de 'ESTADO:' (ej: VALIDADA).\n\nINSTRUCCIONES DE TABLA 'Liquidación':\nExtrae CADA fila de la tabla. No te detengas en la primera. El texto puede venir partido en varias secciones (una por página) que forman UNA sola tabla continua; trátalas como una sola tabla. Mapea:\n- op: Columna 'Op#'\n- id_titulo: Columna 'IdTitulo'\n- valor_factura: Columna 'Valor Factura'\n- fec_inicial: Columna 'Fec Inicial'\n- fec_final: Columna 'Fec Final'\n- dias: Columna 'Dias'\n- factor: Columna 'Factor'\n- saldo_capital: Columna 'Saldo Capital'\n- valor_descuento: Columna 'Valor Descuento'\n- capital_pagado: Columna 'Capital Pagado'\n- descuento_mora_causado_np: Columna 'Descuento /Mora Causado No Pagado'\n- rec_descuento_mora_np: Columna 'Rec. Descuento/ Mora Causado NP'\n- total_pagado: Columna 'Total Pagado' (Importante: este es el valor individual por fila)\n- saldo_despues_pago: Columna 'Saldo Después del Pago'\n\nREGLA CRÍTICA - 'Días Adicionales': cada factura (Op#/IdTitulo) puede tener, inmediatamente debajo (incluso si queda al inicio de la siguiente sección/página, separada de su fila principal), una fila etiquetada 'Días Adicionales :' que representa un pago tardío. Cuando exista esa fila para una factura, DEBES fusionarla con la fila principal en un solo registro así:\n- fec_final: usa la Fec Final de la fila 'Días Adicionales' (no la de la fila principal).\n- dias: usa el valor de Días de la fila 'Días Adicionales' (no el de la fila principal).\n- valor_descuento: SUMA el Valor Descuento de la fila principal MÁS el Valor Descuento de la fila 'Días Adicionales'.\n- El resto de columnas se toman de la fila principal.\nSi una factura NO tiene fila 'Días Adicionales' debajo, usa los valores de la fila principal tal cual. NUNCA generes un registro separado solo para una fila 'Días Adicionales' huérfana — siempre debe quedar fusionada con la factura a la que pertenece (búscala en las filas anteriores si es necesario).\n\nJSON REQUERIDO:\n{\n  \"pago_ref\": \"\",\n  \"pagador\": { \"nombre\": \"\", \"nit\": \"\" },\n  \"cliente\": { \"nombre\": \"\", \"nit\": \"\" },\n  \"concepto\": \"\",\n  \"estado\": \"\",\n  \"fecha_recaudo\": \"\",\n  \"detalle_operaciones\": [\n    {\n      \"op\": \"\", \"id_titulo\": \"\", \"valor_factura\": \"\", \"fec_inicial\": \"\", \"fec_final\": \"\", \"dias\": \"\", \"factor\": \"\", \"saldo_capital\": \"\", \"valor_descuento\": \"\", \"capital_pagado\": \"\", \"descuento_mora_causado_np\": \"\", \"rec_descuento_mora_np\": \"\", \"total_pagado\": \"\", \"saldo_despues_pago\": \"\"\n    }\n  ]\n}";
 
-                foreach ($pages as $page) {
-                    if (empty($page['markdown'])) continue;
-                    $data = $mistralService->getStructuredExtraction($prompt, $page['markdown']);
+                // Se concatenan todas las páginas en una sola extracción: la tabla de
+                // Liquidación puede continuar entre páginas, y una fila "Días
+                // Adicionales" que caiga al inicio de una página nueva perdería el
+                // contexto de su factura (Op#/IdTitulo) si se procesara página por página.
+                $combinedMarkdown = collect($pages)
+                    ->pluck('markdown')
+                    ->filter()
+                    ->implode("\n");
+
+                if ($combinedMarkdown !== '') {
+                    $data = $mistralService->getStructuredExtraction($prompt, $combinedMarkdown);
 
                     $pagoRef = $data['pago_ref'] ?? '';
                     $pagador = $data['pagador']['nombre'] ?? '';

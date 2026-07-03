@@ -3,7 +3,7 @@
     <div class="card-header">
       <span class="icon">📁</span>
       <h2>Procesar Nuevo Documento</h2>
-      <p>Selecciona el tipo y sube tu archivo PDF</p>
+      <p>Selecciona el tipo y sube uno o varios archivos PDF del mismo formato</p>
     </div>
 
     <div class="card-body">
@@ -20,15 +20,26 @@
       </div>
 
       <div class="form-group">
-        <label>Archivo PDF</label>
+        <label>Archivos PDF</label>
         <div class="file-drop-area">
-          <span class="file-msg">{{ selectedFile ? selectedFile.name : 'No hay archivo seleccionado' }}</span>
-          <input type="file" class="file-input" (change)="onFileSelected($event)" accept="application/pdf">
-          <button class="fake-file-button">Seleccionar archivo</button>
+          <span class="file-msg">{{ entries.length ? (entries.length + ' archivo(s) seleccionado(s)') : 'No hay archivos seleccionados' }}</span>
+          <input type="file" class="file-input" (change)="onFileSelected($event)" accept="application/pdf" multiple>
+          <button class="fake-file-button">Seleccionar archivos</button>
         </div>
       </div>
 
-      <button class="submit-button" (click)="procesar()" [disabled]="!selectedFile || cargando"
+      <ul class="file-list" *ngIf="entries.length">
+        <li *ngFor="let entry of entries; let i = index" [class]="'file-item ' + entry.status">
+          <span class="file-name">{{ entry.file.name }}</span>
+          <span class="file-status" *ngIf="entry.status !== 'pendiente'">
+            {{ entry.status === 'subiendo' ? '⏳' : (entry.status === 'exitoso' ? '✅' : '❌') }}
+            {{ entry.mensaje }}
+          </span>
+          <button class="btn-remove" *ngIf="entry.status === 'pendiente'" (click)="removeFile(i)" title="Quitar">✕</button>
+        </li>
+      </ul>
+
+      <button class="submit-button" (click)="procesar()" [disabled]="!entries.length || cargando"
         [class.loading]="cargando">
         <span *ngIf="!cargando">Subir y Extraer Datos</span>
         <span *ngIf="cargando" class="spinner"></span>
@@ -45,7 +56,7 @@
         <span class="status-text">{{ mensaje }}</span>
       </div>
       <button *ngIf="status === 'error' || status === 'success'" class="btn-reset" (click)="reset()">
-        {{ status === 'success' ? 'Cargar otro' : 'Reintentar' }}
+        {{ status === 'success' ? 'Cargar otros' : 'Reintentar' }}
       </button>
     </div>
   </div>
