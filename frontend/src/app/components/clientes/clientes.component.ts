@@ -173,7 +173,7 @@ import Swal from 'sweetalert2';
               <div class="form-row three-cols">
                 <div class="pro-input-group">
                   <label>Correo Electrónico</label>
-                  <input type="email" name="correo_electronico" [(ngModel)]="form.correo_electronico" email placeholder="correo@ejemplo.com" class="pro-input" [class.is-invalid]="errors['correo_electronico']" />
+                  <input type="email" name="correo_electronico" [(ngModel)]="form.correo_electronico" placeholder="correo@ejemplo.com" class="pro-input" [class.is-invalid]="errors['correo_electronico']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Ocupación</label>
@@ -207,7 +207,7 @@ import Swal from 'sweetalert2';
               <div class="form-row three-cols">
                 <div class="pro-input-group">
                   <label>Correo Electrónico Empresarial</label>
-                  <input type="email" name="correo_electronico_empresarial" [(ngModel)]="form.correo_electronico_empresarial" email placeholder="correo@empresa.com" class="pro-input" [class.is-invalid]="errors['correo_electronico_empresarial']" />
+                  <input type="email" name="correo_electronico_empresarial" [(ngModel)]="form.correo_electronico_empresarial" placeholder="correo@empresa.com" class="pro-input" [class.is-invalid]="errors['correo_electronico_empresarial']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Página Web</label>
@@ -261,7 +261,7 @@ import Swal from 'sweetalert2';
                 </div>
                 <div class="pro-input-group">
                   <label>Correo Electrónico</label>
-                  <input type="email" name="rep_correo_electronico" [(ngModel)]="form.rep_correo_electronico" email placeholder="correo@replegal.com" class="pro-input" [class.is-invalid]="errors['rep_correo_electronico']" />
+                  <input type="email" name="rep_correo_electronico" [(ngModel)]="form.rep_correo_electronico" placeholder="correo@replegal.com" class="pro-input" [class.is-invalid]="errors['rep_correo_electronico']" />
                 </div>
               </div>
             </div>
