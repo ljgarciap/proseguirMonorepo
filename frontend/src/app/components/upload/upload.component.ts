@@ -4,6 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { HttpClientModule, HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 
+interface UploadEntry {
+  file: File;
+  status: 'pendiente' | 'subiendo' | 'exitoso' | 'error';
+  mensaje: string;
+}
+
 @Component({
   selector: 'app-upload',
   standalone: true,
@@ -12,7 +18,7 @@ import { environment } from '../../../environments/environment';
   styleUrls: ['./upload.component.scss']
 })
 export class UploadComponent {
-  selectedFile: File | null = null;
+  entries: UploadEntry[] = [];
   categoria: string = 'cartera'; // Valor por defecto
   cargando: boolean = false;
   mensaje: string = '';
@@ -20,56 +26,81 @@ export class UploadComponent {
 
   constructor(private http: HttpClient) { }
 
-  // Se ejecuta cuando seleccionas un archivo en el input
+  // Se ejecuta cuando seleccionas uno o varios archivos en el input
   onFileSelected(event: any): void {
-    const file: File = event.target.files[0];
-    if (file) {
-      this.selectedFile = file;
+    const files: FileList = event.target.files;
+    if (files && files.length) {
+      this.entries = Array.from(files).map(file => ({
+        file,
+        status: 'pendiente' as const,
+        mensaje: ''
+      }));
+      this.mensaje = '';
+      this.status = '';
     }
   }
 
-  // Se ejecuta al hacer clic en el botón
+  removeFile(index: number): void {
+    this.entries.splice(index, 1);
+  }
+
+  // Sube todos los archivos seleccionados, uno por uno, a la misma categoría
   procesar(): void {
-    if (!this.selectedFile) {
-      this.mensaje = 'Por favor, selecciona un archivo primero.';
+    if (!this.entries.length) {
+      this.mensaje = 'Por favor, selecciona al menos un archivo primero.';
       this.status = 'error';
       return;
     }
 
     this.cargando = true;
-    this.mensaje = 'Enviando archivo al servidor...';
+    this.mensaje = '';
     this.status = '';
 
-    const formData = new FormData();
-    // Laravel espera el campo 'file'
-    formData.append('file', this.selectedFile);
-    formData.append('categoria', this.categoria);
-    
     const activeRole = localStorage.getItem('active_role') || 'operativo';
-    formData.append('active_role', activeRole);
-
-    // Llamamos a nuestra propia API en lugar de n8n directamente
     const apiUrl = `${environment.apiUrl}/uploads`;
 
-    this.http.post(apiUrl, formData).subscribe({
-      next: (response: any) => {
-        console.log('Respuesta del servidor:', response);
-        this.mensaje = 'Archivo recibido y enviado a procesamiento interno con éxito.';
+    const subidas = this.entries.map(entry => {
+      entry.status = 'subiendo';
+      entry.mensaje = 'Enviando al servidor...';
+
+      const formData = new FormData();
+      // Laravel espera el campo 'file'
+      formData.append('file', entry.file);
+      formData.append('categoria', this.categoria);
+      formData.append('active_role', activeRole);
+
+      return this.http.post(apiUrl, formData).toPromise()
+        .then(() => {
+          entry.status = 'exitoso';
+          entry.mensaje = 'Enviado a procesamiento interno con éxito.';
+        })
+        .catch(err => {
+          entry.status = 'error';
+          entry.mensaje = 'Error al subir: ' + (err.error?.message || err.message);
+        });
+    });
+
+    Promise.all(subidas).then(() => {
+      this.cargando = false;
+      const exitosos = this.entries.filter(e => e.status === 'exitoso').length;
+      const fallidos = this.entries.filter(e => e.status === 'error').length;
+
+      if (fallidos === 0) {
         this.status = 'success';
-        this.cargando = false;
-      },
-      error: (err) => {
-        console.error('Error completo:', err);
-        this.mensaje = 'Error al subir el archivo al servidor: ' + (err.error?.message || err.message);
+        this.mensaje = `${exitosos} archivo(s) recibido(s) y enviado(s) a procesamiento interno con éxito.`;
+      } else if (exitosos === 0) {
         this.status = 'error';
-        this.cargando = false;
+        this.mensaje = `Los ${fallidos} archivo(s) fallaron al subir. Revisa el detalle de cada uno abajo.`;
+      } else {
+        this.status = 'error';
+        this.mensaje = `${exitosos} archivo(s) exitoso(s), ${fallidos} archivo(s) fallaron. Revisa el detalle de cada uno abajo.`;
       }
     });
   }
 
   // Permite limpiar todo y volver a empezar
   reset(): void {
-    this.selectedFile = null;
+    this.entries = [];
     this.mensaje = '';
     this.status = '';
     this.cargando = false;
