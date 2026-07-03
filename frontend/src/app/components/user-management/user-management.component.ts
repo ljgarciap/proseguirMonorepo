@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import Swal from 'sweetalert2';
 
@@ -490,11 +491,11 @@ export class UserManagementComponent implements OnInit {
       showCancelButton: true,
       confirmButtonText: isEdit ? 'Actualizar' : 'Crear Usuario',
       customClass: { popup: 'modern-swal-popup' },
-      preConfirm: () => {
+      preConfirm: async () => {
         const checkboxes = document.querySelectorAll('.swal-role:checked') as NodeListOf<HTMLInputElement>;
         const roles = Array.from(checkboxes).map(cb => cb.value);
 
-        return {
+        const formValues = {
           tipo_documento_id: (document.getElementById('swal-type') as HTMLSelectElement).value,
           numero_documento: (document.getElementById('swal-doc') as HTMLInputElement).value,
           name: (document.getElementById('swal-name') as HTMLInputElement).value,
@@ -502,28 +503,29 @@ export class UserManagementComponent implements OnInit {
           password: (document.getElementById('swal-pass') as HTMLInputElement).value,
           roles: roles
         };
+
+        if (!formValues.name || !formValues.numero_documento || (!isEdit && !formValues.password)) {
+          Swal.showValidationMessage('Por favor completa los campos obligatorios (Documento, Nombre, Contraseña).');
+          return false;
+        }
+
+        const request = isEdit
+          ? this.http.put(`${this.apiUrl}/${user.id}`, formValues)
+          : this.http.post(this.apiUrl, formValues);
+
+        try {
+          await firstValueFrom(request);
+          return formValues;
+        } catch (err: any) {
+          Swal.showValidationMessage(err.error?.message || 'Ocurrió un error al procesar el usuario.');
+          return false;
+        }
       }
     });
 
     if (formValues) {
-      if (!formValues.name || !formValues.numero_documento || (!isEdit && !formValues.password)) {
-        Swal.fire('Error', 'Por favor completa los campos obligatorios (Documento, Nombre, Contraseña).', 'error');
-        return;
-      }
-
-      const request = isEdit 
-        ? this.http.put(`${this.apiUrl}/${user.id}`, formValues)
-        : this.http.post(this.apiUrl, formValues);
-
-      request.subscribe({
-        next: () => {
-          this.loadUsers();
-          Swal.fire('¡Éxito!', `Usuario ${isEdit ? 'actualizado' : 'creado'} correctamente.`, 'success');
-        },
-        error: (err) => {
-          Swal.fire('Error', err.error.message || 'Ocurrió un error al procesar el usuario.', 'error');
-        }
-      });
+      this.loadUsers();
+      Swal.fire('¡Éxito!', `Usuario ${isEdit ? 'actualizado' : 'creado'} correctamente.`, 'success');
     }
   }
 
