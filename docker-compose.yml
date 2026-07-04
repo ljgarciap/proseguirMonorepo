@@ -17,6 +17,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: production
     container_name: factoring_backend
     restart: always
     volumes:
@@ -50,6 +51,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: production
     container_name: factoring_queue
     restart: always
     command: php artisan queue:work --tries=3
