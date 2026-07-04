@@ -130,3 +130,16 @@ Estos números no son buenos ni malos en sí — son el punto de partida.
 Cualquier cambio futuro que reduzca la cobertura de un módulo específico
 vale la pena revisarlo con más atención, aunque el pipeline no lo
 bloquee todavía.
+
+## Decisiones pendientes (provisionales, a confirmar con Luis)
+
+Sin respuesta explícita todavía, se adoptan estos defaults de bajo
+riesgo — fácil de revisar más adelante si Luis prefiere lo contrario:
+
+- **Herramienta externa (Codecov/SonarQube):** no se adopta por ahora.
+  Se mantiene solo con artifacts de GitHub Actions (gratis, sin enviar
+  código/datos de cobertura a terceros). Revisar si en algún momento se
+  necesita ver tendencia histórica entre sprints.
+- **Umbral mínimo de cobertura:** no se fija todavía. Se espera a tener
+  varios sprints de datos reales (no solo esta primera medición) antes
+  de decidir un % objetivo que bloquee el pipeline.
