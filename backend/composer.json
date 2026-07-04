@@ -54,6 +54,7 @@
             "@php artisan config:clear --ansi",
             "@php artisan test"
         ],
+        "test:coverage": "php artisan test --coverage-clover=coverage/clover.xml --coverage-html=coverage/html",
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
