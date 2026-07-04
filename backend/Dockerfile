@@ -1,4 +1,4 @@
-FROM php:8.4-fpm
+FROM php:8.4-fpm AS base
 
 # Instalar dependencias del sistema
 RUN apt-get update && apt-get install -y \
@@ -37,5 +37,13 @@ RUN chown -R www-data:www-data /var/www/html
 # Instalar dependencias de Node localmente para el helper
 RUN npm install pdfreader
 
+FROM base AS production
+WORKDIR /var/www/html
+EXPOSE 9000
+CMD ["php-fpm"]
+
+FROM base AS local-coverage
+RUN pecl install pcov && docker-php-ext-enable pcov
+WORKDIR /var/www/html
 EXPOSE 9000
 CMD ["php-fpm"]

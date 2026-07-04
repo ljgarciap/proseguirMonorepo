@@ -15,6 +15,7 @@ jobs:
         with:
           php-version: '8.4'
           extensions: mbstring, xml, ctype, iconv, mysql, sqlite
+          coverage: pcov
       - name: Install Composer Dependencies
         run: |
           cd backend
@@ -31,6 +32,22 @@ jobs:
         env:
           DB_CONNECTION: sqlite
           DB_DATABASE: ":memory:"
+      - name: Generate Coverage Report
+        continue-on-error: true
+        run: |
+          cd backend
+          php artisan test --coverage-clover=coverage/clover.xml --coverage-html=coverage/html
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
+      - name: Upload Backend Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-report
+          path: backend/coverage/html
+          retention-days: 14
+          if-no-files-found: warn
 
   test-frontend:
     name: Frontend Tests (Angular)
@@ -53,6 +70,19 @@ jobs:
         run: |
           cd frontend
           npm run test:ci
+      - name: Generate Coverage Report
+        continue-on-error: true
+        run: |
+          cd frontend
+          npm run test:coverage
+      - name: Upload Frontend Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-report
+          path: frontend/coverage/factoring-frontend
+          retention-days: 14
+          if-no-files-found: warn
 
   deploy-prod:
     name: Production Deploy (CD)

@@ -89,7 +89,11 @@
             "styles": [
               "src/styles.scss"
             ],
-            "scripts": []
+            "scripts": [],
+            "codeCoverageExclude": [
+              "src/environments/**",
+              "src/main.ts"
+            ]
           }
         }
       }
