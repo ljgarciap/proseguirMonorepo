@@ -75,15 +75,16 @@ Para descargarlo: abrir el run del workflow en la pestaña **Actions** del
 repo → scroll hasta la sección **Artifacts** al final de la página del
 run → click en el nombre del artifact para bajarlo como `.zip`.
 
-**Nota de seguridad:** el reporte HTML de PHPUnit incluye el código fuente
-completo (con syntax highlighting) de cada archivo de `app/`, no solo
-números de líneas cubiertas — cualquiera con permiso de lectura sobre los
-Artifacts del repo puede efectivamente navegar todo el backend a través
-del reporte. No se encontraron secretos hardcodeados en el código (todo
-pasa por `env()`/`config()`/`ConfiguracionService`), pero si en este repo
-existe alguien con acceso de lectura a Actions sin tener también acceso de
-lectura al código fuente, esto amplía su exposición — vale la pena
-confirmarlo antes de asumir que es un no-problema.
+**Nota de seguridad (confirmado, no es un problema):** el reporte HTML de
+PHPUnit incluye el código fuente completo (con syntax highlighting) de
+cada archivo de `app/`, no solo números de líneas cubiertas. En un repo
+privado esto ampliaría la exposición a cualquiera con acceso de lectura a
+Actions pero sin acceso al código. Se confirmó vía `gh api
+repos/ljgarciap/proseguirMonorepo` que **este repositorio es público**
+(`visibility: public`) — el código ya es 100% legible por cualquiera sin
+necesidad del reporte de cobertura, así que el artifact no agrega ninguna
+exposición nueva. No se encontraron secretos hardcodeados en el código de
+todas formas (todo pasa por `env()`/`config()`/`ConfiguracionService`).
 
 El paso que genera cobertura (`Generate Coverage Report`) corre con
 `continue-on-error: true`: si falla (por ejemplo, por out-of-memory
