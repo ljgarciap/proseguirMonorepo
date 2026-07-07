@@ -83,14 +83,6 @@ export class SolicitudesCreditoComponent implements OnInit {
     mensaje_notificacion: ''
   };
 
-  // Schemes of amortization from description
-  amortizacionPresets = [
-    { nombre: 'Interés Mensual Capital Mensual', codigo: 'INT_MEN_CAP_MEN' },
-    { nombre: 'Interés y Capital Trimestral', codigo: 'INT_CAP_TRI' },
-    { nombre: 'Cuota Fija Mensual', codigo: 'CUOTA_FIJA_MEN' },
-    { nombre: 'Interés Mensual y Capital Semestral', codigo: 'INT_MEN_CAP_SEM' }
-  ];
-
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
