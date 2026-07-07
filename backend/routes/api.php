@@ -204,6 +204,24 @@ Route::prefix('internal-docs')->middleware(['auth:api', 'checkrole:operativo,con
     Route::delete('/{id}', [\App\Http\Controllers\InternalDocumentController::class, 'destroy']);
 });
 
+// Bandeja Interna — Ruta de Aprobación Secuencial (SCRUM-94)
+Route::prefix('document-envios')->middleware(['auth:api', 'checkrole:operativo,contable,gerente,superadmin,coordinador_comercial'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\DocumentEnvioController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\DocumentEnvioController::class, 'store']);
+    Route::patch('/{id}/steps/{stepId}', [\App\Http\Controllers\DocumentEnvioController::class, 'processStep']);
+    Route::get('/{id}/files/{fileId}/download', [\App\Http\Controllers\DocumentEnvioController::class, 'downloadFile']);
+    Route::delete('/{id}', [\App\Http\Controllers\DocumentEnvioController::class, 'destroy']);
+});
+
+// Catálogo de Áreas para la ruta de aprobación (SCRUM-94)
+Route::get('/document-areas', [\App\Http\Controllers\DocumentAreaController::class, 'index'])
+    ->middleware(['auth:api', 'checkrole:operativo,contable,gerente,superadmin,coordinador_comercial']);
+Route::prefix('document-areas')->middleware(['auth:api', 'checkrole:superadmin'])->group(function () {
+    Route::post('/', [\App\Http\Controllers\DocumentAreaController::class, 'store']);
+    Route::put('/{id}', [\App\Http\Controllers\DocumentAreaController::class, 'update']);
+    Route::delete('/{id}', [\App\Http\Controllers\DocumentAreaController::class, 'destroy']);
+});
+
 // Configuraciones del Sistema (Superadmin)
 Route::prefix('configuraciones')->middleware(['auth:api', 'checkrole:superadmin'])->group(function () {
     Route::get('/', [\App\Http\Controllers\ConfiguracionController::class, 'index']);
