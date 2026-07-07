@@ -199,12 +199,12 @@ class ClientUploadController extends Controller
         $operativoCount = (clone $baseQuery)->where('status', 'pendiente')->count();
         $gerenteCount = (clone $baseQuery)->where('status', 'validado')->count();
 
-        // Documentos Internos Pendientes
+        // Documentos Internos Pendientes (bandeja vieja, target_role fijo)
         $internalContable = \App\Models\InternalDocument::where('target_role', 'contable')->where('estado', 'pendiente')->count();
         $internalGerente = \App\Models\InternalDocument::where('target_role', 'gerente')->where('estado', 'pendiente')->count();
         $internalOperativo = \App\Models\InternalDocument::where('target_role', 'operativo')->where('estado', 'pendiente')->count();
 
-        // Documentos Internos por Vencer (< 2 horas)
+        // Documentos Internos por Vencer (< 2 horas) - bandeja vieja
         $expiringContable = 0;
         $expiringGerente = 0;
         $expiringOperativo = 0;
@@ -217,6 +217,33 @@ class ClientUploadController extends Controller
                     if ($doc->target_role === 'contable') $expiringContable++;
                     if ($doc->target_role === 'gerente') $expiringGerente++;
                     if ($doc->target_role === 'operativo') $expiringOperativo++;
+                }
+            }
+        }
+
+        // Envíos de la Bandeja Interna nueva (SCRUM-94): pasos pendientes cuyo turno es el actual
+        $pasosActuales = \App\Models\DocumentEnvioStep::with(['area', 'envio.priority'])
+            ->where('estado', 'pendiente')
+            ->get()
+            ->filter(fn($step) => $step->envio && $step->orden === $step->envio->current_step_order);
+
+        foreach ($pasosActuales as $step) {
+            switch ($step->area?->codigo) {
+                case 'contable': $internalContable++; break;
+                case 'gerente': $internalGerente++; break;
+                case 'operativo': $internalOperativo++; break;
+            }
+
+            $envio = $step->envio;
+            if ($envio->priority && $envio->priority->horas_vencimiento) {
+                $expiresAt = $envio->created_at->copy()->addHours($envio->priority->horas_vencimiento);
+                $hoursRemaining = now()->diffInHours($expiresAt, false);
+                if ($hoursRemaining <= 2) {
+                    switch ($step->area?->codigo) {
+                        case 'contable': $expiringContable++; break;
+                        case 'gerente': $expiringGerente++; break;
+                        case 'operativo': $expiringOperativo++; break;
+                    }
                 }
             }
         }

@@ -18,9 +18,9 @@ export class InternalDocsComponent implements OnInit {
   documents: any[] = [];
   categories: any[] = [];
   priorities: any[] = [];
-  selectedDocIds = new Set<number>();
+  areas: any[] = [];
   loading = false;
-  expandedBatches = new Set<string>();
+  expandedEnvios = new Set<number>();
 
   // Tabs
   currentTab: 'pendientes' | 'procesados' = 'pendientes';
@@ -36,7 +36,8 @@ export class InternalDocsComponent implements OnInit {
 
   // Lightbox State
   showViewer = false;
-  selectedDoc: any = null;
+  selectedEnvio: any = null;
+  selectedFile: any = null;
   viewerUrl: string | null = null;
   isImage = false;
   isExcel = false;
@@ -55,13 +56,13 @@ export class InternalDocsComponent implements OnInit {
   loadInitialData() {
     this.http.get<any[]>(`${environment.apiUrl}/parameters/accounting_categories`).subscribe({ next: res => this.categories = res, error: () => {} });
     this.http.get<any[]>(`${environment.apiUrl}/parameters/accounting_priorities`).subscribe({ next: res => this.priorities = res, error: () => {} });
+    this.http.get<any[]>(`${environment.apiUrl}/document-areas?activo=1`).subscribe({ next: res => this.areas = res, error: () => {} });
   }
 
   loadDocuments() {
     this.loading = true;
-    this.http.get<any[]>(`${environment.apiUrl}/internal-docs`).subscribe({
+    this.http.get<any[]>(`${environment.apiUrl}/document-envios`).subscribe({
       next: (res) => {
-        console.log('Docs received:', res);
         this.documents = res;
         this.loading = false;
       },
@@ -74,81 +75,51 @@ export class InternalDocsComponent implements OnInit {
   }
 
   get filteredDocuments() {
-    const activeRole = this.authService.getActiveRole();
-    const isSuperadmin = activeRole === 'superadmin';
-    const userEmail = this.authService.getUser()?.email;
-
-    let filtered = this.documents.filter(doc => {
-      // 1. View / Role Filter
-      let roleMatch = isSuperadmin;
-      if (!isSuperadmin) {
-        if (doc.sender?.email === userEmail) {
-          roleMatch = true;
-        } else if (activeRole === 'operativo') {
-          if (doc.target_role === 'operativo') {
-            roleMatch = true;
-          } else if (doc.sender?.roles?.includes('operativo')) {
-            roleMatch = true;
-          } else if (doc.target_role === 'gerente' && doc.estado === 'pendiente' && doc.sender?.roles?.includes('coordinador_comercial')) {
-            roleMatch = true;
-          }
-        } else if (activeRole === 'contable' && doc.target_role === 'contable') {
-          roleMatch = true;
-        } else if (activeRole === 'gerente') {
-          if (doc.target_role === 'gerente') {
-            const isFromCoordinator = doc.sender?.roles?.includes('coordinador_comercial');
-            if (!isFromCoordinator || doc.estado !== 'pendiente') {
-              roleMatch = true;
-            }
-          }
-        }
-      }
-
-      // 2. Tab Filter
+    let filtered = this.documents.filter(envio => {
+      // 1. Tab Filter
       let tabMatch = false;
       if (this.currentTab === 'pendientes') {
-        tabMatch = doc.estado === 'pendiente' || doc.estado === 'visto_bueno' || doc.estado === 'visto';
+        tabMatch = envio.estado_general === 'pendiente' || envio.estado_general === 'en_proceso';
       } else {
-        tabMatch = doc.estado === 'procesado' || doc.estado === 'rechazado';
+        tabMatch = envio.estado_general === 'procesado' || envio.estado_general === 'devuelto';
       }
 
-      // 3. Search Filter
+      // 2. Search Filter
       let searchMatch = true;
       if (this.searchTerm) {
         const term = this.searchTerm.toLowerCase();
         searchMatch = (
-          (doc.titulo && doc.titulo.toLowerCase().includes(term)) ||
-          (doc.sender?.name && doc.sender.name.toLowerCase().includes(term)) ||
-          (doc.category?.nombre && doc.category.nombre.toLowerCase().includes(term)) ||
-          (doc.mensaje && doc.mensaje.toLowerCase().includes(term))
+          (envio.titulo && envio.titulo.toLowerCase().includes(term)) ||
+          (envio.sender?.name && envio.sender.name.toLowerCase().includes(term)) ||
+          (envio.category?.nombre && envio.category.nombre.toLowerCase().includes(term)) ||
+          (envio.observaciones && envio.observaciones.toLowerCase().includes(term))
         );
       }
 
-      // 4. Date Range Filter
+      // 3. Date Range Filter
       let dateMatch = true;
       if (this.filterStartDate || this.filterEndDate) {
-        // Obtenemos el timestamp del campo last_modified (que añadimos en el backend)
-        const docDate = new Date(doc.last_modified).getTime();
-        
+        const docDate = new Date(envio.updated_at || envio.created_at).getTime();
+
         if (this.filterStartDate) {
           const start = new Date(this.filterStartDate + 'T00:00:00').getTime();
           if (docDate < start) dateMatch = false;
         }
-        
+
         if (this.filterEndDate) {
           const end = new Date(this.filterEndDate + 'T23:59:59').getTime();
           if (docDate > end) dateMatch = false;
         }
       }
 
-      return roleMatch && tabMatch && searchMatch && dateMatch;
+      return tabMatch && searchMatch && dateMatch;
     });
 
-    // 4. Sorting
+    // Sorting
     filtered.sort((a, b) => {
       let valA = this.getSortValue(a, this.sortColumn);
       let valB = this.getSortValue(b, this.sortColumn);
-      
+
       if (valA < valB) return this.sortDirection === 'asc' ? -1 : 1;
       if (valA > valB) return this.sortDirection === 'asc' ? 1 : -1;
       return 0;
@@ -157,115 +128,68 @@ export class InternalDocsComponent implements OnInit {
     return filtered;
   }
 
-  getSortValue(doc: any, column: string) {
+  getSortValue(envio: any, column: string) {
     switch(column) {
-      case 'titulo': return doc.titulo?.toLowerCase() || '';
-      case 'remitente': return doc.sender?.name?.toLowerCase() || '';
-      case 'categoria': return doc.category?.nombre?.toLowerCase() || '';
-      case 'prioridad': return doc.priority?.nombre?.toLowerCase() || '';
-      case 'estado': return doc.estado?.toLowerCase() || '';
-      case 'created_at': default: return new Date(doc.created_at).getTime();
+      case 'titulo': return envio.titulo?.toLowerCase() || '';
+      case 'remitente': return envio.sender?.name?.toLowerCase() || '';
+      case 'categoria': return envio.category?.nombre?.toLowerCase() || '';
+      case 'prioridad': return envio.priority?.nombre?.toLowerCase() || '';
+      case 'estado': return envio.estado_general?.toLowerCase() || '';
+      case 'created_at': default: return new Date(envio.created_at).getTime();
     }
-  }
-
-  getFolderTitle(doc: any): string {
-    if (doc.batch_id && doc.original_name && doc.titulo) {
-      const suffix = ' - ' + doc.original_name;
-      if (doc.titulo.endsWith(suffix)) {
-        return doc.titulo.substring(0, doc.titulo.length - suffix.length);
-      }
-    }
-    return doc.titulo;
-  }
-
-  get groupedDocuments(): any[] {
-    const grouped: any[] = [];
-    const batchMap = new Map<string, any>();
-
-    for (const doc of this.filteredDocuments) {
-      const hasMultiBatch = doc.batch_id && this.documents.filter(d => d.batch_id === doc.batch_id).length > 1;
-
-      if (hasMultiBatch) {
-        let folder = batchMap.get(doc.batch_id!);
-        if (!folder) {
-          folder = {
-            isFolder: true,
-            batch_id: doc.batch_id,
-            titulo: this.getFolderTitle(doc),
-            created_at: doc.created_at,
-            sender: doc.sender,
-            target_role: doc.target_role,
-            category: doc.category,
-            mensaje: doc.mensaje,
-            priority: doc.priority,
-            estado: doc.estado,
-            children: []
-          };
-          batchMap.set(doc.batch_id!, folder);
-          grouped.push(folder);
-        }
-        folder.children.push(doc);
-      } else {
-        grouped.push(doc);
-      }
-    }
-
-    // Consolidated status
-    for (const folder of batchMap.values()) {
-      const states = folder.children.map((c: any) => c.estado);
-      const uniqueStates = Array.from(new Set(states));
-      if (uniqueStates.length === 1) {
-        folder.estado = uniqueStates[0];
-      } else if (uniqueStates.includes('pendiente')) {
-        folder.estado = 'pendiente';
-      } else if (uniqueStates.includes('visto_bueno')) {
-        folder.estado = 'visto_bueno';
-      } else {
-        folder.estado = uniqueStates[0];
-      }
-    }
-
-    return grouped;
   }
 
   get pagedDocuments() {
     const startIndex = (this.currentPage - 1) * this.itemsPerPage;
-    return this.groupedDocuments.slice(startIndex, startIndex + this.itemsPerPage);
+    return this.filteredDocuments.slice(startIndex, startIndex + this.itemsPerPage);
   }
 
   get totalPages() {
-    return Math.ceil(this.groupedDocuments.length / this.itemsPerPage);
+    return Math.ceil(this.filteredDocuments.length / this.itemsPerPage);
   }
 
   get showingFrom() {
-    return this.groupedDocuments.length === 0 ? 0 : (this.currentPage - 1) * this.itemsPerPage + 1;
+    return this.filteredDocuments.length === 0 ? 0 : (this.currentPage - 1) * this.itemsPerPage + 1;
   }
 
   get showingTo() {
-    return Math.min(this.currentPage * this.itemsPerPage, this.groupedDocuments.length);
+    return Math.min(this.currentPage * this.itemsPerPage, this.filteredDocuments.length);
+  }
+
+  // Ruta de aprobación: "1. Contabilidad → 2. Gerencia"
+  rutaLabel(envio: any): string {
+    if (!envio.steps || envio.steps.length === 0) return '-';
+    return envio.steps.map((s: any) => `${s.orden}. ${s.area?.nombre}`).join(' → ');
+  }
+
+  // Área responsable del paso actual
+  pasoActualLabel(envio: any): string {
+    const step = envio.steps?.find((s: any) => s.orden === envio.current_step_order);
+    return step?.area?.nombre || '-';
   }
 
   // SLA Calculation
-  getRemainingTime(doc: any): { text: string, status: 'ok' | 'warning' | 'critical' | 'expired' | 'none' } {
-    if (!doc.priority || !doc.priority.horas_vencimiento || doc.estado !== 'pendiente') {
+  getRemainingTime(envio: any): { text: string, status: 'ok' | 'warning' | 'critical' | 'expired' | 'none' } {
+    const enCurso = envio.estado_general === 'pendiente' || envio.estado_general === 'en_proceso';
+    if (!envio.priority || !envio.priority.horas_vencimiento || !enCurso) {
       return { text: '-', status: 'none' };
     }
-    
-    const createdAt = new Date(doc.created_at).getTime();
-    const expiresAt = createdAt + (doc.priority.horas_vencimiento * 60 * 60 * 1000);
+
+    const createdAt = new Date(envio.created_at).getTime();
+    const expiresAt = createdAt + (envio.priority.horas_vencimiento * 60 * 60 * 1000);
     const now = new Date().getTime();
     const remainingMs = expiresAt - now;
-    
+
     if (remainingMs <= 0) {
       return { text: 'Vencido', status: 'expired' };
     }
-    
+
     const hours = Math.floor(remainingMs / (1000 * 60 * 60));
     const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     // Critical if <= 2 hours remaining
     const status = hours <= 2 ? 'critical' : (hours <= 6 ? 'warning' : 'ok');
-    
+
     return { text: `${hours}h ${minutes}m`, status };
   }
 
@@ -293,10 +217,134 @@ export class InternalDocsComponent implements OnInit {
     this.filterEndDate = '';
   }
 
+  toggleExpand(envioId: number, event: Event): void {
+    event.stopPropagation();
+    if (this.expandedEnvios.has(envioId)) {
+      this.expandedEnvios.delete(envioId);
+    } else {
+      this.expandedEnvios.add(envioId);
+    }
+  }
+
+  isExpanded(envioId: number): boolean {
+    return this.expandedEnvios.has(envioId);
+  }
+
+  private currentStepOf(envio: any): any {
+    return envio.steps?.find((s: any) => s.orden === envio.current_step_order);
+  }
+
+  canDeleteEnvio(envio: any): boolean {
+    const activeRole = this.authService.getActiveRole();
+    if (activeRole === 'superadmin') return true;
+    return envio.sender_id === this.currentUser?.id && envio.estado_general === 'pendiente';
+  }
+
+  deleteEnvio(envio: any) {
+    Swal.fire({
+      title: '¿Eliminar envío?',
+      text: 'Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.http.delete(`${environment.apiUrl}/document-envios/${envio.id}`).subscribe({
+          next: () => {
+            Swal.fire('Eliminado', 'El envío ha sido eliminado.', 'success');
+            this.loadDocuments();
+          },
+          error: (err) => {
+            Swal.fire('Error', err.error?.message || 'No se pudo eliminar el envío.', 'error');
+          }
+        });
+      }
+    });
+  }
+
+  canProcessEnvio(envio: any): boolean {
+    const activeRole = this.authService.getActiveRole();
+    const enCurso = envio.estado_general === 'pendiente' || envio.estado_general === 'en_proceso';
+    if (!enCurso) return false;
+
+    if (activeRole === 'superadmin') return true;
+
+    const step = this.currentStepOf(envio);
+    return !!step && step.estado === 'pendiente' && step.area?.codigo === activeRole;
+  }
+
+  procesarPaso(envio: any) {
+    const step = this.currentStepOf(envio);
+    if (!step) return;
+
+    Swal.fire({
+      title: '¿Procesar este paso?',
+      text: `Se marcará como procesado el paso "${step.area?.nombre}" del documento "${envio.titulo}".`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, procesar',
+      cancelButtonText: 'Cancelar'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.ejecutarAccionPaso(envio, step, 'procesar');
+      }
+    });
+  }
+
+  devolverPaso(envio: any) {
+    const step = this.currentStepOf(envio);
+    if (!step) return;
+
+    Swal.fire({
+      title: 'Devolver documento',
+      text: 'Esta acción es un rechazo: el envío no continúa por la ruta y el remitente deberá subir un documento nuevo.',
+      input: 'textarea',
+      inputPlaceholder: 'Escriba el motivo de la devolución...',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Confirmar Devolución',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#d33',
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return 'Debe registrar una observación para devolver el documento.';
+        }
+        return null;
+      }
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.ejecutarAccionPaso(envio, step, 'devolver', result.value);
+      }
+    });
+  }
+
+  private ejecutarAccionPaso(envio: any, step: any, accion: 'procesar' | 'devolver', observacion?: string) {
+    this.loading = true;
+    this.http.patch(`${environment.apiUrl}/document-envios/${envio.id}/steps/${step.id}`, {
+      accion,
+      observacion
+    }).subscribe({
+      next: () => {
+        this.loading = false;
+        Swal.fire('¡Listo!', accion === 'procesar' ? 'El paso fue procesado correctamente.' : 'El documento fue devuelto.', 'success');
+        this.loadDocuments();
+      },
+      error: (err) => {
+        this.loading = false;
+        Swal.fire('Error', err.error?.message || 'No se pudo actualizar el paso.', 'error');
+      }
+    });
+  }
+
   async openUploadModal() {
     const categoryOptions = this.categories.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
     const priorityOptions = this.priorities.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
     let selectedFiles: File[] = [];
+    let ruta: any[] = [];
+    const availableAreas = this.areas;
 
     const { value: formValues } = await Swal.fire({
       title: 'Nuevo Envío de Documento',
@@ -306,29 +354,30 @@ export class InternalDocsComponent implements OnInit {
             <label style="display:block; margin-bottom:5px; font-weight:600;">Título del Documento</label>
             <input id="swal-titulo" class="pro-input" style="width:100%" placeholder="Ej: Reporte Mensual">
           </div>
-          
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 1rem;">
-            <div class="pro-input-group">
-              <label style="display:block; margin-bottom:5px; font-weight:600;">Enviar a:</label>
-              <select id="swal-target" class="pro-input" style="width:100%">
-                <option value="contable">CONTABILIDAD</option>
-                <option value="gerente">GERENCIA PSL</option>
-                <option value="operativo">ÁREA ADMINISTRATIVA</option>
-              </select>
+
+          <div class="pro-input-group" style="margin-bottom: 1rem;">
+            <label style="display:block; margin-bottom:5px; font-weight:600;">Ruta de aprobación</label>
+            <div style="font-size:0.8rem;color:#64748b;margin-bottom:6px;">Seleccione las áreas y defina el orden de revisión del documento.</div>
+            <div id="ruta-list-container" style="margin-bottom:8px;"></div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <select id="ruta-area-select" class="pro-input" style="flex:1;"></select>
+              <button type="button" id="btn-add-area" class="btn-pro secondary sm" style="white-space:nowrap; padding: 6px 12px; height: 36px;">+ Agregar área a la ruta</button>
             </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 1rem;">
             <div class="pro-input-group">
               <label style="display:block; margin-bottom:5px; font-weight:600;">Prioridad</label>
               <select id="swal-priority" class="pro-input" style="width:100%">
                 ${priorityOptions}
               </select>
             </div>
-          </div>
-
-          <div class="pro-input-group" style="margin-bottom: 1rem;">
-            <label style="display:block; margin-bottom:5px; font-weight:600;">Categoría</label>
-            <select id="swal-category" class="pro-input" style="width:100%">
-              ${categoryOptions}
-            </select>
+            <div class="pro-input-group">
+              <label style="display:block; margin-bottom:5px; font-weight:600;">Categoría</label>
+              <select id="swal-category" class="pro-input" style="width:100%">
+                ${categoryOptions}
+              </select>
+            </div>
           </div>
 
           <div class="pro-input-group" style="margin-bottom: 1rem;">
@@ -359,7 +408,7 @@ export class InternalDocsComponent implements OnInit {
         const fileInput = Swal.getHtmlContainer()?.querySelector('#swal-file') as HTMLInputElement;
         const listContainer = Swal.getHtmlContainer()?.querySelector('#file-list-container');
         const counterSpan = Swal.getHtmlContainer()?.querySelector('#files-counter');
-        
+
         const updateFileList = () => {
           if (!listContainer || !counterSpan) return;
           counterSpan.textContent = `${selectedFiles.length} archivo(s)`;
@@ -376,7 +425,6 @@ export class InternalDocsComponent implements OnInit {
             </div>
           `).join('');
 
-          // Attach delete events
           listContainer.querySelectorAll('.btn-remove-file').forEach(btn => {
             btn.addEventListener('click', (e) => {
               const idx = parseInt((e.currentTarget as HTMLElement).getAttribute('data-index') || '0');
@@ -397,14 +445,88 @@ export class InternalDocsComponent implements OnInit {
             updateFileList();
           }
         });
+
+        // --- Ruta de aprobación: agregar, reordenar y quitar áreas ---
+        const rutaContainer = Swal.getHtmlContainer()?.querySelector('#ruta-list-container');
+        const areaSelect = Swal.getHtmlContainer()?.querySelector('#ruta-area-select') as HTMLSelectElement;
+        const btnAddArea = Swal.getHtmlContainer()?.querySelector('#btn-add-area');
+
+        const updateAreaSelectOptions = () => {
+          if (!areaSelect) return;
+          const usedIds = new Set(ruta.map(a => a.id));
+          const pendientes = availableAreas.filter(a => !usedIds.has(a.id));
+          areaSelect.innerHTML = pendientes.length === 0
+            ? '<option value="">No hay más áreas disponibles</option>'
+            : pendientes.map(a => `<option value="${a.id}">${a.nombre}</option>`).join('');
+        };
+
+        const renderRuta = () => {
+          if (!rutaContainer) return;
+          if (ruta.length === 0) {
+            rutaContainer.innerHTML = '<i style="color: #94a3b8; display: block; padding: 6px 0;">Ningún área agregada todavía.</i>';
+          } else {
+            rutaContainer.innerHTML = ruta.map((area, idx) => `
+              <div style="display:flex;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;padding:6px 10px;border-radius:6px;margin-bottom:6px;">
+                <span style="font-weight:700; min-width:18px;">${idx + 1}</span>
+                <span style="flex:1; font-weight:500; color:#334155;">${area.nombre}</span>
+                <button type="button" class="btn-move-up" data-index="${idx}" ${idx === 0 ? 'disabled' : ''} style="background:none;border:none;cursor:pointer;padding:2px 6px;">↑</button>
+                <button type="button" class="btn-move-down" data-index="${idx}" ${idx === ruta.length - 1 ? 'disabled' : ''} style="background:none;border:none;cursor:pointer;padding:2px 6px;">↓</button>
+                <button type="button" class="btn-remove-area" data-index="${idx}" style="background:none;border:none;color:#ef4444;cursor:pointer;padding:2px 6px;">✕</button>
+              </div>
+            `).join('');
+
+            rutaContainer.querySelectorAll('.btn-move-up').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                const idx = parseInt((e.currentTarget as HTMLElement).getAttribute('data-index') || '0');
+                if (idx > 0) {
+                  [ruta[idx - 1], ruta[idx]] = [ruta[idx], ruta[idx - 1]];
+                  renderRuta();
+                }
+              });
+            });
+            rutaContainer.querySelectorAll('.btn-move-down').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                const idx = parseInt((e.currentTarget as HTMLElement).getAttribute('data-index') || '0');
+                if (idx < ruta.length - 1) {
+                  [ruta[idx + 1], ruta[idx]] = [ruta[idx], ruta[idx + 1]];
+                  renderRuta();
+                }
+              });
+            });
+            rutaContainer.querySelectorAll('.btn-remove-area').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                const idx = parseInt((e.currentTarget as HTMLElement).getAttribute('data-index') || '0');
+                ruta.splice(idx, 1);
+                renderRuta();
+              });
+            });
+          }
+          updateAreaSelectOptions();
+        };
+
+        btnAddArea?.addEventListener('click', () => {
+          const id = parseInt(areaSelect.value);
+          if (!id) return;
+          const area = availableAreas.find(a => a.id === id);
+          if (area && !ruta.some(r => r.id === id)) {
+            ruta.push(area);
+            renderRuta();
+          }
+        });
+
+        renderRuta();
       },
       preConfirm: () => {
+        if (!ruta.length) {
+          Swal.showValidationMessage('Debe agregar al menos un área a la ruta de aprobación.');
+          return false;
+        }
         return {
           titulo: (document.getElementById('swal-titulo') as HTMLInputElement).value,
-          target_role: (document.getElementById('swal-target') as HTMLSelectElement).value,
+          ruta: ruta.map(a => a.id),
           prioridad_id: (document.getElementById('swal-priority') as HTMLSelectElement).value,
           categoria_id: (document.getElementById('swal-category') as HTMLSelectElement).value,
-          mensaje: (document.getElementById('swal-mensaje') as HTMLTextAreaElement).value,
+          observaciones: (document.getElementById('swal-mensaje') as HTMLTextAreaElement).value,
           archivos: selectedFiles
         };
       }
@@ -418,461 +540,64 @@ export class InternalDocsComponent implements OnInit {
 
       const formData = new FormData();
       formData.append('titulo', formValues.titulo);
-      formData.append('target_role', formValues.target_role);
+      formValues.ruta.forEach((areaId: number) => formData.append('ruta[]', String(areaId)));
       formData.append('prioridad_id', formValues.prioridad_id);
       formData.append('categoria_id', formValues.categoria_id);
-      formData.append('mensaje', formValues.mensaje);
-      
+      formData.append('observaciones', formValues.observaciones);
+
       formValues.archivos.forEach((file: File) => {
         formData.append('archivos[]', file, file.name);
       });
 
       this.loading = true;
-      this.http.post(`${environment.apiUrl}/internal-docs`, formData).subscribe({
+      this.http.post(`${environment.apiUrl}/document-envios`, formData).subscribe({
         next: () => {
-          Swal.fire('¡Éxito!', 'Documento(s) enviado(s) correctamente.', 'success');
+          Swal.fire('¡Éxito!', 'El documento fue enviado correctamente y quedó pendiente en el primer paso de aprobación.', 'success');
           this.loadDocuments();
         },
         error: (err) => {
-          Swal.fire('Error', err.error.message || 'Error al subir los archivos.', 'error');
+          Swal.fire('Error', err.error?.message || 'Error al enviar el documento.', 'error');
           this.loading = false;
         }
       });
     }
   }
 
-  isDocSelected(id: number): boolean {
-    return this.selectedDocIds.has(id);
-  }
-
-  toggleSelectDoc(id: number): void {
-    if (this.selectedDocIds.has(id)) {
-      this.selectedDocIds.delete(id);
-    } else {
-      this.selectedDocIds.add(id);
-    }
-  }
-
-  toggleSelectAll(): void {
-    const docs = this.filteredDocuments;
-    if (this.isAllSelected()) {
-      docs.forEach(doc => this.selectedDocIds.delete(doc.id));
-    } else {
-      docs.forEach(doc => {
-        if (doc.estado === 'pendiente' && (doc.target_role === this.authService.getActiveRole() || doc.sender_id == this.currentUser?.id || this.authService.getActiveRole() === 'superadmin')) {
-          this.selectedDocIds.add(doc.id);
-        }
-      });
-    }
-  }
-
-  isAllSelected(): boolean {
-    const docs = this.filteredDocuments.filter(doc => doc.estado === 'pendiente' && (doc.target_role === this.authService.getActiveRole() || doc.sender_id == this.currentUser?.id || this.authService.getActiveRole() === 'superadmin'));
-    if (docs.length === 0) return false;
-    return docs.every(doc => this.selectedDocIds.has(doc.id));
-  }
-
-  toggleBatch(batchId: string, event: Event): void {
-    event.stopPropagation();
-    if (this.expandedBatches.has(batchId)) {
-      this.expandedBatches.delete(batchId);
-    } else {
-      this.expandedBatches.add(batchId);
-    }
-  }
-
-  isBatchExpanded(batchId: string): boolean {
-    return this.expandedBatches.has(batchId);
-  }
-
-  isFolderSelected(folder: any): boolean {
-    if (!folder.children || folder.children.length === 0) return false;
-    return folder.children.every((child: any) => this.selectedDocIds.has(child.id));
-  }
-
-  isFolderIndeterminate(folder: any): boolean {
-    if (!folder.children || folder.children.length === 0) return false;
-    const selectedCount = folder.children.filter((child: any) => this.selectedDocIds.has(child.id)).length;
-    return selectedCount > 0 && selectedCount < folder.children.length;
-  }
-
-  toggleSelectFolder(folder: any, event: any): void {
-    const checked = event.target.checked;
-    folder.children.forEach((child: any) => {
-      if (checked) {
-        if (child.estado === 'pendiente' && (child.target_role === this.authService.getActiveRole() || child.sender_id == this.currentUser?.id || this.authService.getActiveRole() === 'superadmin')) {
-          this.selectedDocIds.add(child.id);
-        }
-      } else {
-        this.selectedDocIds.delete(child.id);
-      }
-    });
-  }
-
-  docHasAction(doc: any, type: 'process' | 'visto_bueno' | 'approve' | 'delete' | 'reject'): boolean {
-    const activeRole = this.authService.getActiveRole();
-    const isSuperadmin = activeRole === 'superadmin';
-    
-    switch (type) {
-      case 'delete':
-        if (isSuperadmin) return true;
-        return doc.sender_id == this.currentUser?.id && doc.target_role !== activeRole && doc.estado === 'pendiente';
-      case 'process':
-        return doc.target_role === activeRole && doc.estado === 'pendiente' && !(activeRole === 'operativo' && doc.target_role === 'gerente');
-      case 'visto_bueno':
-        return activeRole === 'operativo' && doc.target_role === 'gerente' && doc.estado === 'pendiente' && doc.sender?.roles?.includes('coordinador_comercial');
-      case 'approve':
-        return activeRole === 'gerente' && doc.target_role === 'gerente' && doc.estado === 'visto_bueno';
-      case 'reject':
-        const canProc = doc.target_role === activeRole && doc.estado === 'pendiente' && !(activeRole === 'operativo' && doc.target_role === 'gerente');
-        const canVB = activeRole === 'operativo' && doc.target_role === 'gerente' && doc.estado === 'pendiente' && doc.sender?.roles?.includes('coordinador_comercial');
-        const canApp = activeRole === 'gerente' && doc.target_role === 'gerente' && doc.estado === 'visto_bueno';
-        return canProc || canVB || canApp;
-      default:
-        return false;
-    }
-  }
-
-  folderHasAction(folder: any, type: 'process' | 'visto_bueno' | 'approve' | 'delete' | 'reject'): boolean {
-    return folder.children && folder.children.some((child: any) => this.docHasAction(child, type));
-  }
-
-  deleteFolder(folder: any) {
-    const ids = folder.children.map((child: any) => child.id);
-    if (ids.length === 0) return;
-
-    Swal.fire({
-      title: '¿Eliminar carpeta completa?',
-      text: `Esta acción eliminará todos los ${ids.length} documentos de la carpeta "${folder.titulo}" y no se puede deshacer.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#dc2626',
-      cancelButtonColor: '#64748b',
-      confirmButtonText: 'Sí, eliminar todo',
-      cancelButtonText: 'Cancelar'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        this.loading = true;
-        this.http.delete(`${environment.apiUrl}/internal-docs/bulk-delete`, {
-          body: { ids }
-        }).subscribe({
-          next: () => {
-            this.loading = false;
-            ids.forEach((id: number) => this.selectedDocIds.delete(id));
-            Swal.fire('Eliminados', 'La carpeta y sus documentos han sido eliminados.', 'success');
-            this.loadDocuments();
-          },
-          error: (err) => {
-            this.loading = false;
-            Swal.fire('Error', err.error?.message || 'No se pudieron eliminar los documentos.', 'error');
-          }
-        });
-      }
-    });
-  }
-
-  updateFolderStatus(folder: any, status: string) {
-    let validChildren = folder.children;
-    if (status === 'procesado') {
-      validChildren = folder.children.filter((child: any) => this.docHasAction(child, 'process') || this.docHasAction(child, 'approve'));
-    } else if (status === 'visto_bueno') {
-      validChildren = folder.children.filter((child: any) => this.docHasAction(child, 'visto_bueno'));
-    } else if (status === 'rechazado') {
-      validChildren = folder.children.filter((child: any) => this.docHasAction(child, 'reject'));
-    }
-
-    const ids = validChildren.map((child: any) => child.id);
-    if (ids.length === 0) return;
-
-    if (status === 'rechazado') {
-      Swal.fire({
-        title: 'Motivo de Rechazo de la Carpeta',
-        input: 'textarea',
-        inputPlaceholder: 'Escriba el motivo del rechazo para todos los documentos de la carpeta...',
-        showCancelButton: true,
-        confirmButtonText: 'Confirmar Rechazo',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#d33',
-        inputValidator: (value) => {
-          if (!value || !value.trim()) {
-            return '¡Debe escribir un motivo de rechazo!';
-          }
-          return null;
-        }
-      }).then((result) => {
-        if (result.isConfirmed) {
-          this.executeBulkUpdate(ids, 'rechazado', result.value);
-        }
-      });
-    } else if (status === 'visto_bueno') {
-      Swal.fire({
-        title: '¿Dar Visto Bueno a la carpeta completa?',
-        text: `Se dará visto bueno a los ${ids.length} documentos pendientes de la carpeta "${folder.titulo}".`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, dar Visto Bueno',
-        cancelButtonText: 'Cancelar'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          this.executeBulkUpdate(ids, 'visto_bueno');
-        }
-      });
-    } else {
-      Swal.fire({
-        title: '¿Procesar carpeta completa?',
-        text: `Se marcarán como procesados los ${ids.length} documentos de la carpeta "${folder.titulo}".`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, procesar todo',
-        cancelButtonText: 'Cancelar'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          this.executeBulkUpdate(ids, 'procesado');
-        }
-      });
-    }
-  }
-
-  downloadFolder(folder: any) {
-    if (!folder.children || folder.children.length === 0) return;
-    folder.children.forEach((child: any, index: number) => {
-      setTimeout(() => {
-        this.downloadFile(child);
-      }, index * 250);
-    });
-  }
-
-  canDeleteSelected(): boolean {
-    const ids = Array.from(this.selectedDocIds);
-    if (ids.length === 0) return false;
-    const isSuperadmin = this.authService.getActiveRole() === 'superadmin';
-    return ids.every(id => {
-      const doc = this.documents.find(d => d.id === id);
-      if (!doc) return false;
-      if (isSuperadmin) return true;
-      return doc.sender_id == this.currentUser?.id && doc.estado === 'pendiente';
-    });
-  }
-
-  bulkDelete() {
-    const ids = Array.from(this.selectedDocIds);
-    if (ids.length === 0) return;
-
-    Swal.fire({
-      title: '¿Eliminar documentos seleccionados?',
-      text: `Esta acción eliminará ${ids.length} documento(s) y no se puede deshacer.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#dc2626',
-      cancelButtonColor: '#64748b',
-      confirmButtonText: 'Sí, eliminar todos',
-      cancelButtonText: 'Cancelar'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        this.loading = true;
-        this.http.delete(`${environment.apiUrl}/internal-docs/bulk-delete`, {
-          body: { ids }
-        }).subscribe({
-          next: () => {
-            this.loading = false;
-            this.selectedDocIds.clear();
-            Swal.fire('Eliminados', 'Los documentos han sido eliminados correctamente.', 'success');
-            this.loadDocuments();
-          },
-          error: (err) => {
-            this.loading = false;
-            Swal.fire('Error', err.error?.message || 'No se pudieron eliminar los documentos.', 'error');
-          }
-        });
-      }
-    });
-  }
-
-  bulkUpdateStatus(status: string) {
-    const ids = Array.from(this.selectedDocIds);
-    if (ids.length === 0) return;
-
-    if (status === 'rechazado') {
-      Swal.fire({
-        title: 'Motivo de Rechazo Masivo',
-        input: 'textarea',
-        inputPlaceholder: 'Escriba el motivo del rechazo para todos los documentos aquí...',
-        showCancelButton: true,
-        confirmButtonText: 'Confirmar Rechazo Masivo',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#d33',
-        inputValidator: (value) => {
-          if (!value || !value.trim()) {
-            return '¡Debe escribir un motivo de rechazo!';
-          }
-          return null;
-        }
-      }).then((result) => {
-        if (result.isConfirmed) {
-          this.executeBulkUpdate(ids, 'rechazado', result.value);
-        }
-      });
-    } else {
-      Swal.fire({
-        title: '¿Procesar documentos seleccionados?',
-        text: `Se marcarán como procesados ${ids.length} documentos.`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Sí, procesar todos',
-        cancelButtonText: 'Cancelar'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          this.executeBulkUpdate(ids, 'procesado');
-        }
-      });
-    }
-  }
-
-  executeBulkUpdate(ids: number[], status: string, motivoRechazo?: string) {
-    this.loading = true;
-    this.http.patch(`${environment.apiUrl}/internal-docs/bulk-status`, {
-      ids,
-      estado: status,
-      motivo_rechazo: motivoRechazo
-    }).subscribe({
-      next: () => {
-        this.loading = false;
-        this.selectedDocIds.clear();
-        Swal.fire('¡Éxito!', 'Documentos actualizados en bloque correctamente.', 'success');
-        this.loadDocuments();
-      },
-      error: (err) => {
-        this.loading = false;
-        Swal.fire('Error', 'No se pudieron actualizar los documentos.', 'error');
-        console.error(err);
-      }
-    });
-  }
-
-  processBatch(batchId: string) {
-    if (!batchId) return;
-    const batchDocs = this.documents.filter(doc => doc.batch_id === batchId && doc.estado === 'pendiente' && doc.target_role === this.authService.getActiveRole());
-    const ids = batchDocs.map(doc => doc.id);
-    if (ids.length === 0) {
-      Swal.fire('Información', 'No hay documentos pendientes por procesar en este lote.', 'info');
-      return;
-    }
-
-    Swal.fire({
-      title: '¿Procesar lote completo?',
-      text: `Se marcarán como procesados todos los ${ids.length} documentos de este lote.`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Sí, procesar lote',
-      cancelButtonText: 'Cancelar'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        this.executeBulkUpdate(ids, 'procesado');
-      }
-    });
-  }
-
-  updateStatus(doc: any, status: string) {
-    if (status === 'rechazado') {
-      Swal.fire({
-        title: 'Motivo de Rechazo',
-        input: 'textarea',
-        inputPlaceholder: 'Escriba el motivo del rechazo aquí...',
-        inputAttributes: {
-          'aria-label': 'Escriba el motivo del rechazo aquí'
-        },
-        showCancelButton: true,
-        confirmButtonText: 'Confirmar Rechazo',
-        cancelButtonText: 'Cancelar',
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#718096',
-        inputValidator: (value) => {
-          if (!value || !value.trim()) {
-            return '¡Debe escribir un motivo de rechazo!';
-          }
-          return null;
-        }
-      }).then((result) => {
-        if (result.isConfirmed) {
-          const motivo = result.value;
-          this.http.patch(`${environment.apiUrl}/internal-docs/${doc.id}/status`, { 
-            estado: 'rechazado',
-            motivo_rechazo: motivo 
-          }).subscribe(() => {
-            doc.estado = 'rechazado';
-            doc.motivo_rechazo = motivo;
-            Swal.fire('Rechazado', 'El documento ha sido rechazado.', 'success');
-          });
-        }
-      });
-    } else {
-      this.http.patch(`${environment.apiUrl}/internal-docs/${doc.id}/status`, { estado: status }).subscribe(() => {
-        doc.estado = status;
-        Swal.fire('Actualizado', `Estado cambiado a ${status}.`, 'success');
-      });
-    }
-  }
-
-  deleteDocument(doc: any) {
-    Swal.fire({
-      title: '¿Eliminar documento?',
-      text: 'Esta acción no se puede deshacer.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#dc2626',
-      cancelButtonColor: '#64748b',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        this.http.delete(`${environment.apiUrl}/internal-docs/${doc.id}`).subscribe({
-          next: () => {
-            Swal.fire('Eliminado', 'El documento ha sido eliminado.', 'success');
-            this.loadDocuments();
-          },
-          error: (err) => {
-            Swal.fire('Error', err.error?.message || 'No se pudo eliminar el documento.', 'error');
-          }
-        });
-      }
-    });
-  }
-
-  openViewer(doc: any) {
-    this.selectedDoc = doc;
+  openViewer(envio: any, file: any) {
+    this.selectedEnvio = envio;
+    this.selectedFile = file;
     const baseUrl = environment.apiUrl.replace('/api', '');
-    this.viewerUrl = `${baseUrl}/storage/${doc.archivo_path}`;
-    this.isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.archivo_path);
-    this.isExcel = /\.(xls|xlsx|csv)$/i.test(doc.archivo_path);
-    this.isWord = /\.(doc|docx)$/i.test(doc.archivo_path);
-    
+    this.viewerUrl = `${baseUrl}/storage/${file.path}`;
+    this.isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.path);
+    this.isExcel = /\.(xls|xlsx|csv)$/i.test(file.path);
+    this.isWord = /\.(doc|docx)$/i.test(file.path);
+
     if (this.isWord) {
       // Usar Google Docs Viewer oficial para previsualizar archivos Word
       const encodedUrl = encodeURIComponent(this.viewerUrl);
       this.viewerUrl = `https://docs.google.com/gview?url=${encodedUrl}&embedded=true`;
     }
-    
+
     this.showViewer = true;
   }
 
   closeViewer() {
     this.showViewer = false;
-    this.selectedDoc = null;
+    this.selectedEnvio = null;
+    this.selectedFile = null;
     this.viewerUrl = null;
     this.isWord = false;
   }
 
-  downloadFile(doc: any) {
-    const baseUrl = environment.apiUrl.replace('/api', '');
-    const url = `${baseUrl}/storage/${doc.archivo_path}`;
-    
-    // Hacemos un GET como Blob para forzar al navegador a respetar el nombre original
+  downloadFile(envio: any, file: any) {
+    const url = `${environment.apiUrl}/document-envios/${envio.id}/files/${file.id}/download`;
+
     this.http.get(url, { responseType: 'blob' }).subscribe({
       next: (blob) => {
         const blobUrl = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = blobUrl;
-        link.download = doc.original_name || doc.titulo;
+        link.download = file.original_name || envio.titulo;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -880,13 +605,7 @@ export class InternalDocsComponent implements OnInit {
       },
       error: (err) => {
         console.error('Error al descargar el archivo:', err);
-        // Fallback clásico en caso de error
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = doc.original_name || doc.titulo;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        Swal.fire('Error', 'No se pudo descargar el archivo.', 'error');
       }
     });
   }
