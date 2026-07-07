@@ -60,7 +60,7 @@
           </div>
           <div class="form-group">
             <label>P. Unit (Opcional)</label>
-            <input type="number" [(ngModel)]="newActividad.precio_unitario" placeholder="Usar sugerido">
+            <input type="text" inputmode="decimal" [(ngModel)]="newActividad.precio_unitario" milesSeparator placeholder="Usar sugerido">
           </div>
         </div>
         <div class="form-footer">
@@ -197,7 +197,7 @@
         <div class="mini-form">
           <input type="text" [(ngModel)]="newLabor.nombre" placeholder="Nombre de Labor">
           <input type="text" [(ngModel)]="newLabor.unidad" placeholder="Unidad (Jornal/Metro/etc)">
-          <input type="number" [(ngModel)]="newLabor.precio_sugerido" placeholder="Precio Sugerido">
+          <input type="text" inputmode="decimal" [(ngModel)]="newLabor.precio_sugerido" milesSeparator placeholder="Precio Sugerido">
           <button (click)="saveMaster('labores')">Crear Labor</button>
         </div>
         <ul class="master-list">

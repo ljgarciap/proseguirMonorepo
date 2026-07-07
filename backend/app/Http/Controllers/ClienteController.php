@@ -59,8 +59,13 @@ class ClienteController extends Controller
             'tipo_documento_id' => 'required|exists:document_types,id',
             'numero_documento' => 'required|string|unique:clientes,numero_documento',
             'pais' => 'required|string',
-            'departamento' => 'required|string',
-            'ciudad' => 'required|string',
+            'departamento_id' => 'required|exists:departamentos,id',
+            'ciudad_id' => [
+                'required',
+                Rule::exists('ciudades', 'id')->where(function ($query) use ($request) {
+                    $query->where('departamento_id', $request->departamento_id);
+                }),
+            ],
             'activo' => 'required|boolean',
         ];
 
@@ -117,8 +122,13 @@ class ClienteController extends Controller
                 Rule::unique('clientes', 'numero_documento')->ignore($cliente->id)
             ],
             'pais' => 'required|string',
-            'departamento' => 'required|string',
-            'ciudad' => 'required|string',
+            'departamento_id' => 'required|exists:departamentos,id',
+            'ciudad_id' => [
+                'required',
+                Rule::exists('ciudades', 'id')->where(function ($query) use ($request) {
+                    $query->where('departamento_id', $request->departamento_id);
+                }),
+            ],
             'activo' => 'required|boolean',
         ];
 

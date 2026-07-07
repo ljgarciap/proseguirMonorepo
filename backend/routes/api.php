@@ -58,6 +58,13 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
         // Visitas a Clientes (Superadmin, Gerente, Operativo)
         Route::apiResource('visitas', \App\Http\Controllers\VisitaController::class)
             ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
+
+        // Departamentos/Ciudades de Colombia (SCRUM-118)
+        Route::prefix('ubicaciones')->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo'])->group(function () {
+            Route::get('/departamentos', [\App\Http\Controllers\UbicacionController::class, 'departamentos']);
+            Route::get('/ciudades', [\App\Http\Controllers\UbicacionController::class, 'ciudades']);
+            Route::get('/ciudades/buscar', [\App\Http\Controllers\UbicacionController::class, 'buscarCiudades']);
+        });
         
         // Destinatarios (Superadmin only)
         Route::apiResource('destinatarios', \App\Http\Controllers\DestinatarioController::class)

@@ -3,12 +3,13 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
+import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-visitas',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MilesSeparatorDirective],
   template: `
     <div class="view-container">
       <header class="view-header">
@@ -151,9 +152,25 @@ import Swal from 'sweetalert2';
                   <input type="date" name="fecha" [(ngModel)]="form.fecha" required class="pro-input" />
                 </div>
                 
-                <div class="pro-input-group">
+                <div class="pro-input-group" style="position: relative;">
                   <label>Ciudad <span class="required">*</span></label>
-                  <input type="text" name="ciudad" [(ngModel)]="form.ciudad" required placeholder="Ciudad de la visita" class="pro-input" />
+                  <input
+                    type="text"
+                    name="ciudad"
+                    [(ngModel)]="form.ciudad"
+                    (input)="onCiudadInput()"
+                    (blur)="ocultarSugerenciasCiudadConDelay()"
+                    (focus)="onCiudadInput()"
+                    required
+                    placeholder="Ciudad de la visita"
+                    class="pro-input"
+                    autocomplete="off"
+                  />
+                  <ul *ngIf="mostrarSugerenciasCiudad && ciudadSugerencias.length" style="position: absolute; z-index: 20; top: 100%; left: 0; right: 0; background: white; border: 1px solid #cbd5e1; border-radius: 8px; margin-top: 4px; max-height: 200px; overflow-y: auto; list-style: none; padding: 4px 0; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
+                    <li *ngFor="let c of ciudadSugerencias" (mousedown)="seleccionarCiudad(c)" style="padding: 8px 12px; cursor: pointer; font-size: 0.9rem;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='white'">
+                      {{ c.nombre }}
+                    </li>
+                  </ul>
                 </div>
               </div>
 
@@ -219,7 +236,7 @@ import Swal from 'sweetalert2';
                 
                 <div class="pro-input-group">
                   <label>Monto solicitado <span class="required">*</span></label>
-                  <input type="number" name="monto_solicitado" [(ngModel)]="form.monto_solicitado" required min="0.01" placeholder="$ 0.00" class="pro-input" />
+                  <input type="text" inputmode="decimal" name="monto_solicitado" [(ngModel)]="form.monto_solicitado" milesSeparator required placeholder="$ 0" class="pro-input" />
                 </div>
               </div>
 
@@ -661,6 +678,9 @@ export class VisitasComponent implements OnInit {
   showModal = false;
   isEdit = false;
   editingId: number | null = null;
+  ciudadSugerencias: any[] = [];
+  mostrarSugerenciasCiudad = false;
+  private ciudadBuscarTimeout: any = null;
   form: any = {
     fecha: '',
     ciudad: '',
@@ -680,6 +700,35 @@ export class VisitasComponent implements OnInit {
   };
 
   constructor(private http: HttpClient) {}
+
+  onCiudadInput() {
+    clearTimeout(this.ciudadBuscarTimeout);
+    const q = (this.form.ciudad || '').trim();
+    if (q.length < 2) {
+      this.ciudadSugerencias = [];
+      this.mostrarSugerenciasCiudad = false;
+      return;
+    }
+    this.ciudadBuscarTimeout = setTimeout(() => {
+      this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/ciudades/buscar?q=${encodeURIComponent(q)}`).subscribe({
+        next: (data) => {
+          this.ciudadSugerencias = data;
+          this.mostrarSugerenciasCiudad = true;
+        },
+        error: () => {}
+      });
+    }, 250);
+  }
+
+  seleccionarCiudad(ciudad: any) {
+    this.form.ciudad = ciudad.nombre;
+    this.mostrarSugerenciasCiudad = false;
+  }
+
+  ocultarSugerenciasCiudadConDelay() {
+    // Delay para que el (mousedown) de la sugerencia alcance a dispararse antes del (blur).
+    setTimeout(() => { this.mostrarSugerenciasCiudad = false; }, 150);
+  }
 
   ngOnInit() {
     this.loadVisitas();

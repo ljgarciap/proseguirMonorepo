@@ -967,7 +967,7 @@
     <div class="modal-body">
       <div class="pro-input-group">
         <label>Monto del Crédito (COP)</label>
-        <input type="number" [(ngModel)]="newRequest.monto" placeholder="Ej: 15000000" class="pro-input">
+        <input type="text" inputmode="decimal" [(ngModel)]="newRequest.monto" milesSeparator placeholder="Ej: 15.000.000" class="pro-input">
       </div>
       
       <div class="pro-input-group">

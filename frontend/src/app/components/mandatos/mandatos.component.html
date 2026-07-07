@@ -228,7 +228,7 @@
       <div class="input-row">
         <div class="input-group" [class.has-error]="validationErrors['monto_estimado_total']">
           <label>Monto Estimado Total Operación</label>
-          <input type="text" [(ngModel)]="mandato.monto_estimado_total" name="monto_estimado_total" placeholder="Ej: $100.000.000">
+          <input type="text" inputmode="decimal" [(ngModel)]="mandato.monto_estimado_total" name="monto_estimado_total" milesSeparator tipoValorMiles="string" placeholder="Ej: $100.000.000">
           <span class="error-msg" *ngIf="validationErrors['monto_estimado_total']">{{ getFieldError('monto_estimado_total') }}</span>
         </div>
         <div class="input-group" [class.has-error]="validationErrors['plazo_estimado']">
@@ -532,7 +532,7 @@
             <div class="input-row-modal">
               <div class="input-group-modal">
                 <label>Monto Estimado Total Operación</label>
-                <input type="text" [(ngModel)]="editForm.monto_estimado_total" name="edit_monto_estimado_total">
+                <input type="text" inputmode="decimal" [(ngModel)]="editForm.monto_estimado_total" name="edit_monto_estimado_total" milesSeparator tipoValorMiles="string">
               </div>
               <div class="input-group-modal">
                 <label>Plazo Estimado por Operación</label>
