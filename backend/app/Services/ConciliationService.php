@@ -77,6 +77,11 @@ class ConciliationService
         $extracted = json_decode($jsonOutput, true);
         $text = $extracted['text'] ?? '';
 
+        return $this->parseBankText($text);
+    }
+
+    private function parseBankText($text)
+    {
         $data = [];
         foreach (explode("\n", $text) as $line) {
             $columns = explode('|', $line);
@@ -85,9 +90,16 @@ class ConciliationService
             $dateRaw = $columns[0];
             if (!preg_match('/^\d{4}\/\d{2}\/\d{2}$/', $dateRaw)) continue;
 
-            // Last column is always VALOR, regardless of how many
-            // REFERENCIA/DOCUMENTO columns are populated in between.
-            $valorRaw = array_pop($columns);
+            // La última columna siempre es VALOR, sin importar cuántas
+            // columnas de REFERENCIA/DOCUMENTO haya en el medio.
+            $valorRaw = trim(array_pop($columns));
+
+            // Un VALOR real siempre trae separador de miles y 2 decimales
+            // (ej: "26,700.00"). Si no cumple el formato, lo que llegó ahí
+            // es un número de REFERENCIA/DOCUMENTO pegado sin separador
+            // (o texto, ej. nombre de remitente Nequi) — no un monto.
+            if (!preg_match('/^-?[\d.,]*\d[.,]\d{2}$/', $valorRaw)) continue;
+
             $amount = $this->parseAmount($valorRaw);
             if ($amount <= 0) continue;
 
