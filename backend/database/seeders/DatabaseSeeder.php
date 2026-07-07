@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             SectorSeeder::class,
             AccountingParameterSeeder::class,
             ConfiguracionSeeder::class,
+            DocumentAreaSeeder::class,
         ]);
     }
 }

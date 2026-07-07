@@ -129,6 +129,9 @@ jobs:
             # 5b. Seeder idempotente de configuraciones (updateOrCreate, seguro en cada deploy)
             docker exec factoring_backend php artisan db:seed --class=ConfiguracionSeeder --force
 
+            # 5c. Seeder idempotente de áreas de Bandeja Interna (firstOrCreate, seguro en cada deploy)
+            docker exec factoring_backend php artisan db:seed --class=DocumentAreaSeeder --force
+
             # 6. Configurar seguridad Passport
             docker exec factoring_backend php artisan passport:install --no-interaction
             docker exec factoring_backend php artisan migrate --force
@@ -198,6 +201,9 @@ jobs:
 
             # 5b. Seeder idempotente de configuraciones (updateOrCreate, seguro en cada deploy)
             docker exec factoring_backend php artisan db:seed --class=ConfiguracionSeeder --force
+
+            # 5c. Seeder idempotente de áreas de Bandeja Interna (firstOrCreate, seguro en cada deploy)
+            docker exec factoring_backend php artisan db:seed --class=DocumentAreaSeeder --force
 
             # 6. Configurar seguridad Passport
             docker exec factoring_backend php artisan passport:install --no-interaction

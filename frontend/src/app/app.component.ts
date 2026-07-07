@@ -128,6 +128,9 @@ import { interval, Subscription } from 'rxjs';
             <a routerLink="/configuraciones" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">key</span> Configuraciones
             </a>
+            <a routerLink="/document-areas" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">account_tree</span> Áreas de Aprobación
+            </a>
           </div>
 
           <div class="nav-section" *ngIf="authService.isAuthorized(['cliente'])">
