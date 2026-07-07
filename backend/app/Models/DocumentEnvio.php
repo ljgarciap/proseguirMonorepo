@@ -9,6 +9,7 @@ class DocumentEnvio extends Model
     protected $fillable = [
         'sender_id', 'titulo', 'categoria_id', 'prioridad_id',
         'observaciones', 'estado_general', 'current_step_order',
+        'legacy_batch_key', 'created_at', 'updated_at',
     ];
 
     public function sender()
