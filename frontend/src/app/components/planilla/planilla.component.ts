@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
+import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 
 @Component({
   selector: 'app-planilla',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MilesSeparatorDirective],
   templateUrl: './planilla.component.html',
   styleUrls: ['./planilla.component.scss']
 })

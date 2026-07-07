@@ -276,11 +276,17 @@ import Swal from 'sweetalert2';
                 </div>
                 <div class="pro-input-group">
                   <label>Departamento <span class="required">*</span></label>
-                  <input type="text" name="departamento" [(ngModel)]="form.departamento" required placeholder="Departamento" class="pro-input" [class.is-invalid]="errors['departamento']" />
+                  <select name="departamento_id" [(ngModel)]="form.departamento_id" (ngModelChange)="onDepartamentoChange()" required class="pro-input" [class.is-invalid]="errors['departamento_id']">
+                    <option value="" disabled>Seleccione...</option>
+                    <option *ngFor="let d of departamentos" [value]="d.id">{{ d.nombre }}</option>
+                  </select>
                 </div>
                 <div class="pro-input-group">
                   <label>Ciudad <span class="required">*</span></label>
-                  <input type="text" name="ciudad" [(ngModel)]="form.ciudad" required placeholder="Ciudad" class="pro-input" [class.is-invalid]="errors['ciudad']" />
+                  <select name="ciudad_id" [(ngModel)]="form.ciudad_id" required class="pro-input" [class.is-invalid]="errors['ciudad_id']" [disabled]="!form.departamento_id">
+                    <option value="" disabled>{{ form.departamento_id ? 'Seleccione...' : 'Elija primero un departamento' }}</option>
+                    <option *ngFor="let c of ciudadesDelDepartamento" [value]="c.id">{{ c.nombre }}</option>
+                  </select>
                 </div>
               </div>
 
@@ -716,6 +722,8 @@ export class ClientesComponent implements OnInit {
   clientes: any[] = [];
   tipoPersonas: any[] = [];
   documentTypes: any[] = [];
+  departamentos: any[] = [];
+  ciudadesDelDepartamento: any[] = [];
   loading = false;
 
   // Pagination & Filtering
@@ -745,8 +753,8 @@ export class ClientesComponent implements OnInit {
     ocupacion: '',
     telefono: '',
     pais: '',
-    departamento: '',
-    ciudad: '',
+    departamento_id: '',
+    ciudad_id: '',
     direccion: '',
     nombre_razon_social: '',
     tipo_empresa: '',
@@ -788,6 +796,20 @@ export class ClientesComponent implements OnInit {
   loadParameters() {
     this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_personas`).subscribe({ next: data => this.tipoPersonas = data, error: () => {} });
     this.http.get<any[]>(`${environment.apiUrl}/document-types`).subscribe({ next: data => this.documentTypes = data, error: () => {} });
+    this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/departamentos`).subscribe({ next: data => this.departamentos = data, error: () => {} });
+  }
+
+  onDepartamentoChange(preservarCiudad = false) {
+    if (!preservarCiudad) {
+      this.form.ciudad_id = '';
+    }
+    this.ciudadesDelDepartamento = [];
+    if (this.form.departamento_id) {
+      this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/ciudades?departamento_id=${this.form.departamento_id}`).subscribe({
+        next: data => this.ciudadesDelDepartamento = data,
+        error: () => {}
+      });
+    }
   }
 
   applyFilters() {
@@ -877,6 +899,7 @@ export class ClientesComponent implements OnInit {
   openModal(client: any = null) {
     this.isEdit = !!client;
     this.errors = {};
+    this.ciudadesDelDepartamento = [];
     if (client) {
       this.editingId = client.id;
       this.form = { ...client };
@@ -886,6 +909,8 @@ export class ClientesComponent implements OnInit {
       this.form.tipo_documento_id = client.tipo_documento_id || '';
       this.form.rep_tipo_documento_id = client.rep_tipo_documento_id || '';
       this.form.activo = !!client.activo;
+      this.form.departamento_id = client.departamento_id || '';
+      this.form.ciudad_id = client.ciudad_id || '';
 
       // Fallback for legacy database records
       if (!this.form.numero_documento && client.identificacion) {
@@ -893,6 +918,10 @@ export class ClientesComponent implements OnInit {
       }
       // Set defaults for address fields if missing
       if (!this.form.pais) this.form.pais = 'Colombia';
+
+      if (this.form.departamento_id) {
+        this.onDepartamentoChange(true);
+      }
     } else {
       this.editingId = null;
       this.hasOriginalTipoPersona = false;
@@ -907,8 +936,8 @@ export class ClientesComponent implements OnInit {
         ocupacion: '',
         telefono: '',
         pais: 'Colombia', // Sensible default
-        departamento: '',
-        ciudad: '',
+        departamento_id: '',
+        ciudad_id: '',
         direccion: '',
         nombre_razon_social: '',
         tipo_empresa: '',
@@ -986,8 +1015,8 @@ export class ClientesComponent implements OnInit {
             rep_nombres: 'Nombres Rep. Legal',
             rep_primer_apellido: 'Primer Apellido Rep. Legal',
             pais: 'País',
-            departamento: 'Departamento',
-            ciudad: 'Ciudad'
+            departamento_id: 'Departamento',
+            ciudad_id: 'Ciudad'
           };
           const errList = Object.keys(validationErrors)
             .map(k => fieldNames[k] || k)

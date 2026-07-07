@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             AccountingParameterSeeder::class,
             ConfiguracionSeeder::class,
             DocumentAreaSeeder::class,
+            ColombiaGeografiaSeeder::class,
         ]);
     }
 }

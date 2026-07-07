@@ -6,6 +6,8 @@ use App\Models\User;
 use App\Models\Cliente;
 use App\Models\TipoPersona;
 use App\Models\DocumentType;
+use App\Models\Departamento;
+use App\Models\Ciudad;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Passport\Passport;
@@ -20,6 +22,8 @@ class ClienteTest extends TestCase
     private $tipoJuridica;
     private $docCC;
     private $docNIT;
+    private $departamento;
+    private $ciudad;
 
     protected function setUp(): void
     {
@@ -31,6 +35,9 @@ class ClienteTest extends TestCase
 
         $this->tipoNatural = TipoPersona::firstOrCreate(['codigo' => 'NATURAL'], ['nombre' => 'Persona Natural']);
         $this->tipoJuridica = TipoPersona::firstOrCreate(['codigo' => 'JURIDICA'], ['nombre' => 'Persona Jurídica']);
+
+        $this->departamento = Departamento::create(['nombre' => 'Antioquia']);
+        $this->ciudad = Ciudad::create(['nombre' => 'Medellín', 'departamento_id' => $this->departamento->id]);
 
         // Create superadmin user for authentication
         $this->admin = User::create([
@@ -139,8 +146,8 @@ class ClienteTest extends TestCase
             'correo_electronico' => 'juan@test.com',
             'telefono' => '3001234567',
             'pais' => 'Colombia',
-            'departamento' => 'Antioquia',
-            'ciudad' => 'Medellin',
+            'departamento_id' => $this->departamento->id,
+            'ciudad_id' => $this->ciudad->id,
             'direccion' => 'Calle 10 # 5-6',
             'ocupacion' => 'Ingeniero',
             'activo' => true
@@ -171,6 +178,30 @@ class ClienteTest extends TestCase
         $this->assertTrue(Hash::check('12345678', $user->password));
     }
 
+    public function test_store_rejects_ciudad_that_does_not_belong_to_departamento(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $otroDepartamento = Departamento::create(['nombre' => 'Valle del Cauca']);
+
+        $payload = [
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => '1234567-9',
+            'nombres' => 'Juan Carlos',
+            'primer_apellido' => 'Gomez',
+            'pais' => 'Colombia',
+            'departamento_id' => $otroDepartamento->id,
+            'ciudad_id' => $this->ciudad->id, // pertenece a Antioquia, no a Valle del Cauca
+            'activo' => true
+        ];
+
+        $response = $this->postJson('/api/clientes', $payload);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['ciudad_id']);
+    }
+
     /**
      * Test creation of juridical person and legal representative.
      */
@@ -187,8 +218,8 @@ class ClienteTest extends TestCase
             'actividad_economica' => 'Comercio',
             'correo_electronico_empresarial' => 'contacto@abc.com',
             'pais' => 'Colombia',
-            'departamento' => 'Bogota',
-            'ciudad' => 'Bogota',
+            'departamento_id' => $this->departamento->id,
+            'ciudad_id' => $this->ciudad->id,
             'activo' => true,
 
             // Legal representative info
