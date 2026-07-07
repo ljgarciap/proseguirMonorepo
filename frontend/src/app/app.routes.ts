@@ -140,6 +140,12 @@ export const routes: Routes = [
         data: { roles: ['superadmin'] }
     },
     {
+        path: 'document-areas',
+        loadComponent: () => import('./components/document-areas/document-areas.component').then(m => m.DocumentAreasComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
+    },
+    {
         path: 'document-requests',
         loadComponent: () => import('./components/document-requests/document-requests.component').then(m => m.DocumentRequestsComponent),
         canActivate: [roleGuard],
