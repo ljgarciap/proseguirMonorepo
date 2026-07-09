@@ -69,9 +69,9 @@ class InternalDocumentController extends Controller
     {
         $request->validate([
             'titulo' => 'required|string',
-            'archivo' => 'nullable|file|max:10240',
+            'archivo' => 'nullable|file|max:20480',
             'archivos' => 'nullable|array',
-            'archivos.*' => 'file|max:10240',
+            'archivos.*' => 'file|max:20480',
             'target_role' => 'required|in:contable,gerente,operativo',
             'categoria_id' => 'required|exists:accounting_categories,id',
             'prioridad_id' => 'required|exists:accounting_priorities,id',
