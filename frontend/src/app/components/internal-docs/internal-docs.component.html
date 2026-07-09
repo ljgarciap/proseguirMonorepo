@@ -120,8 +120,11 @@
               </td>
               <td class="text-right" style="padding-right: 1.5rem;">
                 <div class="actions">
+                  <button class="btn-pro secondary sm icon-only" (click)="verDetalleEnvio(envio)" title="Ver Detalle (observaciones y ruta)">
+                    <span class="material-symbols-outlined">info</span>
+                  </button>
                   <ng-container *ngIf="envio.files?.length === 1">
-                    <button class="btn-pro secondary sm icon-only" (click)="openViewer(envio, envio.files[0])" title="Visualizar">
+                    <button class="btn-pro secondary sm icon-only" (click)="openViewer(envio, envio.files[0])" title="Visualizar archivo">
                       <span class="material-symbols-outlined">visibility</span>
                     </button>
                     <button class="btn-pro secondary sm icon-only" (click)="downloadFile(envio, envio.files[0])" title="Descargar">
@@ -133,6 +136,9 @@
                   </button>
                   <button class="btn-pro danger sm icon-only" *ngIf="canProcessEnvio(envio)" (click)="devolverPaso(envio)" title="Devolver Documento">
                     <span class="material-symbols-outlined">undo</span>
+                  </button>
+                  <button class="btn-pro primary sm icon-only" *ngIf="canResendEnvio(envio)" (click)="reenviarPaso(envio)" title="Reenviar (el rechazo fue un error)">
+                    <span class="material-symbols-outlined">send</span>
                   </button>
                   <button class="btn-pro danger sm icon-only" *ngIf="canDeleteEnvio(envio)" (click)="deleteEnvio(envio)" title="Eliminar Envío">
                     <span class="material-symbols-outlined">delete</span>
