@@ -106,19 +106,22 @@ class DocumentEnvioController extends Controller
     }
 
     /**
-     * Procesar o devolver el paso actual de la ruta de aprobación.
+     * Procesar, devolver o reenviar el paso actual de la ruta de aprobación.
      *
      * "Procesar" avanza al siguiente paso, o finaliza la ruta si era el último.
-     * "Devolver" es un rechazo terminal: el envío no continúa por la ruta,
-     * queda visible para el remitente, que debe crear un envío nuevo (no reintenta el mismo).
+     * "Devolver" es un rechazo: el envío no continúa por la ruta y queda visible
+     * para el remitente a modo de notificación, junto con la observación del rechazo.
+     * "Reenviar" solo aplica sobre un envío devuelto y solo puede ejecutarlo el
+     * remitente (o superadmin): si considera que el rechazo fue un error, retoma
+     * la ruta exactamente en el paso que rechazó, con una nueva observación.
      */
     public function processStep(Request $request, $id, $stepId)
     {
         $request->validate([
-            'accion' => 'required|in:procesar,devolver',
-            'observacion' => 'required_if:accion,devolver|nullable|string',
+            'accion' => 'required|in:procesar,devolver,reenviar',
+            'observacion' => 'required_if:accion,devolver,reenviar|nullable|string',
         ], [
-            'observacion.required_if' => 'Debe registrar una observación para devolver el documento.',
+            'observacion.required_if' => 'Debe registrar una observación para esta acción.',
         ]);
 
         $envio = DocumentEnvio::findOrFail($id);
@@ -132,12 +135,24 @@ class DocumentEnvioController extends Controller
         $roles = $user->roles ?? [];
         $isAdmin = in_array('superadmin', $roles);
 
-        if (!$isAdmin && !in_array($step->area->codigo, $roles)) {
-            return response()->json(['message' => 'No tiene permisos para procesar este paso.'], 403);
-        }
+        if ($request->accion === 'reenviar') {
+            $isSender = $envio->sender_id === Auth::id();
 
-        if ($step->orden !== $envio->current_step_order || $step->estado !== 'pendiente') {
-            return response()->json(['message' => 'Este paso no está disponible para procesar actualmente.'], 422);
+            if (!$isAdmin && !$isSender) {
+                return response()->json(['message' => 'No tiene permisos para reenviar este documento.'], 403);
+            }
+
+            if ($step->orden !== $envio->current_step_order || $step->estado !== 'devuelto' || $envio->estado_general !== 'devuelto') {
+                return response()->json(['message' => 'Este documento no está disponible para reenviar actualmente.'], 422);
+            }
+        } else {
+            if (!$isAdmin && !in_array($step->area->codigo, $roles)) {
+                return response()->json(['message' => 'No tiene permisos para procesar este paso.'], 403);
+            }
+
+            if ($step->orden !== $envio->current_step_order || $step->estado !== 'pendiente') {
+                return response()->json(['message' => 'Este paso no está disponible para procesar actualmente.'], 422);
+            }
         }
 
         DB::transaction(function () use ($request, $envio, $step) {
@@ -150,6 +165,24 @@ class DocumentEnvioController extends Controller
                     'observacion' => $request->observacion,
                 ]);
                 $envio->update(['estado_general' => 'devuelto']);
+                return;
+            }
+
+            if ($request->accion === 'reenviar') {
+                $notaReenvio = '[Reenviado ' . now()->format('d/m/Y H:i') . '] ' . $request->observacion;
+
+                $step->update([
+                    'estado' => 'pendiente',
+                    'usuario_id' => null,
+                    'fecha_inicio' => null,
+                    'fecha_procesamiento' => null,
+                    'observacion' => null,
+                ]);
+
+                $envio->update([
+                    'observaciones' => trim(($envio->observaciones ? $envio->observaciones . "\n\n" : '') . $notaReenvio),
+                    'estado_general' => $step->orden === 1 ? 'pendiente' : 'en_proceso',
+                ]);
                 return;
             }
 

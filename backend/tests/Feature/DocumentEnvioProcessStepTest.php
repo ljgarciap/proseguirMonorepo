@@ -181,4 +181,118 @@ class DocumentEnvioProcessStepTest extends TestCase
 
         $response->assertStatus(200);
     }
+
+    public function test_reenviar_requires_observacion(): void
+    {
+        $envio = $this->makeEnvio();
+        $step1 = $envio->steps()->where('orden', 1)->first();
+        $step1->update(['estado' => 'devuelto', 'observacion' => 'Factura ilegible.']);
+        $envio->update(['estado_general' => 'devuelto']);
+
+        Passport::actingAs($this->sender);
+        $response = $this->patchJson("/api/document-envios/{$envio->id}/steps/{$step1->id}", [
+            'accion' => 'reenviar',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['observacion']);
+    }
+
+    public function test_sender_can_reenviar_and_step_retoma_desde_el_paso_que_rechazo(): void
+    {
+        $envio = $this->makeEnvio();
+        $step1 = $envio->steps()->where('orden', 1)->first();
+        $contable = $this->makeUser('contable', 'c4');
+        $step1->update([
+            'estado' => 'devuelto',
+            'usuario_id' => $contable->id,
+            'observacion' => 'Factura ilegible, subir de nuevo.',
+        ]);
+        $envio->update(['estado_general' => 'devuelto']);
+
+        Passport::actingAs($this->sender);
+        $response = $this->patchJson("/api/document-envios/{$envio->id}/steps/{$step1->id}", [
+            'accion' => 'reenviar',
+            'observacion' => 'Fue un error, ya se corrigió la factura.',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('estado_general', 'pendiente');
+        $response->assertJsonPath('current_step_order', 1);
+        $response->assertJsonPath('steps.0.estado', 'pendiente');
+        $response->assertJsonPath('steps.0.usuario_id', null);
+        $response->assertJsonPath('steps.0.observacion', null);
+        $response->assertJsonFragment(['observaciones' => "[Reenviado " . now()->format('d/m/Y H:i') . "] Fue un error, ya se corrigió la factura."]);
+    }
+
+    public function test_reenviar_on_second_step_sets_estado_general_en_proceso(): void
+    {
+        $envio = $this->makeEnvio();
+        $envio->steps()->where('orden', 1)->first()->update(['estado' => 'procesado']);
+        $step2 = $envio->steps()->where('orden', 2)->first();
+        $step2->update(['estado' => 'devuelto', 'observacion' => 'Falta firma.']);
+        $envio->update(['current_step_order' => 2, 'estado_general' => 'devuelto']);
+
+        Passport::actingAs($this->sender);
+        $response = $this->patchJson("/api/document-envios/{$envio->id}/steps/{$step2->id}", [
+            'accion' => 'reenviar',
+            'observacion' => 'Ya se agregó la firma.',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('estado_general', 'en_proceso');
+        $response->assertJsonPath('current_step_order', 2);
+        $response->assertJsonPath('steps.1.estado', 'pendiente');
+    }
+
+    public function test_reenviar_by_non_sender_non_admin_is_forbidden(): void
+    {
+        $envio = $this->makeEnvio();
+        $step1 = $envio->steps()->where('orden', 1)->first();
+        $step1->update(['estado' => 'devuelto', 'observacion' => 'Factura ilegible.']);
+        $envio->update(['estado_general' => 'devuelto']);
+
+        $otro = $this->makeUser('gerente', 'g4');
+
+        Passport::actingAs($otro);
+        $response = $this->patchJson("/api/document-envios/{$envio->id}/steps/{$step1->id}", [
+            'accion' => 'reenviar',
+            'observacion' => 'Intento no autorizado.',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_cannot_reenviar_step_that_is_not_devuelto(): void
+    {
+        $envio = $this->makeEnvio();
+        $step1 = $envio->steps()->where('orden', 1)->first();
+
+        Passport::actingAs($this->sender);
+        $response = $this->patchJson("/api/document-envios/{$envio->id}/steps/{$step1->id}", [
+            'accion' => 'reenviar',
+            'observacion' => 'No debería aceptarse.',
+        ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_superadmin_can_reenviar_any_devuelto_envio(): void
+    {
+        $envio = $this->makeEnvio();
+        $step1 = $envio->steps()->where('orden', 1)->first();
+        $step1->update(['estado' => 'devuelto', 'observacion' => 'Factura ilegible.']);
+        $envio->update(['estado_general' => 'devuelto']);
+
+        $admin = $this->makeUser('superadmin', 'sa2');
+
+        Passport::actingAs($admin);
+        $response = $this->patchJson("/api/document-envios/{$envio->id}/steps/{$step1->id}", [
+            'accion' => 'reenviar',
+            'observacion' => 'Reenviado por soporte.',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('steps.0.estado', 'pendiente');
+    }
 }
