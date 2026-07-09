@@ -57,7 +57,7 @@ class DocumentEnvioController extends Controller
             'prioridad_id' => 'required|exists:accounting_priorities,id',
             'observaciones' => 'nullable|string',
             'archivos' => 'required|array|min:1',
-            'archivos.*' => 'file|max:10240',
+            'archivos.*' => 'file|max:20480',
         ], [
             'titulo.required' => 'Debe ingresar el título del documento.',
             'ruta.required' => 'Debe agregar al menos un área a la ruta de aprobación.',
