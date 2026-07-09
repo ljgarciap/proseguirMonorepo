@@ -78,10 +78,11 @@ export class InternalDocsComponent implements OnInit {
     let filtered = this.documents.filter(envio => {
       // 1. Tab Filter
       let tabMatch = false;
+      const devueltoAccionable = envio.estado_general === 'devuelto' && this.canResendEnvio(envio);
       if (this.currentTab === 'pendientes') {
-        tabMatch = envio.estado_general === 'pendiente' || envio.estado_general === 'en_proceso';
+        tabMatch = envio.estado_general === 'pendiente' || envio.estado_general === 'en_proceso' || devueltoAccionable;
       } else {
-        tabMatch = envio.estado_general === 'procesado' || envio.estado_general === 'devuelto';
+        tabMatch = envio.estado_general === 'procesado' || (envio.estado_general === 'devuelto' && !devueltoAccionable);
       }
 
       // 2. Search Filter
@@ -276,6 +277,13 @@ export class InternalDocsComponent implements OnInit {
     return !!step && step.estado === 'pendiente' && step.area?.codigo === activeRole;
   }
 
+  // El remitente (o superadmin) es quien decide si un documento devuelto fue un error y debe reenviarse.
+  canResendEnvio(envio: any): boolean {
+    if (envio.estado_general !== 'devuelto') return false;
+    const activeRole = this.authService.getActiveRole();
+    return activeRole === 'superadmin' || envio.sender_id === this.currentUser?.id;
+  }
+
   procesarPaso(envio: any) {
     const step = this.currentStepOf(envio);
     if (!step) return;
@@ -321,7 +329,33 @@ export class InternalDocsComponent implements OnInit {
     });
   }
 
-  private ejecutarAccionPaso(envio: any, step: any, accion: 'procesar' | 'devolver', observacion?: string) {
+  reenviarPaso(envio: any) {
+    const step = this.currentStepOf(envio);
+    if (!step) return;
+
+    Swal.fire({
+      title: 'Reenviar documento',
+      text: `Indique por qué considera que la devolución de "${step.area?.nombre}" fue un error. El documento retomará la ruta en ese mismo paso.`,
+      input: 'textarea',
+      inputPlaceholder: 'Escriba la observación del reenvío...',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Reenviar',
+      cancelButtonText: 'Cancelar',
+      inputValidator: (value) => {
+        if (!value || !value.trim()) {
+          return 'Debe registrar una observación para reenviar el documento.';
+        }
+        return null;
+      }
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.ejecutarAccionPaso(envio, step, 'reenviar', result.value);
+      }
+    });
+  }
+
+  private ejecutarAccionPaso(envio: any, step: any, accion: 'procesar' | 'devolver' | 'reenviar', observacion?: string) {
     this.loading = true;
     this.http.patch(`${environment.apiUrl}/document-envios/${envio.id}/steps/${step.id}`, {
       accion,
@@ -329,13 +363,54 @@ export class InternalDocsComponent implements OnInit {
     }).subscribe({
       next: () => {
         this.loading = false;
-        Swal.fire('¡Listo!', accion === 'procesar' ? 'El paso fue procesado correctamente.' : 'El documento fue devuelto.', 'success');
+        const mensajes = {
+          procesar: 'El paso fue procesado correctamente.',
+          devolver: 'El documento fue devuelto.',
+          reenviar: 'El documento fue reenviado y retomó la ruta de aprobación.'
+        };
+        Swal.fire('¡Listo!', mensajes[accion], 'success');
         this.loadDocuments();
       },
       error: (err) => {
         this.loading = false;
         Swal.fire('Error', err.error?.message || 'No se pudo actualizar el paso.', 'error');
       }
+    });
+  }
+
+  // Detalle del envío: observaciones generales y timeline de cada paso (área, estado, usuario, fecha y observación).
+  verDetalleEnvio(envio: any) {
+    const estadoLabel: Record<string, string> = {
+      pendiente: 'Pendiente', en_proceso: 'En proceso', procesado: 'Procesado', devuelto: 'Devuelto'
+    };
+
+    const timelineHtml = (envio.steps || []).map((s: any) => `
+      <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:8px;text-align:left;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong>${s.orden}. ${s.area?.nombre || '-'}</strong>
+          <span class="status-pill ${s.estado}">${estadoLabel[s.estado] || s.estado}</span>
+        </div>
+        ${s.usuario?.name ? `<div style="font-size:0.8rem;color:#64748b;margin-top:4px;">Por: ${s.usuario.name}${s.fecha_procesamiento ? ' — ' + new Date(s.fecha_procesamiento).toLocaleString() : ''}</div>` : ''}
+        ${s.observacion ? `<div style="font-size:0.85rem;color:#334155;margin-top:6px;background:#f8fafc;padding:6px 8px;border-radius:6px;">${s.observacion}</div>` : ''}
+      </div>
+    `).join('');
+
+    Swal.fire({
+      title: envio.titulo,
+      width: 560,
+      html: `
+        <div style="text-align:left;">
+          ${envio.observaciones ? `
+            <div style="margin-bottom:14px;">
+              <div style="font-weight:600;font-size:0.85rem;margin-bottom:4px;">Observaciones</div>
+              <div style="font-size:0.85rem;color:#334155;white-space:pre-wrap;background:#f8fafc;padding:8px 10px;border-radius:6px;">${envio.observaciones}</div>
+            </div>
+          ` : ''}
+          <div style="font-weight:600;font-size:0.85rem;margin-bottom:6px;">Ruta de aprobación</div>
+          ${timelineHtml || '<i style="color:#94a3b8;">Sin pasos registrados.</i>'}
+        </div>
+      `,
+      confirmButtonText: 'Cerrar'
     });
   }
 
