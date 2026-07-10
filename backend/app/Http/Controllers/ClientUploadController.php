@@ -199,16 +199,26 @@ class ClientUploadController extends Controller
         $operativoCount = (clone $baseQuery)->where('status', 'pendiente')->count();
         $gerenteCount = (clone $baseQuery)->where('status', 'validado')->count();
 
-        // Documentos Internos Pendientes (bandeja vieja, target_role fijo)
-        $internalContable = \App\Models\InternalDocument::where('target_role', 'contable')->where('estado', 'pendiente')->count();
-        $internalGerente = \App\Models\InternalDocument::where('target_role', 'gerente')->where('estado', 'pendiente')->count();
-        $internalOperativo = \App\Models\InternalDocument::where('target_role', 'operativo')->where('estado', 'pendiente')->count();
+        // Documentos Internos Pendientes (bandeja vieja, target_role fijo).
+        // Se excluyen los que ya fueron migrados a la Bandeja Interna nueva (SCRUM-94,
+        // ver MigrateLegacyInternalDocuments): esa migración no borra las filas
+        // originales, así que sin este filtro un documento migrado se cuenta dos
+        // veces (una en el modelo viejo, otra en el nuevo).
+        $migratedBatchKeys = \App\Models\DocumentEnvio::whereNotNull('legacy_batch_key')->pluck('legacy_batch_key')->all();
+
+        $pendingInternals = \App\Models\InternalDocument::with('priority')
+            ->where('estado', 'pendiente')
+            ->get()
+            ->reject(fn ($doc) => in_array($doc->batch_id ?? ('single_' . $doc->id), $migratedBatchKeys));
+
+        $internalContable = $pendingInternals->where('target_role', 'contable')->count();
+        $internalGerente = $pendingInternals->where('target_role', 'gerente')->count();
+        $internalOperativo = $pendingInternals->where('target_role', 'operativo')->count();
 
         // Documentos Internos por Vencer (< 2 horas) - bandeja vieja
         $expiringContable = 0;
         $expiringGerente = 0;
         $expiringOperativo = 0;
-        $pendingInternals = \App\Models\InternalDocument::with('priority')->where('estado', 'pendiente')->get();
         foreach ($pendingInternals as $doc) {
             if ($doc->priority && $doc->priority->horas_vencimiento) {
                 $expiresAt = $doc->created_at->addHours($doc->priority->horas_vencimiento);
