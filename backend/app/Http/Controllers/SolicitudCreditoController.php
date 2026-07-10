@@ -187,47 +187,19 @@ class SolicitudCreditoController extends Controller
             // 3.1. Automatically start the BPMN CreditoOrdinario workflow if type is ORDINARIO
             $tipoCredito = \App\Models\TipoCredito::find($validated['tipo_credito_id']);
             if ($tipoCredito && strtoupper($tipoCredito->codigo) === 'ORDINARIO') {
-                $numeroSolicitud = 'CO-' . date('Y') . '-' . \Illuminate\Support\Str::upper(\Illuminate\Support\Str::random(4)) . rand(10, 99);
-                
-                $documentos = [
-                    'formulario_solicitud' => null,
-                    'documentos_identidad' => null,
-                    'estados_financieros' => null,
-                    'certificados_laborales' => null,
-                    'sarlft_sintesis' => null,
-                    'sarlft_datacredito' => null,
-                    'analisis_financiero' => null,
-                    'presentacion_comite' => null,
-                    'acta_comite_firmada' => null,
-                    'pagare_borrador' => null,
-                    'carta_instrucciones_borrador' => null,
-                    'contrato_borrador' => null,
-                    'garantias_firmadas' => null,
-                    'registro_cyf' => null,
-                    'desembolso_egreso' => null,
-                    'comprobante_transferencia' => null,
-                ];
+                $activeRole = $request->header('X-Active-Role')
+                    ?? (($request->user()->roles && is_array($request->user()->roles))
+                        ? ($request->user()->roles[0] ?? 'coordinador_comercial')
+                        : 'coordinador_comercial');
 
-                $historial = [
-                    [
-                        'fecha' => now()->toIso8601String(),
-                        'usuario' => $request->user()->name,
-                        'rol' => $request->header('X-Active-Role') ?? (($request->user()->roles && is_array($request->user()->roles)) ? ($request->user()->roles[0] ?? 'coordinador_comercial') : 'coordinador_comercial'),
-                        'estado_anterior' => 'ninguno',
-                        'estado_nuevo' => 'revision_documental',
-                        'comentario' => 'Solicitud de crédito ordinario registrada e iniciada desde el módulo de solicitudes.'
-                    ]
-                ];
-
-                \App\Models\CreditoOrdinario::create([
-                    'numero_solicitud' => $numeroSolicitud,
-                    'cliente_id' => $user->id,
-                    'monto' => $validated['monto_solicitado'],
-                    'plazo_meses' => $validated['plazo_meses'],
-                    'estado' => 'revision_documental',
-                    'documentos' => $documentos,
-                    'historial_estados' => $historial
-                ]);
+                \App\Models\CreditoOrdinario::iniciar(
+                    clienteId:  $user->id,
+                    monto:      $validated['monto_solicitado'],
+                    plazoMeses: $validated['plazo_meses'],
+                    usuario:    $request->user()->name,
+                    rol:        $activeRole,
+                    comentario: 'Solicitud de crédito ordinario registrada e iniciada desde el módulo de solicitudes.'
+                );
             }
 
             // 4. Create DocumentRequest in the database if document_preset_id is provided

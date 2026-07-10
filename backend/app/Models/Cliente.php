@@ -29,6 +29,8 @@ class Cliente extends Model
         'telefono',
         'pais',
         'departamento',
+        'departamento_id',
+        'ciudad_id',
         'direccion',
 
         // Persona Jurídica
@@ -68,6 +70,16 @@ class Cliente extends Model
     public function repDocumentType()
     {
         return $this->belongsTo(DocumentType::class, 'rep_tipo_documento_id');
+    }
+
+    public function departamentoRel()
+    {
+        return $this->belongsTo(Departamento::class, 'departamento_id');
+    }
+
+    public function ciudadRel()
+    {
+        return $this->belongsTo(Ciudad::class, 'ciudad_id');
     }
 
     protected static function boot()

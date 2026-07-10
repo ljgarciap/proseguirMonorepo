@@ -76,18 +76,39 @@ class ConciliationService
         $jsonOutput = shell_exec("node " . escapeshellarg($nodeHelperPath) . " " . escapeshellarg($pdfPath));
         $extracted = json_decode($jsonOutput, true);
         $text = $extracted['text'] ?? '';
-        
-        $data = [];
-        preg_match_all('/(\d{4}\/\d{2}\/\d{2})\s+(.*?)\s+([-\d,.]+)/', $text, $matches, PREG_SET_ORDER);
 
-        foreach ($matches as $match) {
-            $amount = $this->parseAmount($match[3]);
+        return $this->parseBankText($text);
+    }
+
+    private function parseBankText($text)
+    {
+        $data = [];
+        foreach (explode("\n", $text) as $line) {
+            $columns = explode('|', $line);
+            if (count($columns) < 2) continue;
+
+            $dateRaw = $columns[0];
+            if (!preg_match('/^\d{4}\/\d{2}\/\d{2}$/', $dateRaw)) continue;
+
+            // La última columna siempre es VALOR, sin importar cuántas
+            // columnas de REFERENCIA/DOCUMENTO haya en el medio.
+            $valorRaw = trim(array_pop($columns));
+
+            // Un VALOR real siempre trae separador de miles y 2 decimales
+            // (ej: "26,700.00"). Si no cumple el formato, lo que llegó ahí
+            // es un número de REFERENCIA/DOCUMENTO pegado sin separador
+            // (o texto, ej. nombre de remitente Nequi) — no un monto.
+            if (!preg_match('/^-?[\d.,]*\d[.,]\d{2}$/', $valorRaw)) continue;
+
+            $amount = $this->parseAmount($valorRaw);
             if ($amount <= 0) continue;
 
+            $description = trim(implode(' ', array_slice($columns, 1)));
+
             $data[] = [
-                'date' => str_replace('/', '-', $match[1]),
+                'date' => str_replace('/', '-', $dateRaw),
                 'amount' => $amount,
-                'description' => trim($match[2]),
+                'description' => $description,
                 'source' => 'Bank'
             ];
         }

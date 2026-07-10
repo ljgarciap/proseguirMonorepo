@@ -50,16 +50,22 @@ class ClienteController extends Controller
 
     public function store(Request $request)
     {
-        $tipoPersona = TipoPersona::findOrFail($request->tipo_persona_id);
-        $codigo = strtoupper($tipoPersona->codigo);
+        $tipoPersonaId = $request->tipo_persona_id;
+        $tipoPersona = $tipoPersonaId ? TipoPersona::find($tipoPersonaId) : null;
+        $codigo = $tipoPersona ? strtoupper($tipoPersona->codigo) : '';
 
         $rules = [
             'tipo_persona_id' => 'required|exists:tipo_personas,id',
             'tipo_documento_id' => 'required|exists:document_types,id',
             'numero_documento' => 'required|string|unique:clientes,numero_documento',
             'pais' => 'required|string',
-            'departamento' => 'required|string',
-            'ciudad' => 'required|string',
+            'departamento_id' => 'required|exists:departamentos,id',
+            'ciudad_id' => [
+                'required',
+                Rule::exists('ciudades', 'id')->where(function ($query) use ($request) {
+                    $query->where('departamento_id', $request->departamento_id);
+                }),
+            ],
             'activo' => 'required|boolean',
         ];
 
@@ -103,8 +109,9 @@ class ClienteController extends Controller
     public function update(Request $request, $id)
     {
         $cliente = Cliente::findOrFail($id);
-        $tipoPersona = TipoPersona::findOrFail($request->tipo_persona_id);
-        $codigo = strtoupper($tipoPersona->codigo);
+        $tipoPersonaId = $request->tipo_persona_id;
+        $tipoPersona = $tipoPersonaId ? TipoPersona::find($tipoPersonaId) : null;
+        $codigo = $tipoPersona ? strtoupper($tipoPersona->codigo) : '';
 
         $rules = [
             'tipo_persona_id' => 'required|exists:tipo_personas,id',
@@ -115,8 +122,13 @@ class ClienteController extends Controller
                 Rule::unique('clientes', 'numero_documento')->ignore($cliente->id)
             ],
             'pais' => 'required|string',
-            'departamento' => 'required|string',
-            'ciudad' => 'required|string',
+            'departamento_id' => 'required|exists:departamentos,id',
+            'ciudad_id' => [
+                'required',
+                Rule::exists('ciudades', 'id')->where(function ($query) use ($request) {
+                    $query->where('departamento_id', $request->departamento_id);
+                }),
+            ],
             'activo' => 'required|boolean',
         ];
 
@@ -188,14 +200,24 @@ class ClienteController extends Controller
         // Find existing user by document
         $user = User::withTrashed()->where('numero_documento', $cliente->numero_documento)->first();
 
+        // Keep existing roles if user exists, otherwise default to ['cliente']
+        $roles = ['cliente'];
+        if ($user) {
+            $existingRoles = is_array($user->roles) ? $user->roles : (json_decode($user->roles, true) ?: []);
+            if (!in_array('cliente', $existingRoles)) {
+                $existingRoles[] = 'cliente';
+            }
+            $roles = $existingRoles;
+        }
+
         // If email exists on another user, prevent collision (use document-based mock email if empty)
-        $email = $email ?: ($cleanPassword . '@proseguir.com');
+        $email = $email ?: ($cliente->numero_documento . '@noreply.proseguir.local');
 
         $userData = [
             'name' => $cliente->nombre,
             'email' => $email,
             'tipo_documento_id' => $cliente->tipo_documento_id,
-            'roles' => ['cliente'],
+            'roles' => $roles,
         ];
 
         if (!$user) {

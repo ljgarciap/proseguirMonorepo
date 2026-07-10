@@ -15,6 +15,7 @@ jobs:
         with:
           php-version: '8.4'
           extensions: mbstring, xml, ctype, iconv, mysql, sqlite
+          coverage: pcov
       - name: Install Composer Dependencies
         run: |
           cd backend
@@ -31,6 +32,22 @@ jobs:
         env:
           DB_CONNECTION: sqlite
           DB_DATABASE: ":memory:"
+      - name: Generate Coverage Report
+        continue-on-error: true
+        run: |
+          cd backend
+          php artisan test --coverage-clover=coverage/clover.xml --coverage-html=coverage/html
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ":memory:"
+      - name: Upload Backend Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-report
+          path: backend/coverage/html
+          retention-days: 14
+          if-no-files-found: warn
 
   test-frontend:
     name: Frontend Tests (Angular)
@@ -53,6 +70,19 @@ jobs:
         run: |
           cd frontend
           npm run test:ci
+      - name: Generate Coverage Report
+        continue-on-error: true
+        run: |
+          cd frontend
+          npm run test:coverage
+      - name: Upload Frontend Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-report
+          path: frontend/coverage/factoring-frontend
+          retention-days: 14
+          if-no-files-found: warn
 
   deploy-prod:
     name: Production Deploy (CD)
@@ -77,7 +107,11 @@ jobs:
             
             # 2. Copiar archivos .env correctos de producción
             cp PROD.env .env
-            cp frontend/.env.prod frontend/.env
+            if [ -f frontend/.env.prod ]; then
+              cp frontend/.env.prod frontend/.env
+            else
+              cp frontend/.env.prod.example frontend/.env
+            fi
             
             # 3. Reconstruir frontend y backend conservando volúmenes
             docker compose up -d --build
@@ -91,23 +125,35 @@ jobs:
             
             # 5. Migraciones incrementales de DB (SEGURAS, NO FRESH)
             docker exec factoring_backend php artisan migrate --force
-            
+
+            # 5b. Seeder idempotente de configuraciones (updateOrCreate, seguro en cada deploy)
+            docker exec factoring_backend php artisan db:seed --class=ConfiguracionSeeder --force
+
+            # 5c. Seeder idempotente de áreas de Bandeja Interna (firstOrCreate, seguro en cada deploy)
+            docker exec factoring_backend php artisan db:seed --class=DocumentAreaSeeder --force
+
+            # 5d. Seeder idempotente de departamentos/ciudades de Colombia (firstOrCreate, seguro en cada deploy)
+            docker exec factoring_backend php artisan db:seed --class=ColombiaGeografiaSeeder --force
+
             # 6. Configurar seguridad Passport
-            docker exec factoring_backend php artisan passport:install --force --no-interaction
+            docker exec factoring_backend php artisan passport:install --no-interaction
             docker exec factoring_backend php artisan migrate --force
             docker exec factoring_backend chown -R www-data:www-data storage
             docker exec factoring_backend chmod 600 storage/oauth-private.key
             docker exec factoring_backend chmod 600 storage/oauth-public.key
-            
+
             # 7. Recrear el enlace simbólico de storage de forma relativa (Evita Error 403)
             docker exec factoring_backend rm -f public/storage
             docker exec factoring_backend ln -s ../storage/app/public public/storage
-            
+
             # 8. Limpieza y caché para optimizar rendimiento Laravel
             docker exec factoring_backend php artisan config:cache
             docker exec factoring_backend php artisan route:cache
             docker exec factoring_backend chmod -R 777 storage bootstrap/cache
             docker exec factoring_backend chmod 600 storage/oauth-private.key storage/oauth-public.key
+
+            # 9. Reiniciar el worker de la cola para aplicar cambios de código
+            docker exec factoring_queue php artisan queue:restart || true
 
   deploy-test:
     name: Test Deploy (CD)
@@ -155,20 +201,32 @@ jobs:
             
             # 5. Migraciones incrementales de DB (SEGURAS, NO FRESH)
             docker exec factoring_backend php artisan migrate --force
-            
+
+            # 5b. Seeder idempotente de configuraciones (updateOrCreate, seguro en cada deploy)
+            docker exec factoring_backend php artisan db:seed --class=ConfiguracionSeeder --force
+
+            # 5c. Seeder idempotente de áreas de Bandeja Interna (firstOrCreate, seguro en cada deploy)
+            docker exec factoring_backend php artisan db:seed --class=DocumentAreaSeeder --force
+
+            # 5d. Seeder idempotente de departamentos/ciudades de Colombia (firstOrCreate, seguro en cada deploy)
+            docker exec factoring_backend php artisan db:seed --class=ColombiaGeografiaSeeder --force
+
             # 6. Configurar seguridad Passport
-            docker exec factoring_backend php artisan passport:install --force --no-interaction
+            docker exec factoring_backend php artisan passport:install --no-interaction
             docker exec factoring_backend php artisan migrate --force
             docker exec factoring_backend chown -R www-data:www-data storage
             docker exec factoring_backend chmod 600 storage/oauth-private.key
             docker exec factoring_backend chmod 600 storage/oauth-public.key
-            
+
             # 7. Recrear el enlace simbólico de storage de forma relativa (Evita Error 403)
             docker exec factoring_backend rm -f public/storage
             docker exec factoring_backend ln -s ../storage/app/public public/storage
-            
+
             # 8. Limpieza y caché para optimizar rendimiento Laravel
             docker exec factoring_backend php artisan config:cache
             docker exec factoring_backend php artisan route:cache
             docker exec factoring_backend chmod -R 777 storage bootstrap/cache
             docker exec factoring_backend chmod 600 storage/oauth-private.key storage/oauth-public.key
+
+            # 9. Reiniciar el worker de la cola para aplicar cambios de código
+            docker exec factoring_queue php artisan queue:restart || true

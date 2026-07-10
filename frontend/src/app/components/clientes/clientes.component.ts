@@ -132,7 +132,7 @@ import Swal from 'sweetalert2';
             <div class="form-row three-cols">
               <div class="pro-input-group">
                 <label>Tipo de Persona <span class="required">*</span></label>
-                <select name="tipo_persona_id" [(ngModel)]="form.tipo_persona_id" (change)="onTipoPersonaChange()" required class="pro-input" [disabled]="isEdit">
+                <select name="tipo_persona_id" [(ngModel)]="form.tipo_persona_id" (change)="onTipoPersonaChange()" required class="pro-input" [disabled]="isEdit && hasOriginalTipoPersona" [class.is-invalid]="errors['tipo_persona_id']">
                   <option value="" disabled selected>Seleccione...</option>
                   <option *ngFor="let tp of tipoPersonas" [value]="tp.id">{{ tp.nombre }}</option>
                 </select>
@@ -140,7 +140,7 @@ import Swal from 'sweetalert2';
 
               <div class="pro-input-group">
                 <label>Tipo de Documento <span class="required">*</span></label>
-                <select name="tipo_documento_id" [(ngModel)]="form.tipo_documento_id" required class="pro-input">
+                <select name="tipo_documento_id" [(ngModel)]="form.tipo_documento_id" required class="pro-input" [class.is-invalid]="errors['tipo_documento_id']">
                   <option value="" disabled selected>Seleccione...</option>
                   <option *ngFor="let dt of documentTypes" [value]="dt.id">{{ dt.codigo }} - {{ dt.nombre }}</option>
                 </select>
@@ -148,7 +148,7 @@ import Swal from 'sweetalert2';
 
               <div class="pro-input-group">
                 <label>Número Documento <span class="required">*</span></label>
-                <input type="text" name="numero_documento" [(ngModel)]="form.numero_documento" required placeholder="Ej. 123456789" class="pro-input" />
+                <input type="text" name="numero_documento" [(ngModel)]="form.numero_documento" required placeholder="Ej. 123456789" class="pro-input" [class.is-invalid]="errors['numero_documento']" />
               </div>
             </div>
 
@@ -158,30 +158,30 @@ import Swal from 'sweetalert2';
               <div class="form-row three-cols">
                 <div class="pro-input-group">
                   <label>Nombres <span class="required">*</span></label>
-                  <input type="text" name="nombres" [(ngModel)]="form.nombres" required placeholder="Nombres" class="pro-input" />
+                  <input type="text" name="nombres" [(ngModel)]="form.nombres" required placeholder="Nombres" class="pro-input" [class.is-invalid]="errors['nombres']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Primer Apellido <span class="required">*</span></label>
-                  <input type="text" name="primer_apellido" [(ngModel)]="form.primer_apellido" required placeholder="Primer Apellido" class="pro-input" />
+                  <input type="text" name="primer_apellido" [(ngModel)]="form.primer_apellido" required placeholder="Primer Apellido" class="pro-input" [class.is-invalid]="errors['primer_apellido']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Segundo Apellido</label>
-                  <input type="text" name="segundo_apellido" [(ngModel)]="form.segundo_apellido" placeholder="Segundo Apellido" class="pro-input" />
+                  <input type="text" name="segundo_apellido" [(ngModel)]="form.segundo_apellido" placeholder="Segundo Apellido" class="pro-input" [class.is-invalid]="errors['segundo_apellido']" />
                 </div>
               </div>
 
               <div class="form-row three-cols">
                 <div class="pro-input-group">
                   <label>Correo Electrónico</label>
-                  <input type="email" name="correo_electronico" [(ngModel)]="form.correo_electronico" email placeholder="correo@ejemplo.com" class="pro-input" />
+                  <input type="email" name="correo_electronico" [(ngModel)]="form.correo_electronico" placeholder="correo@ejemplo.com" class="pro-input" [class.is-invalid]="errors['correo_electronico']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Ocupación</label>
-                  <input type="text" name="ocupacion" [(ngModel)]="form.ocupacion" placeholder="Ocupación" class="pro-input" />
+                  <input type="text" name="ocupacion" [(ngModel)]="form.ocupacion" placeholder="Ocupación" class="pro-input" [class.is-invalid]="errors['ocupacion']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Teléfono</label>
-                  <input type="text" name="telefono" [(ngModel)]="form.telefono" placeholder="Teléfono" class="pro-input" />
+                  <input type="text" name="telefono" [(ngModel)]="form.telefono" placeholder="Teléfono" class="pro-input" [class.is-invalid]="errors['telefono']" />
                 </div>
               </div>
             </div>
@@ -192,30 +192,30 @@ import Swal from 'sweetalert2';
               <div class="form-row three-cols">
                 <div class="pro-input-group">
                   <label>Nombre o Razón Social <span class="required">*</span></label>
-                  <input type="text" name="nombre_razon_social" [(ngModel)]="form.nombre_razon_social" required placeholder="Razón Social" class="pro-input" />
+                  <input type="text" name="nombre_razon_social" [(ngModel)]="form.nombre_razon_social" required placeholder="Razón Social" class="pro-input" [class.is-invalid]="errors['nombre_razon_social']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Tipo de Empresa</label>
-                  <input type="text" name="tipo_empresa" [(ngModel)]="form.tipo_empresa" placeholder="Ej. S.A.S, Limitada" class="pro-input" />
+                  <input type="text" name="tipo_empresa" [(ngModel)]="form.tipo_empresa" placeholder="Ej. S.A.S, Limitada" class="pro-input" [class.is-invalid]="errors['tipo_empresa']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Actividad Económica</label>
-                  <input type="text" name="actividad_economica" [(ngModel)]="form.actividad_economica" placeholder="Actividad Económica" class="pro-input" />
+                  <input type="text" name="actividad_economica" [(ngModel)]="form.actividad_economica" placeholder="Actividad Económica" class="pro-input" [class.is-invalid]="errors['actividad_economica']" />
                 </div>
               </div>
 
               <div class="form-row three-cols">
                 <div class="pro-input-group">
                   <label>Correo Electrónico Empresarial</label>
-                  <input type="email" name="correo_electronico_empresarial" [(ngModel)]="form.correo_electronico_empresarial" email placeholder="correo@empresa.com" class="pro-input" />
+                  <input type="email" name="correo_electronico_empresarial" [(ngModel)]="form.correo_electronico_empresarial" placeholder="correo@empresa.com" class="pro-input" [class.is-invalid]="errors['correo_electronico_empresarial']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Página Web</label>
-                  <input type="text" name="pagina_web" [(ngModel)]="form.pagina_web" placeholder="www.empresa.com" class="pro-input" />
+                  <input type="text" name="pagina_web" [(ngModel)]="form.pagina_web" placeholder="www.empresa.com" class="pro-input" [class.is-invalid]="errors['pagina_web']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Teléfono</label>
-                  <input type="text" name="telefono" [(ngModel)]="form.telefono" placeholder="Teléfono" class="pro-input" />
+                  <input type="text" name="telefono" [(ngModel)]="form.telefono" placeholder="Teléfono" class="pro-input" [class.is-invalid]="errors['telefono']" />
                 </div>
               </div>
 
@@ -224,44 +224,44 @@ import Swal from 'sweetalert2';
               <div class="form-row three-cols">
                 <div class="pro-input-group">
                   <label>Tipo de Documento <span class="required">*</span></label>
-                  <select name="rep_tipo_documento_id" [(ngModel)]="form.rep_tipo_documento_id" required class="pro-input">
+                  <select name="rep_tipo_documento_id" [(ngModel)]="form.rep_tipo_documento_id" required class="pro-input" [class.is-invalid]="errors['rep_tipo_documento_id']">
                     <option value="" disabled selected>Seleccione...</option>
                     <option *ngFor="let dt of documentTypes" [value]="dt.id">{{ dt.codigo }} - {{ dt.nombre }}</option>
                   </select>
                 </div>
                 <div class="pro-input-group">
                   <label>Número Documento <span class="required">*</span></label>
-                  <input type="text" name="rep_numero_documento" [(ngModel)]="form.rep_numero_documento" required placeholder="Número Documento" class="pro-input" />
+                  <input type="text" name="rep_numero_documento" [(ngModel)]="form.rep_numero_documento" required placeholder="Número Documento" class="pro-input" [class.is-invalid]="errors['rep_numero_documento']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Teléfono</label>
-                  <input type="text" name="rep_telefono" [(ngModel)]="form.rep_telefono" placeholder="Teléfono Rep. Legal" class="pro-input" />
+                  <input type="text" name="rep_telefono" [(ngModel)]="form.rep_telefono" placeholder="Teléfono Rep. Legal" class="pro-input" [class.is-invalid]="errors['rep_telefono']" />
                 </div>
               </div>
 
               <div class="form-row three-cols">
                 <div class="pro-input-group">
                   <label>Nombres <span class="required">*</span></label>
-                  <input type="text" name="rep_nombres" [(ngModel)]="form.rep_nombres" required placeholder="Nombres" class="pro-input" />
+                  <input type="text" name="rep_nombres" [(ngModel)]="form.rep_nombres" required placeholder="Nombres" class="pro-input" [class.is-invalid]="errors['rep_nombres']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Primer Apellido <span class="required">*</span></label>
-                  <input type="text" name="rep_primer_apellido" [(ngModel)]="form.rep_primer_apellido" required placeholder="Primer Apellido" class="pro-input" />
+                  <input type="text" name="rep_primer_apellido" [(ngModel)]="form.rep_primer_apellido" required placeholder="Primer Apellido" class="pro-input" [class.is-invalid]="errors['rep_primer_apellido']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Segundo Apellido</label>
-                  <input type="text" name="rep_segundo_apellido" [(ngModel)]="form.rep_segundo_apellido" placeholder="Segundo Apellido" class="pro-input" />
+                  <input type="text" name="rep_segundo_apellido" [(ngModel)]="form.rep_segundo_apellido" placeholder="Segundo Apellido" class="pro-input" [class.is-invalid]="errors['rep_segundo_apellido']" />
                 </div>
               </div>
 
               <div class="form-row two-cols">
                 <div class="pro-input-group">
                   <label>Cargo</label>
-                  <input type="text" name="rep_cargo" [(ngModel)]="form.rep_cargo" placeholder="Cargo" class="pro-input" />
+                  <input type="text" name="rep_cargo" [(ngModel)]="form.rep_cargo" placeholder="Cargo" class="pro-input" [class.is-invalid]="errors['rep_cargo']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Correo Electrónico</label>
-                  <input type="email" name="rep_correo_electronico" [(ngModel)]="form.rep_correo_electronico" email placeholder="correo@replegal.com" class="pro-input" />
+                  <input type="email" name="rep_correo_electronico" [(ngModel)]="form.rep_correo_electronico" placeholder="correo@replegal.com" class="pro-input" [class.is-invalid]="errors['rep_correo_electronico']" />
                 </div>
               </div>
             </div>
@@ -272,22 +272,28 @@ import Swal from 'sweetalert2';
               <div class="form-row three-cols">
                 <div class="pro-input-group">
                   <label>País <span class="required">*</span></label>
-                  <input type="text" name="pais" [(ngModel)]="form.pais" required placeholder="País" class="pro-input" />
+                  <input type="text" name="pais" [(ngModel)]="form.pais" required placeholder="País" class="pro-input" [class.is-invalid]="errors['pais']" />
                 </div>
                 <div class="pro-input-group">
                   <label>Departamento <span class="required">*</span></label>
-                  <input type="text" name="departamento" [(ngModel)]="form.departamento" required placeholder="Departamento" class="pro-input" />
+                  <select name="departamento_id" [(ngModel)]="form.departamento_id" (ngModelChange)="onDepartamentoChange()" required class="pro-input" [class.is-invalid]="errors['departamento_id']">
+                    <option value="" disabled>Seleccione...</option>
+                    <option *ngFor="let d of departamentos" [value]="d.id">{{ d.nombre }}</option>
+                  </select>
                 </div>
                 <div class="pro-input-group">
                   <label>Ciudad <span class="required">*</span></label>
-                  <input type="text" name="ciudad" [(ngModel)]="form.ciudad" required placeholder="Ciudad" class="pro-input" />
+                  <select name="ciudad_id" [(ngModel)]="form.ciudad_id" required class="pro-input" [class.is-invalid]="errors['ciudad_id']" [disabled]="!form.departamento_id">
+                    <option value="" disabled>{{ form.departamento_id ? 'Seleccione...' : 'Elija primero un departamento' }}</option>
+                    <option *ngFor="let c of ciudadesDelDepartamento" [value]="c.id">{{ c.nombre }}</option>
+                  </select>
                 </div>
               </div>
 
               <div class="form-row two-cols">
                 <div class="pro-input-group">
                   <label>Dirección</label>
-                  <input type="text" name="direccion" [(ngModel)]="form.direccion" placeholder="Dirección Completa" class="pro-input" />
+                  <input type="text" name="direccion" [(ngModel)]="form.direccion" placeholder="Dirección Completa" class="pro-input" [class.is-invalid]="errors['direccion']" />
                 </div>
                 <div class="pro-input-group checkbox-align">
                   <label class="pro-checkbox-label">
@@ -496,7 +502,7 @@ import Swal from 'sweetalert2';
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 1100;
+      z-index: 1040;
     }
 
     .modal-card {
@@ -617,6 +623,12 @@ import Swal from 'sweetalert2';
         color: #64748b;
         cursor: not-allowed;
       }
+
+      &.is-invalid {
+        border-color: #ef4444 !important;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+        background-color: #fef2f2 !important;
+      }
     }
 
     .required {
@@ -710,6 +722,8 @@ export class ClientesComponent implements OnInit {
   clientes: any[] = [];
   tipoPersonas: any[] = [];
   documentTypes: any[] = [];
+  departamentos: any[] = [];
+  ciudadesDelDepartamento: any[] = [];
   loading = false;
 
   // Pagination & Filtering
@@ -722,10 +736,12 @@ export class ClientesComponent implements OnInit {
     activo: ''
   };
 
+  hasOriginalTipoPersona = false;
   // Form Modal state
   showModal = false;
   isEdit = false;
   editingId: number | null = null;
+  errors: any = {};
   form: any = {
     tipo_persona_id: '',
     tipo_documento_id: '',
@@ -737,8 +753,8 @@ export class ClientesComponent implements OnInit {
     ocupacion: '',
     telefono: '',
     pais: '',
-    departamento: '',
-    ciudad: '',
+    departamento_id: '',
+    ciudad_id: '',
     direccion: '',
     nombre_razon_social: '',
     tipo_empresa: '',
@@ -772,14 +788,28 @@ export class ClientesComponent implements OnInit {
       },
       error: () => {
         this.loading = false;
-        Swal.fire('Error', 'No se pudieron cargar los clientes.', 'error');
+        this.fireAlert('Error', 'No se pudieron cargar los clientes.', 'error');
       }
     });
   }
 
   loadParameters() {
-    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_personas`).subscribe(data => this.tipoPersonas = data);
-    this.http.get<any[]>(`${environment.apiUrl}/document-types`).subscribe(data => this.documentTypes = data);
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_personas`).subscribe({ next: data => this.tipoPersonas = data, error: () => {} });
+    this.http.get<any[]>(`${environment.apiUrl}/document-types`).subscribe({ next: data => this.documentTypes = data, error: () => {} });
+    this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/departamentos`).subscribe({ next: data => this.departamentos = data, error: () => {} });
+  }
+
+  onDepartamentoChange(preservarCiudad = false) {
+    if (!preservarCiudad) {
+      this.form.ciudad_id = '';
+    }
+    this.ciudadesDelDepartamento = [];
+    if (this.form.departamento_id) {
+      this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/ciudades?departamento_id=${this.form.departamento_id}`).subscribe({
+        next: data => this.ciudadesDelDepartamento = data,
+        error: () => {}
+      });
+    }
   }
 
   applyFilters() {
@@ -840,20 +870,61 @@ export class ClientesComponent implements OnInit {
     this.form.rep_cargo = '';
     this.form.rep_correo_electronico = '';
     this.form.rep_telefono = '';
+
+    // Auto-migrate legacy name when selecting person type
+    const code = this.getSelectedTipoPersonaCodigo();
+    if (this.form.nombre) {
+      if (code === 'JURIDICA') {
+        this.form.nombre_razon_social = this.form.nombre;
+      } else if (code === 'NATURAL') {
+        const parts = this.form.nombre.trim().split(/\s+/);
+        if (parts.length >= 4) {
+          this.form.nombres = parts.slice(0, 2).join(' ');
+          this.form.primer_apellido = parts[2];
+          this.form.segundo_apellido = parts.slice(3).join(' ');
+        } else if (parts.length === 3) {
+          this.form.nombres = parts[0];
+          this.form.primer_apellido = parts[1];
+          this.form.segundo_apellido = parts[2];
+        } else if (parts.length === 2) {
+          this.form.nombres = parts[0];
+          this.form.primer_apellido = parts[1];
+        } else {
+          this.form.nombres = this.form.nombre;
+        }
+      }
+    }
   }
 
   openModal(client: any = null) {
     this.isEdit = !!client;
+    this.errors = {};
+    this.ciudadesDelDepartamento = [];
     if (client) {
       this.editingId = client.id;
       this.form = { ...client };
       // Convert relations references to foreign keys integers
       this.form.tipo_persona_id = client.tipo_persona_id || '';
+      this.hasOriginalTipoPersona = !!client.tipo_persona_id;
       this.form.tipo_documento_id = client.tipo_documento_id || '';
       this.form.rep_tipo_documento_id = client.rep_tipo_documento_id || '';
       this.form.activo = !!client.activo;
+      this.form.departamento_id = client.departamento_id || '';
+      this.form.ciudad_id = client.ciudad_id || '';
+
+      // Fallback for legacy database records
+      if (!this.form.numero_documento && client.identificacion) {
+        this.form.numero_documento = client.identificacion;
+      }
+      // Set defaults for address fields if missing
+      if (!this.form.pais) this.form.pais = 'Colombia';
+
+      if (this.form.departamento_id) {
+        this.onDepartamentoChange(true);
+      }
     } else {
       this.editingId = null;
+      this.hasOriginalTipoPersona = false;
       this.form = {
         tipo_persona_id: '',
         tipo_documento_id: '',
@@ -865,8 +936,8 @@ export class ClientesComponent implements OnInit {
         ocupacion: '',
         telefono: '',
         pais: 'Colombia', // Sensible default
-        departamento: '',
-        ciudad: '',
+        departamento_id: '',
+        ciudad_id: '',
         direccion: '',
         nombre_razon_social: '',
         tipo_empresa: '',
@@ -890,24 +961,28 @@ export class ClientesComponent implements OnInit {
   closeModal() {
     this.showModal = false;
     this.editingId = null;
+    this.errors = {};
   }
 
   saveCliente() {
-    // Basic email checks before submitting
+    this.errors = {};
     const codigo = this.getSelectedTipoPersonaCodigo();
     if (codigo === 'NATURAL' && this.form.correo_electronico) {
       if (!this.isValidEmail(this.form.correo_electronico)) {
-        Swal.fire('Validación', 'El formato del correo electrónico no es válido.', 'warning');
+        this.errors['correo_electronico'] = true;
+        this.fireAlert('Validación', 'El formato del correo electrónico no es válido.', 'warning');
         return;
       }
     }
     if (codigo === 'JURIDICA') {
       if (this.form.correo_electronico_empresarial && !this.isValidEmail(this.form.correo_electronico_empresarial)) {
-        Swal.fire('Validación', 'El formato del correo empresarial no es válido.', 'warning');
+        this.errors['correo_electronico_empresarial'] = true;
+        this.fireAlert('Validación', 'El formato del correo empresarial no es válido.', 'warning');
         return;
       }
       if (this.form.rep_correo_electronico && !this.isValidEmail(this.form.rep_correo_electronico)) {
-        Swal.fire('Validación', 'El formato del correo del representante legal no es válido.', 'warning');
+        this.errors['rep_correo_electronico'] = true;
+        this.fireAlert('Validación', 'El formato del correo del representante legal no es válido.', 'warning');
         return;
       }
     }
@@ -918,13 +993,39 @@ export class ClientesComponent implements OnInit {
 
     request.subscribe({
       next: () => {
-        Swal.fire('¡Éxito!', 'Cliente guardado correctamente.', 'success');
         this.closeModal();
+        this.fireAlert('¡Éxito!', 'Cliente guardado correctamente.', 'success');
         this.loadClientes();
       },
       error: (err) => {
-        const errorMsg = err.error?.message || 'Ocurrió un error al procesar el registro.';
-        Swal.fire('Error', errorMsg, 'error');
+        if (err.status === 422 && err.error?.errors) {
+          const validationErrors = err.error.errors;
+          for (const key in validationErrors) {
+            this.errors[key] = true;
+          }
+          const fieldNames: { [key: string]: string } = {
+            numero_documento: 'Número Documento',
+            nombres: 'Nombres',
+            primer_apellido: 'Primer Apellido',
+            nombre_razon_social: 'Nombre o Razón Social',
+            correo_electronico: 'Correo Electrónico',
+            correo_electronico_empresarial: 'Correo Empresarial',
+            rep_correo_electronico: 'Correo Rep. Legal',
+            rep_numero_documento: 'Documento Rep. Legal',
+            rep_nombres: 'Nombres Rep. Legal',
+            rep_primer_apellido: 'Primer Apellido Rep. Legal',
+            pais: 'País',
+            departamento_id: 'Departamento',
+            ciudad_id: 'Ciudad'
+          };
+          const errList = Object.keys(validationErrors)
+            .map(k => fieldNames[k] || k)
+            .join(', ');
+          this.fireAlert('Validación', `Por favor verifique los siguientes campos con errores: ${errList}`, 'warning');
+        } else {
+          const errorMsg = err.error?.message || 'Ocurrió un error al procesar el registro.';
+          this.fireAlert('Error', errorMsg, 'error');
+        }
       }
     });
   }
@@ -956,5 +1057,13 @@ export class ClientesComponent implements OnInit {
   private isValidEmail(email: string): boolean {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
+  }
+
+  private fireAlert(title: string, text: string, icon: 'success' | 'error' | 'warning' | 'info' | 'question') {
+    Swal.fire({
+      title,
+      text,
+      icon
+    });
   }
 }

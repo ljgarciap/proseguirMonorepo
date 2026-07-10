@@ -125,6 +125,12 @@ import { interval, Subscription } from 'rxjs';
             <a routerLink="/db-cleaner" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">restart_alt</span> Limpieza BD
             </a>
+            <a routerLink="/configuraciones" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">key</span> Configuraciones
+            </a>
+            <a routerLink="/document-areas" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">account_tree</span> Áreas de Aprobación
+            </a>
           </div>
 
           <div class="nav-section" *ngIf="authService.isAuthorized(['cliente'])">
@@ -136,7 +142,7 @@ import { interval, Subscription } from 'rxjs';
               <span class="material-symbols-outlined">description</span> Diligenciar Mandato
             </a>
             <a routerLink="/creditos" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">payments</span> Crédito Ordinario
+              <span class="material-symbols-outlined">payments</span> Mis Créditos
             </a>
           </div>
 

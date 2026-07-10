@@ -4,12 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
+import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-mandatos',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MilesSeparatorDirective],
   templateUrl: './mandatos.component.html',
   styleUrls: ['./mandatos.component.scss']
 })
@@ -245,8 +246,9 @@ export class MandatosComponent implements OnInit {
   }
 
   loadHistorial(): void {
-    this.http.get<any[]>(`${environment.apiUrl}/mandatos`).subscribe(res => {
-      this.historialMandatos = res;
+    this.http.get<any>(`${environment.apiUrl}/mandatos?perPage=200`).subscribe({
+      next: (res) => { this.historialMandatos = res.data ?? res; },
+      error: () => {}
     });
   }
 

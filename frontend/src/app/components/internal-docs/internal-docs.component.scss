@@ -119,8 +119,29 @@
   &.pendiente { background: #fffbeb; color: #d97706; }
   &.visto { background: #eff6ff; color: #2563eb; }
   &.visto_bueno { background: #e0f2fe; color: #0284c7; }
+  &.en_proceso { background: #eff6ff; color: #2563eb; }
   &.procesado { background: #f0fdf4; color: #16a34a; }
   &.rechazado { background: #fef2f2; color: #dc2626; }
+  &.devuelto { background: #fef2f2; color: #dc2626; }
+}
+
+.ruta-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.paso-actual-badge {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .role-badge.contable { background: #E8EAF6; color: #3F51B5; }

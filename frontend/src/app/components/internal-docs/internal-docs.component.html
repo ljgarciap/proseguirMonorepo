@@ -2,9 +2,9 @@
   <header class="view-header">
     <div class="title-area">
       <h1>Bandeja Interna de Documentos</h1>
-      <p>Gestión de flujo documental entre Operativo, Contabilidad y Gerencia.</p>
+      <p>Gestión de flujo documental secuencial entre áreas.</p>
     </div>
-    <button class="btn-pro primary" (click)="openUploadModal()" *ngIf="authService.isAuthorized(['operativo', 'contable'])">
+    <button class="btn-pro primary" (click)="openUploadModal()" *ngIf="authService.isAuthorized(['operativo', 'contable', 'gerente', 'coordinador_comercial', 'superadmin'])">
       <span class="material-symbols-outlined">send</span> Nuevo Envío
     </button>
   </header>
@@ -20,7 +20,7 @@
         Historial Procesados
       </button>
     </div>
-    
+
     <div class="filters-container" style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
       <!-- Date Range Filters -->
       <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #64748b;">
@@ -28,7 +28,7 @@
         <input type="date" [(ngModel)]="filterStartDate" (ngModelChange)="currentPage = 1" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; font-size: 0.85rem; background: white;">
         <span>Hasta:</span>
         <input type="date" [(ngModel)]="filterEndDate" (ngModelChange)="currentPage = 1" style="padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; font-size: 0.85rem; background: white;">
-        
+
         <button *ngIf="filterStartDate || filterEndDate" class="btn-pro secondary sm" (click)="filterStartDate = ''; filterEndDate = ''; currentPage = 1;" style="padding: 4px 8px; height: 32px;" title="Limpiar filtros de fecha">
           <span class="material-symbols-outlined" style="font-size: 1.1rem; vertical-align: middle;">backspace</span>
         </button>
@@ -42,46 +42,21 @@
     </div>
   </div>
 
-  <div class="bulk-actions-bar" *ngIf="selectedDocIds.size > 0" style="display: flex; align-items: center; justify-content: space-between; background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 8px; padding: 10px 16px; margin-bottom: 1.5rem;">
-    <div style="display: flex; align-items: center; gap: 8px; color: #0369a1; font-weight: 600; font-size: 0.9rem;">
-      <span class="material-symbols-outlined" style="font-size: 1.3rem;">check_box</span>
-      <span>{{ selectedDocIds.size }} documento(s) seleccionado(s)</span>
-    </div>
-    <div style="display: flex; gap: 10px;">
-      <button class="btn-pro success sm" (click)="bulkUpdateStatus('procesado')" style="display: inline-flex; align-items: center; gap: 6px;">
-        <span class="material-symbols-outlined" style="font-size: 1.1rem;">check_circle</span> Procesar en Bloque
-      </button>
-      <button class="btn-pro danger sm" (click)="bulkUpdateStatus('rechazado')" style="display: inline-flex; align-items: center; gap: 6px;">
-        <span class="material-symbols-outlined" style="font-size: 1.1rem;">cancel</span> Rechazar en Bloque
-      </button>
-      <button class="btn-pro danger sm" *ngIf="canDeleteSelected()" (click)="bulkDelete()" style="display: inline-flex; align-items: center; gap: 6px; background-color: #ef4444; border-color: #ef4444;">
-        <span class="material-symbols-outlined" style="font-size: 1.1rem;">delete</span> Eliminar en Bloque
-      </button>
-    </div>
-  </div>
-
   <div class="card p-0 overflow-hidden shadow-sm">
     <div class="table-scroll-wrapper">
       <table class="pro-table">
         <thead>
           <tr>
-            <th *ngIf="currentTab === 'pendientes'" style="width: 40px; text-align: center; padding-left: 1.5rem;">
-              <input type="checkbox" [checked]="isAllSelected()" (change)="toggleSelectAll()" style="cursor: pointer; width: 16px; height: 16px; accent-color: #3b82f6;">
-            </th>
-            <th (click)="sortBy('titulo')" style="cursor: pointer; user-select: none;">
+            <th (click)="sortBy('titulo')" style="cursor: pointer; user-select: none; padding-left: 1.5rem;">
               Documento
               <span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle; color: #94a3b8;" *ngIf="sortColumn === 'titulo'">{{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
             </th>
-            <th (click)="sortBy('remitente')" style="cursor: pointer; user-select: none;">
-              De/Para
-              <span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle; color: #94a3b8;" *ngIf="sortColumn === 'remitente'">{{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
-            </th>
+            <th>Ruta de aprobación</th>
+            <th>Paso actual</th>
             <th (click)="sortBy('categoria')" style="cursor: pointer; user-select: none;">
               Categoría
               <span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle; color: #94a3b8;" *ngIf="sortColumn === 'categoria'">{{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
             </th>
-            <th>Observaciones</th>
-            <th *ngIf="currentTab === 'procesados'">Motivo de Rechazo</th>
             <th (click)="sortBy('prioridad')" style="cursor: pointer; user-select: none;">
               Prioridad
               <span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle; color: #94a3b8;" *ngIf="sortColumn === 'prioridad'">{{ sortDirection === 'asc' ? 'arrow_upward' : 'arrow_downward' }}</span>
@@ -95,275 +70,125 @@
           </tr>
         </thead>
         <tbody>
-          <ng-container *ngFor="let item of pagedDocuments">
-            <!-- Folder Row -->
-            <tr *ngIf="item.isFolder" class="folder-row" [ngClass]="'row-' + getRemainingTime(item).status">
-              <td *ngIf="currentTab === 'pendientes'" style="width: 40px; text-align: center; padding-left: 1.5rem;">
-                <input type="checkbox" 
-                       [checked]="isFolderSelected(item)" 
-                       [indeterminate]="isFolderIndeterminate(item)"
-                       (change)="toggleSelectFolder(item, $event)" 
-                       style="cursor: pointer; width: 16px; height: 16px; accent-color: #3b82f6;">
-              </td>
-              <td (click)="toggleBatch(item.batch_id, $event)" style="cursor: pointer;">
+          <ng-container *ngFor="let envio of pagedDocuments">
+            <tr [ngClass]="'row-' + getRemainingTime(envio).status">
+              <td (click)="envio.files?.length > 1 ? toggleExpand(envio.id, $event) : null" [style.cursor]="envio.files?.length > 1 ? 'pointer' : 'default'" style="padding-left: 1.5rem;">
                 <div class="doc-cell">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="material-symbols-outlined toggle-icon" style="color: #64748b; font-size: 1.2rem; transition: transform 0.2s;" [style.transform]="isBatchExpanded(item.batch_id) ? 'rotate(90deg)' : 'none'">
+                    <span class="material-symbols-outlined toggle-icon" *ngIf="envio.files?.length > 1" style="color: #64748b; font-size: 1.2rem; transition: transform 0.2s;" [style.transform]="isExpanded(envio.id) ? 'rotate(90deg)' : 'none'">
                       chevron_right
                     </span>
-                    <span class="material-symbols-outlined" style="font-size: 1.3rem; color: #f59e0b; vertical-align: middle;">folder</span>
-                    <strong class="name">{{ item.titulo }}</strong>
-                    <span class="badge" style="background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
-                      {{ item.children.length }} arch.
+                    <span class="material-symbols-outlined" style="font-size: 1.2rem; color: #64748b; vertical-align: middle;">{{ envio.files?.length > 1 ? 'folder' : 'description' }}</span>
+                    <span class="name">{{ envio.titulo }}</span>
+                    <span class="badge" *ngIf="envio.files?.length > 1" style="background: #e2e8f0; color: #475569; padding: 2px 6px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                      {{ envio.files.length }} arch.
                     </span>
                   </div>
-                  <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px;">
-                    <span class="date" style="font-size: 0.75rem; color: #64748b;">Creado: {{ item.created_at | date:'medium' }}</span>
-                    <span class="date" style="font-size: 0.75rem; color: #3b82f6;" [title]="'Última acción: ' + (item.last_modified | date:'medium')">Modificado: {{ item.last_modified | date:'medium' }}</span>
+                  <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px; padding-left: 1.6rem;">
+                    <span class="date" style="font-size: 0.75rem; color: #64748b;">Enviado por: {{ envio.sender?.name }}</span>
+                    <span class="date" style="font-size: 0.75rem; color: #64748b;">Creado: {{ envio.created_at | date:'medium' }}</span>
                   </div>
                 </div>
               </td>
               <td>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">De:</span>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <div class="avatar-sm" style="width: 24px; height: 24px; font-size: 0.7rem; background: #e2e8f0; color: #475569;">
-                        {{ item.sender?.name?.charAt(0) }}
-                      </div>
-                      <strong style="font-size: 0.85rem; color: #334155;">{{ item.sender?.name }}</strong>
-                    </div>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">Para:</span>
-                    <span class="role-badge" [ngClass]="item.target_role" style="font-size: 0.7rem; padding: 2px 8px;">
-                      {{ item.target_role === 'contable' ? 'CONTABILIDAD' : (item.target_role === 'gerente' ? 'GERENCIA PSL' : (item.target_role === 'operativo' ? 'ÁREA ADMINISTRATIVA' : (item.target_role | uppercase))) }}
-                    </span>
-                  </div>
-                </div>
+                <div class="ruta-label">{{ rutaLabel(envio) }}</div>
               </td>
               <td>
-                <span class="cat-label">{{ item.category?.nombre }}</span>
+                <span class="paso-actual-badge">{{ pasoActualLabel(envio) }}</span>
               </td>
               <td>
-                <span class="obs-text" [title]="item.mensaje">{{ item.mensaje || '-' }}</span>
-              </td>
-              <td *ngIf="currentTab === 'procesados'">
-                <span class="obs-text text-danger" [title]="item.children[0]?.motivo_rechazo">{{ item.children[0]?.motivo_rechazo || '-' }}</span>
+                <span class="cat-label">{{ envio.category?.nombre }}</span>
               </td>
               <td>
-                <span class="prio-tag" [style.background]="item.priority?.color">
-                  {{ item.priority?.nombre }}
+                <span class="prio-tag" [style.background]="envio.priority?.color">
+                  {{ envio.priority?.nombre }}
                 </span>
               </td>
               <td>
-                <span class="status-pill" [ngClass]="item.estado">
-                  {{ item.estado === 'visto_bueno' ? 'Visto Bueno' : (item.estado | titlecase) }}
+                <span class="status-pill" [ngClass]="envio.estado_general">
+                  {{ envio.estado_general === 'en_proceso' ? 'En Proceso' : (envio.estado_general | titlecase) }}
                 </span>
               </td>
               <td>
-                <div class="sla-badge" [ngClass]="getRemainingTime(item).status" *ngIf="getRemainingTime(item).status !== 'none'">
+                <div class="sla-badge" [ngClass]="getRemainingTime(envio).status" *ngIf="getRemainingTime(envio).status !== 'none'">
                   <span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 4px; vertical-align: middle;">
-                    {{ getRemainingTime(item).status === 'expired' ? 'error' : 'timer' }}
+                    {{ getRemainingTime(envio).status === 'expired' ? 'error' : 'timer' }}
                   </span>
-                  {{ getRemainingTime(item).text }}
+                  {{ getRemainingTime(envio).text }}
                 </div>
-                <span *ngIf="getRemainingTime(item).status === 'none'" style="color: #94a3b8; font-size: 0.8rem;">N/A</span>
+                <span *ngIf="getRemainingTime(envio).status === 'none'" style="color: #94a3b8; font-size: 0.8rem;">N/A</span>
               </td>
               <td class="text-right" style="padding-right: 1.5rem;">
                 <div class="actions">
-                  <button class="btn-pro secondary sm icon-only" (click)="downloadFolder(item)" title="Descargar Carpeta Completa">
-                    <span class="material-symbols-outlined">download_for_offline</span>
+                  <button class="btn-pro secondary sm icon-only" (click)="verDetalleEnvio(envio)" title="Ver Detalle (observaciones y ruta)">
+                    <span class="material-symbols-outlined">info</span>
                   </button>
-                  <button class="btn-pro danger sm icon-only" *ngIf="folderHasAction(item, 'delete')" (click)="deleteFolder(item)" title="Eliminar Carpeta Completa">
+                  <ng-container *ngIf="envio.files?.length === 1">
+                    <button class="btn-pro secondary sm icon-only" (click)="openViewer(envio, envio.files[0])" title="Visualizar archivo">
+                      <span class="material-symbols-outlined">visibility</span>
+                    </button>
+                    <button class="btn-pro secondary sm icon-only" (click)="downloadFile(envio, envio.files[0])" title="Descargar">
+                      <span class="material-symbols-outlined">download</span>
+                    </button>
+                  </ng-container>
+                  <button class="btn-pro success sm icon-only" *ngIf="canProcessEnvio(envio)" (click)="procesarPaso(envio)" title="Procesar Paso">
+                    <span class="material-symbols-outlined">check_circle</span>
+                  </button>
+                  <button class="btn-pro danger sm icon-only" *ngIf="canProcessEnvio(envio)" (click)="devolverPaso(envio)" title="Devolver Documento">
+                    <span class="material-symbols-outlined">undo</span>
+                  </button>
+                  <button class="btn-pro primary sm icon-only" *ngIf="canResendEnvio(envio)" (click)="reenviarPaso(envio)" title="Reenviar (el rechazo fue un error)">
+                    <span class="material-symbols-outlined">send</span>
+                  </button>
+                  <button class="btn-pro danger sm icon-only" *ngIf="canDeleteEnvio(envio)" (click)="deleteEnvio(envio)" title="Eliminar Envío">
                     <span class="material-symbols-outlined">delete</span>
-                  </button>
-                  <button class="btn-pro success sm icon-only" *ngIf="folderHasAction(item, 'process')" (click)="updateFolderStatus(item, 'procesado')" title="Procesar Carpeta">
-                    <span class="material-symbols-outlined">check_circle</span>
-                  </button>
-                  <button class="btn-pro success sm icon-only" *ngIf="folderHasAction(item, 'visto_bueno')" (click)="updateFolderStatus(item, 'visto_bueno')" title="Dar Visto Bueno a Carpeta" style="background-color: #0284c7; border-color: #0284c7;">
-                    <span class="material-symbols-outlined">thumb_up</span>
-                  </button>
-                  <button class="btn-pro success sm icon-only" *ngIf="folderHasAction(item, 'approve')" (click)="updateFolderStatus(item, 'procesado')" title="Aprobar Carpeta">
-                    <span class="material-symbols-outlined">check_circle</span>
-                  </button>
-                  <button class="btn-pro danger sm icon-only" *ngIf="folderHasAction(item, 'reject')" (click)="updateFolderStatus(item, 'rechazado')" title="Rechazar Carpeta">
-                    <span class="material-symbols-outlined">cancel</span>
                   </button>
                 </div>
               </td>
             </tr>
 
-            <!-- Expanded Child Rows -->
-            <ng-container *ngIf="item.isFolder && isBatchExpanded(item.batch_id)">
-              <tr *ngFor="let child of item.children" class="child-row" [ngClass]="'row-' + getRemainingTime(child).status">
-                <td *ngIf="currentTab === 'pendientes'" style="width: 40px; text-align: center; padding-left: 1.5rem;">
-                  <input type="checkbox" 
-                         *ngIf="child.estado === 'pendiente' && (child.target_role === authService.getActiveRole() || child.sender_id == currentUser?.id || authService.getActiveRole() === 'superadmin')"
-                         [checked]="isDocSelected(child.id)" 
-                         (change)="toggleSelectDoc(child.id)" 
-                         style="cursor: pointer; width: 16px; height: 16px; accent-color: #3b82f6;">
-                </td>
+            <!-- Expanded file rows (envíos con múltiples archivos) -->
+            <ng-container *ngIf="envio.files?.length > 1 && isExpanded(envio.id)">
+              <tr *ngFor="let file of envio.files" class="child-row">
                 <td>
                   <div class="doc-cell" style="padding-left: 1.5rem; position: relative;">
                     <span class="child-tree-line"></span>
                     <div style="display: flex; align-items: center; gap: 6px;">
                       <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #64748b; vertical-align: middle;">description</span>
-                      <span class="name" style="font-weight: 500; font-size: 0.85rem; color: #475569;">{{ child.original_name }}</span>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 2px; padding-left: 1.5rem;">
-                      <span class="date" style="font-size: 0.7rem; color: #64748b;">Creado: {{ child.created_at | date:'medium' }}</span>
-                      <span class="date" style="font-size: 0.7rem; color: #3b82f6;" [title]="'Última acción: ' + (child.last_modified | date:'medium')">Modificado: {{ child.last_modified | date:'medium' }}</span>
+                      <span class="name" style="font-weight: 500; font-size: 0.85rem; color: #475569;">{{ file.original_name }}</span>
                     </div>
                   </div>
                 </td>
                 <td></td>
                 <td></td>
                 <td></td>
-                <td *ngIf="currentTab === 'procesados'">
-                  <span class="obs-text text-danger" [title]="child.motivo_rechazo">{{ child.motivo_rechazo || '-' }}</span>
-                </td>
                 <td></td>
-                <td>
-                  <span class="status-pill" [ngClass]="child.estado" style="font-size: 0.7rem; padding: 2px 8px;">
-                    {{ child.estado === 'visto_bueno' ? 'Visto Bueno' : (child.estado | titlecase) }}
-                  </span>
-                </td>
+                <td></td>
                 <td></td>
                 <td class="text-right" style="padding-right: 1.5rem;">
                   <div class="actions">
-                    <button class="btn-pro secondary sm icon-only" (click)="openViewer(child)" title="Visualizar">
+                    <button class="btn-pro secondary sm icon-only" (click)="openViewer(envio, file)" title="Visualizar">
                       <span class="material-symbols-outlined" style="font-size: 1rem;">visibility</span>
                     </button>
-                    <button class="btn-pro secondary sm icon-only" (click)="downloadFile(child)" title="Descargar">
+                    <button class="btn-pro secondary sm icon-only" (click)="downloadFile(envio, file)" title="Descargar">
                       <span class="material-symbols-outlined" style="font-size: 1rem;">download</span>
-                    </button>
-                    <button class="btn-pro danger sm icon-only" *ngIf="docHasAction(child, 'delete')" (click)="deleteDocument(child)" title="Eliminar Documento">
-                      <span class="material-symbols-outlined" style="font-size: 1rem;">delete</span>
-                    </button>
-                    <button class="btn-pro success sm icon-only" *ngIf="docHasAction(child, 'process')" (click)="updateStatus(child, 'procesado')" title="Marcar como Procesado">
-                      <span class="material-symbols-outlined" style="font-size: 1rem;">check_circle</span>
-                    </button>
-                    <button class="btn-pro success sm icon-only" *ngIf="docHasAction(child, 'visto_bueno')" (click)="updateStatus(child, 'visto_bueno')" title="Dar Visto Bueno" style="background-color: #0284c7; border-color: #0284c7;">
-                      <span class="material-symbols-outlined" style="font-size: 1rem;">thumb_up</span>
-                    </button>
-                    <button class="btn-pro success sm icon-only" *ngIf="docHasAction(child, 'approve')" (click)="updateStatus(child, 'procesado')" title="Aprobar y Procesar">
-                      <span class="material-symbols-outlined" style="font-size: 1rem;">check_circle</span>
-                    </button>
-                    <button class="btn-pro danger sm icon-only" *ngIf="docHasAction(child, 'reject')" (click)="updateStatus(child, 'rechazado')" title="Rechazar">
-                      <span class="material-symbols-outlined" style="font-size: 1rem;">cancel</span>
                     </button>
                   </div>
                 </td>
               </tr>
             </ng-container>
-
-            <!-- Single Document Row -->
-            <tr *ngIf="!item.isFolder" [ngClass]="'row-' + getRemainingTime(item).status">
-              <td *ngIf="currentTab === 'pendientes'" style="width: 40px; text-align: center; padding-left: 1.5rem;">
-                <input type="checkbox" 
-                       *ngIf="item.estado === 'pendiente' && (item.target_role === authService.getActiveRole() || item.sender_id == currentUser?.id || authService.getActiveRole() === 'superadmin')"
-                       [checked]="isDocSelected(item.id)" 
-                       (change)="toggleSelectDoc(item.id)" 
-                       style="cursor: pointer; width: 16px; height: 16px; accent-color: #3b82f6;">
-              </td>
-              <td>
-                <div class="doc-cell">
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #64748b; vertical-align: middle;">description</span>
-                    <span class="name">{{ item.titulo }}</span>
-                  </div>
-                  <div style="display: flex; flex-direction: column; gap: 2px; margin-top: 4px;">
-                    <span class="date" style="font-size: 0.75rem; color: #64748b;">Creado: {{ item.created_at | date:'medium' }}</span>
-                    <span class="date" style="font-size: 0.75rem; color: #3b82f6;" [title]="'Última acción: ' + (item.last_modified | date:'medium')">Modificado: {{ item.last_modified | date:'medium' }}</span>
-                  </div>
-                </div>
-              </td>
-              <td>
-                <div style="display: flex; flex-direction: column; gap: 6px;">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">De:</span>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <div class="avatar-sm" style="width: 24px; height: 24px; font-size: 0.7rem; background: #e2e8f0; color: #475569;">
-                        {{ item.sender?.name?.charAt(0) }}
-                      </div>
-                      <strong style="font-size: 0.85rem; color: #334155;">{{ item.sender?.name }}</strong>
-                    </div>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 0.75rem; color: #64748b; font-weight: 600; width: 35px;">Para:</span>
-                    <span class="role-badge" [ngClass]="item.target_role" style="font-size: 0.7rem; padding: 2px 8px;">
-                      {{ item.target_role === 'contable' ? 'CONTABILIDAD' : (item.target_role === 'gerente' ? 'GERENCIA PSL' : (item.target_role === 'operativo' ? 'ÁREA ADMINISTRATIVA' : (item.target_role | uppercase))) }}
-                    </span>
-                  </div>
-                </div>
-              </td>
-              <td>
-                <span class="cat-label">{{ item.category?.nombre }}</span>
-              </td>
-              <td>
-                <span class="obs-text" [title]="item.mensaje">{{ item.mensaje || '-' }}</span>
-              </td>
-              <td *ngIf="currentTab === 'procesados'">
-                <span class="obs-text text-danger" [title]="item.motivo_rechazo">{{ item.motivo_rechazo || '-' }}</span>
-              </td>
-              <td>
-                <span class="prio-tag" [style.background]="item.priority?.color">
-                  {{ item.priority?.nombre }}
-                </span>
-              </td>
-              <td>
-                <span class="status-pill" [ngClass]="item.estado">
-                  {{ item.estado === 'visto_bueno' ? 'Visto Bueno' : (item.estado | titlecase) }}
-                </span>
-              </td>
-              <td>
-                <div class="sla-badge" [ngClass]="getRemainingTime(item).status" *ngIf="getRemainingTime(item).status !== 'none'">
-                  <span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 4px; vertical-align: middle;">
-                    {{ getRemainingTime(item).status === 'expired' ? 'error' : 'timer' }}
-                  </span>
-                  {{ getRemainingTime(item).text }}
-                </div>
-                <span *ngIf="getRemainingTime(item).status === 'none'" style="color: #94a3b8; font-size: 0.8rem;">N/A</span>
-              </td>
-              <td class="text-right" style="padding-right: 1.5rem;">
-                <div class="actions">
-                  <button class="btn-pro secondary sm icon-only" (click)="openViewer(item)" title="Visualizar">
-                    <span class="material-symbols-outlined">visibility</span>
-                  </button>
-                  <button class="btn-pro secondary sm icon-only" (click)="downloadFile(item)" title="Descargar">
-                    <span class="material-symbols-outlined">download</span>
-                  </button>
-                  <button class="btn-pro danger sm icon-only" *ngIf="docHasAction(item, 'delete')" (click)="deleteDocument(item)" title="Eliminar Documento">
-                    <span class="material-symbols-outlined">delete</span>
-                  </button>
-                  <button class="btn-pro success sm icon-only" *ngIf="docHasAction(item, 'process')" (click)="updateStatus(item, 'procesado')" title="Marcar como Procesado">
-                    <span class="material-symbols-outlined">check_circle</span>
-                  </button>
-                  <button class="btn-pro success sm icon-only" *ngIf="docHasAction(item, 'visto_bueno')" (click)="updateStatus(item, 'visto_bueno')" title="Dar Visto Bueno" style="background-color: #0284c7; border-color: #0284c7;">
-                    <span class="material-symbols-outlined">thumb_up</span>
-                  </button>
-                  <button class="btn-pro success sm icon-only" *ngIf="docHasAction(item, 'approve')" (click)="updateStatus(item, 'procesado')" title="Aprobar y Procesar">
-                    <span class="material-symbols-outlined">check_circle</span>
-                  </button>
-                  <button class="btn-pro danger sm icon-only" *ngIf="docHasAction(item, 'reject')" (click)="updateStatus(item, 'rechazado')" title="Rechazar">
-                    <span class="material-symbols-outlined">cancel</span>
-                  </button>
-                </div>
-              </td>
-            </tr>
           </ng-container>
-          <tr *ngIf="groupedDocuments.length === 0 && !loading">
-            <td colspan="9" class="empty-state">No se han encontrado documentos en esta vista.</td>
+          <tr *ngIf="filteredDocuments.length === 0 && !loading">
+            <td colspan="8" class="empty-state">No se han encontrado documentos en esta vista.</td>
           </tr>
         </tbody>
       </table>
     </div>
-    
+
     <div class="pagination-footer" style="padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; background: #fafafa;">
       <div style="display: flex; align-items: center; gap: 12px;">
         <span style="color: #64748b; font-size: 0.85rem;">
-          Mostrando {{ showingFrom }} a {{ showingTo }} de {{ groupedDocuments.length }} elementos ({{ filteredDocuments.length }} documentos en total)
+          Mostrando {{ showingFrom }} a {{ showingTo }} de {{ filteredDocuments.length }} elementos
         </span>
         <div style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #64748b;">
           <span>| Mostrar</span>
@@ -392,12 +217,12 @@
         <div class="doc-title">
           <span class="material-symbols-outlined">description</span>
           <div>
-            <h4>{{ selectedDoc?.titulo }}</h4>
-            <p>{{ selectedDoc?.created_at | date:'medium' }} - Enviado por {{ selectedDoc?.sender?.name }}</p>
+            <h4>{{ selectedFile?.original_name || selectedEnvio?.titulo }}</h4>
+            <p>{{ selectedEnvio?.created_at | date:'medium' }} - Enviado por {{ selectedEnvio?.sender?.name }}</p>
           </div>
         </div>
         <div class="viewer-actions">
-          <button class="btn-icon" (click)="downloadFile(selectedDoc)" title="Descargar Original">
+          <button class="btn-icon" (click)="downloadFile(selectedEnvio, selectedFile)" title="Descargar Original">
             <span class="material-symbols-outlined">download</span>
           </button>
           <button class="btn-icon close" (click)="closeViewer()">
@@ -408,15 +233,15 @@
 
       <div class="viewer-body">
         <img *ngIf="isImage" [src]="viewerUrl" alt="Documento" class="viewer-image">
-        
+
         <iframe *ngIf="!isImage && !isExcel" [src]="viewerUrl | safeUrl" width="100%" height="100%" frameborder="0"></iframe>
-        
+
         <!-- EXCEL / SPREADSHEET FALLBACK -->
         <div *ngIf="isExcel" style="text-align: center; color: #475569; padding: 2rem;">
            <span class="material-symbols-outlined" style="font-size: 5rem; color: #217346; margin-bottom: 1rem;">table_view</span>
            <h3 style="color: #1e293b; margin-bottom: 0.5rem;">Vista previa no disponible</h3>
            <p style="margin-bottom: 1.5rem; font-size: 0.9rem;">Las hojas de cálculo no pueden visualizarse dentro de la plataforma.</p>
-           <button class="btn-pro primary" (click)="downloadFile(selectedDoc)" style="display: inline-flex; justify-content: center;">
+           <button class="btn-pro primary" (click)="downloadFile(selectedEnvio, selectedFile)" style="display: inline-flex; justify-content: center;">
              <span class="material-symbols-outlined">download</span> Descargar Excel
            </button>
         </div>

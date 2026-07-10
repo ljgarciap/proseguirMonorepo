@@ -1,184 +1,177 @@
 import { Routes } from '@angular/router';
-import { DashboardComponent } from './components/dashboard/dashboard.component';
-import { LogsComponent } from './components/logs/logs.component';
-import { SheetsComponent } from './components/sheets/sheets.component';
-import { UploadComponent } from './components/upload/upload.component';
-import { ContableComponent } from './components/contable/contable.component';
-import { PlanillaComponent } from './components/planilla/planilla.component';
-
-import { ClientUploadComponent } from './components/client-upload/client-upload.component';
-import { OperatorValidationComponent } from './components/operator-validation/operator-validation.component';
-import { LoginComponent } from './components/auth/login/login.component';
 import { roleGuard } from './guards/role.guard';
-import { DocumentConfigComponent } from './components/document-config/document-config.component';
-import { DocumentRequestsComponent } from './components/document-requests/document-requests.component';
-
-import { ProfileSettingsComponent } from './components/profile-settings/profile-settings.component';
-import { UserManagementComponent } from './components/user-management/user-management.component';
-import { MandatosComponent } from './components/mandatos/mandatos.component';
-import { ConciliacionSusuerteComponent } from './components/conciliacion-susuerte/conciliacion-susuerte.component';
-import { ConciliacionSusuerteHistoryComponent } from './components/conciliacion-susuerte-history/conciliacion-susuerte-history.component';
-import { DestinatariosComponent } from './components/destinatarios/destinatarios.component';
-import { NotificacionesComponent } from './components/notificaciones/notificaciones.component';
-import { AsignacionesComponent } from './components/asignaciones/asignaciones.component';
-import { RoadmapComponent } from './components/roadmap/roadmap.component';
 
 export const routes: Routes = [
     { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-    { path: 'login', component: LoginComponent },
-    { 
-        path: 'conciliacion-susuerte', 
-        component: ConciliacionSusuerteComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['superadmin', 'operativo', 'gerente', 'contable'] } 
+    {
+        path: 'login',
+        loadComponent: () => import('./components/auth/login/login.component').then(m => m.LoginComponent)
     },
-    { 
-        path: 'conciliacion-susuerte-history', 
-        component: ConciliacionSusuerteHistoryComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['superadmin', 'operativo', 'gerente', 'contable'] } 
+    {
+        path: 'conciliacion-susuerte',
+        loadComponent: () => import('./components/conciliacion-susuerte/conciliacion-susuerte.component').then(m => m.ConciliacionSusuerteComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin', 'operativo', 'gerente', 'contable'] }
     },
-    { 
-        path: 'mandatos', 
-        component: MandatosComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['cliente', 'superadmin', 'operativo', 'gerente', 'contable'] } 
+    {
+        path: 'conciliacion-susuerte-history',
+        loadComponent: () => import('./components/conciliacion-susuerte-history/conciliacion-susuerte-history.component').then(m => m.ConciliacionSusuerteHistoryComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin', 'operativo', 'gerente', 'contable'] }
     },
-    { 
-        path: 'profile', 
-        component: ProfileSettingsComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['gerente', 'operativo', 'cliente', 'contable', 'superadmin'] } 
+    {
+        path: 'mandatos',
+        loadComponent: () => import('./components/mandatos/mandatos.component').then(m => m.MandatosComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['cliente', 'superadmin', 'operativo', 'gerente', 'contable'] }
     },
-    { 
-        path: 'dashboard', 
-        component: DashboardComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['gerente', 'operativo', 'contable', 'superadmin'] } 
+    {
+        path: 'profile',
+        loadComponent: () => import('./components/profile-settings/profile-settings.component').then(m => m.ProfileSettingsComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['gerente', 'operativo', 'cliente', 'contable', 'superadmin'] }
     },
-    { 
-        path: 'logs', 
-        component: LogsComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['gerente', 'operativo', 'contable', 'superadmin'] } 
+    {
+        path: 'dashboard',
+        loadComponent: () => import('./components/dashboard/dashboard.component').then(m => m.DashboardComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['gerente', 'operativo', 'contable', 'superadmin'] }
     },
-    { 
-        path: 'sheets', 
-        component: SheetsComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['operativo'] } 
+    {
+        path: 'logs',
+        loadComponent: () => import('./components/logs/logs.component').then(m => m.LogsComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['gerente', 'operativo', 'contable', 'superadmin'] }
     },
-    { 
-        path: 'upload', 
-        component: UploadComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['operativo'] } 
+    {
+        path: 'sheets',
+        loadComponent: () => import('./components/sheets/sheets.component').then(m => m.SheetsComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['operativo'] }
     },
-    { 
-        path: 'contable', 
-        component: ContableComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['operativo'] } 
+    {
+        path: 'upload',
+        loadComponent: () => import('./components/upload/upload.component').then(m => m.UploadComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['operativo'] }
     },
-    { 
-        path: 'planilla', 
-        component: PlanillaComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['operativo'] } 
+    {
+        path: 'contable',
+        loadComponent: () => import('./components/contable/contable.component').then(m => m.ContableComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['operativo'] }
     },
-    { 
-        path: 'client-upload', 
-        component: ClientUploadComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['cliente'] } 
+    {
+        path: 'planilla',
+        loadComponent: () => import('./components/planilla/planilla.component').then(m => m.PlanillaComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['operativo'] }
     },
-    { 
-        path: 'validation', 
-        component: OperatorValidationComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['operativo', 'gerente'] } 
+    {
+        path: 'client-upload',
+        loadComponent: () => import('./components/client-upload/client-upload.component').then(m => m.ClientUploadComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['cliente'] }
     },
-    { 
-        path: 'users', 
-        component: UserManagementComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['superadmin'] } 
+    {
+        path: 'validation',
+        loadComponent: () => import('./components/operator-validation/operator-validation.component').then(m => m.OperatorValidationComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['operativo', 'gerente'] }
     },
-    { 
-        path: 'destinatarios', 
-        component: DestinatariosComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['superadmin'] } 
+    {
+        path: 'users',
+        loadComponent: () => import('./components/user-management/user-management.component').then(m => m.UserManagementComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
     },
-    { 
-        path: 'notificaciones', 
-        component: NotificacionesComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['superadmin'] } 
+    {
+        path: 'destinatarios',
+        loadComponent: () => import('./components/destinatarios/destinatarios.component').then(m => m.DestinatariosComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
     },
-    { 
-        path: 'asignaciones', 
-        component: AsignacionesComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['superadmin'] } 
+    {
+        path: 'notificaciones',
+        loadComponent: () => import('./components/notificaciones/notificaciones.component').then(m => m.NotificacionesComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
     },
-    { 
-        path: 'parameters', 
-        loadComponent: () => import('./components/parameters/parameters.component').then(m => m.ParametersComponent), 
-        canActivate: [roleGuard], 
-        data: { roles: ['superadmin'] } 
+    {
+        path: 'asignaciones',
+        loadComponent: () => import('./components/asignaciones/asignaciones.component').then(m => m.AsignacionesComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
     },
-    { 
-        path: 'internal-docs', 
-        loadComponent: () => import('./components/internal-docs/internal-docs.component').then(m => m.InternalDocsComponent), 
-        canActivate: [roleGuard], 
-        data: { roles: ['operativo', 'contable', 'gerente', 'superadmin'] } 
+    {
+        path: 'parameters',
+        loadComponent: () => import('./components/parameters/parameters.component').then(m => m.ParametersComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
     },
-    { 
-        path: 'creditos', 
-        loadComponent: () => import('./components/credito-ordinario/credito-ordinario.component').then(m => m.CreditoOrdinarioComponent), 
-        canActivate: [roleGuard], 
-        data: { roles: ['cliente', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'] } 
+    {
+        path: 'internal-docs',
+        loadComponent: () => import('./components/internal-docs/internal-docs.component').then(m => m.InternalDocsComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['operativo', 'contable', 'gerente', 'superadmin'] }
     },
-    { 
-        path: 'solicitudes-credito', 
-        loadComponent: () => import('./components/solicitudes-credito/solicitudes-credito.component').then(m => m.SolicitudesCreditoComponent), 
-        canActivate: [roleGuard], 
-        data: { roles: ['superadmin', 'gerente', 'coordinador_comercial', 'operativo'] } 
+    {
+        path: 'creditos',
+        loadComponent: () => import('./components/credito-ordinario/credito-ordinario.component').then(m => m.CreditoOrdinarioComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['cliente', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'] }
     },
-    { 
-        path: 'db-cleaner', 
-        loadComponent: () => import('./components/db-cleaner/db-cleaner.component').then(m => m.DbCleanerComponent), 
-        canActivate: [roleGuard], 
-        data: { roles: ['superadmin'] } 
+    {
+        path: 'solicitudes-credito',
+        loadComponent: () => import('./components/solicitudes-credito/solicitudes-credito.component').then(m => m.SolicitudesCreditoComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin', 'gerente', 'coordinador_comercial', 'operativo'] }
     },
-    { 
-        path: 'document-requests', 
-        component: DocumentRequestsComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['operativo', 'superadmin'] } 
+    {
+        path: 'db-cleaner',
+        loadComponent: () => import('./components/db-cleaner/db-cleaner.component').then(m => m.DbCleanerComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
     },
-    { 
-        path: 'document-config', 
-        component: DocumentConfigComponent, 
-        canActivate: [roleGuard], 
-        data: { roles: ['operativo', 'superadmin'] } 
+    {
+        path: 'configuraciones',
+        loadComponent: () => import('./components/configuraciones/configuraciones.component').then(m => m.ConfiguracionesComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
     },
-    { 
-        path: 'clientes', 
-        loadComponent: () => import('./components/clientes/clientes.component').then(m => m.ClientesComponent), 
-        canActivate: [roleGuard], 
-        data: { roles: ['superadmin', 'gerente', 'operativo'] } 
+    {
+        path: 'document-areas',
+        loadComponent: () => import('./components/document-areas/document-areas.component').then(m => m.DocumentAreasComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
     },
-    { 
-        path: 'visitas', 
-        loadComponent: () => import('./components/visitas/visitas.component').then(m => m.VisitasComponent), 
-        canActivate: [roleGuard], 
-        data: { roles: ['superadmin', 'gerente', 'operativo'] } 
+    {
+        path: 'document-requests',
+        loadComponent: () => import('./components/document-requests/document-requests.component').then(m => m.DocumentRequestsComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['operativo', 'superadmin'] }
+    },
+    {
+        path: 'document-config',
+        loadComponent: () => import('./components/document-config/document-config.component').then(m => m.DocumentConfigComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['operativo', 'superadmin'] }
+    },
+    {
+        path: 'clientes',
+        loadComponent: () => import('./components/clientes/clientes.component').then(m => m.ClientesComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin', 'gerente', 'operativo'] }
+    },
+    {
+        path: 'visitas',
+        loadComponent: () => import('./components/visitas/visitas.component').then(m => m.VisitasComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin', 'gerente', 'operativo'] }
     },
     {
         path: 'roadmap',
-        component: RoadmapComponent,
+        loadComponent: () => import('./components/roadmap/roadmap.component').then(m => m.RoadmapComponent),
         canActivate: [roleGuard],
         data: { roles: ['superadmin'] }
     },

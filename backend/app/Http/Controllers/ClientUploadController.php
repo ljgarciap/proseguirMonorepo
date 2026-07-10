@@ -15,7 +15,7 @@ class ClientUploadController extends Controller
         $query = ClientUpload::with(['user', 'validator', 'approver']);
 
         // Roles Filtering
-        if (in_array('cliente', $user->roles) && count($user->roles) === 1) {
+        if (in_array('cliente', $user->roles) && !array_intersect($user->roles, ['superadmin', 'gerente', 'operativo', 'contable', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'])) {
             $query->where('user_id', $user->id);
         } else {
             // Operativos/Gerentes/Superadmins: solo deben ver lo que se subió CON ROL de cliente
@@ -48,23 +48,28 @@ class ClientUploadController extends Controller
             'file' => 'required|file|max:102400', 
             'active_role' => 'nullable|string',
             'document_request_item_id' => 'nullable|exists:document_request_items,id',
-            'category' => 'nullable|string'
+            'category' => 'nullable|string',
+            'categoria' => 'nullable|string'
         ]);
 
         $file = $request->file('file');
         $path = $file->store('client_uploads');
 
+        $category = $request->category ?? $request->categoria;
+
         $upload = ClientUpload::create([
             'user_id' => $request->user()->id,
             'upload_role' => $request->active_role ?? 'cliente',
-            'category' => $request->category,
+            'category' => $category,
             'filename' => $path,
             'original_name' => $file->getClientOriginalName(),
             'status' => 'pendiente',
+            'ocr_status' => 'procesando',
+            'ocr_message' => 'Enviado a cola de procesamiento'
         ]);
 
-        if ($request->filled('categoria')) {
-            \Illuminate\Support\Facades\Cache::put("pending_upload_{$request->categoria}", $upload->id, 300);
+        if ($category) {
+            \Illuminate\Support\Facades\Cache::put("pending_upload_{$category}", $upload->id, 300);
         }
 
         if ($request->filled('document_request_item_id')) {
@@ -76,32 +81,49 @@ class ClientUploadController extends Controller
             ]);
         }
 
-        // REENVÍO INTERNO A n8n (Sin CORS, sin Firewall)
+        // Dispatch OCR processing job
         try {
-            $webhookUrl = config('services.n8n.webhook_url');
-            \Illuminate\Support\Facades\Log::info("Intentando enviar a n8n: " . $webhookUrl);
-            
-            if ($webhookUrl) {
-                $response = \Illuminate\Support\Facades\Http::attach(
-                    'data', 
-                    file_get_contents($file->getRealPath()), 
-                    $file->getClientOriginalName()
-                )->post($webhookUrl, [
-                    'upload_id' => $upload->id,
-                    'user_id' => $upload->user_id,
-                    'original_name' => $upload->original_name,
-                    'categoria' => $request->categoria
-                ]);
-                \Illuminate\Support\Facades\Log::info("Respuesta de n8n: " . $response->status());
-                \Illuminate\Support\Facades\Log::info("[DEBUG] categoria enviada a n8n: " . ($request->categoria ?? 'NO_ENVIADA') . " | archivo: " . $upload->original_name);
+            if ($category) {
+                \App\Jobs\ProcessUploadJob::dispatch($upload->id, $category);
+                \Illuminate\Support\Facades\Log::info("Despachado ProcessUploadJob local para upload ID: {$upload->id}, categoria: {$category}");
             } else {
-                \Illuminate\Support\Facades\Log::warning("No se encontró N8N_INTERNAL_WEBHOOK_URL en la configuración.");
+                $upload->update([
+                    'ocr_status' => 'exitoso',
+                    'ocr_message' => 'No requiere procesamiento OCR'
+                ]);
+                \Illuminate\Support\Facades\Log::warning("No se especificó categoría para el upload ID: {$upload->id}, omitiendo procesamiento OCR.");
             }
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("Error enviando a n8n: " . $e->getMessage());
+            $upload->update([
+                'ocr_status' => 'fallido',
+                'ocr_message' => 'Error al despachar trabajo: ' . $e->getMessage()
+            ]);
+            \Illuminate\Support\Facades\Log::error("Error despachando ProcessUploadJob: " . $e->getMessage());
         }
 
         return response()->json($upload);
+    }
+
+    public function recentOcr(Request $request)
+    {
+        $user = $request->user();
+        $query = ClientUpload::query();
+
+        // Si es cliente, solo ve los suyos
+        if (in_array('cliente', $user->roles) && !array_intersect($user->roles, ['superadmin', 'gerente', 'operativo', 'contable', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'])) {
+            $query->where('user_id', $user->id);
+        }
+
+        // Obtener los últimos 5 archivos subidos en las últimas 24 horas o que estén procesando
+        $uploads = $query->where(function($q) {
+            $q->where('created_at', '>=', now()->subHours(24))
+              ->orWhere('ocr_status', 'procesando');
+        })
+        ->orderBy('created_at', 'desc')
+        ->limit(5)
+        ->get();
+
+        return response()->json($uploads);
     }
 
     public function validateUpload(Request $request, $id)
@@ -170,19 +192,19 @@ class ClientUploadController extends Controller
         
         $baseQuery = ClientUpload::where('upload_role', 'cliente');
 
-        if (in_array('cliente', $user->roles) && count($user->roles) === 1) {
+        if (in_array('cliente', $user->roles) && !array_intersect($user->roles, ['superadmin', 'gerente', 'operativo', 'contable', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'])) {
             $baseQuery->where('user_id', $user->id);
         }
 
         $operativoCount = (clone $baseQuery)->where('status', 'pendiente')->count();
         $gerenteCount = (clone $baseQuery)->where('status', 'validado')->count();
 
-        // Documentos Internos Pendientes
+        // Documentos Internos Pendientes (bandeja vieja, target_role fijo)
         $internalContable = \App\Models\InternalDocument::where('target_role', 'contable')->where('estado', 'pendiente')->count();
         $internalGerente = \App\Models\InternalDocument::where('target_role', 'gerente')->where('estado', 'pendiente')->count();
         $internalOperativo = \App\Models\InternalDocument::where('target_role', 'operativo')->where('estado', 'pendiente')->count();
 
-        // Documentos Internos por Vencer (< 2 horas)
+        // Documentos Internos por Vencer (< 2 horas) - bandeja vieja
         $expiringContable = 0;
         $expiringGerente = 0;
         $expiringOperativo = 0;
@@ -195,6 +217,33 @@ class ClientUploadController extends Controller
                     if ($doc->target_role === 'contable') $expiringContable++;
                     if ($doc->target_role === 'gerente') $expiringGerente++;
                     if ($doc->target_role === 'operativo') $expiringOperativo++;
+                }
+            }
+        }
+
+        // Envíos de la Bandeja Interna nueva (SCRUM-94): pasos pendientes cuyo turno es el actual
+        $pasosActuales = \App\Models\DocumentEnvioStep::with(['area', 'envio.priority'])
+            ->where('estado', 'pendiente')
+            ->get()
+            ->filter(fn($step) => $step->envio && $step->orden === $step->envio->current_step_order);
+
+        foreach ($pasosActuales as $step) {
+            switch ($step->area?->codigo) {
+                case 'contable': $internalContable++; break;
+                case 'gerente': $internalGerente++; break;
+                case 'operativo': $internalOperativo++; break;
+            }
+
+            $envio = $step->envio;
+            if ($envio->priority && $envio->priority->horas_vencimiento) {
+                $expiresAt = $envio->created_at->copy()->addHours($envio->priority->horas_vencimiento);
+                $hoursRemaining = now()->diffInHours($expiresAt, false);
+                if ($hoursRemaining <= 2) {
+                    switch ($step->area?->codigo) {
+                        case 'contable': $expiringContable++; break;
+                        case 'gerente': $expiringGerente++; break;
+                        case 'operativo': $expiringOperativo++; break;
+                    }
                 }
             }
         }
@@ -221,7 +270,7 @@ class ClientUploadController extends Controller
         $user = $request->user();
 
         // Si es cliente, validar que sea su propio archivo
-        if (in_array('cliente', $user->roles) && count($user->roles) === 1) {
+        if (in_array('cliente', $user->roles) && !array_intersect($user->roles, ['superadmin', 'gerente', 'operativo', 'contable', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'])) {
             if ($upload->user_id !== $user->id) {
                 return response()->json(['message' => 'No tienes permiso para ver este archivo.'], 403);
             }

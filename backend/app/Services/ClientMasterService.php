@@ -7,6 +7,8 @@ use App\Models\SystemLog;
 
 class ClientMasterService
 {
+    protected static array $resolvedClients = [];
+
     /**
      * Master a client's data.
      * Returns the master identification for the operation.
@@ -20,6 +22,11 @@ class ClientMasterService
         // 1. Normalize data
         $nombre = trim($nombre);
         $nitBase = preg_replace('/[^0-9]/', '', $identificacion);
+
+        $cacheKey = $nombre . '|' . $nitBase;
+        if (isset(self::$resolvedClients[$cacheKey])) {
+            return self::$resolvedClients[$cacheKey];
+        }
         
         // 2. SEARCH BY NIT FIRST (Unique Identifier)
         // This avoids 1062 Duplicate Entry errors
@@ -34,12 +41,14 @@ class ClientMasterService
                     'records_processed' => 0
                 ]);
             }
+            self::$resolvedClients[$cacheKey] = $clientByNit->identificacion;
             return $clientByNit->identificacion;
         }
 
         // 3. Search by name (Fallback)
         $clientByName = Cliente::where('nombre', $nombre)->first();
         if ($clientByName) {
+            self::$resolvedClients[$cacheKey] = $clientByName->identificacion;
             return $clientByName->identificacion;
         }
 
@@ -57,10 +66,14 @@ class ClientMasterService
         } catch (\Exception $e) {
             // Final fallback: if creation fails due to race condition or hidden constraint
             $retry = Cliente::where('identificacion', $nitBase)->first();
-            if ($retry) return $retry->identificacion;
+            if ($retry) {
+                self::$resolvedClients[$cacheKey] = $retry->identificacion;
+                return $retry->identificacion;
+            }
             throw $e;
         }
 
+        self::$resolvedClients[$cacheKey] = $nitBase;
         return $nitBase;
     }
 }

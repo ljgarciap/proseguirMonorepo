@@ -9,17 +9,18 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class MandatoController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = auth()->user();
         $roles = $user->roles ?? [];
         $isAdminOrOp = in_array('superadmin', $roles) || in_array('operativo', $roles);
+        $perPage = (int) $request->get('perPage', 50);
 
-        if ($isAdminOrOp) {
-            return response()->json(Mandato::with('user')->orderBy('created_at', 'desc')->get());
-        }
+        $query = $isAdminOrOp
+            ? Mandato::with('user')->orderBy('created_at', 'desc')
+            : Mandato::where('user_id', $user->id)->orderBy('created_at', 'desc');
 
-        return response()->json(Mandato::where('user_id', $user->id)->orderBy('created_at', 'desc')->get());
+        return response()->json($query->paginate($perPage));
     }
 
     public function updateStatus(Request $request, $id)

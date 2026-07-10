@@ -20,6 +20,9 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             SectorSeeder::class,
             AccountingParameterSeeder::class,
+            ConfiguracionSeeder::class,
+            DocumentAreaSeeder::class,
+            ColombiaGeografiaSeeder::class,
         ]);
     }
 }

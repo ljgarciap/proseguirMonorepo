@@ -3,12 +3,13 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
+import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-solicitudes-credito',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MilesSeparatorDirective],
   templateUrl: './solicitudes-credito.component.html',
   styleUrls: ['./solicitudes-credito.component.css']
 })
@@ -83,14 +84,6 @@ export class SolicitudesCreditoComponent implements OnInit {
     mensaje_notificacion: ''
   };
 
-  // Schemes of amortization from description
-  amortizacionPresets = [
-    { nombre: 'Interés Mensual Capital Mensual', codigo: 'INT_MEN_CAP_MEN' },
-    { nombre: 'Interés y Capital Trimestral', codigo: 'INT_CAP_TRI' },
-    { nombre: 'Cuota Fija Mensual', codigo: 'CUOTA_FIJA_MEN' },
-    { nombre: 'Interés Mensual y Capital Semestral', codigo: 'INT_MEN_CAP_SEM' }
-  ];
-
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
@@ -124,17 +117,17 @@ export class SolicitudesCreditoComponent implements OnInit {
 
   loadDropdowns() {
     // Clientes
-    this.http.get<any[]>(`${environment.apiUrl}/clientes?activo=true`).subscribe(data => this.activeClientes = data);
+    this.http.get<any[]>(`${environment.apiUrl}/clientes?activo=true`).subscribe({ next: data => this.activeClientes = data, error: () => {} });
     // Tipos Credito
-    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_creditos`).subscribe(data => this.tipoCreditos = data);
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_creditos`).subscribe({ next: data => this.tipoCreditos = data, error: () => {} });
     // Amortizaciones
-    this.http.get<any[]>(`${environment.apiUrl}/parameters/amortizaciones`).subscribe(data => this.amortizaciones = data);
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/amortizaciones`).subscribe({ next: data => this.amortizaciones = data, error: () => {} });
     // Document Types
-    this.http.get<any[]>(`${environment.apiUrl}/document-types`).subscribe(data => this.documentTypes = data);
+    this.http.get<any[]>(`${environment.apiUrl}/document-types`).subscribe({ next: data => this.documentTypes = data, error: () => {} });
     // Tipo Personas (Natural / Jurídica)
-    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_personas`).subscribe(data => this.tipoPersonas = data);
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_personas`).subscribe({ next: data => this.tipoPersonas = data, error: () => {} });
     // Presets
-    this.http.get<any[]>(`${environment.apiUrl}/document-presets`).subscribe(data => this.presets = data);
+    this.http.get<any[]>(`${environment.apiUrl}/document-presets`).subscribe({ next: data => this.presets = data, error: () => {} });
   }
 
   switchTab(tab: 'pendientes' | 'registrar') {

@@ -261,3 +261,15 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* Ensure SweetAlert is always displayed above modal layers */
+body .swal2-container, .swal2-container {
+  z-index: 999999 !important;
+}
+
+/* Invalid form controls highlight */
+.pro-input.is-invalid {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+  background-color: #fef2f2 !important;
+}
+

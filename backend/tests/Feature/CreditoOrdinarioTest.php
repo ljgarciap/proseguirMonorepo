@@ -8,6 +8,7 @@ use App\Models\CreditoOrdinario;
 use App\Models\Cliente;
 use App\Models\TipoPersona;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Passport\Passport;
 use Tests\TestCase;
@@ -35,7 +36,6 @@ class CreditoOrdinarioTest extends TestCase
         $this->docCC = DocumentType::create(['nombre' => 'Cédula', 'codigo' => 'CC']);
         $this->tipoNatural = TipoPersona::firstOrCreate(['codigo' => 'NATURAL'], ['nombre' => 'Persona Natural']);
 
-        // Create Cliente User
         $this->cliente = User::create([
             'name' => 'Cliente Test',
             'email' => 'cliente.test@test.com',
@@ -45,7 +45,6 @@ class CreditoOrdinarioTest extends TestCase
             'roles' => ['cliente']
         ]);
 
-        // Create Staff Users
         $this->coordinador = User::create([
             'name' => 'Coordinador Test',
             'email' => 'coordinador.test@test.com',
@@ -110,277 +109,210 @@ class CreditoOrdinarioTest extends TestCase
         ]);
     }
 
+    private function pdf(string $name = 'doc.pdf'): UploadedFile
+    {
+        return UploadedFile::fake()->create($name, 100, 'application/pdf');
+    }
+
+    private function subirArchivo(int $creditoId, string $campo, string $rol, string $nombre = 'doc.pdf'): \Illuminate\Testing\TestResponse
+    {
+        return $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion'          => 'subir_archivo',
+            'campo_documento' => $campo,
+            'archivo'         => $this->pdf($nombre),
+        ], ['X-Active-Role' => $rol]);
+    }
+
     public function test_full_bpmn_transitions_and_devoluciones(): void
     {
         Passport::actingAs($this->admin);
 
-        // 1. Store/Create Credit Request
+        // 1. Create Credit Request
         $response = $this->postJson('/api/creditos', [
-            'monto' => 50000000.00,
+            'monto'       => 50000000.00,
             'plazo_meses' => 24,
-            'cliente_id' => $this->cliente->id
+            'cliente_id'  => $this->cliente->id
         ], ['X-Active-Role' => 'superadmin']);
 
         $response->assertStatus(201);
         $creditoId = $response->json('id');
+        $this->assertDatabaseHas('credito_ordinarios', ['id' => $creditoId, 'estado' => 'revision_documental']);
 
-        $this->assertDatabaseHas('credito_ordinarios', [
-            'id' => $creditoId,
-            'estado' => 'revision_documental'
-        ]);
-
-        // 2. Coordinador Comercial approves initial documental revision
+        // 2. Coordinador approves documental revision
         Passport::actingAs($this->coordinador);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'aprobar',
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion'     => 'aprobar',
             'comentario' => 'Documentación inicial correcta.'
-        ], ['X-Active-Role' => 'coordinador_comercial']);
+        ], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'analisis_sarlaft_financiero');
 
-        $response->assertStatus(200);
-        $this->assertEquals('analisis_sarlaft_financiero', $response->json('estado'));
-
-        // 3. Parallel Analysis (Oficial de Cumplimiento and Coordinador Comercial upload documents)
-        // Cumplimiento uploads sarlft_sintesis
+        // 3. Parallel analysis: Cumplimiento uploads SARLAFT docs
         Passport::actingAs($this->cumplimiento);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'subir_archivo',
-            'campo_documento' => 'sarlft_sintesis',
-            'archivo' => 'data:application/pdf;base64,dGVzdA==',
-            'archivo_nombre' => 'sintesis.pdf'
-        ], ['X-Active-Role' => 'oficial_cumplimiento']);
-        $response->assertStatus(200);
-        $this->assertEquals('analisis_sarlaft_financiero', $response->json('estado'));
+        $this->subirArchivo($creditoId, 'sarlft_sintesis', 'oficial_cumplimiento', 'sintesis.pdf')
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'analisis_sarlaft_financiero');
 
-        // Cumplimiento uploads sarlft_datacredito
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'subir_archivo',
-            'campo_documento' => 'sarlft_datacredito',
-            'archivo' => 'data:application/pdf;base64,dGVzdA==',
-            'archivo_nombre' => 'datacredito.pdf'
-        ], ['X-Active-Role' => 'oficial_cumplimiento']);
-        $response->assertStatus(200);
+        $this->subirArchivo($creditoId, 'sarlft_datacredito', 'oficial_cumplimiento', 'datacredito.pdf')
+            ->assertStatus(200);
 
-        // Comercial uploads analisis_financiero
+        // Coordinador uploads financial docs
         Passport::actingAs($this->coordinador);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'subir_archivo',
-            'campo_documento' => 'analisis_financiero',
-            'archivo' => 'data:application/pdf;base64,dGVzdA==',
-            'archivo_nombre' => 'analisis.pdf'
-        ], ['X-Active-Role' => 'coordinador_comercial']);
-        $response->assertStatus(200);
+        $this->subirArchivo($creditoId, 'analisis_financiero', 'coordinador_comercial', 'analisis.pdf')
+            ->assertStatus(200);
 
-        // Comercial uploads presentacion_comite -> triggers automatic transition to aprobacion_presentacion
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'subir_archivo',
-            'campo_documento' => 'presentacion_comite',
-            'archivo' => 'data:application/pdf;base64,dGVzdA==',
-            'archivo_nombre' => 'presentacion.pdf'
-        ], ['X-Active-Role' => 'coordinador_comercial']);
-        $response->assertStatus(200);
-        $this->assertEquals('aprobacion_presentacion', $response->json('estado'));
+        // Last doc triggers auto-transition to aprobacion_presentacion
+        $this->subirArchivo($creditoId, 'presentacion_comite', 'coordinador_comercial', 'presentacion.pdf')
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'aprobacion_presentacion');
 
-        // 4. Gerente rejects presentation first (returns to analysis)
+        // 4. Gerente rejects (returns to analisis) then re-approves
         Passport::actingAs($this->gerente);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'rechazar',
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion'     => 'rechazar',
             'comentario' => 'Revisar datos financieros'
-        ], ['X-Active-Role' => 'gerente']);
-        $response->assertStatus(200);
-        $this->assertEquals('analisis_sarlaft_financiero', $response->json('estado'));
+        ], ['X-Active-Role' => 'gerente'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'analisis_sarlaft_financiero');
 
-        // Re-upload presentacion_comite to trigger back to Gerente
         Passport::actingAs($this->coordinador);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'subir_archivo',
-            'campo_documento' => 'presentacion_comite',
-            'archivo' => 'data:application/pdf;base64,dGVzdA==',
-            'archivo_nombre' => 'presentacion_v2.pdf'
-        ], ['X-Active-Role' => 'coordinador_comercial']);
-        $response->assertStatus(200);
-        $this->assertEquals('aprobacion_presentacion', $response->json('estado'));
+        $this->subirArchivo($creditoId, 'presentacion_comite', 'coordinador_comercial', 'presentacion_v2.pdf')
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'aprobacion_presentacion');
 
-        // Gerente approves presentation
         Passport::actingAs($this->gerente);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'aprobar',
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion'     => 'aprobar',
             'comentario' => 'Presentación lista.'
-        ], ['X-Active-Role' => 'gerente']);
-        $response->assertStatus(200);
-        $this->assertEquals('comite_evaluacion', $response->json('estado'));
+        ], ['X-Active-Role' => 'gerente'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'comite_evaluacion');
 
-        // 5. Comite de Credito returns (devolver) to Gerente first
+        // 5. Comité devuelve a Gerente, luego re-aprueba
         Passport::actingAs($this->comite);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'devolver',
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion'     => 'devolver',
             'comentario' => 'El monto es muy alto, ajustar propuesta'
-        ], ['X-Active-Role' => 'comite_credito']);
-        $response->assertStatus(200);
-        $this->assertEquals('aprobacion_presentacion', $response->json('estado'));
+        ], ['X-Active-Role' => 'comite_credito'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'aprobacion_presentacion');
 
-        // Re-approve by Gerente to go back to Comite
         Passport::actingAs($this->gerente);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
             'accion' => 'aprobar'
-        ], ['X-Active-Role' => 'gerente']);
-        $response->assertStatus(200);
-        $this->assertEquals('comite_evaluacion', $response->json('estado'));
+        ], ['X-Active-Role' => 'gerente'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'comite_evaluacion');
 
-        // Comite uploads Acta and approves
+        // Comité sube acta y aprueba
         Passport::actingAs($this->comite);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'subir_archivo',
-            'campo_documento' => 'acta_comite_firmada',
-            'archivo' => 'data:application/pdf;base64,dGVzdA==',
-            'archivo_nombre' => 'acta.pdf'
-        ], ['X-Active-Role' => 'comite_credito']);
-        $response->assertStatus(200);
+        $this->subirArchivo($creditoId, 'acta_comite_firmada', 'comite_credito', 'acta.pdf')
+            ->assertStatus(200);
 
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'aprobar',
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion'     => 'aprobar',
             'comentario' => 'Aprobado por unanimidad.'
-        ], ['X-Active-Role' => 'comite_credito']);
-        $response->assertStatus(200);
-        $this->assertEquals('formalizacion_garantias', $response->json('estado'));
+        ], ['X-Active-Role' => 'comite_credito'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'formalizacion_garantias');
 
-        // 6. Guarantees stage - Cliente uploads signed guarantees
+        // 6. Garantías: cliente sube, operativo rechaza (limpia archivo), cliente re-sube, operativo aprueba
         Passport::actingAs($this->cliente);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'subir_archivo',
-            'campo_documento' => 'garantias_firmadas',
-            'archivo' => 'data:application/pdf;base64,dGVzdA==',
-            'archivo_nombre' => 'firmadas.pdf'
-        ], ['X-Active-Role' => 'cliente']);
-        $response->assertStatus(200);
+        $this->subirArchivo($creditoId, 'garantias_firmadas', 'cliente', 'firmadas.pdf')
+            ->assertStatus(200);
 
-        // Operativo rejects guarantees first (clears signed file, remains in guarantees)
         Passport::actingAs($this->operativo);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'rechazar',
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion'     => 'rechazar',
             'comentario' => 'Falta firma en página 3'
-        ], ['X-Active-Role' => 'operativo']);
-        $response->assertStatus(200);
-        $this->assertEquals('formalizacion_garantias', $response->json('estado'));
-        $this->assertNull($response->json('documentos.garantias_firmadas'));
+        ], ['X-Active-Role' => 'operativo'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'formalizacion_garantias')
+            ->assertJsonPath('documentos.garantias_firmadas', null);
 
-        // Re-upload and approve garantías
         Passport::actingAs($this->cliente);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'subir_archivo',
-            'campo_documento' => 'garantias_firmadas',
-            'archivo' => 'data:application/pdf;base64,dGVzdA==',
-            'archivo_nombre' => 'firmadas_corregidas.pdf'
-        ], ['X-Active-Role' => 'cliente']);
-        $response->assertStatus(200);
+        $this->subirArchivo($creditoId, 'garantias_firmadas', 'cliente', 'firmadas_corregidas.pdf')
+            ->assertStatus(200);
 
         Passport::actingAs($this->operativo);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
             'accion' => 'aprobar'
-        ], ['X-Active-Role' => 'operativo']);
-        $response->assertStatus(200);
-        $this->assertEquals('aprobacion_registro_cyf', $response->json('estado'));
+        ], ['X-Active-Role' => 'operativo'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'aprobacion_registro_cyf');
 
-        // 7. CYF Registration - Comercial uploads support
+        // 7. CYF: comercial sube, gerente rechaza (limpia), comercial re-sube, gerente aprueba
         Passport::actingAs($this->coordinador);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'subir_archivo',
-            'campo_documento' => 'registro_cyf',
-            'archivo' => 'data:application/pdf;base64,dGVzdA==',
-            'archivo_nombre' => 'cyf_soporte.pdf'
-        ], ['X-Active-Role' => 'coordinador_comercial']);
-        $response->assertStatus(200);
+        $this->subirArchivo($creditoId, 'registro_cyf', 'coordinador_comercial', 'cyf_soporte.pdf')
+            ->assertStatus(200);
 
-        // Gerente rejects CYF support (clears file)
         Passport::actingAs($this->gerente);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'rechazar',
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion'     => 'rechazar',
             'comentario' => 'Soporte borroso'
-        ], ['X-Active-Role' => 'gerente']);
-        $response->assertStatus(200);
-        $this->assertEquals('aprobacion_registro_cyf', $response->json('estado'));
-        $this->assertNull($response->json('documentos.registro_cyf'));
+        ], ['X-Active-Role' => 'gerente'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'aprobacion_registro_cyf')
+            ->assertJsonPath('documentos.registro_cyf', null);
 
-        // Re-upload and approve CYF
         Passport::actingAs($this->coordinador);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'subir_archivo',
-            'campo_documento' => 'registro_cyf',
-            'archivo' => 'data:application/pdf;base64,dGVzdA==',
-            'archivo_nombre' => 'cyf_soporte_clear.pdf'
-        ], ['X-Active-Role' => 'coordinador_comercial']);
-        $response->assertStatus(200);
+        $this->subirArchivo($creditoId, 'registro_cyf', 'coordinador_comercial', 'cyf_soporte_clear.pdf')
+            ->assertStatus(200);
 
         Passport::actingAs($this->gerente);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
             'accion' => 'aprobar'
-        ], ['X-Active-Role' => 'gerente']);
-        $response->assertStatus(200);
-        $this->assertEquals('desembolso_ingreso', $response->json('estado'));
+        ], ['X-Active-Role' => 'gerente'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'desembolso_ingreso');
 
-        // 8. Desembolso Ingreso - Operativo uploads egreso support
+        // 8. Desembolso ingreso: operativo sube egreso y aprueba
         Passport::actingAs($this->operativo);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'subir_archivo',
-            'campo_documento' => 'desembolso_egreso',
-            'archivo' => 'data:application/pdf;base64,dGVzdA==',
-            'archivo_nombre' => 'egreso.pdf'
-        ], ['X-Active-Role' => 'operativo']);
-        $response->assertStatus(200);
+        $this->subirArchivo($creditoId, 'desembolso_egreso', 'operativo', 'egreso.pdf')
+            ->assertStatus(200);
 
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
             'accion' => 'aprobar'
-        ], ['X-Active-Role' => 'operativo']);
-        $response->assertStatus(200);
-        $this->assertEquals('desembolso_aprobacion', $response->json('estado'));
+        ], ['X-Active-Role' => 'operativo'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'desembolso_aprobacion');
 
-        // 9. Desembolso Aprobacion - Gerente devuelves to egreso (clears egreso document)
+        // 9. Gerente devuelve desembolso (limpia egreso), operativo re-sube y aprueba
         Passport::actingAs($this->gerente);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'devolver',
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion'     => 'devolver',
             'comentario' => 'Monto de transferencia errado'
-        ], ['X-Active-Role' => 'gerente']);
-        $response->assertStatus(200);
-        $this->assertEquals('desembolso_ingreso', $response->json('estado'));
-        $this->assertNull($response->json('documentos.desembolso_egreso'));
+        ], ['X-Active-Role' => 'gerente'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'desembolso_ingreso')
+            ->assertJsonPath('documentos.desembolso_egreso', null);
 
-        // Re-upload and approve egreso
         Passport::actingAs($this->operativo);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'subir_archivo',
-            'campo_documento' => 'desembolso_egreso',
-            'archivo' => 'data:application/pdf;base64,dGVzdA==',
-            'archivo_nombre' => 'egreso_v2.pdf'
-        ], ['X-Active-Role' => 'operativo']);
-        $response->assertStatus(200);
+        $this->subirArchivo($creditoId, 'desembolso_egreso', 'operativo', 'egreso_v2.pdf')
+            ->assertStatus(200);
 
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
             'accion' => 'aprobar'
-        ], ['X-Active-Role' => 'operativo']);
-        $response->assertStatus(200);
-        $this->assertEquals('desembolso_aprobacion', $response->json('estado'));
+        ], ['X-Active-Role' => 'operativo'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'desembolso_aprobacion');
 
-        // Approve desembolso by Gerente
         Passport::actingAs($this->gerente);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
             'accion' => 'aprobar'
-        ], ['X-Active-Role' => 'gerente']);
-        $response->assertStatus(200);
-        $this->assertEquals('ejecucion_transferencia', $response->json('estado'));
+        ], ['X-Active-Role' => 'gerente'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'ejecucion_transferencia');
 
-        // 10. Transferencia - Tesorería uploads transfer support and completes process
+        // 10. Tesorería sube comprobante y completa el proceso BPMN
         Passport::actingAs($this->tesoreria);
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'subir_archivo',
-            'campo_documento' => 'comprobante_transferencia',
-            'archivo' => 'data:application/pdf;base64,dGVzdA==',
-            'archivo_nombre' => 'transfer.pdf'
-        ], ['X-Active-Role' => 'tesoreria']);
-        $response->assertStatus(200);
+        $this->subirArchivo($creditoId, 'comprobante_transferencia', 'tesoreria', 'transfer.pdf')
+            ->assertStatus(200);
 
-        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
             'accion' => 'aprobar'
-        ], ['X-Active-Role' => 'tesoreria']);
-        $response->assertStatus(200);
-        $this->assertEquals('completado', $response->json('estado'));
+        ], ['X-Active-Role' => 'tesoreria'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'completado');
     }
 }

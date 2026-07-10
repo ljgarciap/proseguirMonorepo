@@ -7,7 +7,6 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class CreditoOrdinarioController extends Controller
 {
@@ -17,7 +16,7 @@ class CreditoOrdinarioController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $activeRole = $request->header('X-Active-Role') ?? (($user->roles && is_array($user->roles)) ? ($user->roles[0] ?? 'cliente') : 'cliente');
+        $activeRole = $this->resolveActiveRole($request);
         
         $query = CreditoOrdinario::with('cliente');
 
@@ -41,7 +40,7 @@ class CreditoOrdinarioController extends Controller
         ]);
 
         $user = Auth::user();
-        $activeRole = $request->header('X-Active-Role') ?? (($user->roles && is_array($user->roles)) ? ($user->roles[0] ?? 'cliente') : 'cliente');
+        $activeRole = $this->resolveActiveRole($request);
 
         // Determinar el cliente
         $clienteId = $request->cliente_id;
@@ -53,49 +52,14 @@ class CreditoOrdinarioController extends Controller
             $clienteId = $clientePrueba ? $clientePrueba->id : $user->id;
         }
 
-        $numeroSolicitud = 'CO-' . date('Y') . '-' . Str::upper(Str::random(4)) . rand(10, 99);
-
-        // Inicializar documentos vacíos conforme al flujo BPMN
-        $documentos = [
-            'formulario_solicitud' => null,
-            'documentos_identidad' => null,
-            'estados_financieros' => null,
-            'certificados_laborales' => null,
-            'sarlft_sintesis' => null,
-            'sarlft_datacredito' => null,
-            'analisis_financiero' => null,
-            'presentacion_comite' => null,
-            'acta_comite_firmada' => null,
-            'pagare_borrador' => null,
-            'carta_instrucciones_borrador' => null,
-            'contrato_borrador' => null,
-            'garantias_firmadas' => null,
-            'registro_cyf' => null,
-            'desembolso_egreso' => null,
-            'comprobante_transferencia' => null,
-        ];
-
-        // Crear historial inicial
-        $historial = [
-            [
-                'fecha' => now()->toIso8601String(),
-                'usuario' => $user->name,
-                'rol' => $activeRole,
-                'estado_anterior' => 'ninguno',
-                'estado_nuevo' => 'revision_documental',
-                'comentario' => 'Solicitud de crédito ordinario registrada e iniciada en revisión documental.'
-            ]
-        ];
-
-        $credito = CreditoOrdinario::create([
-            'numero_solicitud' => $numeroSolicitud,
-            'cliente_id' => $clienteId,
-            'monto' => $request->monto,
-            'plazo_meses' => $request->plazo_meses,
-            'estado' => 'revision_documental',
-            'documentos' => $documentos,
-            'historial_estados' => $historial
-        ]);
+        $credito = CreditoOrdinario::iniciar(
+            clienteId:   $clienteId,
+            monto:       $request->monto,
+            plazoMeses:  $request->plazo_meses,
+            usuario:     $user->name,
+            rol:         $activeRole,
+            comentario:  'Solicitud de crédito ordinario registrada e iniciada en revisión documental.'
+        );
 
         return response()->json($credito->load('cliente'), 201);
     }
@@ -116,14 +80,13 @@ class CreditoOrdinarioController extends Controller
     {
         $credito = CreditoOrdinario::findOrFail($id);
         $user = Auth::user();
-        $activeRole = $request->header('X-Active-Role') ?? (($user->roles && is_array($user->roles)) ? ($user->roles[0] ?? 'cliente') : 'cliente');
+        $activeRole = $this->resolveActiveRole($request);
         
         $request->validate([
-            'accion' => 'required|string|in:aprobar,rechazar,completar,subir_archivo,devolver',
-            'comentario' => 'nullable|string',
-            'archivo' => 'nullable|string', // base64 representation of the file
-            'archivo_nombre' => 'nullable|string',
-            'campo_documento' => 'nullable|string' // field in the documentos array
+            'accion'          => 'required|string|in:aprobar,rechazar,completar,subir_archivo,devolver',
+            'comentario'      => 'nullable|string',
+            'archivo'         => 'nullable|file|mimes:pdf|max:102400',
+            'campo_documento' => 'nullable|string',
         ]);
 
         $accion = $request->accion;
@@ -162,22 +125,14 @@ class CreditoOrdinarioController extends Controller
         $documentos = $credito->documentos ?? [];
 
         // 1. Manejo de Carga de Archivos
-        if ($request->has('archivo') && $request->filled('archivo') && $request->filled('campo_documento')) {
-            $base64File = $request->archivo;
-            $fileName = $request->archivo_nombre ?? 'documento_' . Str::random(10) . '.pdf';
-            
-            // Decodificar base64
-            if (preg_match('/^data:application\/pdf;base64,/', $base64File)) {
-                $base64File = substr($base64File, strpos($base64File, ',') + 1);
-            }
-            $fileData = base64_decode($base64File);
-            
-            $path = 'credito_documentos/' . $credito->id . '/' . $fileName;
-            Storage::disk('public')->put($path, $fileData);
-            
-            $campoDoc = $request->campo_documento;
-            $documentos[$campoDoc] = Storage::url($path);
-            $credito->documentos = $documentos;
+        if ($request->hasFile('archivo') && $request->filled('campo_documento')) {
+            $file     = $request->file('archivo');
+            $fileName = $file->getClientOriginalName();
+            $path     = $file->storeAs('credito_documentos/' . $credito->id, $fileName, 'public');
+
+            $campoDoc              = $request->campo_documento;
+            $documentos[$campoDoc] = Storage::disk('public')->url($path);
+            $credito->documentos   = $documentos;
             $credito->save();
 
             $comentario .= " (Archivo '$fileName' cargado correctamente en '$campoDoc').";
@@ -361,5 +316,18 @@ class CreditoOrdinarioController extends Controller
         $credito->save();
 
         return response()->json($credito->load('cliente'));
+    }
+
+    private function resolveActiveRole(Request $request): string
+    {
+        $user      = Auth::user();
+        $userRoles = is_array($user->roles) ? $user->roles : [];
+        $header    = $request->header('X-Active-Role');
+
+        if ($header && (in_array($header, $userRoles) || in_array('superadmin', $userRoles))) {
+            return $header;
+        }
+
+        return $userRoles[0] ?? 'cliente';
     }
 }

@@ -17,6 +17,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: production
     container_name: factoring_backend
     restart: always
     volumes:
@@ -46,6 +47,28 @@ services:
     networks:
       - factoring_network
 
+  queue:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: factoring_queue
+    restart: always
+    command: php artisan queue:work --tries=3
+    volumes:
+      - ./backend:/var/www/html
+      - ./.env:/var/www/html/.env
+    environment:
+      - DB_HOST=db
+      - DB_DATABASE=factoring_db
+      - DB_USERNAME=root
+      - DB_PASSWORD=${DB_PASSWORD:-root}
+    depends_on:
+      - db
+      - backend
+    networks:
+      - factoring_network
+
   frontend:
     build:
       context: ./frontend
@@ -59,30 +82,9 @@ services:
     networks:
       - factoring_network
 
-  n8n:
-    image: n8nio/n8n:latest
-    container_name: factoring_n8n
-    restart: always
-    ports:
-      - "5678:5678"
-    environment:
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - N8N_BASE_URL=${N8N_BASE_URL:-http://localhost:5678}
-      - WEBHOOK_URL=${WEBHOOK_URL:-http://localhost:5678}
-      - N8N_PATH=${N8N_PATH:-/}
-      - N8N_CORS_ALLOWED_ORIGINS=*
-      - NODE_ENV=production
-      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-false}
-    networks:
-      - factoring_network
-    volumes:
-      - n8n_data:/home/node/.n8n
-
 networks:
   factoring_network:
     driver: bridge
 
 volumes:
   mysql_data:
-  n8n_data:

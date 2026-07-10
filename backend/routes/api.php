@@ -4,18 +4,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 
-Route::post('/webhook/n8n/{categoria}', [\App\Http\Controllers\N8nWebhookController::class, 'handle'])
-    ->middleware(\App\Http\Middleware\VerifyN8nToken::class);
-
 Route::post('/login', [AuthController::class, 'login']);
 
-
-Route::get('/test-zia', function (Request $request) {
-    return response()->json([
-        'mensaje' => 'Si esto sale 200, ya lo tenemos',
-        'user' => $request->user('api')
-    ]);
-})->middleware('auth:api');
 
 Route::get('/me', [AuthController::class, 'me'])->middleware('auth:api');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:api');
@@ -68,6 +58,13 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
         // Visitas a Clientes (Superadmin, Gerente, Operativo)
         Route::apiResource('visitas', \App\Http\Controllers\VisitaController::class)
             ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
+
+        // Departamentos/Ciudades de Colombia (SCRUM-118)
+        Route::prefix('ubicaciones')->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo'])->group(function () {
+            Route::get('/departamentos', [\App\Http\Controllers\UbicacionController::class, 'departamentos']);
+            Route::get('/ciudades', [\App\Http\Controllers\UbicacionController::class, 'ciudades']);
+            Route::get('/ciudades/buscar', [\App\Http\Controllers\UbicacionController::class, 'buscarCiudades']);
+        });
         
         // Destinatarios (Superadmin only)
         Route::apiResource('destinatarios', \App\Http\Controllers\DestinatarioController::class)
@@ -94,8 +91,9 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
         // Uploads group with granular auth
         Route::prefix('uploads')->middleware(['auth:api', 'checkrole'])->group(function () {
             Route::get('/', [\App\Http\Controllers\ClientUploadController::class, 'index']);
+            Route::get('/recent-ocr', [\App\Http\Controllers\ClientUploadController::class, 'recentOcr']);
             Route::post('/', [\App\Http\Controllers\ClientUploadController::class, 'store'])
-                ->middleware('checkrole:cliente');
+                ->middleware('checkrole:cliente,operativo');
             Route::get('/{id}/download', [\App\Http\Controllers\ClientUploadController::class, 'download'])
                 ->middleware('checkrole:cliente,operativo,gerente,superadmin');
             Route::post('/{id}/validate', [\App\Http\Controllers\ClientUploadController::class, 'validateUpload'])
@@ -105,15 +103,6 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
             Route::delete('/{id}', [\App\Http\Controllers\ClientUploadController::class, 'destroy'])
                 ->middleware('checkrole:cliente,superadmin');
         });
-
-Route::get('/debug-passport', function (Illuminate\Http\Request $request) {
-    return [
-        'user' => $request->user('api') ? $request->user('api')->email : 'NADIE',
-        'auth_header' => $request->header('Authorization'),
-        'all_headers' => $request->headers->all(),
-        'guard_api_driver' => config('auth.guards.api.driver'),
-    ];
-});
 
 use App\Http\Controllers\ContableImportController;
 use App\Http\Controllers\ContableController;
@@ -138,13 +127,12 @@ Route::post('/settlement/reconcile', [\App\Http\Controllers\SettlementController
 Route::post('/conciliacion-susuerte', [\App\Http\Controllers\ConciliationController::class, 'conciliate'])
     ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable']);
 
-// Conciliación Susuerte History and New Conciliation routes
-Route::get('/conciliaciones-susuerte/history', [\App\Http\Controllers\ConciliacionSusuerteController::class, 'history'])
-    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable,admin']);
-Route::post('/conciliaciones-susuerte/new', [\App\Http\Controllers\ConciliacionSusuerteController::class, 'newConciliation'])
-    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable,admin']);
-Route::put('/conciliaciones-susuerte/{id}', [\App\Http\Controllers\ConciliacionSusuerteController::class, 'update'])
-    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable,admin']);
+Route::get('/conciliaciones-susuerte/history', [\App\Http\Controllers\ConciliationController::class, 'history'])
+    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable']);
+Route::post('/conciliaciones-susuerte/new', [\App\Http\Controllers\ConciliationController::class, 'newConciliation'])
+    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable']);
+Route::put('/conciliaciones-susuerte/{id}', [\App\Http\Controllers\ConciliationController::class, 'update'])
+    ->middleware(['auth:api', 'checkrole:operativo,superadmin,gerente,contable']);
 
 use App\Http\Controllers\PlanillaController;
 
@@ -221,6 +209,30 @@ Route::prefix('internal-docs')->middleware(['auth:api', 'checkrole:operativo,con
     Route::patch('/{id}/status', [\App\Http\Controllers\InternalDocumentController::class, 'updateStatus']);
     Route::delete('/bulk-delete', [\App\Http\Controllers\InternalDocumentController::class, 'bulkDestroy']);
     Route::delete('/{id}', [\App\Http\Controllers\InternalDocumentController::class, 'destroy']);
+});
+
+// Bandeja Interna — Ruta de Aprobación Secuencial (SCRUM-94)
+Route::prefix('document-envios')->middleware(['auth:api', 'checkrole:operativo,contable,gerente,superadmin,coordinador_comercial'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\DocumentEnvioController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\DocumentEnvioController::class, 'store']);
+    Route::patch('/{id}/steps/{stepId}', [\App\Http\Controllers\DocumentEnvioController::class, 'processStep']);
+    Route::get('/{id}/files/{fileId}/download', [\App\Http\Controllers\DocumentEnvioController::class, 'downloadFile']);
+    Route::delete('/{id}', [\App\Http\Controllers\DocumentEnvioController::class, 'destroy']);
+});
+
+// Catálogo de Áreas para la ruta de aprobación (SCRUM-94)
+Route::get('/document-areas', [\App\Http\Controllers\DocumentAreaController::class, 'index'])
+    ->middleware(['auth:api', 'checkrole:operativo,contable,gerente,superadmin,coordinador_comercial']);
+Route::prefix('document-areas')->middleware(['auth:api', 'checkrole:superadmin'])->group(function () {
+    Route::post('/', [\App\Http\Controllers\DocumentAreaController::class, 'store']);
+    Route::put('/{id}', [\App\Http\Controllers\DocumentAreaController::class, 'update']);
+    Route::delete('/{id}', [\App\Http\Controllers\DocumentAreaController::class, 'destroy']);
+});
+
+// Configuraciones del Sistema (Superadmin)
+Route::prefix('configuraciones')->middleware(['auth:api', 'checkrole:superadmin'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\ConfiguracionController::class, 'index']);
+    Route::put('/{id}', [\App\Http\Controllers\ConfiguracionController::class, 'update']);
 });
 
 // Limpieza de Base de Datos (Superadmin)

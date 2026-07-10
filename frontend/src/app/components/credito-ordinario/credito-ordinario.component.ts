@@ -4,12 +4,13 @@ import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
+import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-credito-ordinario',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MilesSeparatorDirective],
   templateUrl: './credito-ordinario.component.html',
   styleUrls: ['./credito-ordinario.component.css']
 })
@@ -136,7 +137,6 @@ export class CreditoOrdinarioComponent implements OnInit {
     return currentStep ? currentStep.role === this.activeRole : false;
   }
 
-  // Handle file select and convert to base64
   onFileUpload(event: Event, campoDoc: string) {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
@@ -147,19 +147,12 @@ export class CreditoOrdinarioComponent implements OnInit {
       return;
     }
 
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const base64String = reader.result as string;
-      this.executeTransition('subir_archivo', `Carga de soporte PDF obligatorio en campo: ${campoDoc}`, {
-        archivo: base64String,
-        archivo_nombre: file.name,
-        campo_documento: campoDoc
-      });
-    };
+    this.executeTransition('subir_archivo', `Carga de soporte PDF obligatorio en campo: ${campoDoc}`, {
+      _file: file,
+      campo_documento: campoDoc
+    });
   }
 
-  // Execute stage transitions or approvals
   executeTransition(accion: string, comentarioDefecto: string = '', extraData: any = {}) {
     Swal.fire({
       title: accion === 'rechazar' ? '¿Rechazar Solicitud?' : 'Confirmar Acción',
@@ -174,21 +167,28 @@ export class CreditoOrdinarioComponent implements OnInit {
       confirmButtonColor: accion === 'rechazar' ? '#E53E3E' : '#3182CE'
     }).then((result) => {
       if (result.isConfirmed) {
-        const payload = {
-          accion: accion,
-          comentario: result.value || comentarioDefecto,
-          ...extraData
-        };
+        const comentario = result.value || comentarioDefecto;
+        const headers = { 'X-Active-Role': this.activeRole };
+        const url = `${environment.apiUrl}/creditos/${this.selectedCredito.id}/transition`;
 
-        this.http.post(`${environment.apiUrl}/creditos/${this.selectedCredito.id}/transition`, payload, {
-          headers: { 'X-Active-Role': this.activeRole }
-        }).subscribe({
-          next: (updatedCredito) => {
+        const request$ = (extraData._file instanceof File)
+          ? (() => {
+              const formData = new FormData();
+              formData.append('accion', accion);
+              formData.append('comentario', comentario);
+              formData.append('archivo', extraData._file, extraData._file.name);
+              formData.append('campo_documento', extraData.campo_documento);
+              return this.http.post(url, formData, { headers });
+            })()
+          : this.http.post(url, { accion, comentario, ...extraData }, { headers });
+
+        request$.subscribe({
+          next: () => {
             Swal.fire('¡Procesado!', 'El estado del crédito se ha actualizado correctamente.', 'success');
             this.loadCreditos();
           },
           error: (err) => {
-            Swal.fire('Error', err.error.message || 'No se pudo actualizar el estado del crédito.', 'error');
+            Swal.fire('Error', err.error?.message || 'No se pudo actualizar el estado del crédito.', 'error');
           }
         });
       }

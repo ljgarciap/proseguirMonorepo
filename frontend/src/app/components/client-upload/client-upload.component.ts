@@ -109,7 +109,8 @@ import Swal from 'sweetalert2';
                 <th>Archivo</th>
                 <th>Tipo de Solicitud</th>
                 <th>Fecha de Carga</th>
-                <th>Estado</th>
+                <th>Estado Documento</th>
+                <th>Procesamiento OCR</th>
                 <th>Observaciones Operativas</th>
                 <th class="text-center">Acciones</th>
               </tr>
@@ -136,6 +137,17 @@ import Swal from 'sweetalert2';
                     'rejected': upload.status === 'rechazado'
                   }">{{ upload.status }}</span>
                 </td>
+                <td>
+                  <div class="ocr-status-cell">
+                    <span class="ocr-badge" [ngClass]="upload.ocr_status || 'procesando'">
+                      <span class="ocr-dot"></span>
+                      {{ upload.ocr_status === 'exitoso' ? 'Completado' : (upload.ocr_status === 'fallido' ? 'Fallido' : 'Procesando') }}
+                    </span>
+                    <span class="ocr-text-msg" *ngIf="upload.ocr_message" [title]="upload.ocr_message">
+                      {{ upload.ocr_message }}
+                    </span>
+                  </div>
+                </td>
                 <td class="text-muted">{{ upload.observations || 'Sin observaciones aún' }}</td>
                 <td class="text-center">
                   <div class="actions-cell-inline">
@@ -155,7 +167,7 @@ import Swal from 'sweetalert2';
                 </td>
               </tr>
               <tr *ngIf="uploads.length === 0">
-                <td colspan="5" class="empty-state">
+                <td colspan="7" class="empty-state">
                   <span class="material-symbols-outlined">inventory_2</span>
                   <p>No se han encontrado registros de carga.</p>
                 </td>
@@ -495,6 +507,55 @@ import Swal from 'sweetalert2';
     .category-badge.general {
       background: #f1f5f9;
       color: #475569;
+    }
+
+    .ocr-status-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ocr-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      width: fit-content;
+      text-transform: uppercase;
+    }
+    .ocr-badge.procesando {
+      background: #eff6ff;
+      color: #1e40af;
+      .ocr-dot { background: #3b82f6; animation: ocrPulse 1.5s infinite; }
+    }
+    .ocr-badge.exitoso {
+      background: #f0fdf4;
+      color: #166534;
+      .ocr-dot { background: #22c55e; }
+    }
+    .ocr-badge.fallido {
+      background: #fef2f2;
+      color: #991b1b;
+      .ocr-dot { background: #ef4444; }
+    }
+    .ocr-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .ocr-text-msg {
+      font-size: 0.7rem;
+      color: #64748b;
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    @keyframes ocrPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
     }
   `]
 })

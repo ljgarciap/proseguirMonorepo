@@ -1,7 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { HttpClientModule, HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { AuthService } from '../../../services/auth.service';
@@ -36,6 +36,11 @@ import { AuthService } from '../../../services/auth.service';
               <span class="material-symbols-outlined">lock</span>
               <input type="password" [(ngModel)]="credentials.password" name="password" required placeholder="••••••••" class="pro-input">
             </div>
+          </div>
+
+            <div class="expired-msg" *ngIf="sessionExpired">
+            <span class="material-symbols-outlined">timer_off</span>
+            Tu sesión expiró. Por favor inicia sesión de nuevo.
           </div>
 
           <div class="error-msg" *ngIf="errorMessage">
@@ -120,6 +125,13 @@ import { AuthService } from '../../../services/auth.service';
 
     .full-width { width: 100%; }
 
+    .expired-msg {
+      display: flex; align-items: center; gap: 8px;
+      background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A;
+      border-radius: 10px; padding: 10px 14px; font-size: 0.85rem; font-weight: 500;
+      .material-symbols-outlined { font-size: 18px; flex-shrink: 0; }
+    }
+
     .error-msg {
       background: #FFF5F5;
       color: var(--danger);
@@ -167,18 +179,24 @@ import { AuthService } from '../../../services/auth.service';
     }
   `]
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   credentials = { numero_documento: '', password: '' };
   isLoading = false;
   errorMessage = '';
+  sessionExpired = false;
   showRoleSelector = false;
   availableRoles: string[] = [];
 
   constructor(
     private http: HttpClient,
     private authService: AuthService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {}
+
+  ngOnInit(): void {
+    this.sessionExpired = this.route.snapshot.queryParamMap.get('expired') === '1';
+  }
 
   onLogin(): void {
     this.isLoading = true;

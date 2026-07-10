@@ -13,6 +13,25 @@ import Swal from 'sweetalert2';
   imports: [CommonModule, FormsModule],
   template: `
     <div class="view-container">
+      <!-- Seccíon de Cargas Recientes de OCR -->
+      <div class="ocr-status-banner" *ngIf="recentOcrUploads.length > 0">
+        <div class="ocr-banner-header">
+          <span>⏱️ Procesamiento de Documentos (OCR Recientes)</span>
+        </div>
+        <div class="ocr-items-container">
+          <div class="ocr-item-badge" *ngFor="let item of recentOcrUploads" [ngClass]="item.ocr_status">
+            <span class="ocr-file-name" [title]="item.original_name">📄 {{ item.original_name }}</span>
+            <span class="ocr-state">
+              <span class="state-dot"></span>
+              {{ item.ocr_status === 'exitoso' ? 'Completado' : (item.ocr_status === 'fallido' ? 'Fallido' : 'Procesando') }}
+            </span>
+            <span class="ocr-desc" *ngIf="item.ocr_message" [title]="item.ocr_message">
+              - {{ item.ocr_message }}
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div class="search-header">
         <div class="search-card">
           <span class="search-icon">🔍</span>
@@ -1047,6 +1066,92 @@ import Swal from 'sweetalert2';
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
     }
+    .ocr-status-banner {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .ocr-banner-header {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .ocr-items-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .ocr-item-badge {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: 1px solid #edf2f7;
+      background: #f8fafc;
+    }
+    .ocr-item-badge.procesando {
+      border-color: #bee3f8;
+      background: #ebf8ff;
+      color: #2b6cb0;
+      .state-dot { background: #3182ce; animation: ocrPulse 1.5s infinite; }
+    }
+    .ocr-item-badge.exitoso {
+      border-color: #c6f6d5;
+      background: #f0fff4;
+      color: #22543d;
+      .state-dot { background: #38a169; }
+    }
+    .ocr-item-badge.fallido {
+      border-color: #fed7d7;
+      background: #fff5f5;
+      color: #742a2a;
+      .state-dot { background: #e53e3e; }
+    }
+    .ocr-file-name {
+      font-weight: 700;
+      max-width: 250px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ocr-state {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      text-transform: uppercase;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .state-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #a0aec0;
+    }
+    .ocr-desc {
+      font-size: 0.75rem;
+      font-weight: 400;
+      opacity: 0.85;
+      max-width: 500px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    @keyframes ocrPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
   `]
 })
 export class SheetsComponent implements OnInit {
@@ -1058,6 +1163,9 @@ export class SheetsComponent implements OnInit {
   saveStatus: { [id: number]: 'saving' | 'success' | 'error' | null } = {};
   sectors: any[] = [];
   selectedRow: any = null;
+
+  recentOcrUploads: any[] = [];
+  private ocrInterval: any;
 
   // Parámetros de tabla
   searchTerm: string = '';
@@ -1077,6 +1185,8 @@ export class SheetsComponent implements OnInit {
 
   ngOnInit() {
     this.loadSectors();
+    this.loadRecentOcr();
+    this.ocrInterval = setInterval(() => this.loadRecentOcr(), 10000);
 
     // Listen to query parameters for category and search
     this.routeSub = this.route.queryParams.subscribe(params => {
@@ -1092,11 +1202,28 @@ export class SheetsComponent implements OnInit {
 
   ngOnDestroy() {
     if (this.routeSub) this.routeSub.unsubscribe();
+    if (this.ocrInterval) clearInterval(this.ocrInterval);
   }
 
   loadSectors() {
     this.http.get<any[]>(`${this.baseUrl}/sectores`).subscribe(res => {
       this.sectors = res;
+    });
+  }
+
+  loadRecentOcr() {
+    this.http.get<any[]>(`${this.baseUrl}/uploads/recent-ocr`).subscribe({
+      next: (res) => {
+        const hadProcesandoBefore = this.recentOcrUploads.some(item => item.ocr_status === 'procesando');
+        this.recentOcrUploads = res || [];
+        const hasProcesandoNow = this.recentOcrUploads.some(item => item.ocr_status === 'procesando');
+        
+        // Si un archivo terminó de procesarse (pasó de procesando a exitoso), actualizamos el historial automáticamente
+        if (hadProcesandoBefore && !hasProcesandoNow) {
+          this.loadHistory();
+        }
+      },
+      error: (err) => console.error('Error loading recent OCR uploads', err)
     });
   }
 
