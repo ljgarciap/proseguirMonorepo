@@ -113,6 +113,32 @@ class PendingCountTest extends TestCase
         $this->assertEquals(2, $response->json('contable'));
     }
 
+    public function test_migrated_legacy_document_is_not_double_counted(): void
+    {
+        $legacy = InternalDocument::create([
+            'sender_id' => $this->sender->id,
+            'target_role' => 'contable',
+            'titulo' => 'Ya migrado',
+            'archivo_path' => 'internal_docs/migrado.pdf',
+            'categoria_id' => $this->categoria->id,
+            'prioridad_id' => $this->prioridad->id,
+            'estado' => 'pendiente',
+        ]);
+
+        // Simula que este documento ya fue migrado a la Bandeja Interna nueva
+        // (SCRUM-94, ver MigrateLegacyInternalDocuments): existe un DocumentEnvio
+        // con el legacy_batch_key correspondiente. Sin batch_id, la clave es
+        // 'single_{id}', igual que en el comando de migración.
+        $envio = $this->makeEnvioWithStep('contable', 1, 1);
+        $envio->update(['legacy_batch_key' => 'single_' . $legacy->id]);
+
+        Passport::actingAs($this->viewer);
+        $response = $this->getJson('/api/uploads/pending-count')->assertStatus(200);
+
+        // Debe contarse una sola vez (vía el DocumentEnvio migrado), no dos.
+        $this->assertEquals(1, $response->json('contable'));
+    }
+
     public function test_expiring_soon_envio_is_flagged(): void
     {
         // horas_vencimiento = 1 y creado ahora => vence en <2h
