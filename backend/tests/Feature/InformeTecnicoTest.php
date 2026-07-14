@@ -135,6 +135,7 @@ class InformeTecnicoTest extends TestCase
         $payload = [
             'cliente_id' => $this->clienteNatural->id,
             'tipo_credito_id' => $this->tipoConstructor->id,
+            'proyecto' => 'Entre Verde M+D',
             'monto_solicitado' => 500000000.00,
             'plazo_meses' => 18,
             'amortizacion_id' => $this->amortizacionMensual->id,
@@ -256,13 +257,15 @@ class InformeTecnicoTest extends TestCase
 
         Passport::actingAs($this->ingeniero);
         $response = $this->putJson("/api/informes-tecnicos/{$credito->id}/borrador", [
-            'ventas_totales_proyecto' => ['total' => 1000000],
-            'costos' => ['total' => 600000],
-            'invertido' => ['total' => 200000],
+            'ventas_totales_proyecto' => ['apartamentos' => 1000000],
+            'costos' => ['lote' => 600000],
+            'invertido' => ['lote' => 200000],
         ], ['X-Active-Role' => 'ingeniero']);
 
         $response->assertStatus(200);
-        $this->assertEquals(1000000, $response->json('ventas_totales_proyecto.total'));
+        $this->assertEquals(1000000, $response->json('ventas_totales_proyecto.total_ventas'));
+        $this->assertEquals(600000, $response->json('costos.total_costos'));
+        $this->assertEquals(200000, $response->json('invertido.total_invertido'));
 
         $this->assertDatabaseHas('credito_ordinarios', [
             'id' => $credito->id,
@@ -315,6 +318,70 @@ class InformeTecnicoTest extends TestCase
         $this->putJson("/api/informes-tecnicos/{$credito->id}/borrador", [
             'observaciones_ingeniero' => 'Intento de edición tardía',
         ], ['X-Active-Role' => 'ingeniero'])->assertStatus(403);
+    }
+
+    /**
+     * Flujo completo Ingeniero -> Coordinador vía HTTP con los valores reales
+     * del fixture (proyecto Entre Verde M+D) — valida que el controller arma
+     * correctamente las referencias cruzadas entre secciones (ej. Coordinador
+     * no vuelve a pedir Cuotas Iniciales Ya Pagadas, la toma de lo que guardó
+     * el Ingeniero) y no solo el servicio de cálculo aislado.
+     */
+    public function test_flujo_completo_con_valores_reales_del_fixture_calcula_formulas_correctamente(): void
+    {
+        $credito = $this->crearCreditoEnEstadoIngeniero();
+
+        Passport::actingAs($this->ingeniero);
+        $response = $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'ventas_totales_proyecto' => ['apartamentos' => 32841282386],
+            'costos' => [
+                'lote' => 5315952140,
+                'directos' => 12690962100,
+                'directos_urbanismo' => 865000000,
+                'indirectos' => 8771866121,
+                'honorarios' => 2495448000,
+                'financieros' => 1596600000,
+            ],
+            'invertido' => [
+                'lote' => 5315952140,
+                'costos_directos' => 1410320211,
+                'costos_indirectos' => 1660000000,
+                'recursos_propios' => 2416500000,
+                'cuotas_iniciales_ya_pagadas' => 3561000000,
+            ],
+            'observaciones_ingeniero' => 'Proyecto Entre Verde M+D, documentación completa.',
+        ], ['X-Active-Role' => 'ingeniero']);
+
+        $response->assertStatus(200);
+        $this->assertEqualsWithDelta(32841282386, $response->json('ventas_totales_proyecto.total_ventas'), 0.01);
+        $this->assertEqualsWithDelta(27643780361, $response->json('costos.total_costos'), 0.01);
+        $this->assertEqualsWithDelta(8386272351, $response->json('invertido.total_invertido'), 0.01);
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'credito_solicitado' => [
+                'credito_solicitado' => 8000000000,
+                'aptos_vendidos' => 32841282386,
+                'porcentaje_cuotas_iniciales_pendientes' => 0.30,
+            ],
+            'saldos_por_recaudar_contraentrega' => [
+                'porcentaje_cuotas_iniciales' => 0.10,
+            ],
+            'observaciones_coordinador' => 'Aprobado, informe consolidado.',
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200);
+        // E39 = +E33: el Coordinador no volvió a mandar este dato, viene del Ingeniero.
+        $this->assertEqualsWithDelta(3561000000, $response->json('credito_solicitado.cuotas_iniciales_ya_pagadas'), 0.01);
+        // E40 = E38*30%-E39
+        $this->assertEqualsWithDelta(6291384715.8, $response->json('credito_solicitado.cuotas_iniciales_pendientes'), 0.01);
+        // E48 = E40+E41+E42
+        $this->assertEqualsWithDelta(29280282386, $response->json('saldos_por_recaudar_contraentrega.total_pendiente_por_recaudar'), 0.01);
+        // E57 Saldo X Financiar
+        $this->assertEqualsWithDelta(4966123294.2, $response->json('analisis_financiacion.saldo_x_financiar'), 0.01);
+        // G77 = E36/E9 (Apartamentos, no total de ventas)
+        $this->assertEqualsWithDelta(0.24359584701876, $response->json('coberturas.cobertura_garantia.cobertura'), 0.0000001);
+        $this->assertEquals('registrado', $response->json('estado'));
     }
 
     public function test_coordinador_guarda_borrador_y_registra_finaliza_credito(): void

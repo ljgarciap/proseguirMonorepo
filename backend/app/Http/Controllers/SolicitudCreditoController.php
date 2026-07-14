@@ -53,6 +53,7 @@ class SolicitudCreditoController extends Controller
             'cliente_id' => 'required|exists:clientes,id',
             'tipo_credito_id' => 'required|exists:tipo_creditos,id',
             'monto_solicitado' => 'required|numeric|min:0.01',
+            'proyecto' => 'nullable|string',
             'plazo_meses' => 'required|integer|min:1',
             'amortizacion_id' => 'required|exists:amortizaciones,id',
             'destino_recurso' => 'required|string',
@@ -68,6 +69,14 @@ class SolicitudCreditoController extends Controller
         $cliente = Cliente::findOrFail($request->cliente_id);
         $tipoPersona = $cliente->tipoPersona;
         $codigoPersona = $tipoPersona ? strtoupper($tipoPersona->codigo) : 'NATURAL';
+
+        // Proyecto es obligatorio solo para Crédito Constructor (SCRUM-120 Fase 2) —
+        // la bandeja de Informe Técnico lo necesita para mostrar/filtrar.
+        $tipoCreditoSolicitud = \App\Models\TipoCredito::find($request->tipo_credito_id);
+        $codigoTipoCreditoSolicitud = $tipoCreditoSolicitud ? strtoupper($tipoCreditoSolicitud->codigo) : null;
+        if ($codigoTipoCreditoSolicitud === 'CONSTRUCTOR') {
+            $rules['proyecto'] = 'required|string';
+        }
 
         if ($codigoPersona === 'NATURAL') {
             $rules['nombres'] = 'required|string';
@@ -172,6 +181,7 @@ class SolicitudCreditoController extends Controller
                 'cliente_id' => $cliente->id,
                 'usuario_registra_id' => $request->user()->id,
                 'tipo_credito_id' => $validated['tipo_credito_id'],
+                'proyecto' => $validated['proyecto'] ?? null,
                 'monto_solicitado' => $validated['monto_solicitado'],
                 'plazo_meses' => $validated['plazo_meses'],
                 'amortizacion_id' => $validated['amortizacion_id'],

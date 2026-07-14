@@ -5,12 +5,17 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesActiveRole;
 use App\Models\CreditoOrdinario;
 use App\Models\InformeTecnico;
+use App\Services\InformeTecnicoCalculoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class InformeTecnicoController extends Controller
 {
     use ResolvesActiveRole;
+
+    public function __construct(private InformeTecnicoCalculoService $calculo)
+    {
+    }
 
     /**
      * Estados del expediente en los que aplica el flujo de Informe Técnico,
@@ -39,7 +44,7 @@ class InformeTecnicoController extends Controller
                 $q->where('codigo', 'CONSTRUCTOR');
             })
             ->whereIn('estado', self::ESTADOS_INFORME_TECNICO)
-            ->with(['cliente', 'solicitudCredito', 'informeTecnico']);
+            ->with(['cliente', 'solicitudCredito.cliente', 'informeTecnico']);
 
         if ($activeRole === 'ingeniero') {
             $query->where('estado', 'informe_tecnico_ingeniero');
@@ -49,7 +54,19 @@ class InformeTecnicoController extends Controller
             $query->whereRaw('1 = 0');
         }
 
-        return response()->json($query->orderBy('created_at', 'desc')->get());
+        $creditos = $query->orderBy('created_at', 'desc')->get();
+
+        // Bandeja: proyecto/ciudad/dirección se toman de SolicitudCredito.proyecto
+        // y Cliente.ciudad/direccion (no de CreditoOrdinario.cliente, que apunta al
+        // User del cliente y no tiene estos campos).
+        $creditos->each(function (CreditoOrdinario $credito) {
+            $cliente = $credito->solicitudCredito?->cliente;
+            $credito->proyecto = $credito->solicitudCredito?->proyecto;
+            $credito->ciudad = $cliente?->ciudad;
+            $credito->direccion = $cliente?->direccion;
+        });
+
+        return response()->json($creditos);
     }
 
     /**
@@ -89,7 +106,7 @@ class InformeTecnicoController extends Controller
             'estado' => 'borrador',
         ]);
 
-        $informe->update($this->datosSeccionSegunEstado($request, $credito->estado));
+        $informe->update($this->datosSeccionSegunEstado($request, $credito->estado, $informe));
 
         return response()->json($informe->fresh());
     }
@@ -111,7 +128,7 @@ class InformeTecnicoController extends Controller
             'estado' => 'borrador',
         ]);
 
-        $datos = $this->datosSeccionSegunEstado($request, $credito->estado);
+        $datos = $this->datosSeccionSegunEstado($request, $credito->estado, $informe);
 
         if ($credito->estado === 'informe_tecnico_ingeniero') {
             $observaciones = $request->input('observaciones_ingeniero', $informe->observaciones_ingeniero);
@@ -196,25 +213,96 @@ class InformeTecnicoController extends Controller
         }
     }
 
-    private function datosSeccionSegunEstado(Request $request, string $estado): array
+    /**
+     * Solo recalcula/persiste las secciones presentes en el request (permite
+     * autoguardado parcial). Los cruces entre secciones (ej. % costos e
+     * invertido necesitan Total Ventas) usan lo ya persistido en $informe
+     * cuando la sección de origen no viene en este request puntual.
+     *
+     * El backend SIEMPRE calcula los totales — nunca se confía en lo que
+     * mande el frontend (SCRUM-120 Fase 2, InformeTecnicoCalculoService).
+     */
+    private function datosSeccionSegunEstado(Request $request, string $estado, InformeTecnico $informe): array
     {
         if ($estado === 'informe_tecnico_ingeniero') {
-            return $request->only([
-                'ventas_totales_proyecto',
-                'costos',
-                'invertido',
-                'observaciones_ingeniero',
-            ]);
+            $datos = [];
+            $totalVentas = $informe->ventas_totales_proyecto['total_ventas'] ?? 0;
+
+            if ($request->has('ventas_totales_proyecto')) {
+                $datos['ventas_totales_proyecto'] = $this->calculo->calcularVentasTotalesProyecto(
+                    $request->input('ventas_totales_proyecto', [])
+                );
+                $totalVentas = $datos['ventas_totales_proyecto']['total_ventas'];
+            }
+
+            if ($request->has('costos')) {
+                $datos['costos'] = $this->calculo->calcularCostos($request->input('costos', []), $totalVentas);
+            }
+
+            if ($request->has('invertido')) {
+                $datos['invertido'] = $this->calculo->calcularInvertido($request->input('invertido', []), $totalVentas);
+            }
+
+            if ($request->has('observaciones_ingeniero')) {
+                $datos['observaciones_ingeniero'] = $request->input('observaciones_ingeniero');
+            }
+
+            return $datos;
         }
 
         if ($estado === 'informe_tecnico_coordinador') {
-            return $request->only([
-                'credito_solicitado',
-                'saldos_por_recaudar_contraentrega',
-                'analisis_financiacion',
-                'coberturas',
-                'observaciones_coordinador',
-            ]);
+            $datos = [];
+
+            // Contexto ya diligenciado por el Ingeniero (persistido antes de que
+            // el expediente llegara a esta etapa).
+            $totalVentas = $informe->ventas_totales_proyecto['total_ventas'] ?? 0;
+            $costosIngeniero = $informe->costos ?? [];
+            $invertidoIngeniero = $informe->invertido ?? [];
+            $cuotasInicialesYaPagadas = $invertidoIngeniero['cuotas_iniciales_ya_pagadas'] ?? 0;
+
+            $creditoSolicitado = $informe->credito_solicitado ?? [];
+            $saldosPorRecaudar = $informe->saldos_por_recaudar_contraentrega ?? [];
+
+            if ($request->has('credito_solicitado')) {
+                $creditoSolicitado = $this->calculo->calcularCreditoSolicitado(
+                    $request->input('credito_solicitado', []),
+                    $totalVentas,
+                    $cuotasInicialesYaPagadas
+                );
+                $datos['credito_solicitado'] = $creditoSolicitado;
+            }
+
+            $aptosVendidos = $creditoSolicitado['aptos_vendidos'] ?? 0;
+
+            if ($request->has('saldos_por_recaudar_contraentrega')) {
+                $saldosPorRecaudar = $this->calculo->calcularSaldosPorRecaudarContraentrega(
+                    $request->input('saldos_por_recaudar_contraentrega', []),
+                    $totalVentas,
+                    $aptosVendidos,
+                    $creditoSolicitado
+                );
+                $datos['saldos_por_recaudar_contraentrega'] = $saldosPorRecaudar;
+            }
+
+            // Análisis de Financiación y Coberturas son 100% derivados (sin
+            // input directo del Coordinador) — se recalculan si cambió
+            // cualquiera de las dos secciones de las que dependen.
+            if ($request->has('credito_solicitado') || $request->has('saldos_por_recaudar_contraentrega')) {
+                $analisisFinanciacion = $this->calculo->calcularAnalisisFinanciacion(
+                    $costosIngeniero,
+                    $invertidoIngeniero,
+                    $creditoSolicitado,
+                    $saldosPorRecaudar
+                );
+                $datos['analisis_financiacion'] = $analisisFinanciacion;
+                $datos['coberturas'] = $this->calculo->calcularCoberturas($creditoSolicitado, $analisisFinanciacion, $saldosPorRecaudar);
+            }
+
+            if ($request->has('observaciones_coordinador')) {
+                $datos['observaciones_coordinador'] = $request->input('observaciones_coordinador');
+            }
+
+            return $datos;
         }
 
         return [];
