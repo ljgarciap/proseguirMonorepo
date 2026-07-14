@@ -183,6 +183,7 @@ Route::prefix('informes-tecnicos')->middleware('auth:api')->group(function () {
     Route::get('/{creditoId}', [\App\Http\Controllers\InformeTecnicoController::class, 'show']);
     Route::put('/{creditoId}/borrador', [\App\Http\Controllers\InformeTecnicoController::class, 'guardarBorrador']);
     Route::post('/{creditoId}/registrar', [\App\Http\Controllers\InformeTecnicoController::class, 'registrar']);
+    Route::get('/{creditoId}/descargar', [\App\Http\Controllers\InformeTecnicoController::class, 'descargar']);
 });
 
 // Registro de Solicitudes de Crédito

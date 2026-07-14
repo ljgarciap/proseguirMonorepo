@@ -5,17 +5,34 @@
         <span class="material-symbols-outlined">arrow_back</span> Volver a la bandeja
       </button>
       <h1>Informe Técnico — {{ credito.numero_solicitud }}</h1>
-      <p>Solicitante: {{ credito.cliente?.name || '—' }}</p>
+      <p>
+        Proyecto: {{ credito.solicitud_credito?.proyecto || '—' }} ·
+        Solicitante: {{ credito.cliente?.name || '—' }}
+      </p>
     </div>
-    <span class="status-pill" [ngClass]="{
-      'warning': credito.estado === 'informe_tecnico_ingeniero' || credito.estado === 'informe_tecnico_coordinador',
-      'success': esFinalizado
-    }">{{ credito.estado }}</span>
+    <div class="header-actions">
+      <span class="status-pill" [ngClass]="{
+        'warning': credito.estado === 'informe_tecnico_ingeniero' || credito.estado === 'informe_tecnico_coordinador',
+        'success': esFinalizado
+      }">{{ credito.estado }}</span>
+      <div class="download-actions" *ngIf="puedeDescargar">
+        <button class="btn-pro secondary sm" (click)="descargar('pdf')" title="Descargar PDF">
+          <span class="material-symbols-outlined">picture_as_pdf</span> PDF
+        </button>
+        <button class="btn-pro secondary sm" (click)="descargar('excel')" title="Descargar Excel">
+          <span class="material-symbols-outlined">grid_on</span> Excel
+        </button>
+      </div>
+    </div>
   </header>
 
-  <div class="alert-readonly" *ngIf="!puedeEditar">
+  <div class="alert-readonly" *ngIf="!esFinalizado && !puedeEditar">
     <span class="material-symbols-outlined">visibility</span>
-    Estás viendo este informe en modo solo lectura. {{ esFinalizado ? 'El informe técnico ya fue finalizado.' : 'No tienes el rol requerido para editar en esta etapa.' }}
+    Estás viendo este informe en modo solo lectura. No tienes el rol requerido para editar en esta etapa.
+  </div>
+  <div class="alert-readonly" *ngIf="esFinalizado">
+    <span class="material-symbols-outlined">verified</span>
+    El informe técnico ya fue finalizado. Modo solo lectura.
   </div>
 
   <!-- SECCIÓN INGENIERO -->
@@ -26,43 +43,170 @@
     </h3>
     <p class="card-subtitle">Ventas Totales del Proyecto, Costos, Invertido y Observaciones técnicas.</p>
 
+    <!-- Ventas Totales Proyecto -->
+    <h4 class="section-subtitle mt-4">① Ventas Totales Proyecto</h4>
+    <table class="items-table">
+      <thead>
+        <tr><th>Campo</th><th>Valor</th><th>% Sobre Ventas</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Casas</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.casas" [disabled]="!seccionIngenieroEditable"></td>
+          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.casas || 0) | percent:'1.0-2' }}</td>
+        </tr>
+        <tr>
+          <td>Apartamentos</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.apartamentos" [disabled]="!seccionIngenieroEditable"></td>
+          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.apartamentos || 0) | percent:'1.0-2' }}</td>
+        </tr>
+        <tr>
+          <td>Parqueaderos</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.parqueaderos" [disabled]="!seccionIngenieroEditable"></td>
+          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.parqueaderos || 0) | percent:'1.0-2' }}</td>
+        </tr>
+        <tr>
+          <td>Conexión gas / arras desist.</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.conexion_gas_arras" [disabled]="!seccionIngenieroEditable"></td>
+          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.conexion_gas_arras || 0) | percent:'1.0-2' }}</td>
+        </tr>
+        <tr>
+          <td>Local comercial</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.local_comercial" [disabled]="!seccionIngenieroEditable"></td>
+          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.local_comercial || 0) | percent:'1.0-2' }}</td>
+        </tr>
+        <tr>
+          <td>Cuartos útiles</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.cuartos_utiles" [disabled]="!seccionIngenieroEditable"></td>
+          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.cuartos_utiles || 0) | percent:'1.0-2' }}</td>
+        </tr>
+        <tr>
+          <td>Otros</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.otros" [disabled]="!seccionIngenieroEditable"></td>
+          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.otros || 0) | percent:'1.0-2' }}</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td>Total Ventas</td>
+          <td colspan="2">$ {{ (informe?.ventas_totales_proyecto?.total_ventas || 0) | number:'1.0-0':'es-CO' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- Costos -->
+    <h4 class="section-subtitle mt-4">② Costos (incluido Costo Financiero)</h4>
+    <p class="field-note">
+      <span class="material-symbols-outlined">info</span>
+      {{ informe?.costos?.nota || 'Honorarios y Financieros no se incluyen en el total de Costos (regla del documento de control CR-RO-09A).' }}
+    </p>
+    <table class="items-table">
+      <thead>
+        <tr><th>Campo</th><th>Valor</th><th></th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Lote</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.lote" [disabled]="!seccionIngenieroEditable"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Directos</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.directos" [disabled]="!seccionIngenieroEditable"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Directos Urbanismo</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.directos_urbanismo" [disabled]="!seccionIngenieroEditable"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Indirectos</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.indirectos" [disabled]="!seccionIngenieroEditable"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Honorarios <span class="tag-nota">no suma al total</span></td>
+          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.honorarios" [disabled]="!seccionIngenieroEditable"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Incremento en costos</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.incremento_costos" [disabled]="!seccionIngenieroEditable"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Financieros <span class="tag-nota">no suma al total</span></td>
+          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.financieros" [disabled]="!seccionIngenieroEditable"></td>
+          <td></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td>Total Costos</td>
+          <td>$ {{ (informe?.costos?.total_costos || 0) | number:'1.0-0':'es-CO' }}</td>
+          <td class="pct-cell">{{ (informe?.costos?.porcentaje_costos || 0) | percent:'1.0-2' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- Invertido -->
+    <h4 class="section-subtitle mt-4">③ Invertido</h4>
+    <table class="items-table">
+      <thead>
+        <tr><th>Campo</th><th>Valor</th><th></th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Lote</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="invertidoInput.lote" [disabled]="!seccionIngenieroEditable"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Costos Directos</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="invertidoInput.costos_directos" [disabled]="!seccionIngenieroEditable"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Costos Indirectos</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="invertidoInput.costos_indirectos" [disabled]="!seccionIngenieroEditable"></td>
+          <td></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td>Total Invertido</td>
+          <td>$ {{ (informe?.invertido?.total_invertido || 0) | number:'1.0-0':'es-CO' }}</td>
+          <td class="pct-cell">{{ (informe?.invertido?.porcentaje_invertido || 0) | percent:'1.0-2' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <table class="items-table mt-2">
+      <tbody>
+        <tr>
+          <td>Recursos propios</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="invertidoInput.recursos_propios" [disabled]="!seccionIngenieroEditable"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Cuotas Iniciales Ya Pagadas</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="invertidoInput.cuotas_iniciales_ya_pagadas" [disabled]="!seccionIngenieroEditable"></td>
+          <td></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td>Total Fuentes</td>
+          <td colspan="2">$ {{ (informe?.invertido?.total_fuentes || 0) | number:'1.0-0':'es-CO' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
     <div class="form-grid mt-4">
-      <div class="form-group">
-        <label>Ventas Totales Proyecto</label>
-        <input class="pro-input" type="number" [(ngModel)]="ingeniero.ventas_totales_proyecto.valor_total"
-               [disabled]="!seccionIngenieroEditable" placeholder="Valor total">
-      </div>
-      <div class="form-group span-2">
-        <label>Detalle de Ventas</label>
-        <input class="pro-input" type="text" [(ngModel)]="ingeniero.ventas_totales_proyecto.detalle"
-               [disabled]="!seccionIngenieroEditable" placeholder="Detalle o desglose">
-      </div>
-
-      <div class="form-group">
-        <label>Costos</label>
-        <input class="pro-input" type="number" [(ngModel)]="ingeniero.costos.valor_total"
-               [disabled]="!seccionIngenieroEditable" placeholder="Valor total">
-      </div>
-      <div class="form-group span-2">
-        <label>Detalle de Costos</label>
-        <input class="pro-input" type="text" [(ngModel)]="ingeniero.costos.detalle"
-               [disabled]="!seccionIngenieroEditable" placeholder="Detalle o desglose">
-      </div>
-
-      <div class="form-group">
-        <label>Invertido</label>
-        <input class="pro-input" type="number" [(ngModel)]="ingeniero.invertido.valor_total"
-               [disabled]="!seccionIngenieroEditable" placeholder="Valor total">
-      </div>
-      <div class="form-group span-2">
-        <label>Detalle de lo Invertido</label>
-        <input class="pro-input" type="text" [(ngModel)]="ingeniero.invertido.detalle"
-               [disabled]="!seccionIngenieroEditable" placeholder="Detalle o desglose">
-      </div>
-
       <div class="form-group span-full">
         <label>Observaciones del Ingeniero <span class="required">*</span></label>
-        <textarea class="pro-input textarea" [(ngModel)]="ingeniero.observaciones_ingeniero"
+        <textarea class="pro-input textarea" [(ngModel)]="observacionesIngeniero"
                   [disabled]="!seccionIngenieroEditable" placeholder="Observaciones obligatorias antes de registrar"></textarea>
       </div>
     </div>
@@ -85,44 +229,159 @@
     </h3>
     <p class="card-subtitle">Crédito Solicitado, Saldos por recaudar, Análisis de financiación y Coberturas.</p>
 
+    <div class="alert-readonly subtle">
+      <span class="material-symbols-outlined">lock</span>
+      La sección Ingeniero (arriba) se muestra en modo solo lectura para el Coordinador Comercial.
+    </div>
+
+    <!-- Crédito Solicitado -->
+    <h4 class="section-subtitle mt-4">④ Crédito Solicitado</h4>
+    <table class="items-table">
+      <thead>
+        <tr><th>Campo</th><th>Valor</th><th>% Sobre Ventas</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Crédito Solicitado</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="creditoSolicitadoInput.credito_solicitado" [disabled]="!seccionCoordinadorEditable"></td>
+          <td class="pct-cell">{{ (informe?.credito_solicitado?.porcentaje_sobre_ventas || 0) | percent:'1.0-2' }}</td>
+        </tr>
+        <tr>
+          <td>Aptos. Vendidos</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="creditoSolicitadoInput.aptos_vendidos" [disabled]="!seccionCoordinadorEditable"></td>
+          <td class="pct-cell">{{ (informe?.credito_solicitado?.porcentaje_aptos_vendidos_sobre_ventas || 0) | percent:'1.0-2' }}</td>
+        </tr>
+        <tr>
+          <td>Cuotas Iniciales Ya Pagadas <span class="tag-nota">= Invertido (Ingeniero)</span></td>
+          <td class="readonly-value">$ {{ (informe?.credito_solicitado?.cuotas_iniciales_ya_pagadas || 0) | number:'1.0-0':'es-CO' }}</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>% para cuotas iniciales pendientes</td>
+          <td><input class="pro-input" type="number" step="0.01" [(ngModel)]="creditoSolicitadoInput.porcentaje_cuotas_iniciales_pendientes" [disabled]="!seccionCoordinadorEditable"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Cuotas Iniciales Pendientes</td>
+          <td class="readonly-value">$ {{ (informe?.credito_solicitado?.cuotas_iniciales_pendientes || 0) | number:'1.0-0':'es-CO' }}</td>
+          <td></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td>Saldo por Recaudar Contraentrega (vendidos)</td>
+          <td colspan="2">$ {{ (informe?.credito_solicitado?.saldo_recaudar_contraentrega_vendidos || 0) | number:'1.0-0':'es-CO' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- Saldo por Recaudar Contraentrega (por vender) -->
+    <h4 class="section-subtitle mt-4">⑥ Saldo por Recaudar Contraentrega (por vender)</h4>
+    <table class="items-table">
+      <thead>
+        <tr><th>Campo</th><th>Valor</th><th>% Sobre Ventas</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Aptos x Vender</td>
+          <td class="readonly-value">$ {{ (informe?.saldos_por_recaudar_contraentrega?.aptos_x_vender || 0) | number:'1.0-0':'es-CO' }}</td>
+          <td class="pct-cell">{{ (informe?.saldos_por_recaudar_contraentrega?.porcentaje_sobre_ventas || 0) | percent:'1.0-2' }}</td>
+        </tr>
+        <tr>
+          <td>% para cuotas iniciales (por vender)</td>
+          <td><input class="pro-input" type="number" step="0.01" [(ngModel)]="saldosPorRecaudarInput.porcentaje_cuotas_iniciales" [disabled]="!seccionCoordinadorEditable"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Cuotas Iniciales</td>
+          <td class="readonly-value">$ {{ (informe?.saldos_por_recaudar_contraentrega?.cuotas_iniciales || 0) | number:'1.0-0':'es-CO' }}</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Cuotas Iniciales Pendientes</td>
+          <td><input class="pro-input" type="number" [(ngModel)]="saldosPorRecaudarInput.cuotas_iniciales_pendientes" [disabled]="!seccionCoordinadorEditable"></td>
+          <td></td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td>Saldo por Recaudar Contraentrega (por vender)</td>
+          <td colspan="2">$ {{ (informe?.saldos_por_recaudar_contraentrega?.saldo_recaudar_contraentrega_por_vender || 0) | number:'1.0-0':'es-CO' }}</td>
+        </tr>
+        <tr class="total-row">
+          <td>Total Pendiente por Recaudar</td>
+          <td colspan="2">$ {{ (informe?.saldos_por_recaudar_contraentrega?.total_pendiente_por_recaudar || 0) | number:'1.0-0':'es-CO' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- Análisis de Financiación -->
+    <h4 class="section-subtitle mt-4">Análisis de Financiación</h4>
+    <table class="items-table readonly-table">
+      <tbody>
+        <tr>
+          <td>Costo de la Obra</td>
+          <td class="readonly-value">$ {{ (informe?.analisis_financiacion?.costo_obra || 0) | number:'1.0-0':'es-CO' }}</td>
+        </tr>
+        <tr>
+          <td>(-) Valor Invertido</td>
+          <td class="readonly-value">$ {{ (informe?.analisis_financiacion?.valor_invertido || 0) | number:'1.0-0':'es-CO' }}</td>
+        </tr>
+        <tr>
+          <td>(-) Crédito</td>
+          <td class="readonly-value">$ {{ (informe?.analisis_financiacion?.credito || 0) | number:'1.0-0':'es-CO' }}</td>
+        </tr>
+        <tr>
+          <td>Saldo X Financiar (bruto)</td>
+          <td class="readonly-value">$ {{ (informe?.analisis_financiacion?.saldo_x_financiar_bruto || 0) | number:'1.0-0':'es-CO' }}</td>
+        </tr>
+        <tr>
+          <td>(-) Cuotas Iniciales x Recaudar</td>
+          <td class="readonly-value">$ {{ (informe?.analisis_financiacion?.cuotas_iniciales_x_recaudar || 0) | number:'1.0-0':'es-CO' }}</td>
+        </tr>
+        <tr class="total-row">
+          <td>⑦ Saldo X Financiar</td>
+          <td>$ {{ (informe?.analisis_financiacion?.saldo_x_financiar || 0) | number:'1.0-0':'es-CO' }}</td>
+        </tr>
+        <tr>
+          <td>(-) Cuotas iniciales Pendientes (por vender)</td>
+          <td class="readonly-value">$ {{ (informe?.analisis_financiacion?.cuotas_iniciales_pendientes_por_vender || 0) | number:'1.0-0':'es-CO' }}</td>
+        </tr>
+        <tr class="total-row">
+          <td>⑧ Saldo No Financiado</td>
+          <td>$ {{ (informe?.analisis_financiacion?.saldo_no_financiado || 0) | number:'1.0-0':'es-CO' }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Coberturas -->
+    <h4 class="section-subtitle mt-4">Coberturas</h4>
+    <div class="coverage-grid">
+      <div class="coverage-card" [ngClass]="informe?.coberturas?.peor_escenario?.semaforo">
+        <p class="coverage-label">A) Peor Escenario (no vende más)</p>
+        <p class="coverage-value">{{ (informe?.coberturas?.peor_escenario?.cobertura || 0) | percent:'1.0-2' }}</p>
+        <p class="coverage-meta">Umbral máximo: {{ (informe?.coberturas?.peor_escenario?.umbral_maximo || 0) | percent:'1.0-0' }}</p>
+      </div>
+      <div class="coverage-card" [ngClass]="informe?.coberturas?.mejor_escenario?.semaforo">
+        <p class="coverage-label">B) Mejor Escenario (vende todo)</p>
+        <p class="coverage-value">{{ (informe?.coberturas?.mejor_escenario?.cobertura || 0) | percent:'1.0-2' }}</p>
+        <p class="coverage-meta">Umbral máximo: {{ (informe?.coberturas?.mejor_escenario?.umbral_maximo || 0) | percent:'1.0-0' }}</p>
+      </div>
+      <div class="coverage-card" [ngClass]="informe?.coberturas?.cobertura_garantia?.semaforo">
+        <p class="coverage-label">C) Cobertura de Garantía</p>
+        <p class="coverage-value">{{ (informe?.coberturas?.cobertura_garantia?.cobertura || 0) | percent:'1.0-2' }}</p>
+        <p class="coverage-meta">Umbral máximo: {{ (informe?.coberturas?.cobertura_garantia?.umbral_maximo || 0) | percent:'1.0-0' }}</p>
+      </div>
+    </div>
+    <p class="field-note">
+      <span class="material-symbols-outlined">info</span>
+      Cobertura de Garantía usa Apartamentos como referencia de ventas (no el Total de Ventas del proyecto) — así está en el documento de control CR-RO-09A.
+    </p>
+
     <div class="form-grid mt-4">
-      <div class="form-group">
-        <label>Crédito Solicitado</label>
-        <input class="pro-input" type="number" [(ngModel)]="coordinador.credito_solicitado.valor"
-               [disabled]="!seccionCoordinadorEditable" placeholder="Valor">
-      </div>
-      <div class="form-group span-2">
-        <label>Detalle del Crédito Solicitado</label>
-        <input class="pro-input" type="text" [(ngModel)]="coordinador.credito_solicitado.detalle"
-               [disabled]="!seccionCoordinadorEditable" placeholder="Detalle">
-      </div>
-
-      <div class="form-group">
-        <label>Saldos por Recaudar Contraentrega</label>
-        <input class="pro-input" type="number" [(ngModel)]="coordinador.saldos_por_recaudar_contraentrega.valor"
-               [disabled]="!seccionCoordinadorEditable" placeholder="Valor">
-      </div>
-      <div class="form-group span-2">
-        <label>Detalle de Saldos</label>
-        <input class="pro-input" type="text" [(ngModel)]="coordinador.saldos_por_recaudar_contraentrega.detalle"
-               [disabled]="!seccionCoordinadorEditable" placeholder="Detalle">
-      </div>
-
-      <div class="form-group span-full">
-        <label>Análisis de Financiación</label>
-        <textarea class="pro-input textarea" [(ngModel)]="coordinador.analisis_financiacion.detalle"
-                  [disabled]="!seccionCoordinadorEditable" placeholder="Análisis de financiación"></textarea>
-      </div>
-
-      <div class="form-group span-full">
-        <label>Coberturas</label>
-        <textarea class="pro-input textarea" [(ngModel)]="coordinador.coberturas.detalle"
-                  [disabled]="!seccionCoordinadorEditable" placeholder="Coberturas"></textarea>
-      </div>
-
       <div class="form-group span-full">
         <label>Observaciones del Coordinador Comercial</label>
-        <textarea class="pro-input textarea" [(ngModel)]="coordinador.observaciones_coordinador"
+        <textarea class="pro-input textarea" [(ngModel)]="observacionesCoordinador"
                   [disabled]="!seccionCoordinadorEditable" placeholder="Observaciones / concepto"></textarea>
       </div>
     </div>

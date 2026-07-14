@@ -16,6 +16,7 @@ class SolicitudCredito extends Model
         'cliente_id',
         'usuario_registra_id',
         'tipo_credito_id',
+        'proyecto',
         'monto_solicitado',
         'plazo_meses',
         'amortizacion_id',

@@ -71,6 +71,7 @@ export class SolicitudesCreditoComponent implements OnInit {
 
     // Credit fields
     tipo_credito_id: '',
+    proyecto: '',
     monto_solicitado: null,
     plazo_meses: null,
     amortizacion_id: '',
@@ -292,6 +293,14 @@ export class SolicitudesCreditoComponent implements OnInit {
     return false;
   }
 
+  // SCRUM-120 Fase 2: el campo Proyecto solo aplica (y es obligatorio) para
+  // Crédito Constructor — la bandeja de Informe Técnico lo necesita.
+  isTipoCreditoConstructor(): boolean {
+    if (!this.form.tipo_credito_id || this.tipoCreditos.length === 0) return false;
+    const selected = this.tipoCreditos.find(tc => tc.id === Number(this.form.tipo_credito_id));
+    return !!selected && String(selected.codigo).toUpperCase() === 'CONSTRUCTOR';
+  }
+
   // Load preset documents
   onPresetChange() {
     if (!this.selectedPresetId) {
@@ -306,6 +315,7 @@ export class SolicitudesCreditoComponent implements OnInit {
   isFormValid(): boolean {
     if (!this.form.cliente_id && !this.form.numero_documento) return false;
     if (!this.form.tipo_credito_id || !this.form.monto_solicitado || !this.form.plazo_meses || !this.form.amortizacion_id) return false;
+    if (this.isTipoCreditoConstructor() && !this.form.proyecto) return false;
     if (!this.form.destino_recurso || !this.form.fuente_pago) return false;
     if (!this.form.correo_notificacion || !this.form.asunto_notificacion || !this.form.mensaje_notificacion) return false;
 
@@ -399,6 +409,7 @@ export class SolicitudesCreditoComponent implements OnInit {
       rep_telefono: '',
 
       tipo_credito_id: '',
+      proyecto: '',
       monto_solicitado: null,
       plazo_meses: null,
       amortizacion_id: '',
