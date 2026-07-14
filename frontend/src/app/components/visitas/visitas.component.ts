@@ -146,31 +146,27 @@ import Swal from 'sweetalert2';
             <div class="form-section">
               <h4 class="section-title">Información general de la visita</h4>
               
-              <div class="form-row two-cols">
+              <div class="form-row one-col">
                 <div class="pro-input-group">
                   <label>Fecha de la visita <span class="required">*</span></label>
                   <input type="date" name="fecha" [(ngModel)]="form.fecha" required class="pro-input" />
                 </div>
-                
-                <div class="pro-input-group" style="position: relative;">
+              </div>
+
+              <div class="form-row two-cols">
+                <div class="pro-input-group">
+                  <label>Departamento <span class="required">*</span></label>
+                  <select name="departamento_id" [(ngModel)]="form.departamento_id" (ngModelChange)="onDepartamentoChange()" required class="pro-input">
+                    <option value="" disabled>Seleccione...</option>
+                    <option *ngFor="let d of departamentos" [value]="d.id">{{ d.nombre }}</option>
+                  </select>
+                </div>
+                <div class="pro-input-group">
                   <label>Ciudad <span class="required">*</span></label>
-                  <input
-                    type="text"
-                    name="ciudad"
-                    [(ngModel)]="form.ciudad"
-                    (input)="onCiudadInput()"
-                    (blur)="ocultarSugerenciasCiudadConDelay()"
-                    (focus)="onCiudadInput()"
-                    required
-                    placeholder="Ciudad de la visita"
-                    class="pro-input"
-                    autocomplete="off"
-                  />
-                  <ul *ngIf="mostrarSugerenciasCiudad && ciudadSugerencias.length" style="position: absolute; z-index: 20; top: 100%; left: 0; right: 0; background: white; border: 1px solid #cbd5e1; border-radius: 8px; margin-top: 4px; max-height: 200px; overflow-y: auto; list-style: none; padding: 4px 0; box-shadow: 0 4px 10px rgba(0,0,0,0.08);">
-                    <li *ngFor="let c of ciudadSugerencias" (mousedown)="seleccionarCiudad(c)" style="padding: 8px 12px; cursor: pointer; font-size: 0.9rem;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='white'">
-                      {{ c.nombre }}
-                    </li>
-                  </ul>
+                  <select name="ciudad_id" [(ngModel)]="form.ciudad_id" required class="pro-input" [disabled]="!form.departamento_id">
+                    <option value="" disabled>{{ form.departamento_id ? 'Seleccione...' : 'Elija primero un departamento' }}</option>
+                    <option *ngFor="let c of ciudadesDelDepartamento" [value]="c.id">{{ c.nombre }}</option>
+                  </select>
                 </div>
               </div>
 
@@ -678,17 +674,17 @@ export class VisitasComponent implements OnInit {
   showModal = false;
   isEdit = false;
   editingId: number | null = null;
-  ciudadSugerencias: any[] = [];
-  mostrarSugerenciasCiudad = false;
-  private ciudadBuscarTimeout: any = null;
+  departamentos: any[] = [];
+  ciudadesDelDepartamento: any[] = [];
   form: any = {
     fecha: '',
-    ciudad: '',
+    departamento_id: '',
+    ciudad_id: '',
     cliente_id: '',
     asistentes: '',
     observaciones: '',
     requiere_credito: false,
-    
+
     // Credit fields
     tipo_credito_id: '',
     monto_solicitado: null,
@@ -701,39 +697,28 @@ export class VisitasComponent implements OnInit {
 
   constructor(private http: HttpClient) {}
 
-  onCiudadInput() {
-    clearTimeout(this.ciudadBuscarTimeout);
-    const q = (this.form.ciudad || '').trim();
-    if (q.length < 2) {
-      this.ciudadSugerencias = [];
-      this.mostrarSugerenciasCiudad = false;
-      return;
+  onDepartamentoChange(preservarCiudad = false) {
+    if (!preservarCiudad) {
+      this.form.ciudad_id = '';
     }
-    this.ciudadBuscarTimeout = setTimeout(() => {
-      this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/ciudades/buscar?q=${encodeURIComponent(q)}`).subscribe({
-        next: (data) => {
-          this.ciudadSugerencias = data;
-          this.mostrarSugerenciasCiudad = true;
-        },
+    this.ciudadesDelDepartamento = [];
+    if (this.form.departamento_id) {
+      this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/ciudades?departamento_id=${this.form.departamento_id}`).subscribe({
+        next: data => this.ciudadesDelDepartamento = data,
         error: () => {}
       });
-    }, 250);
-  }
-
-  seleccionarCiudad(ciudad: any) {
-    this.form.ciudad = ciudad.nombre;
-    this.mostrarSugerenciasCiudad = false;
-  }
-
-  ocultarSugerenciasCiudadConDelay() {
-    // Delay para que el (mousedown) de la sugerencia alcance a dispararse antes del (blur).
-    setTimeout(() => { this.mostrarSugerenciasCiudad = false; }, 150);
+    }
   }
 
   ngOnInit() {
     this.loadVisitas();
     this.loadActiveClientes();
     this.loadParameters();
+    this.loadDepartamentos();
+  }
+
+  loadDepartamentos() {
+    this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/departamentos`).subscribe({ next: data => this.departamentos = data, error: () => {} });
   }
 
   loadVisitas() {
@@ -797,6 +782,7 @@ export class VisitasComponent implements OnInit {
 
   openModal(visit: any = null) {
     this.isEdit = !!visit;
+    this.ciudadesDelDepartamento = [];
     if (visit) {
       this.editingId = visit.id;
       this.form = { ...visit };
@@ -805,19 +791,28 @@ export class VisitasComponent implements OnInit {
         this.form.fecha = new Date(visit.fecha).toISOString().split('T')[0];
       }
       this.form.cliente_id = visit.cliente_id || '';
+      this.form.departamento_id = visit.departamento_id || '';
+      this.form.ciudad_id = visit.ciudad_id || '';
       this.form.tipo_credito_id = visit.tipo_credito_id || '';
       this.form.amortizacion_id = visit.amortizacion_id || '';
       this.form.requiere_credito = !!visit.requiere_credito;
+      // Visitas registradas antes de SCRUM-118 (14/07) solo tienen el texto
+      // libre 'ciudad', sin departamento_id/ciudad_id — quedan sin
+      // preseleccionar, hay que volver a elegir el desplegable una vez.
+      if (this.form.departamento_id) {
+        this.onDepartamentoChange(true);
+      }
     } else {
       this.editingId = null;
       this.form = {
         fecha: new Date().toISOString().split('T')[0], // Default to today
-        ciudad: '',
+        departamento_id: '',
+        ciudad_id: '',
         cliente_id: '',
         asistentes: '',
         observaciones: '',
         requiere_credito: false,
-        
+
         tipo_credito_id: '',
         monto_solicitado: null,
         plazo: null,

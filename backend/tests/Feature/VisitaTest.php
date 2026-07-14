@@ -9,6 +9,8 @@ use App\Models\DocumentType;
 use App\Models\TipoCredito;
 use App\Models\Amortizacion;
 use App\Models\Visita;
+use App\Models\Departamento;
+use App\Models\Ciudad;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Passport\Passport;
 use Tests\TestCase;
@@ -29,9 +31,20 @@ class VisitaTest extends TestCase
     private $activeClient;
     private $inactiveClient;
 
+    // ubicacion catalog (SCRUM-118)
+    private $risaralda;
+    private $manizales;
+    private $pereira;
+    private $caliModificado;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->risaralda = Departamento::create(['nombre' => 'Risaralda']);
+        $this->manizales = Ciudad::create(['nombre' => 'Manizales', 'departamento_id' => $this->risaralda->id]);
+        $this->pereira = Ciudad::create(['nombre' => 'Pereira', 'departamento_id' => $this->risaralda->id]);
+        $this->caliModificado = Ciudad::create(['nombre' => 'Cali Modificado', 'departamento_id' => $this->risaralda->id]);
 
         // 1. Create document types and person types
         $this->docCC = DocumentType::create(['nombre' => 'Cédula', 'codigo' => 'CC']);
@@ -106,7 +119,8 @@ class VisitaTest extends TestCase
 
         $response = $this->postJson('/api/visitas', [
             'fecha' => '2026-06-01',
-            'ciudad' => 'Manizales',
+            'departamento_id' => $this->risaralda->id,
+            'ciudad_id' => $this->manizales->id,
             'cliente_id' => $this->activeClient->id,
             'asistentes' => 'Carlos, Luis',
             'requiere_credito' => true // demands credit fields
@@ -132,7 +146,8 @@ class VisitaTest extends TestCase
 
         $response = $this->postJson('/api/visitas', [
             'fecha' => '2026-06-01',
-            'ciudad' => 'Pereira',
+            'departamento_id' => $this->risaralda->id,
+            'ciudad_id' => $this->pereira->id,
             'cliente_id' => $this->inactiveClient->id,
             'asistentes' => 'Carlos, Luis',
             'requiere_credito' => false
@@ -151,7 +166,8 @@ class VisitaTest extends TestCase
 
         $payload = [
             'fecha' => '2026-06-02',
-            'ciudad' => 'Pereira',
+            'departamento_id' => $this->risaralda->id,
+            'ciudad_id' => $this->pereira->id,
             'cliente_id' => $this->activeClient->id,
             'asistentes' => 'Carlos, Luis',
             'requiere_credito' => true,
@@ -192,7 +208,8 @@ class VisitaTest extends TestCase
 
         $response = $this->putJson("/api/visitas/{$visit->id}", [
             'fecha' => '2026-06-01',
-            'ciudad' => 'Cali Modificado',
+            'departamento_id' => $this->risaralda->id,
+            'ciudad_id' => $this->caliModificado->id,
             'cliente_id' => $this->activeClient->id,
             'asistentes' => 'Antigravity, User',
             'requiere_credito' => false
@@ -222,6 +239,65 @@ class VisitaTest extends TestCase
 
         $this->assertDatabaseMissing('visitas', [
             'id' => $visit->id
+        ]);
+    }
+
+    /**
+     * SCRUM-118 (seguimiento 14/07): Ciudad ya no es texto libre, se
+     * exige el desplegable Departamento -> Ciudad igual que en Clientes.
+     */
+    public function test_store_requires_departamento_and_ciudad_ids(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $response = $this->postJson('/api/visitas', [
+            'fecha' => '2026-06-01',
+            'cliente_id' => $this->activeClient->id,
+            'asistentes' => 'Carlos, Luis',
+            'requiere_credito' => false
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['departamento_id', 'ciudad_id']);
+    }
+
+    public function test_store_rejects_ciudad_that_does_not_belong_to_departamento(): void
+    {
+        $otroDepartamento = Departamento::create(['nombre' => 'Antioquia']);
+
+        Passport::actingAs($this->admin);
+
+        $response = $this->postJson('/api/visitas', [
+            'fecha' => '2026-06-01',
+            'departamento_id' => $otroDepartamento->id,
+            'ciudad_id' => $this->pereira->id, // Pereira pertenece a Risaralda, no a Antioquia
+            'cliente_id' => $this->activeClient->id,
+            'asistentes' => 'Carlos, Luis',
+            'requiere_credito' => false
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString('no pertenece', $response->json()['message']);
+    }
+
+    public function test_ciudad_texto_se_deriva_del_desplegable(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $response = $this->postJson('/api/visitas', [
+            'fecha' => '2026-06-01',
+            'departamento_id' => $this->risaralda->id,
+            'ciudad_id' => $this->manizales->id,
+            'cliente_id' => $this->activeClient->id,
+            'asistentes' => 'Carlos, Luis',
+            'requiere_credito' => false
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('visitas', [
+            'ciudad' => 'Manizales',
+            'departamento_id' => $this->risaralda->id,
+            'ciudad_id' => $this->manizales->id,
         ]);
     }
 }

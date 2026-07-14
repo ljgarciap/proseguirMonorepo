@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Visita;
 use App\Models\Cliente;
+use App\Models\Ciudad;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -56,7 +57,8 @@ class VisitaController extends Controller
     {
         $rules = [
             'fecha' => 'required|date',
-            'ciudad' => 'required|string|max:255',
+            'departamento_id' => 'required|exists:departamentos,id',
+            'ciudad_id' => 'required|exists:ciudades,id',
             'cliente_id' => 'required|exists:clientes,id',
             'asistentes' => 'required|string',
             'observaciones' => 'nullable|string',
@@ -93,8 +95,10 @@ class VisitaController extends Controller
             $validated['fuente_pago'] = null;
         }
 
+        $validated['ciudad'] = $this->resolverTextoCiudad($validated['departamento_id'], $validated['ciudad_id']);
+
         $visita = Visita::create($validated);
-        
+
         return response()->json($visita->load(['cliente.tipoPersona', 'tipoCredito', 'amortizacion']), 201);
     }
 
@@ -104,7 +108,8 @@ class VisitaController extends Controller
 
         $rules = [
             'fecha' => 'required|date',
-            'ciudad' => 'required|string|max:255',
+            'departamento_id' => 'required|exists:departamentos,id',
+            'ciudad_id' => 'required|exists:ciudades,id',
             'cliente_id' => 'required|exists:clientes,id',
             'asistentes' => 'required|string',
             'observaciones' => 'nullable|string',
@@ -141,6 +146,8 @@ class VisitaController extends Controller
             $validated['fuente_pago'] = null;
         }
 
+        $validated['ciudad'] = $this->resolverTextoCiudad($validated['departamento_id'], $validated['ciudad_id']);
+
         $visita->update($validated);
 
         return response()->json($visita->load(['cliente.tipoPersona', 'tipoCredito', 'amortizacion']));
@@ -152,5 +159,26 @@ class VisitaController extends Controller
         $visita->delete();
 
         return response()->json(['message' => 'Visita eliminada correctamente']);
+    }
+
+    /**
+     * SCRUM-118: 'ciudad' (texto libre) se conserva por compatibilidad con
+     * el filtro de index() y con datos históricos, pero ahora se deriva
+     * siempre del desplegable — nunca se vuelve a pedir como input aparte.
+     * Valida además que la ciudad realmente pertenezca al departamento
+     * elegido (no confiar en que el frontend mande una combinación
+     * consistente).
+     */
+    private function resolverTextoCiudad(int $departamentoId, int $ciudadId): string
+    {
+        $ciudad = Ciudad::where('id', $ciudadId)->where('departamento_id', $departamentoId)->first();
+
+        if (!$ciudad) {
+            abort(response()->json([
+                'message' => 'La ciudad seleccionada no pertenece al departamento elegido.'
+            ], 422));
+        }
+
+        return $ciudad->nombre;
     }
 }
