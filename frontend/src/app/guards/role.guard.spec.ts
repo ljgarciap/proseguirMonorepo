@@ -74,6 +74,15 @@ describe('roleGuard', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/solicitudes-credito']);
   });
 
+  it('redirige ingeniero a /informes-tecnicos', () => {
+    authSpy.isAuthenticated.and.returnValue(true);
+    authSpy.isAuthorized.and.returnValue(false);
+    authSpy.getActiveRole.and.returnValue('ingeniero');
+
+    expect(run(['superadmin'])).toBeFalse();
+    expect(router.navigate).toHaveBeenCalledWith(['/informes-tecnicos']);
+  });
+
   ['oficial_cumplimiento', 'comite_credito', 'tesoreria'].forEach(rol => {
     it(`redirige ${rol} a /creditos`, () => {
       authSpy.isAuthenticated.and.returnValue(true);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesActiveRole;
 use App\Models\CreditoOrdinario;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\Storage;
 
 class CreditoOrdinarioController extends Controller
 {
+    use ResolvesActiveRole;
+
     /**
      * Listar las solicitudes de crédito ordinario
      */
@@ -316,18 +319,5 @@ class CreditoOrdinarioController extends Controller
         $credito->save();
 
         return response()->json($credito->load('cliente'));
-    }
-
-    private function resolveActiveRole(Request $request): string
-    {
-        $user      = Auth::user();
-        $userRoles = is_array($user->roles) ? $user->roles : [];
-        $header    = $request->header('X-Active-Role');
-
-        if ($header && (in_array($header, $userRoles) || in_array('superadmin', $userRoles))) {
-            return $header;
-        }
-
-        return $userRoles[0] ?? 'cliente';
     }
 }

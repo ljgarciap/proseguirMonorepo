@@ -128,6 +128,18 @@ export const routes: Routes = [
         data: { roles: ['superadmin', 'gerente', 'coordinador_comercial', 'operativo'] }
     },
     {
+        path: 'informes-tecnicos',
+        loadComponent: () => import('./components/informe-tecnico/informe-tecnico-bandeja.component').then(m => m.InformeTecnicoBandejaComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['ingeniero', 'coordinador_comercial', 'superadmin'] }
+    },
+    {
+        path: 'informes-tecnicos/:creditoId',
+        loadComponent: () => import('./components/informe-tecnico/informe-tecnico-detalle.component').then(m => m.InformeTecnicoDetalleComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['ingeniero', 'coordinador_comercial', 'superadmin'] }
+    },
+    {
         path: 'db-cleaner',
         loadComponent: () => import('./components/db-cleaner/db-cleaner.component').then(m => m.DbCleanerComponent),
         canActivate: [roleGuard],

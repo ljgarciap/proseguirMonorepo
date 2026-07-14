@@ -482,6 +482,7 @@ export class UserManagementComponent implements OnInit {
                    <label><input type="checkbox" class="swal-role" value="oficial_cumplimiento" ${user?.roles?.includes('oficial_cumplimiento') ? 'checked' : ''}> Oficial Cumpl.</label>
                    <label><input type="checkbox" class="swal-role" value="comite_credito" ${user?.roles?.includes('comite_credito') ? 'checked' : ''}> Comité Crédito</label>
                    <label><input type="checkbox" class="swal-role" value="tesoreria" ${user?.roles?.includes('tesoreria') ? 'checked' : ''}> Tesorería</label>
+                   <label><input type="checkbox" class="swal-role" value="ingeniero" ${user?.roles?.includes('ingeniero') ? 'checked' : ''}> Ingeniero</label>
                  </div>
              </div>
           </div>

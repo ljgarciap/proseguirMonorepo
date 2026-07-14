@@ -1,0 +1,59 @@
+<div class="view-container">
+  <header class="view-header">
+    <div class="title-area">
+      <h1>Informe Técnico — Crédito Constructor</h1>
+      <p>Diligenciamiento secuencial del informe técnico entre Ingeniero y Coordinador Comercial.</p>
+    </div>
+  </header>
+
+  <div class="content-card">
+    <h3 class="card-title">Bandeja de Informe Técnico</h3>
+    <p class="card-subtitle">Créditos tipo Constructor con documentación validada, pendientes o en proceso de informe técnico.</p>
+
+    <div class="table-container mt-4">
+      <table class="modern-table">
+        <thead>
+          <tr>
+            <th>No. de Crédito</th>
+            <th>Proyecto</th>
+            <th>Solicitante</th>
+            <th>Estado del Informe Técnico</th>
+            <th>Rol Actual</th>
+            <th class="text-right">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let credito of creditos">
+            <td class="id-cell">{{ credito.numero_solicitud }}</td>
+            <td>{{ proyecto(credito) }}</td>
+            <td>
+              <div class="user-cell">
+                <span class="name">{{ solicitante(credito) }}</span>
+              </div>
+            </td>
+            <td>
+              <span class="status-pill" [ngClass]="{
+                'warning': credito.estado === 'informe_tecnico_ingeniero' || credito.estado === 'informe_tecnico_coordinador',
+                'success': credito.estado === 'informe_tecnico_finalizado'
+              }">{{ estadoLabel(credito.estado) }}</span>
+            </td>
+            <td>{{ rolActual(credito.estado) }}</td>
+            <td class="text-right">
+              <button class="btn-pro sm" [class.primary]="puedeEditar(credito)" [class.secondary]="!puedeEditar(credito)"
+                      [routerLink]="['/informes-tecnicos', credito.id]">
+                <span class="material-symbols-outlined">{{ puedeEditar(credito) ? 'edit_note' : 'visibility' }}</span>
+                {{ accionLabel(credito) }}
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="creditos.length === 0 && !loading">
+            <td colspan="6" class="text-center py-4 text-muted">No hay créditos Constructor en el flujo de Informe Técnico para tu rol.</td>
+          </tr>
+          <tr *ngIf="loading">
+            <td colspan="6" class="text-center py-4">Cargando bandeja de Informe Técnico...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

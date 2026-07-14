@@ -184,22 +184,41 @@ class SolicitudCreditoController extends Controller
                 'document_preset_id' => $validated['document_preset_id'] ?? null,
             ]);
 
-            // 3.1. Automatically start the BPMN CreditoOrdinario workflow if type is ORDINARIO
+            // 3.1. Automatically start the BPMN CreditoOrdinario workflow for
+            // ORDINARIO (comité completo) y CONSTRUCTOR (SCRUM-120: solo hasta
+            // Informe Técnico en esta fase, sin pasar por comité/desembolso).
             $tipoCredito = \App\Models\TipoCredito::find($validated['tipo_credito_id']);
-            if ($tipoCredito && strtoupper($tipoCredito->codigo) === 'ORDINARIO') {
+            $codigoTipoCredito = $tipoCredito ? strtoupper($tipoCredito->codigo) : null;
+
+            if (in_array($codigoTipoCredito, ['ORDINARIO', 'CONSTRUCTOR'])) {
                 $activeRole = $request->header('X-Active-Role')
                     ?? (($request->user()->roles && is_array($request->user()->roles))
                         ? ($request->user()->roles[0] ?? 'coordinador_comercial')
                         : 'coordinador_comercial');
 
-                \App\Models\CreditoOrdinario::iniciar(
-                    clienteId:  $user->id,
-                    monto:      $validated['monto_solicitado'],
-                    plazoMeses: $validated['plazo_meses'],
-                    usuario:    $request->user()->name,
-                    rol:        $activeRole,
-                    comentario: 'Solicitud de crédito ordinario registrada e iniciada desde el módulo de solicitudes.'
-                );
+                if ($codigoTipoCredito === 'CONSTRUCTOR') {
+                    \App\Models\CreditoOrdinario::iniciar(
+                        clienteId:  $user->id,
+                        monto:      $validated['monto_solicitado'],
+                        plazoMeses: $validated['plazo_meses'],
+                        usuario:    $request->user()->name,
+                        rol:        $activeRole,
+                        comentario: 'Solicitud de crédito Constructor registrada. Esperando validación de documentación para habilitar el Informe Técnico.',
+                        solicitudCreditoId: $solicitud->id,
+                        estadoInicial: 'validacion_documental_constructor',
+                        documentosIniciales: []
+                    );
+                } else {
+                    \App\Models\CreditoOrdinario::iniciar(
+                        clienteId:  $user->id,
+                        monto:      $validated['monto_solicitado'],
+                        plazoMeses: $validated['plazo_meses'],
+                        usuario:    $request->user()->name,
+                        rol:        $activeRole,
+                        comentario: 'Solicitud de crédito ordinario registrada e iniciada desde el módulo de solicitudes.',
+                        solicitudCreditoId: $solicitud->id
+                    );
+                }
             }
 
             // 4. Create DocumentRequest in the database if document_preset_id is provided
@@ -216,6 +235,16 @@ class SolicitudCreditoController extends Controller
                         ->first();
 
                     if ($existingDocRequest) {
+                        // Si la solicitud pendiente encontrada todavía no está
+                        // ligada a ninguna SolicitudCredito, la asociamos a
+                        // esta (SCRUM-120). Si ya estaba ligada a otra (cliente
+                        // con dos solicitudes activas a la vez), la dejamos
+                        // como está — es una limitación conocida, no se
+                        // reasigna para no romper el vínculo existente.
+                        if (!$existingDocRequest->solicitud_credito_id) {
+                            $existingDocRequest->update(['solicitud_credito_id' => $solicitud->id]);
+                        }
+
                         // Add new requirements to the existing request
                         foreach ($requirementIds as $reqId) {
                             $itemExists = DocumentRequestItem::where('document_request_id', $existingDocRequest->id)
@@ -235,6 +264,7 @@ class SolicitudCreditoController extends Controller
                         $docRequest = DocumentRequest::create([
                             'cliente_id' => $user->id,
                             'creado_por' => $request->user()->id,
+                            'solicitud_credito_id' => $solicitud->id,
                             'estado' => 'pendiente'
                         ]);
 

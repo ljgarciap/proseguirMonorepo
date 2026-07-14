@@ -24,7 +24,7 @@ import { interval, Subscription } from 'rxjs';
         </div>
 
         <nav class="sidebar-nav">
-          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'])">
+          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria', 'ingeniero'])">
             <label>Operaciones</label>
             <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])" routerLink="/dashboard" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">dashboard</span> Dashboard
@@ -34,6 +34,9 @@ import { interval, Subscription } from 'rxjs';
             </a>
             <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'gerente', 'superadmin', 'operativo'])" routerLink="/solicitudes-credito" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">assignment_turned_in</span> Registro Solicitud Crédito
+            </a>
+            <a *ngIf="authService.isAuthorized(['ingeniero', 'coordinador_comercial', 'superadmin'])" routerLink="/informes-tecnicos" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">engineering</span> Informe Técnico
             </a>
             <a *ngIf="authService.isAuthorized(['operativo'])" routerLink="/sheets" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">database</span> Base de Datos
@@ -399,6 +402,8 @@ export class AppComponent implements OnInit, OnDestroy {
       this.router.navigate(['/client-upload']);
     } else if (role === 'coordinador_comercial') {
       this.router.navigate(['/solicitudes-credito']);
+    } else if (role === 'ingeniero') {
+      this.router.navigate(['/informes-tecnicos']);
     } else if (['oficial_cumplimiento', 'comite_credito', 'tesoreria'].includes(role)) {
       this.router.navigate(['/creditos']);
     } else {
