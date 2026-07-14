@@ -14,6 +14,7 @@ class CreditoOrdinario extends Model
     protected $fillable = [
         'numero_solicitud',
         'cliente_id',
+        'solicitud_credito_id',
         'monto',
         'plazo_meses',
         'estado',
@@ -32,7 +33,8 @@ class CreditoOrdinario extends Model
             'documentos' => 'array',
             'historial_estados' => 'array',
             'monto' => 'decimal:2',
-            'plazo_meses' => 'integer'
+            'plazo_meses' => 'integer',
+            'solicitud_credito_id' => 'integer'
         ];
     }
 
@@ -44,23 +46,48 @@ class CreditoOrdinario extends Model
         return $this->belongsTo(User::class, 'cliente_id');
     }
 
-    public static function iniciar(int $clienteId, float $monto, int $plazoMeses, string $usuario, string $rol, string $comentario): self
+    /**
+     * Relación con la Solicitud de Crédito que originó este expediente BPMN.
+     * Nullable: expedientes creados antes de SCRUM-120 no la tienen.
+     */
+    public function solicitudCredito()
     {
+        return $this->belongsTo(SolicitudCredito::class, 'solicitud_credito_id');
+    }
+
+    public function informeTecnico()
+    {
+        return $this->hasOne(InformeTecnico::class, 'credito_ordinario_id');
+    }
+
+    public static function iniciar(
+        int $clienteId,
+        float $monto,
+        int $plazoMeses,
+        string $usuario,
+        string $rol,
+        string $comentario,
+        ?int $solicitudCreditoId = null,
+        ?string $estadoInicial = null,
+        ?array $documentosIniciales = null
+    ): self {
         $numeroSolicitud = 'CO-' . date('Y') . '-' . \Illuminate\Support\Str::upper(\Illuminate\Support\Str::random(4)) . rand(10, 99);
+        $estadoInicial = $estadoInicial ?? 'revision_documental';
 
         return self::create([
             'numero_solicitud' => $numeroSolicitud,
             'cliente_id'       => $clienteId,
+            'solicitud_credito_id' => $solicitudCreditoId,
             'monto'            => $monto,
             'plazo_meses'      => $plazoMeses,
-            'estado'           => 'revision_documental',
-            'documentos'       => self::documentosIniciales(),
+            'estado'           => $estadoInicial,
+            'documentos'       => $documentosIniciales ?? self::documentosIniciales(),
             'historial_estados' => [[
                 'fecha'          => now()->toIso8601String(),
                 'usuario'        => $usuario,
                 'rol'            => $rol,
                 'estado_anterior' => 'ninguno',
-                'estado_nuevo'   => 'revision_documental',
+                'estado_nuevo'   => $estadoInicial,
                 'comentario'     => $comentario,
             ]],
         ]);

@@ -133,5 +133,17 @@ class UserSeeder extends Seeder
                 'roles' => ['tesoreria']
             ]
         );
+
+        // 11. Ingeniero (SCRUM-120: Informe Técnico Constructor)
+        User::updateOrCreate(
+            ['numero_documento' => '1123'],
+            [
+                'name' => 'Ingeniero de Proyectos de Prueba',
+                'email' => 'ingeniero@test.com',
+                'password' => '1123',
+                'tipo_documento_id' => $cc,
+                'roles' => ['ingeniero']
+            ]
+        );
     }
 }
