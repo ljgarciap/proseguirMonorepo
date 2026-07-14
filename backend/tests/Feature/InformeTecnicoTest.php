@@ -289,15 +289,32 @@ class InformeTecnicoTest extends TestCase
         ]);
     }
 
+    public function test_ingeniero_registrar_sin_ventas_cargadas_falla_422(): void
+    {
+        $credito = $this->crearCreditoEnEstadoIngeniero();
+
+        Passport::actingAs($this->ingeniero);
+        $response = $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'observaciones_ingeniero' => 'Proyecto viable, documentación completa.',
+        ], ['X-Active-Role' => 'ingeniero']);
+
+        $response->assertStatus(422)
+            ->assertJsonFragment(['message' => 'Debe diligenciar al menos un valor en Ventas Totales Proyecto antes de registrar el informe técnico.']);
+        $this->assertDatabaseHas('credito_ordinarios', [
+            'id' => $credito->id,
+            'estado' => 'informe_tecnico_ingeniero',
+        ]);
+    }
+
     public function test_ingeniero_registrar_con_observaciones_transiciona_a_coordinador(): void
     {
         $credito = $this->crearCreditoEnEstadoIngeniero();
 
         Passport::actingAs($this->ingeniero);
         $response = $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
-            'ventas_totales_proyecto' => ['total' => 1000000],
-            'costos' => ['total' => 600000],
-            'invertido' => ['total' => 200000],
+            'ventas_totales_proyecto' => ['apartamentos' => 1000000],
+            'costos' => ['lote' => 600000],
+            'invertido' => ['lote' => 200000],
             'observaciones_ingeniero' => 'Proyecto viable, documentación completa.',
         ], ['X-Active-Role' => 'ingeniero']);
 
@@ -390,6 +407,7 @@ class InformeTecnicoTest extends TestCase
 
         Passport::actingAs($this->ingeniero);
         $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'ventas_totales_proyecto' => ['apartamentos' => 1000000],
             'observaciones_ingeniero' => 'Proyecto viable.',
         ], ['X-Active-Role' => 'ingeniero'])->assertStatus(200);
 
@@ -459,6 +477,7 @@ class InformeTecnicoTest extends TestCase
         // (y el ingeniero sigue pudiendo, aunque ya no editar).
         Passport::actingAs($this->ingeniero);
         $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'ventas_totales_proyecto' => ['apartamentos' => 1000000],
             'observaciones_ingeniero' => 'Listo',
         ], ['X-Active-Role' => 'ingeniero'])->assertStatus(200);
 
@@ -481,6 +500,7 @@ class InformeTecnicoTest extends TestCase
         ], ['X-Active-Role' => 'superadmin'])->assertStatus(200);
 
         $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'ventas_totales_proyecto' => ['apartamentos' => 1000000],
             'observaciones_ingeniero' => 'Editado por superadmin',
         ], ['X-Active-Role' => 'superadmin'])->assertStatus(200);
 

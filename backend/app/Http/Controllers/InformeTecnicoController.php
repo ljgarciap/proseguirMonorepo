@@ -141,6 +141,15 @@ class InformeTecnicoController extends Controller
                 ], 422);
             }
 
+            $totalVentas = $datos['ventas_totales_proyecto']['total_ventas']
+                ?? $informe->ventas_totales_proyecto['total_ventas']
+                ?? 0;
+            if ($totalVentas <= 0) {
+                return response()->json([
+                    'message' => 'Debe diligenciar al menos un valor en Ventas Totales Proyecto antes de registrar el informe técnico.'
+                ], 422);
+            }
+
             $datos['diligenciado_por_ingeniero_id'] = $user->id;
             $datos['diligenciado_por_ingeniero_at'] = now();
             $informe->update($datos);
