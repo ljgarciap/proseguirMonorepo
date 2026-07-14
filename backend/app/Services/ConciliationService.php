@@ -83,38 +83,80 @@ class ConciliationService
     private function parseBankText($text)
     {
         $data = [];
+        // $active acumula las columnas de la transacción en curso. Normalmente
+        // se cierra con la misma línea que la abrió, pero el extractor de PDF a
+        // veces parte un pago en dos renglones (el VALOR queda en la línea
+        // siguiente, sin fecha) — ver SCRUM-125. Esas líneas huérfanas se
+        // fusionan aquí en vez de descartarse.
+        $active = null;
+
         foreach (explode("\n", $text) as $line) {
+            if (trim($line) === '') continue;
+
             $columns = explode('|', $line);
-            if (count($columns) < 2) continue;
+            $startsNewRecord = preg_match('/^\d{4}\/\d{2}\/\d{2}$/', $columns[0]);
 
-            $dateRaw = $columns[0];
-            if (!preg_match('/^\d{4}\/\d{2}\/\d{2}$/', $dateRaw)) continue;
+            if ($startsNewRecord) {
+                // Cierra la transacción anterior (si quedó pendiente de una
+                // continuación que nunca llegó) antes de abrir esta.
+                if ($active !== null) {
+                    $this->pushBankRowIfValid($active, $data);
+                }
+                $active = $columns;
+            } else {
+                if ($active === null) continue; // huérfana sin transacción previa a la cual fusionarse
+                $active = array_merge($active, $columns);
+            }
 
-            // La última columna siempre es VALOR, sin importar cuántas
-            // columnas de REFERENCIA/DOCUMENTO haya en el medio.
-            $valorRaw = trim(array_pop($columns));
+            // Si con lo acumulado hasta ahora ya se arma un registro válido,
+            // se cierra de inmediato. Esto evita que una línea posterior no
+            // relacionada (pie de página, totales) se fusione por error con
+            // un pago que ya estaba completo.
+            if ($this->pushBankRowIfValid($active, $data)) {
+                $active = null;
+            }
+        }
 
-            // Un VALOR real siempre trae separador de miles y 2 decimales
-            // (ej: "26,700.00"). Si no cumple el formato, lo que llegó ahí
-            // es un número de REFERENCIA/DOCUMENTO pegado sin separador
-            // (o texto, ej. nombre de remitente Nequi) — no un monto.
-            if (!preg_match('/^-?[\d.,]*\d[.,]\d{2}$/', $valorRaw)) continue;
-
-            $amount = $this->parseAmount($valorRaw);
-            if ($amount <= 0) continue;
-
-            $description = trim(implode(' ', array_slice($columns, 1)));
-
-            $data[] = [
-                'date' => str_replace('/', '-', $dateRaw),
-                'amount' => $amount,
-                'description' => $description,
-                'source' => 'Bank'
-            ];
+        if ($active !== null) {
+            $this->pushBankRowIfValid($active, $data);
         }
 
         \Log::info("Bank entries found: " . count($data));
         return $data;
+    }
+
+    /**
+     * Valida un conjunto de columnas (fecha + ... + VALOR) y, si es válido,
+     * lo agrega a $data. Devuelve true si se agregó.
+     */
+    private function pushBankRowIfValid(array $columns, array &$data): bool
+    {
+        $dateRaw = $columns[0];
+        if (!preg_match('/^\d{4}\/\d{2}\/\d{2}$/', $dateRaw)) return false;
+
+        // La última columna siempre es VALOR, sin importar cuántas columnas
+        // de REFERENCIA/DOCUMENTO haya en el medio.
+        $valorRaw = trim($columns[count($columns) - 1]);
+
+        // Un VALOR real siempre trae separador de miles y 2 decimales
+        // (ej: "26,700.00"). Si no cumple el formato, lo que llegó ahí
+        // es un número de REFERENCIA/DOCUMENTO pegado sin separador
+        // (o texto, ej. nombre de remitente Nequi) — no un monto todavía.
+        if (!preg_match('/^-?[\d.,]*\d[.,]\d{2}$/', $valorRaw)) return false;
+
+        $amount = $this->parseAmount($valorRaw);
+        if ($amount <= 0) return false;
+
+        $description = trim(implode(' ', array_slice($columns, 1, count($columns) - 2)));
+
+        $data[] = [
+            'date' => str_replace('/', '-', $dateRaw),
+            'amount' => $amount,
+            'description' => $description,
+            'source' => 'Bank'
+        ];
+
+        return true;
     }
 
     private function performMatching($susuerteData, $bankData)
