@@ -341,7 +341,8 @@ class InformeTecnicoController extends Controller
                     $saldosPorRecaudar
                 );
                 $datos['analisis_financiacion'] = $analisisFinanciacion;
-                $datos['coberturas'] = $this->calculo->calcularCoberturas($creditoSolicitado, $analisisFinanciacion, $saldosPorRecaudar);
+                $ventasTotalesProyecto = $informe->ventas_totales_proyecto ?? [];
+                $datos['coberturas'] = $this->calculo->calcularCoberturas($creditoSolicitado, $analisisFinanciacion, $saldosPorRecaudar, $ventasTotalesProyecto);
             }
 
             if ($request->has('observaciones_coordinador')) {

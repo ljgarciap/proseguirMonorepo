@@ -228,15 +228,23 @@ class InformeTecnicoCalculoService
      * por ser la fuente de verdad más primaria; documentado como decisión
      * de diseño explícita, no una suposición (ver reporte de la tarea).
      */
-    public function calcularCoberturas(array $creditoSolicitado, array $analisisFinanciacion, array $saldosPorRecaudar): array
-    {
+    public function calcularCoberturas(
+        array $creditoSolicitado,
+        array $analisisFinanciacion,
+        array $saldosPorRecaudar,
+        array $ventasTotalesProyecto
+    ): array {
         $credito = $creditoSolicitado['credito_solicitado'] ?? 0;
         $saldoXFinanciar = $analisisFinanciacion['saldo_x_financiar'] ?? 0;
         $saldoNoFinanciado = $analisisFinanciacion['saldo_no_financiado'] ?? 0;
         $saldoContraentregaVendidos = $creditoSolicitado['saldo_recaudar_contraentrega_vendidos'] ?? 0;
         $saldoContraentregaPorVender = $saldosPorRecaudar['saldo_recaudar_contraentrega_por_vender'] ?? 0;
-        // "Valor Total en Ventas" en Cobertura de Garantía = Apartamentos (E9), no el total de ventas (E7).
-        $apartamentos = $creditoSolicitado['aptos_vendidos'] ?? 0;
+        // "Valor Total en Ventas" en Cobertura de Garantía = Apartamentos (E9,
+        // línea de Ventas Totales Proyecto del Ingeniero), NO "Aptos. Vendidos"
+        // (E38, Crédito Solicitado del Coordinador) — son campos distintos que
+        // solo coinciden cuando se vendió el 100% del proyecto, como en el
+        // fixture de referencia. Ese solape ocultaba este bug en el test.
+        $apartamentos = $ventasTotalesProyecto['apartamentos'] ?? 0;
 
         $peorNumerador = $credito + $saldoXFinanciar;
         $peorDenominador = $saldoContraentregaVendidos;

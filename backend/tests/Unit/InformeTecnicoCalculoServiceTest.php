@@ -157,8 +157,9 @@ class InformeTecnicoCalculoServiceTest extends TestCase
             'saldo_no_financiado' => 4966123294.2,
         ];
         $saldosPorRecaudar = ['saldo_recaudar_contraentrega_por_vender' => 0];
+        $ventasTotalesProyecto = ['apartamentos' => 32841282386];
 
-        $resultado = $this->service->calcularCoberturas($creditoSolicitado, $analisisFinanciacion, $saldosPorRecaudar);
+        $resultado = $this->service->calcularCoberturas($creditoSolicitado, $analisisFinanciacion, $saldosPorRecaudar, $ventasTotalesProyecto);
 
         // G66 = F66/F67 = (E36+E57)/E41
         $this->assertEqualsWithDelta(0.56401674757149, $resultado['peor_escenario']['cobertura'], 0.0000001);
@@ -171,6 +172,29 @@ class InformeTecnicoCalculoServiceTest extends TestCase
         // G77 = F77/F78 = E36/E9 (Apartamentos, no total de ventas)
         $this->assertEqualsWithDelta(0.24359584701876, $resultado['cobertura_garantia']['cobertura'], 0.0000001);
         $this->assertEquals('verde', $resultado['cobertura_garantia']['semaforo']);
+    }
+
+    public function test_coberturas_garantia_usa_apartamentos_de_ventas_no_aptos_vendidos_del_coordinador(): void
+    {
+        // Caso donde Apartamentos (E9, Ingeniero) y Aptos. Vendidos (E38,
+        // Coordinador) son DISTINTOS — no se vendió el 100% del proyecto.
+        // El fixture real (Entre Verde) los tenía iguales por casualidad,
+        // lo que ocultó un bug donde calcularCoberturas() leía por error
+        // aptos_vendidos en vez de apartamentos para este cálculo.
+        $creditoSolicitado = [
+            'credito_solicitado' => 8000000000,
+            'aptos_vendidos' => 20000000000, // distinto de apartamentos a propósito
+            'saldo_recaudar_contraentrega_vendidos' => 1,
+        ];
+        $analisisFinanciacion = ['saldo_x_financiar' => 0, 'saldo_no_financiado' => 0];
+        $saldosPorRecaudar = ['saldo_recaudar_contraentrega_por_vender' => 0];
+        $ventasTotalesProyecto = ['apartamentos' => 40000000000];
+
+        $resultado = $this->service->calcularCoberturas($creditoSolicitado, $analisisFinanciacion, $saldosPorRecaudar, $ventasTotalesProyecto);
+
+        // G77 = E36/E9 = 8,000,000,000 / 40,000,000,000 = 0.2 (usando apartamentos, no aptos_vendidos)
+        $this->assertEqualsWithDelta(0.2, $resultado['cobertura_garantia']['cobertura'], 0.0000001);
+        $this->assertEquals(40000000000, $resultado['cobertura_garantia']['denominador']);
     }
 
     public function test_division_por_cero_no_produce_nan_ni_infinito(): void
