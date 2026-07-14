@@ -493,4 +493,38 @@ class InformeTecnicoTest extends TestCase
             'observaciones_coordinador' => 'Editado por superadmin',
         ], ['X-Active-Role' => 'superadmin'])->assertStatus(200);
     }
+
+    public function test_descargar_pdf_y_excel_del_informe_tecnico(): void
+    {
+        $credito = $this->crearCreditoEnEstadoIngeniero();
+
+        Passport::actingAs($this->ingeniero);
+        $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'ventas_totales_proyecto' => ['apartamentos' => 32841282386],
+            'observaciones_ingeniero' => 'Proyecto viable.',
+        ], ['X-Active-Role' => 'ingeniero'])->assertStatus(200);
+
+        // El propio Ingeniero puede descargar aunque el informe siga en
+        // borrador (habilitado apenas exista algún dato guardado).
+        $responsePdf = $this->get("/api/informes-tecnicos/{$credito->id}/descargar?formato=pdf", [
+            'X-Active-Role' => 'ingeniero'
+        ]);
+        $responsePdf->assertStatus(200);
+        $responsePdf->assertHeader('content-type', 'application/pdf');
+
+        $responseExcel = $this->get("/api/informes-tecnicos/{$credito->id}/descargar?formato=excel", [
+            'X-Active-Role' => 'ingeniero'
+        ]);
+        $responseExcel->assertStatus(200);
+    }
+
+    public function test_coordinador_no_puede_descargar_mientras_es_turno_del_ingeniero(): void
+    {
+        $credito = $this->crearCreditoEnEstadoIngeniero();
+
+        Passport::actingAs($this->coordinador);
+        $this->get("/api/informes-tecnicos/{$credito->id}/descargar?formato=pdf", [
+            'X-Active-Role' => 'coordinador_comercial'
+        ])->assertStatus(403);
+    }
 }

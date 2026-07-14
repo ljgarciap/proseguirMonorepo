@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\InformeTecnicoExport;
 use App\Http\Controllers\Concerns\ResolvesActiveRole;
 use App\Models\CreditoOrdinario;
 use App\Models\InformeTecnico;
 use App\Services\InformeTecnicoCalculoService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Maatwebsite\Excel\Facades\Excel;
 
 class InformeTecnicoController extends Controller
 {
@@ -163,13 +166,56 @@ class InformeTecnicoController extends Controller
         return response()->json(['message' => 'El informe técnico ya fue finalizado.'], 422);
     }
 
+    /**
+     * Documento consolidado (PDF o Excel) del informe técnico — habilitado
+     * apenas exista algún dato guardado, no solo cuando está finalizado
+     * (así lo pide el prototipo). Reusa el mismo gate de visualización que
+     * el detalle (show()) para que el Coordinador no pueda descargar antes
+     * de que le corresponda ver el informe.
+     */
+    public function descargar(Request $request, $creditoId)
+    {
+        $credito = $this->findCreditoConstructor($creditoId);
+        $activeRole = $this->resolveActiveRole($request);
+
+        $this->autorizarVisualizacion($activeRole, $credito->estado);
+
+        $informe = $credito->informeTecnico;
+        if (!$informe) {
+            abort(404, 'El informe técnico aún no tiene datos para descargar.');
+        }
+
+        $formato = $request->query('formato', 'pdf');
+        $filename = 'informe-tecnico-' . $credito->numero_solicitud;
+
+        if ($formato === 'excel') {
+            return Excel::download(new InformeTecnicoExport($credito, $informe), $filename . '.xlsx');
+        }
+
+        $pdf = Pdf::loadView('informe-tecnico.pdf', [
+            'credito' => $credito,
+            'informe' => $informe,
+            'solicitudCredito' => $credito->solicitudCredito,
+            'cliente' => $credito->solicitudCredito?->cliente,
+            'v' => $informe->ventas_totales_proyecto ?? [],
+            'c' => $informe->costos ?? [],
+            'i' => $informe->invertido ?? [],
+            'cs' => $informe->credito_solicitado ?? [],
+            's' => $informe->saldos_por_recaudar_contraentrega ?? [],
+            'af' => $informe->analisis_financiacion ?? [],
+            'cob' => $informe->coberturas ?? [],
+        ]);
+
+        return $pdf->download($filename . '.pdf');
+    }
+
     private function findCreditoConstructor($creditoId): CreditoOrdinario
     {
         return CreditoOrdinario::whereHas('solicitudCredito.tipoCredito', function ($q) {
                 $q->where('codigo', 'CONSTRUCTOR');
             })
             ->whereIn('estado', self::ESTADOS_INFORME_TECNICO)
-            ->with(['cliente', 'solicitudCredito', 'informeTecnico'])
+            ->with(['cliente', 'solicitudCredito.cliente', 'informeTecnico'])
             ->findOrFail($creditoId);
     }
 
