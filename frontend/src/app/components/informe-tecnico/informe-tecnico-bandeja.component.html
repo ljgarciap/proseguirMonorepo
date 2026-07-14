@@ -10,6 +10,17 @@
     <h3 class="card-title">Bandeja de Informe Técnico</h3>
     <p class="card-subtitle">Créditos tipo Constructor con documentación validada, pendientes o en proceso de informe técnico.</p>
 
+    <div class="filters-bar mt-4">
+      <input class="pro-input" type="text" [(ngModel)]="filtroNumero" placeholder="Buscar por No. de crédito...">
+      <input class="pro-input" type="text" [(ngModel)]="filtroUbicacion" placeholder="Buscar por ciudad o dirección...">
+      <select class="pro-input" [(ngModel)]="filtroEstado">
+        <option value="">Todos los estados</option>
+        <option value="informe_tecnico_ingeniero">Diligenciando Ingeniero</option>
+        <option value="informe_tecnico_coordinador">Diligenciando Coordinador Comercial</option>
+        <option value="informe_tecnico_finalizado">Finalizado</option>
+      </select>
+    </div>
+
     <div class="table-container mt-4">
       <table class="modern-table">
         <thead>
@@ -17,13 +28,15 @@
             <th>No. de Crédito</th>
             <th>Proyecto</th>
             <th>Solicitante</th>
+            <th>Ciudad</th>
+            <th>Dirección</th>
             <th>Estado del Informe Técnico</th>
             <th>Rol Actual</th>
-            <th class="text-right">Acción</th>
+            <th class="text-right">Acciones</th>
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let credito of creditos">
+          <tr *ngFor="let credito of creditosFiltrados">
             <td class="id-cell">{{ credito.numero_solicitud }}</td>
             <td>{{ proyecto(credito) }}</td>
             <td>
@@ -31,6 +44,8 @@
                 <span class="name">{{ solicitante(credito) }}</span>
               </div>
             </td>
+            <td>{{ credito.ciudad || '—' }}</td>
+            <td>{{ credito.direccion || '—' }}</td>
             <td>
               <span class="status-pill" [ngClass]="{
                 'warning': credito.estado === 'informe_tecnico_ingeniero' || credito.estado === 'informe_tecnico_coordinador',
@@ -38,19 +53,25 @@
               }">{{ estadoLabel(credito.estado) }}</span>
             </td>
             <td>{{ rolActual(credito.estado) }}</td>
-            <td class="text-right">
+            <td class="text-right actions-cell">
+              <button class="btn-pro sm secondary" (click)="verSolicitud(credito)" title="Ver Solicitud">
+                <span class="material-symbols-outlined">description</span>
+              </button>
+              <button class="btn-pro sm secondary" *ngIf="puedeDescargar(credito)" (click)="descargar(credito, 'pdf')" title="Descargar PDF">
+                <span class="material-symbols-outlined">picture_as_pdf</span>
+              </button>
               <button class="btn-pro sm" [class.primary]="puedeEditar(credito)" [class.secondary]="!puedeEditar(credito)"
                       [routerLink]="['/informes-tecnicos', credito.id]">
-                <span class="material-symbols-outlined">{{ puedeEditar(credito) ? 'edit_note' : 'visibility' }}</span>
+                <span class="material-symbols-outlined">{{ accionIcono(credito) }}</span>
                 {{ accionLabel(credito) }}
               </button>
             </td>
           </tr>
-          <tr *ngIf="creditos.length === 0 && !loading">
-            <td colspan="6" class="text-center py-4 text-muted">No hay créditos Constructor en el flujo de Informe Técnico para tu rol.</td>
+          <tr *ngIf="creditosFiltrados.length === 0 && !loading">
+            <td colspan="8" class="text-center py-4 text-muted">No hay créditos Constructor en el flujo de Informe Técnico para tu rol o los filtros aplicados.</td>
           </tr>
           <tr *ngIf="loading">
-            <td colspan="6" class="text-center py-4">Cargando bandeja de Informe Técnico...</td>
+            <td colspan="8" class="text-center py-4">Cargando bandeja de Informe Técnico...</td>
           </tr>
         </tbody>
       </table>

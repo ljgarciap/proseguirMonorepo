@@ -17,23 +17,49 @@ const ROL_POR_ESTADO: Record<string, string> = {
 };
 
 /**
- * Fase 1 (SCRUM-120): captura simple por sección, sin las fórmulas del
- * Excel de referencia (eso es Fase 2). Cada sección se guarda como JSON
- * en el backend (columnas `json` en `informes_tecnicos`).
+ * SCRUM-120 Fase 2: shape itemizado real (fórmulas del Excel de referencia
+ * CR-RO-09A v5). Estos son solo los INPUTS crudos que el frontend manda —
+ * los totales/porcentajes SIEMPRE se calculan y devuelven desde el backend
+ * (InformeTecnicoCalculoService), nunca se recalculan aquí, para que no
+ * puedan divergir del valor persistido.
  */
-interface SeccionIngeniero {
-  ventas_totales_proyecto: { valor_total: number | null; detalle: string };
-  costos: { valor_total: number | null; detalle: string };
-  invertido: { valor_total: number | null; detalle: string };
-  observaciones_ingeniero: string;
+interface VentasInput {
+  casas: number | null;
+  apartamentos: number | null;
+  parqueaderos: number | null;
+  conexion_gas_arras: number | null;
+  local_comercial: number | null;
+  cuartos_utiles: number | null;
+  otros: number | null;
 }
 
-interface SeccionCoordinador {
-  credito_solicitado: { valor: number | null; detalle: string };
-  saldos_por_recaudar_contraentrega: { valor: number | null; detalle: string };
-  analisis_financiacion: { detalle: string };
-  coberturas: { detalle: string };
-  observaciones_coordinador: string;
+interface CostosInput {
+  lote: number | null;
+  directos: number | null;
+  directos_urbanismo: number | null;
+  indirectos: number | null;
+  honorarios: number | null;
+  incremento_costos: number | null;
+  financieros: number | null;
+}
+
+interface InvertidoInput {
+  lote: number | null;
+  costos_directos: number | null;
+  costos_indirectos: number | null;
+  recursos_propios: number | null;
+  cuotas_iniciales_ya_pagadas: number | null;
+}
+
+interface CreditoSolicitadoInput {
+  credito_solicitado: number | null;
+  aptos_vendidos: number | null;
+  porcentaje_cuotas_iniciales_pendientes: number | null;
+}
+
+interface SaldosPorRecaudarInput {
+  porcentaje_cuotas_iniciales: number | null;
+  cuotas_iniciales_pendientes: number | null;
 }
 
 @Component({
@@ -50,20 +76,28 @@ export class InformeTecnicoDetalleComponent implements OnInit {
   loading = false;
   activeRole: string = '';
 
-  ingeniero: SeccionIngeniero = {
-    ventas_totales_proyecto: { valor_total: null, detalle: '' },
-    costos: { valor_total: null, detalle: '' },
-    invertido: { valor_total: null, detalle: '' },
-    observaciones_ingeniero: ''
+  // Inputs editables — hidratados desde `informe` al cargar/guardar.
+  ventasInput: VentasInput = {
+    casas: null, apartamentos: null, parqueaderos: null, conexion_gas_arras: null,
+    local_comercial: null, cuartos_utiles: null, otros: null
   };
+  costosInput: CostosInput = {
+    lote: null, directos: null, directos_urbanismo: null, indirectos: null,
+    honorarios: null, incremento_costos: null, financieros: null
+  };
+  invertidoInput: InvertidoInput = {
+    lote: null, costos_directos: null, costos_indirectos: null,
+    recursos_propios: null, cuotas_iniciales_ya_pagadas: null
+  };
+  observacionesIngeniero = '';
 
-  coordinador: SeccionCoordinador = {
-    credito_solicitado: { valor: null, detalle: '' },
-    saldos_por_recaudar_contraentrega: { valor: null, detalle: '' },
-    analisis_financiacion: { detalle: '' },
-    coberturas: { detalle: '' },
-    observaciones_coordinador: ''
+  creditoSolicitadoInput: CreditoSolicitadoInput = {
+    credito_solicitado: null, aptos_vendidos: null, porcentaje_cuotas_iniciales_pendientes: 0.30
   };
+  saldosPorRecaudarInput: SaldosPorRecaudarInput = {
+    porcentaje_cuotas_iniciales: 0.10, cuotas_iniciales_pendientes: null
+  };
+  observacionesCoordinador = '';
 
   constructor(
     private route: ActivatedRoute,
@@ -100,20 +134,42 @@ export class InformeTecnicoDetalleComponent implements OnInit {
   private hidratarFormularios(): void {
     if (!this.informe) return;
 
-    this.ingeniero = {
-      ventas_totales_proyecto: this.informe.ventas_totales_proyecto || { valor_total: null, detalle: '' },
-      costos: this.informe.costos || { valor_total: null, detalle: '' },
-      invertido: this.informe.invertido || { valor_total: null, detalle: '' },
-      observaciones_ingeniero: this.informe.observaciones_ingeniero || ''
+    const v = this.informe.ventas_totales_proyecto || {};
+    this.ventasInput = {
+      casas: v.casas ?? null, apartamentos: v.apartamentos ?? null, parqueaderos: v.parqueaderos ?? null,
+      conexion_gas_arras: v.conexion_gas_arras ?? null, local_comercial: v.local_comercial ?? null,
+      cuartos_utiles: v.cuartos_utiles ?? null, otros: v.otros ?? null
     };
 
-    this.coordinador = {
-      credito_solicitado: this.informe.credito_solicitado || { valor: null, detalle: '' },
-      saldos_por_recaudar_contraentrega: this.informe.saldos_por_recaudar_contraentrega || { valor: null, detalle: '' },
-      analisis_financiacion: this.informe.analisis_financiacion || { detalle: '' },
-      coberturas: this.informe.coberturas || { detalle: '' },
-      observaciones_coordinador: this.informe.observaciones_coordinador || ''
+    const c = this.informe.costos || {};
+    this.costosInput = {
+      lote: c.lote ?? null, directos: c.directos ?? null, directos_urbanismo: c.directos_urbanismo ?? null,
+      indirectos: c.indirectos ?? null, honorarios: c.honorarios ?? null,
+      incremento_costos: c.incremento_costos ?? null, financieros: c.financieros ?? null
     };
+
+    const i = this.informe.invertido || {};
+    this.invertidoInput = {
+      lote: i.lote ?? null, costos_directos: i.costos_directos ?? null, costos_indirectos: i.costos_indirectos ?? null,
+      recursos_propios: i.recursos_propios ?? null, cuotas_iniciales_ya_pagadas: i.cuotas_iniciales_ya_pagadas ?? null
+    };
+
+    this.observacionesIngeniero = this.informe.observaciones_ingeniero || '';
+
+    const cs = this.informe.credito_solicitado || {};
+    this.creditoSolicitadoInput = {
+      credito_solicitado: cs.credito_solicitado ?? null,
+      aptos_vendidos: cs.aptos_vendidos ?? null,
+      porcentaje_cuotas_iniciales_pendientes: cs.porcentaje_cuotas_iniciales_pendientes ?? 0.30
+    };
+
+    const s = this.informe.saldos_por_recaudar_contraentrega || {};
+    this.saldosPorRecaudarInput = {
+      porcentaje_cuotas_iniciales: s.porcentaje_cuotas_iniciales ?? 0.10,
+      cuotas_iniciales_pendientes: s.cuotas_iniciales_pendientes ?? null
+    };
+
+    this.observacionesCoordinador = this.informe.observaciones_coordinador || '';
   }
 
   get esFinalizado(): boolean {
@@ -127,8 +183,6 @@ export class InformeTecnicoDetalleComponent implements OnInit {
   }
 
   get seccionIngenieroVisible(): boolean {
-    // Visible siempre que exista (diligenciada o en curso); editable solo
-    // mientras el crédito está en informe_tecnico_ingeniero.
     return true;
   }
 
@@ -144,12 +198,29 @@ export class InformeTecnicoDetalleComponent implements OnInit {
     return this.puedeEditar && this.credito?.estado === 'informe_tecnico_coordinador';
   }
 
+  // Habilitado apenas exista algún dato guardado, aunque sea borrador
+  // (así lo pide el prototipo — no solo cuando el informe está finalizado).
+  get puedeDescargar(): boolean {
+    if (!this.informe) return false;
+    const v = this.informe.ventas_totales_proyecto;
+    return !!(v && (v.total_ventas || 0) > 0) || !!this.informe.observaciones_ingeniero;
+  }
+
   private payloadSegunEstado(): any {
     if (this.credito.estado === 'informe_tecnico_ingeniero') {
-      return { ...this.ingeniero };
+      return {
+        ventas_totales_proyecto: this.ventasInput,
+        costos: this.costosInput,
+        invertido: this.invertidoInput,
+        observaciones_ingeniero: this.observacionesIngeniero
+      };
     }
     if (this.credito.estado === 'informe_tecnico_coordinador') {
-      return { ...this.coordinador };
+      return {
+        credito_solicitado: this.creditoSolicitadoInput,
+        saldos_por_recaudar_contraentrega: this.saldosPorRecaudarInput,
+        observaciones_coordinador: this.observacionesCoordinador
+      };
     }
     return {};
   }
@@ -160,6 +231,7 @@ export class InformeTecnicoDetalleComponent implements OnInit {
     }).subscribe({
       next: (informe) => {
         this.informe = informe;
+        this.hidratarFormularios();
         Swal.fire('Guardado', 'El borrador del informe técnico se guardó correctamente.', 'success');
       },
       error: (err) => {
@@ -194,6 +266,26 @@ export class InformeTecnicoDetalleComponent implements OnInit {
           Swal.fire('Error', err.error?.message || 'No se pudo registrar el informe técnico.', 'error');
         }
       });
+    });
+  }
+
+  descargar(formato: 'pdf' | 'excel'): void {
+    this.http.get(`${environment.apiUrl}/informes-tecnicos/${this.creditoId}/descargar`, {
+      headers: { 'X-Active-Role': this.activeRole },
+      params: { formato },
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `informe-tecnico-${this.creditoId}.${formato === 'pdf' ? 'pdf' : 'xlsx'}`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: () => {
+        Swal.fire('Error', 'No se pudo descargar el informe técnico.', 'error');
+      }
     });
   }
 
