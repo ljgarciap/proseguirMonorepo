@@ -51,7 +51,8 @@ describe('VisitasComponent', () => {
   it('should properly clear fields on reset or close', () => {
     component.openModal();
     expect(component.editingId).toBeNull();
-    expect(component.form.ciudad).toBe('');
+    expect(component.form.departamento_id).toBe('');
+    expect(component.form.ciudad_id).toBe('');
     expect(component.form.requiere_credito).toBeFalse();
   });
 });

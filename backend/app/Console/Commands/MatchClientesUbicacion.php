@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\NormalizaTextoUbicacion;
 use App\Models\Cliente;
 use App\Models\Departamento;
 use App\Models\Ciudad;
@@ -9,6 +10,8 @@ use Illuminate\Console\Command;
 
 class MatchClientesUbicacion extends Command
 {
+    use NormalizaTextoUbicacion;
+
     protected $signature = 'app:match-clientes-ubicacion {--dry-run : Solo mostrar el resultado del match, sin escribir nada}';
 
     protected $description = 'Reconcilia los campos de texto libre departamento/ciudad de clientes existentes (SCRUM-118) contra el catálogo nuevo de departamentos/ciudades, completando departamento_id/ciudad_id cuando el match es inequívoco. No borra ni modifica los campos de texto originales.';
@@ -146,22 +149,5 @@ class MatchClientesUbicacion extends Command
         }
 
         return 'ambiguo';
-    }
-
-    private function normalizar(string $s): string
-    {
-        $s = mb_strtoupper(trim($s));
-        $s = strtr($s, [
-            'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U', 'Ñ' => 'N', 'Ü' => 'U',
-        ]);
-        // "Bogotá D.C." / "BOGOTA DC" -> "BOGOTA", para machear con el uso común sin sufijo.
-        $s = preg_replace('/\s*D\.?\s*C\.?$/', '', $s);
-        $s = preg_replace('/[^A-Z0-9]+/', ' ', $s);
-        return trim(preg_replace('/\s+/', ' ', $s));
-    }
-
-    private function normalizarSinEspacios(string $s): string
-    {
-        return str_replace(' ', '', $this->normalizar($s));
     }
 }
