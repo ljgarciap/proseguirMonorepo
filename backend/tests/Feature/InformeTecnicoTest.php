@@ -373,6 +373,37 @@ class InformeTecnicoTest extends TestCase
         ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(403);
     }
 
+    public function test_coordinador_no_puede_ver_el_detalle_mientras_es_turno_del_ingeniero(): void
+    {
+        $credito = $this->crearCreditoEnEstadoIngeniero();
+
+        // El ingeniero sí puede ver su propio turno.
+        Passport::actingAs($this->ingeniero);
+        $this->getJson("/api/informes-tecnicos/{$credito->id}", ['X-Active-Role' => 'ingeniero'])
+            ->assertStatus(200);
+
+        // El coordinador no debe poder ver el detalle todavía (evita ver un
+        // borrador ajeno antes de que le corresponda).
+        Passport::actingAs($this->coordinador);
+        $this->getJson("/api/informes-tecnicos/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(403);
+
+        // Una vez que el ingeniero registra, el coordinador ya puede ver
+        // (y el ingeniero sigue pudiendo, aunque ya no editar).
+        Passport::actingAs($this->ingeniero);
+        $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'observaciones_ingeniero' => 'Listo',
+        ], ['X-Active-Role' => 'ingeniero'])->assertStatus(200);
+
+        Passport::actingAs($this->coordinador);
+        $this->getJson("/api/informes-tecnicos/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(200);
+
+        Passport::actingAs($this->ingeniero);
+        $this->getJson("/api/informes-tecnicos/{$credito->id}", ['X-Active-Role' => 'ingeniero'])
+            ->assertStatus(200);
+    }
+
     public function test_superadmin_puede_actuar_en_cualquier_estado(): void
     {
         $credito = $this->crearCreditoEnEstadoIngeniero();

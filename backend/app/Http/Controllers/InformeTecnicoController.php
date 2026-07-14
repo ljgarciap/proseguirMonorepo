@@ -59,6 +59,9 @@ class InformeTecnicoController extends Controller
     public function show(Request $request, $creditoId)
     {
         $credito = $this->findCreditoConstructor($creditoId);
+        $activeRole = $this->resolveActiveRole($request);
+
+        $this->autorizarVisualizacion($activeRole, $credito->estado);
 
         $informe = $credito->informeTecnico ?? InformeTecnico::create([
             'credito_ordinario_id' => $credito->id,
@@ -151,6 +154,29 @@ class InformeTecnicoController extends Controller
             ->whereIn('estado', self::ESTADOS_INFORME_TECNICO)
             ->with(['cliente', 'solicitudCredito', 'informeTecnico'])
             ->findOrFail($creditoId);
+    }
+
+    /**
+     * Gatilla la visibilidad del detalle (no solo la edición): el Coordinador
+     * Comercial no debe poder ver el informe mientras todavía está en manos
+     * del Ingeniero (evita ver un borrador ajeno antes de que le corresponda).
+     * El Ingeniero sí puede ver en cualquiera de los 3 estados, ya que su
+     * fase siempre ocurre primero — no hay riesgo de ver "antes de tiempo".
+     */
+    private function autorizarVisualizacion(string $activeRole, string $estado): void
+    {
+        if ($activeRole === 'superadmin' || $activeRole === 'ingeniero') {
+            return;
+        }
+
+        if ($activeRole === 'coordinador_comercial' && in_array($estado, ['informe_tecnico_coordinador', 'informe_tecnico_finalizado'])) {
+            return;
+        }
+
+        abort(response()->json([
+            'message' => 'No tienes autorización para ver el informe técnico en esta etapa.',
+            'rol_activo' => $activeRole,
+        ], 403));
     }
 
     private function autorizarRolParaEstado(string $activeRole, string $estado): void
