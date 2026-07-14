@@ -347,10 +347,48 @@ class ClientUploadController extends Controller
                 $pendingItems = $request->items()->where('estado', '!=', 'aprobado')->count();
                 if ($pendingItems === 0) {
                     $request->update(['estado' => 'completado']);
+                    $this->habilitarInformeTecnicoSiAplica($request);
                 } else {
                     $request->update(['estado' => 'pendiente']);
                 }
             }
         }
+    }
+
+    /**
+     * SCRUM-120: cuando una DocumentRequest queda completa (todos los items
+     * aprobados) y pertenece a una SolicitudCredito de tipo Constructor, la
+     * bandeja de Informe Técnico se habilita transicionando el
+     * CreditoOrdinario asociado a 'informe_tecnico_ingeniero'.
+     */
+    private function habilitarInformeTecnicoSiAplica(\App\Models\DocumentRequest $request): void
+    {
+        if (!$request->solicitud_credito_id) {
+            return;
+        }
+
+        $solicitud = \App\Models\SolicitudCredito::with('tipoCredito')->find($request->solicitud_credito_id);
+        if (!$solicitud || !$solicitud->tipoCredito || strtoupper($solicitud->tipoCredito->codigo) !== 'CONSTRUCTOR') {
+            return;
+        }
+
+        $credito = \App\Models\CreditoOrdinario::where('solicitud_credito_id', $solicitud->id)->first();
+        if (!$credito || $credito->estado !== 'validacion_documental_constructor') {
+            return;
+        }
+
+        $historial = $credito->historial_estados ?? [];
+        $historial[] = [
+            'fecha' => now()->toIso8601String(),
+            'usuario' => 'Sistema',
+            'rol' => 'sistema',
+            'estado_anterior' => $credito->estado,
+            'estado_nuevo' => 'informe_tecnico_ingeniero',
+            'comentario' => 'Documentación requerida validada. Bandeja de Informe Técnico habilitada para el Ingeniero.',
+        ];
+
+        $credito->estado = 'informe_tecnico_ingeniero';
+        $credito->historial_estados = $historial;
+        $credito->save();
     }
 }

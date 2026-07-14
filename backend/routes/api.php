@@ -177,6 +177,14 @@ Route::prefix('creditos')->middleware('auth:api')->group(function () {
     Route::post('/{id}/transition', [CreditoOrdinarioController::class, 'transition']);
 });
 
+// Informe Técnico — Crédito Constructor (SCRUM-120)
+Route::prefix('informes-tecnicos')->middleware('auth:api')->group(function () {
+    Route::get('/', [\App\Http\Controllers\InformeTecnicoController::class, 'index']);
+    Route::get('/{creditoId}', [\App\Http\Controllers\InformeTecnicoController::class, 'show']);
+    Route::put('/{creditoId}/borrador', [\App\Http\Controllers\InformeTecnicoController::class, 'guardarBorrador']);
+    Route::post('/{creditoId}/registrar', [\App\Http\Controllers\InformeTecnicoController::class, 'registrar']);
+});
+
 // Registro de Solicitudes de Crédito
 Route::prefix('solicitudes-credito')->middleware('auth:api')->group(function () {
     Route::get('/pendientes', [\App\Http\Controllers\SolicitudCreditoController::class, 'indexPending'])

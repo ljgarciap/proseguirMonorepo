@@ -1,0 +1,150 @@
+<div class="view-container" *ngIf="!loading && credito">
+  <header class="view-header">
+    <div class="title-area">
+      <button class="btn-pro secondary sm back-btn" (click)="volver()">
+        <span class="material-symbols-outlined">arrow_back</span> Volver a la bandeja
+      </button>
+      <h1>Informe Técnico — {{ credito.numero_solicitud }}</h1>
+      <p>Solicitante: {{ credito.cliente?.name || '—' }}</p>
+    </div>
+    <span class="status-pill" [ngClass]="{
+      'warning': credito.estado === 'informe_tecnico_ingeniero' || credito.estado === 'informe_tecnico_coordinador',
+      'success': esFinalizado
+    }">{{ credito.estado }}</span>
+  </header>
+
+  <div class="alert-readonly" *ngIf="!puedeEditar">
+    <span class="material-symbols-outlined">visibility</span>
+    Estás viendo este informe en modo solo lectura. {{ esFinalizado ? 'El informe técnico ya fue finalizado.' : 'No tienes el rol requerido para editar en esta etapa.' }}
+  </div>
+
+  <!-- SECCIÓN INGENIERO -->
+  <div class="content-card mt-4" *ngIf="seccionIngenieroVisible">
+    <h3 class="card-title">
+      <span class="material-symbols-outlined">engineering</span>
+      Sección Ingeniero
+    </h3>
+    <p class="card-subtitle">Ventas Totales del Proyecto, Costos, Invertido y Observaciones técnicas.</p>
+
+    <div class="form-grid mt-4">
+      <div class="form-group">
+        <label>Ventas Totales Proyecto</label>
+        <input class="pro-input" type="number" [(ngModel)]="ingeniero.ventas_totales_proyecto.valor_total"
+               [disabled]="!seccionIngenieroEditable" placeholder="Valor total">
+      </div>
+      <div class="form-group span-2">
+        <label>Detalle de Ventas</label>
+        <input class="pro-input" type="text" [(ngModel)]="ingeniero.ventas_totales_proyecto.detalle"
+               [disabled]="!seccionIngenieroEditable" placeholder="Detalle o desglose">
+      </div>
+
+      <div class="form-group">
+        <label>Costos</label>
+        <input class="pro-input" type="number" [(ngModel)]="ingeniero.costos.valor_total"
+               [disabled]="!seccionIngenieroEditable" placeholder="Valor total">
+      </div>
+      <div class="form-group span-2">
+        <label>Detalle de Costos</label>
+        <input class="pro-input" type="text" [(ngModel)]="ingeniero.costos.detalle"
+               [disabled]="!seccionIngenieroEditable" placeholder="Detalle o desglose">
+      </div>
+
+      <div class="form-group">
+        <label>Invertido</label>
+        <input class="pro-input" type="number" [(ngModel)]="ingeniero.invertido.valor_total"
+               [disabled]="!seccionIngenieroEditable" placeholder="Valor total">
+      </div>
+      <div class="form-group span-2">
+        <label>Detalle de lo Invertido</label>
+        <input class="pro-input" type="text" [(ngModel)]="ingeniero.invertido.detalle"
+               [disabled]="!seccionIngenieroEditable" placeholder="Detalle o desglose">
+      </div>
+
+      <div class="form-group span-full">
+        <label>Observaciones del Ingeniero <span class="required">*</span></label>
+        <textarea class="pro-input textarea" [(ngModel)]="ingeniero.observaciones_ingeniero"
+                  [disabled]="!seccionIngenieroEditable" placeholder="Observaciones obligatorias antes de registrar"></textarea>
+      </div>
+    </div>
+
+    <div class="form-footer" *ngIf="seccionIngenieroEditable">
+      <button class="btn-pro secondary" (click)="guardarBorrador()">
+        <span class="material-symbols-outlined">save</span> Guardar Borrador
+      </button>
+      <button class="btn-pro primary" (click)="registrar()">
+        <span class="material-symbols-outlined">check_circle</span> Registrar Informe del Ingeniero
+      </button>
+    </div>
+  </div>
+
+  <!-- SECCIÓN COORDINADOR COMERCIAL -->
+  <div class="content-card mt-4" *ngIf="seccionCoordinadorVisible">
+    <h3 class="card-title">
+      <span class="material-symbols-outlined">badge</span>
+      Sección Coordinador Comercial
+    </h3>
+    <p class="card-subtitle">Crédito Solicitado, Saldos por recaudar, Análisis de financiación y Coberturas.</p>
+
+    <div class="form-grid mt-4">
+      <div class="form-group">
+        <label>Crédito Solicitado</label>
+        <input class="pro-input" type="number" [(ngModel)]="coordinador.credito_solicitado.valor"
+               [disabled]="!seccionCoordinadorEditable" placeholder="Valor">
+      </div>
+      <div class="form-group span-2">
+        <label>Detalle del Crédito Solicitado</label>
+        <input class="pro-input" type="text" [(ngModel)]="coordinador.credito_solicitado.detalle"
+               [disabled]="!seccionCoordinadorEditable" placeholder="Detalle">
+      </div>
+
+      <div class="form-group">
+        <label>Saldos por Recaudar Contraentrega</label>
+        <input class="pro-input" type="number" [(ngModel)]="coordinador.saldos_por_recaudar_contraentrega.valor"
+               [disabled]="!seccionCoordinadorEditable" placeholder="Valor">
+      </div>
+      <div class="form-group span-2">
+        <label>Detalle de Saldos</label>
+        <input class="pro-input" type="text" [(ngModel)]="coordinador.saldos_por_recaudar_contraentrega.detalle"
+               [disabled]="!seccionCoordinadorEditable" placeholder="Detalle">
+      </div>
+
+      <div class="form-group span-full">
+        <label>Análisis de Financiación</label>
+        <textarea class="pro-input textarea" [(ngModel)]="coordinador.analisis_financiacion.detalle"
+                  [disabled]="!seccionCoordinadorEditable" placeholder="Análisis de financiación"></textarea>
+      </div>
+
+      <div class="form-group span-full">
+        <label>Coberturas</label>
+        <textarea class="pro-input textarea" [(ngModel)]="coordinador.coberturas.detalle"
+                  [disabled]="!seccionCoordinadorEditable" placeholder="Coberturas"></textarea>
+      </div>
+
+      <div class="form-group span-full">
+        <label>Observaciones del Coordinador Comercial</label>
+        <textarea class="pro-input textarea" [(ngModel)]="coordinador.observaciones_coordinador"
+                  [disabled]="!seccionCoordinadorEditable" placeholder="Observaciones / concepto"></textarea>
+      </div>
+    </div>
+
+    <div class="form-footer" *ngIf="seccionCoordinadorEditable">
+      <button class="btn-pro secondary" (click)="guardarBorrador()">
+        <span class="material-symbols-outlined">save</span> Guardar Borrador
+      </button>
+      <button class="btn-pro primary" (click)="registrar()">
+        <span class="material-symbols-outlined">check_circle</span> Registrar y Finalizar Informe
+      </button>
+    </div>
+  </div>
+
+  <div class="content-card mt-4" *ngIf="!seccionCoordinadorVisible">
+    <p class="card-subtitle pending-msg">
+      <span class="material-symbols-outlined">hourglass_top</span>
+      La sección del Coordinador Comercial se habilita una vez el Ingeniero registre su informe.
+    </p>
+  </div>
+</div>
+
+<div class="view-container" *ngIf="loading">
+  <p class="text-center py-4">Cargando informe técnico...</p>
+</div>

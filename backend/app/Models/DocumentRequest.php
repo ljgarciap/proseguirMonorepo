@@ -12,12 +12,18 @@ class DocumentRequest extends Model
     protected $fillable = [
         'cliente_id',
         'creado_por',
+        'solicitud_credito_id',
         'estado'
     ];
 
     public function cliente()
     {
         return $this->belongsTo(User::class, 'cliente_id');
+    }
+
+    public function solicitudCredito()
+    {
+        return $this->belongsTo(SolicitudCredito::class, 'solicitud_credito_id');
     }
 
     public function creador()
