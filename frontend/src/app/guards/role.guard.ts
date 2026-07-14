@@ -23,6 +23,8 @@ export const roleGuard: CanActivateFn = (route, state) => {
     router.navigate(['/client-upload']);
   } else if (role === 'coordinador_comercial') {
     router.navigate(['/solicitudes-credito']);
+  } else if (role === 'ingeniero') {
+    router.navigate(['/informes-tecnicos']);
   } else if (['oficial_cumplimiento', 'comite_credito', 'tesoreria'].includes(role || '')) {
     router.navigate(['/creditos']);
   } else {
