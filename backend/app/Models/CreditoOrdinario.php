@@ -19,7 +19,11 @@ class CreditoOrdinario extends Model
         'plazo_meses',
         'estado',
         'documentos',
-        'historial_estados'
+        'historial_estados',
+        'sarlaft_concepto',
+        'sarlaft_observaciones',
+        'sarlaft_diligenciado_por_id',
+        'sarlaft_diligenciado_at',
     ];
 
     /**
@@ -34,7 +38,9 @@ class CreditoOrdinario extends Model
             'historial_estados' => 'array',
             'monto' => 'decimal:2',
             'plazo_meses' => 'integer',
-            'solicitud_credito_id' => 'integer'
+            'solicitud_credito_id' => 'integer',
+            'sarlaft_diligenciado_por_id' => 'integer',
+            'sarlaft_diligenciado_at' => 'datetime',
         ];
     }
 
@@ -58,6 +64,15 @@ class CreditoOrdinario extends Model
     public function informeTecnico()
     {
         return $this->hasOne(InformeTecnico::class, 'credito_ordinario_id');
+    }
+
+    /**
+     * Usuario (Oficial de Cumplimiento) que diligenció el concepto de
+     * Listas Restrictivas y SARLAFT (SCRUM-128).
+     */
+    public function sarlaftDiligenciadoPor()
+    {
+        return $this->belongsTo(User::class, 'sarlaft_diligenciado_por_id');
     }
 
     public static function iniciar(
@@ -102,6 +117,7 @@ class CreditoOrdinario extends Model
             'certificados_laborales'       => null,
             'sarlft_sintesis'              => null,
             'sarlft_datacredito'           => null,
+            'sintesis_oficial_cumplimiento' => null,
             'analisis_financiero'          => null,
             'presentacion_comite'          => null,
             'acta_comite_firmada'          => null,

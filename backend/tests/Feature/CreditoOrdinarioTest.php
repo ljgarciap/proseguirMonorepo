@@ -138,25 +138,24 @@ class CreditoOrdinarioTest extends TestCase
         $creditoId = $response->json('id');
         $this->assertDatabaseHas('credito_ordinarios', ['id' => $creditoId, 'estado' => 'revision_documental']);
 
-        // 2. Coordinador approves documental revision
+        // 2. Coordinador approves documental revision — pasa a la bandeja dedicada
+        // de Listas Restrictivas y SARLAFT (SCRUM-128), fuera del alcance de este test.
         Passport::actingAs($this->coordinador);
         $this->postJson("/api/creditos/{$creditoId}/transition", [
             'accion'     => 'aprobar',
             'comentario' => 'Documentación inicial correcta.'
         ], ['X-Active-Role' => 'coordinador_comercial'])
             ->assertStatus(200)
-            ->assertJsonPath('estado', 'analisis_sarlaft_financiero');
+            ->assertJsonPath('estado', 'sarlaft_control_interno');
 
-        // 3. Parallel analysis: Cumplimiento uploads SARLAFT docs
-        Passport::actingAs($this->cumplimiento);
-        $this->subirArchivo($creditoId, 'sarlft_sintesis', 'oficial_cumplimiento', 'sintesis.pdf')
-            ->assertStatus(200)
-            ->assertJsonPath('estado', 'analisis_sarlaft_financiero');
+        // El concepto SARLAFT favorable (probado en ListasRestrictivasSarlaftTest)
+        // deja el crédito en pendiente_analisis_financiero. Simulamos ese resultado
+        // directamente sobre el modelo para continuar el flujo BPMN desde ahí.
+        $credito = CreditoOrdinario::find($creditoId);
+        $credito->estado = 'pendiente_analisis_financiero';
+        $credito->save();
 
-        $this->subirArchivo($creditoId, 'sarlft_datacredito', 'oficial_cumplimiento', 'datacredito.pdf')
-            ->assertStatus(200);
-
-        // Coordinador uploads financial docs
+        // 3. Coordinador uploads financial docs
         Passport::actingAs($this->coordinador);
         $this->subirArchivo($creditoId, 'analisis_financiero', 'coordinador_comercial', 'analisis.pdf')
             ->assertStatus(200);
@@ -173,7 +172,7 @@ class CreditoOrdinarioTest extends TestCase
             'comentario' => 'Revisar datos financieros'
         ], ['X-Active-Role' => 'gerente'])
             ->assertStatus(200)
-            ->assertJsonPath('estado', 'analisis_sarlaft_financiero');
+            ->assertJsonPath('estado', 'pendiente_analisis_financiero');
 
         Passport::actingAs($this->coordinador);
         $this->subirArchivo($creditoId, 'presentacion_comite', 'coordinador_comercial', 'presentacion_v2.pdf')

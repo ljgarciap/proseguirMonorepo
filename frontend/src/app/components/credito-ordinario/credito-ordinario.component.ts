@@ -30,7 +30,13 @@ export class CreditoOrdinarioComponent implements OnInit {
   bpmnSteps = [
     { key: 'revision_documental', label: 'Revisión Solicitud', role: 'coordinador_comercial', roleLabel: 'Coordinador Comercial', desc: 'Revisar la solicitud inicial del cliente y verificar que los soportes y formularios estén completos.' },
     { key: 'completar_solicitud', label: 'Completar Sop.', role: 'cliente', roleLabel: 'Cliente', desc: 'Completar la documentación faltante solicitada por el Coordinador Comercial.' },
-    { key: 'analisis_sarlaft_financiero', label: 'Análisis Dual', role: 'cumplimiento_y_comercial', roleLabel: 'Cumplimiento & Comercial', desc: 'Validar listas restrictivas/SARLAFT (Cumplimiento) y realizar análisis financiero / presentación del cliente (Comercial).' },
+    // SCRUM-128: el paso combinado analisis_sarlaft_financiero se separó en dos
+    // etapas secuenciales. La validación de Listas Restrictivas y SARLAFT ahora
+    // se diligencia en el módulo dedicado (/listas-sarlaft, Oficial de
+    // Cumplimiento) — este paso del stepper solo queda como referencia visual
+    // de progreso, sin panel de acción propio en esta pantalla.
+    { key: 'sarlaft_control_interno', label: 'Listas Restrictivas / SARLAFT', role: 'oficial_cumplimiento', roleLabel: 'Oficial de Cumplimiento', desc: 'Validar Listas Restrictivas y emitir concepto SARLAFT (gestionado desde el módulo Listas Restrictivas y SARLAFT).' },
+    { key: 'pendiente_analisis_financiero', label: 'Análisis Financiero', role: 'coordinador_comercial', roleLabel: 'Coordinador Comercial', desc: 'Realizar el análisis financiero y preparar la presentación del cliente para el Comité.' },
     { key: 'aprobacion_presentacion', label: 'Aprobación Pres.', role: 'gerente', roleLabel: 'Gerencia', desc: 'Revisar y aprobar la presentación del cliente elaborada para el Comité de Créditos.' },
     { key: 'comite_evaluacion', label: 'Comité de Crédito', role: 'comite_credito', roleLabel: 'Comité de Crédito', desc: 'Evaluar el perfil de crédito y firmar el Acta oficial de decisión del Comité.' },
     { key: 'formalizacion_garantias', label: 'Garantías', role: 'operativo', roleLabel: 'Dirección Administrativa', desc: 'Revisar y registrar las garantías firmadas por el cliente.' },
@@ -120,9 +126,10 @@ export class CreditoOrdinarioComponent implements OnInit {
     const currentStatus = this.selectedCredito.estado;
     if (currentStatus === 'completado' || currentStatus === 'rechazado') return false;
 
-    // Custom check for parallel SARLAFT/Financial analysis step
-    if (currentStatus === 'analisis_sarlaft_financiero') {
-      return ['coordinador_comercial', 'oficial_cumplimiento'].includes(this.activeRole);
+    // SCRUM-128: sarlaft_control_interno no tiene panel de acción en esta
+    // pantalla (se gestiona en /listas-sarlaft) — nadie puede "actuar" acá.
+    if (currentStatus === 'sarlaft_control_interno') {
+      return false;
     }
 
     if (currentStatus === 'formalizacion_garantias') {
