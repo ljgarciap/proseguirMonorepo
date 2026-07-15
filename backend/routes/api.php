@@ -186,6 +186,14 @@ Route::prefix('informes-tecnicos')->middleware('auth:api')->group(function () {
     Route::get('/{creditoId}/descargar', [\App\Http\Controllers\InformeTecnicoController::class, 'descargar']);
 });
 
+// Listas Restrictivas y SARLAFT (SCRUM-128)
+Route::prefix('listas-sarlaft')->middleware('auth:api')->group(function () {
+    Route::get('/', [\App\Http\Controllers\ListasRestrictivasSarlaftController::class, 'index']);
+    Route::get('/{creditoId}', [\App\Http\Controllers\ListasRestrictivasSarlaftController::class, 'show']);
+    Route::put('/{creditoId}/borrador', [\App\Http\Controllers\ListasRestrictivasSarlaftController::class, 'guardarBorrador']);
+    Route::post('/{creditoId}/finalizar', [\App\Http\Controllers\ListasRestrictivasSarlaftController::class, 'finalizar']);
+});
+
 // Registro de Solicitudes de Crédito
 Route::prefix('solicitudes-credito')->middleware('auth:api')->group(function () {
     Route::get('/pendientes', [\App\Http\Controllers\SolicitudCreditoController::class, 'indexPending'])

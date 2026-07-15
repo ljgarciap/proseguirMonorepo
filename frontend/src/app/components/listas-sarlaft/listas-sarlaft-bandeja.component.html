@@ -1,0 +1,110 @@
+<div class="view-container">
+  <header class="view-header">
+    <div class="title-area">
+      <h1>Listas Restrictivas y SARLAFT</h1>
+      <p>Validación de Listas Restrictivas y concepto SARLAFT antes de continuar con el Análisis Financiero.</p>
+    </div>
+  </header>
+
+  <div class="tiles-grid">
+    <div class="tile-card">
+      <span class="material-symbols-outlined tile-icon pending">hourglass_top</span>
+      <div>
+        <p class="tile-value">{{ countPendientes }}</p>
+        <p class="tile-label">Pendientes</p>
+      </div>
+    </div>
+    <div class="tile-card">
+      <span class="material-symbols-outlined tile-icon warning">fact_check</span>
+      <div>
+        <p class="tile-value">{{ countEnRevision }}</p>
+        <p class="tile-label">En revisión</p>
+      </div>
+    </div>
+    <div class="tile-card">
+      <span class="material-symbols-outlined tile-icon success">check_circle</span>
+      <div>
+        <p class="tile-value">{{ countFavorables }}</p>
+        <p class="tile-label">Favorables</p>
+      </div>
+    </div>
+    <div class="tile-card">
+      <span class="material-symbols-outlined tile-icon danger">cancel</span>
+      <div>
+        <p class="tile-value">{{ countDesfavorables }}</p>
+        <p class="tile-label">Desfavorables</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="content-card mt-4">
+    <h3 class="card-title">Bandeja de Validación</h3>
+    <p class="card-subtitle">Créditos con documentación inicial aprobada, pendientes o en proceso de validación de Listas Restrictivas y SARLAFT.</p>
+
+    <div class="filters-bar mt-4">
+      <input class="pro-input" type="text" [(ngModel)]="filtroTexto" placeholder="Buscar por No. crédito, cliente o documento...">
+      <select class="pro-input" [(ngModel)]="filtroTipoCredito">
+        <option value="">Todos los tipos de crédito</option>
+        <option value="ORDINARIO">Crédito Ordinario</option>
+        <option value="CONSTRUCTOR">Crédito Constructor</option>
+      </select>
+      <select class="pro-input" [(ngModel)]="filtroTipoPersona">
+        <option value="">Todos los tipos de persona</option>
+        <option value="NATURAL">Persona Natural</option>
+        <option value="JURIDICA">Persona Jurídica</option>
+      </select>
+      <select class="pro-input" [(ngModel)]="filtroEstado">
+        <option value="">Todos los estados</option>
+        <option value="Pendiente">Pendiente</option>
+        <option value="En revisión">En revisión</option>
+        <option value="Favorable">Favorable</option>
+        <option value="Desfavorable">Desfavorable</option>
+      </select>
+    </div>
+
+    <div class="table-container mt-4">
+      <table class="modern-table">
+        <thead>
+          <tr>
+            <th>Fecha Solicitud</th>
+            <th>No. de Crédito</th>
+            <th>Tipo de Crédito</th>
+            <th>Documento</th>
+            <th>Tipo Persona</th>
+            <th>Cliente / Razón Social</th>
+            <th>Estado</th>
+            <th class="text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let credito of creditosFiltrados">
+            <td>{{ credito.created_at | date:'dd/MM/yyyy' }}</td>
+            <td class="id-cell">{{ credito.numero_solicitud }}</td>
+            <td>{{ tipoCreditoLabel(credito) }}</td>
+            <td>{{ clienteIdentificacion(credito) }}</td>
+            <td>{{ tipoPersonaLabel(credito) }}</td>
+            <td>
+              <div class="user-cell">
+                <span class="name">{{ clienteNombre(credito) }}</span>
+              </div>
+            </td>
+            <td><span class="status-pill" [ngClass]="estadoPillClass(credito)">{{ credito.sarlaft_estado_derivado }}</span></td>
+            <td class="text-right actions-cell">
+              <button class="btn-pro sm" [class.primary]="puedeValidar(credito)" [class.secondary]="!puedeValidar(credito)"
+                      [routerLink]="['/listas-sarlaft', credito.id]">
+                <span class="material-symbols-outlined">{{ accionIcono(credito) }}</span>
+                {{ accionLabel(credito) }}
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="creditosFiltrados.length === 0 && !loading">
+            <td colspan="8" class="text-center py-4 text-muted">No hay créditos para tu rol o los filtros aplicados.</td>
+          </tr>
+          <tr *ngIf="loading">
+            <td colspan="8" class="text-center py-4">Cargando bandeja...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

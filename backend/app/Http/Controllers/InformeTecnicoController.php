@@ -78,10 +78,10 @@ class InformeTecnicoController extends Controller
      */
     public function show(Request $request, $creditoId)
     {
-        $credito = $this->findCreditoConstructor($creditoId);
+        $credito = $this->findCreditoConstructorVisible($creditoId);
         $activeRole = $this->resolveActiveRole($request);
 
-        $this->autorizarVisualizacion($activeRole, $credito->estado);
+        $this->autorizarVisualizacion($activeRole, $credito);
 
         $informe = $credito->informeTecnico ?? InformeTecnico::create([
             'credito_ordinario_id' => $credito->id,
@@ -169,6 +169,13 @@ class InformeTecnicoController extends Controller
             $this->transicionarCredito($credito, 'informe_tecnico_finalizado', $user->name, $activeRole,
                 'Coordinador Comercial registró el informe técnico. Informe finalizado.');
 
+            // SCRUM-128: el expediente Constructor no se detiene en
+            // informe_tecnico_finalizado — encadena automáticamente a la
+            // validación de Listas Restrictivas y SARLAFT en la misma
+            // llamada, con su propia entrada de historial.
+            $this->transicionarCredito($credito, 'sarlaft_control_interno', $user->name, $activeRole,
+                'Informe técnico finalizado. Pasa automáticamente a validación de Listas Restrictivas y SARLAFT.');
+
             return response()->json($informe->fresh());
         }
 
@@ -184,10 +191,10 @@ class InformeTecnicoController extends Controller
      */
     public function descargar(Request $request, $creditoId)
     {
-        $credito = $this->findCreditoConstructor($creditoId);
+        $credito = $this->findCreditoConstructorVisible($creditoId);
         $activeRole = $this->resolveActiveRole($request);
 
-        $this->autorizarVisualizacion($activeRole, $credito->estado);
+        $this->autorizarVisualizacion($activeRole, $credito);
 
         $informe = $credito->informeTecnico;
         if (!$informe) {
@@ -229,19 +236,53 @@ class InformeTecnicoController extends Controller
     }
 
     /**
+     * Gate ampliado solo para VISUALIZACIÓN (show/descargar, SCRUM-128): el
+     * expediente Constructor ya no se detiene en informe_tecnico_finalizado
+     * — encadena automáticamente a sarlaft_control_interno (y de ahí sigue
+     * avanzando por el resto del BPMN). El informe técnico ya registrado
+     * debe seguir siendo consultable/descargable sin importar en qué estado
+     * esté el CreditoOrdinario ahora. La EDICIÓN (guardarBorrador/registrar)
+     * sigue usando findCreditoConstructor() sin relajar nada.
+     */
+    private function findCreditoConstructorVisible($creditoId): CreditoOrdinario
+    {
+        return CreditoOrdinario::whereHas('solicitudCredito.tipoCredito', function ($q) {
+                $q->where('codigo', 'CONSTRUCTOR');
+            })
+            ->where(function ($q) {
+                $q->whereIn('estado', self::ESTADOS_INFORME_TECNICO)
+                    ->orWhereHas('informeTecnico', function ($iq) {
+                        $iq->where('estado', 'registrado');
+                    });
+            })
+            ->with(['cliente', 'solicitudCredito.cliente', 'informeTecnico'])
+            ->findOrFail($creditoId);
+    }
+
+    /**
      * Gatilla la visibilidad del detalle (no solo la edición): el Coordinador
      * Comercial no debe poder ver el informe mientras todavía está en manos
      * del Ingeniero (evita ver un borrador ajeno antes de que le corresponda).
      * El Ingeniero sí puede ver en cualquiera de los 3 estados, ya que su
      * fase siempre ocurre primero — no hay riesgo de ver "antes de tiempo".
+     *
+     * SCRUM-128: además de los 2 estados originales del Coordinador, un
+     * informe ya registrado (InformeTecnico.estado === 'registrado') sigue
+     * siendo visible sin importar a qué estado haya avanzado el
+     * CreditoOrdinario después (sarlaft_control_interno, etc.) — mismo
+     * criterio que findCreditoConstructorVisible().
      */
-    private function autorizarVisualizacion(string $activeRole, string $estado): void
+    private function autorizarVisualizacion(string $activeRole, CreditoOrdinario $credito): void
     {
         if ($activeRole === 'superadmin' || $activeRole === 'ingeniero') {
             return;
         }
 
-        if ($activeRole === 'coordinador_comercial' && in_array($estado, ['informe_tecnico_coordinador', 'informe_tecnico_finalizado'])) {
+        $estado = $credito->estado;
+        $informeRegistrado = $credito->informeTecnico && $credito->informeTecnico->estado === 'registrado';
+
+        if ($activeRole === 'coordinador_comercial'
+            && (in_array($estado, ['informe_tecnico_coordinador', 'informe_tecnico_finalizado']) || $informeRegistrado)) {
             return;
         }
 

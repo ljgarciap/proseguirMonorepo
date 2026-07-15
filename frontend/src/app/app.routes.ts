@@ -140,6 +140,18 @@ export const routes: Routes = [
         data: { roles: ['ingeniero', 'coordinador_comercial', 'superadmin'] }
     },
     {
+        path: 'listas-sarlaft',
+        loadComponent: () => import('./components/listas-sarlaft/listas-sarlaft-bandeja.component').then(m => m.ListasSarlaftBandejaComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['oficial_cumplimiento', 'superadmin'] }
+    },
+    {
+        path: 'listas-sarlaft/:creditoId',
+        loadComponent: () => import('./components/listas-sarlaft/listas-sarlaft-detalle.component').then(m => m.ListasSarlaftDetalleComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['oficial_cumplimiento', 'superadmin'] }
+    },
+    {
         path: 'db-cleaner',
         loadComponent: () => import('./components/db-cleaner/db-cleaner.component').then(m => m.DbCleanerComponent),
         canActivate: [roleGuard],

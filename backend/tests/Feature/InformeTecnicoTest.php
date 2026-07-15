@@ -428,14 +428,64 @@ class InformeTecnicoTest extends TestCase
         $response->assertStatus(200);
         $this->assertEquals('registrado', $response->json('estado'));
 
+        // SCRUM-128: el expediente ya no se detiene en informe_tecnico_finalizado
+        // — encadena automáticamente a sarlaft_control_interno en la misma
+        // llamada (ver test_registrar_coordinador_encadena_a_sarlaft_control_interno
+        // para el detalle de ese comportamiento).
         $this->assertDatabaseHas('credito_ordinarios', [
             'id' => $credito->id,
-            'estado' => 'informe_tecnico_finalizado',
+            'estado' => 'sarlaft_control_interno',
         ]);
         $this->assertDatabaseHas('informes_tecnicos', [
             'credito_ordinario_id' => $credito->id,
             'estado' => 'registrado',
         ]);
+    }
+
+    /**
+     * SCRUM-128: al registrar el Coordinador Comercial, el hook automático
+     * encadena el expediente a sarlaft_control_interno (no se detiene en
+     * informe_tecnico_finalizado) y el informe técnico ya registrado sigue
+     * siendo consultable — el gate de visualización de show()/descargar()
+     * fue ampliado para no depender solo del estado del CreditoOrdinario.
+     */
+    public function test_registrar_coordinador_encadena_a_sarlaft_control_interno(): void
+    {
+        $credito = $this->crearCreditoEnEstadoIngeniero();
+
+        Passport::actingAs($this->ingeniero);
+        $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'ventas_totales_proyecto' => ['apartamentos' => 1000000],
+            'observaciones_ingeniero' => 'Proyecto viable.',
+        ], ['X-Active-Role' => 'ingeniero'])->assertStatus(200);
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'credito_solicitado' => ['monto' => 500000000],
+            'saldos_por_recaudar_contraentrega' => ['saldo' => 100000000],
+            'observaciones_coordinador' => 'Aprobado, informe consolidado.',
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200);
+
+        $credito->refresh();
+        $this->assertEquals('sarlaft_control_interno', $credito->estado);
+
+        // El historial documenta los dos saltos de estado en la misma llamada.
+        $historial = $credito->historial_estados;
+        $ultimosDos = array_slice($historial, -2);
+        $this->assertEquals('informe_tecnico_finalizado', $ultimosDos[0]['estado_nuevo']);
+        $this->assertEquals('sarlaft_control_interno', $ultimosDos[1]['estado_nuevo']);
+
+        // El informe técnico ya registrado sigue siendo consultable/descargable
+        // aunque el CreditoOrdinario avanzó más allá de los 3 estados originales.
+        Passport::actingAs($this->coordinador);
+        $this->getJson("/api/informes-tecnicos/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(200);
+
+        Passport::actingAs($this->ingeniero);
+        $this->getJson("/api/informes-tecnicos/{$credito->id}/descargar?formato=pdf", ['X-Active-Role' => 'ingeniero'])
+            ->assertStatus(200);
     }
 
     public function test_usuario_sin_rol_correspondiente_recibe_403(): void

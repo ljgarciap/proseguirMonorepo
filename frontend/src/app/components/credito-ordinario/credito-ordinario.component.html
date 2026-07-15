@@ -213,46 +213,19 @@
               </button>
             </div>
 
-            <!-- Stage 3: analisis_sarlaft_financiero (Parallel Cumplimiento / Comercial) -->
-            <div *ngIf="selectedCredito.estado === 'analisis_sarlaft_financiero'">
-              <p class="action-instructions">Esta etapa requiere **análisis en paralelo**. Sube los PDFs correspondientes a tu rol:</p>
-              
+            <!-- Stage 3: pendiente_analisis_financiero (Coordinador Comercial) -->
+            <!-- SCRUM-128: el concepto SARLAFT/Listas Restrictivas ya se resolvió
+                 en la bandeja dedicada (Oficial de Cumplimiento) antes de llegar
+                 acá — este estado solo cubre el análisis financiero comercial. -->
+            <div *ngIf="selectedCredito.estado === 'pendiente_analisis_financiero'">
+              <p class="action-instructions">Sube los PDFs de análisis financiero requeridos para continuar:</p>
+
               <div class="parallel-actions-grid">
-                <!-- Oficial de Cumplimiento Area -->
-                <div class="role-action-box" [class.active]="activeRole === 'oficial_cumplimiento' || activeRole === 'superadmin'">
-                  <h5>🛡️ Oficial de Cumplimiento (SARLAFT)</h5>
-                  <p>Debe validar listas restrictivas y generar los reportes de Síntesis y Datacrédito.</p>
-                  
-                  <div class="upload-controls">
-                    <div class="upload-item">
-                      <label>1. Documento Síntesis SARLAFT (PDF)</label>
-                      <input type="file" id="file-sintesis" (change)="onFileUpload($event, 'sarlft_sintesis')" 
-                             [disabled]="!(activeRole === 'oficial_cumplimiento' || activeRole === 'superadmin')" accept=".pdf" class="file-input-hide">
-                      <label for="file-sintesis" class="btn-pro secondary sm btn-upload">
-                        <span class="material-symbols-outlined">upload</span>
-                        {{ selectedCredito.documentos?.sarlft_sintesis ? 'Reemplazar Síntesis' : 'Cargar Síntesis' }}
-                      </label>
-                      <span class="file-status" *ngIf="selectedCredito.documentos?.sarlft_sintesis">✅ Cargado</span>
-                    </div>
-
-                    <div class="upload-item">
-                      <label>2. Reporte Datacrédito (PDF)</label>
-                      <input type="file" id="file-datacredito" (change)="onFileUpload($event, 'sarlft_datacredito')"
-                             [disabled]="!(activeRole === 'oficial_cumplimiento' || activeRole === 'superadmin')" accept=".pdf" class="file-input-hide">
-                      <label for="file-datacredito" class="btn-pro secondary sm btn-upload">
-                        <span class="material-symbols-outlined">upload</span>
-                        {{ selectedCredito.documentos?.sarlft_datacredito ? 'Reemplazar Datacrédito' : 'Cargar Datacrédito' }}
-                      </label>
-                      <span class="file-status" *ngIf="selectedCredito.documentos?.sarlft_datacredito">✅ Cargado</span>
-                    </div>
-                  </div>
-                </div>
-
                 <!-- Coordinador Comercial Area -->
                 <div class="role-action-box" [class.active]="activeRole === 'coordinador_comercial' || activeRole === 'superadmin'">
                   <h5>📈 Coordinador Comercial</h5>
                   <p>Debe elaborar la Planilla de Análisis Financiero y la Presentación del Comité.</p>
-                  
+
                   <div class="upload-controls">
                     <div class="upload-item">
                       <label>1. Planilla de Análisis Financiero (PDF)</label>
@@ -278,13 +251,13 @@
                   </div>
                 </div>
               </div>
-              
-              <div class="transition-trigger-box" *ngIf="selectedCredito.documentos?.sarlft_sintesis && selectedCredito.documentos?.sarlft_datacredito && selectedCredito.documentos?.analisis_financiero && selectedCredito.documentos?.presentacion_comite">
+
+              <div class="transition-trigger-box" *ngIf="selectedCredito.documentos?.analisis_financiero && selectedCredito.documentos?.presentacion_comite">
                 <div class="info-alert">
                   <span class="material-symbols-outlined">info</span>
-                  <p>Todos los documentos requeridos de análisis paralelo han sido cargados con éxito. Procede a confirmar el paso a Gerencia.</p>
+                  <p>Todos los documentos requeridos de análisis financiero han sido cargados con éxito. Procede a confirmar el paso a Gerencia.</p>
                 </div>
-                <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Análisis paralelo SARLAFT y financiero completado con éxito.')">
+                <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Análisis financiero completado con éxito.')">
                   Enviar a Aprobación de Gerencia
                 </button>
               </div>

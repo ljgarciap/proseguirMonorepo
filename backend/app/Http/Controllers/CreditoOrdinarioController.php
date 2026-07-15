@@ -104,7 +104,7 @@ class CreditoOrdinarioController extends Controller
         $rolesAutorizados = [
             'revision_documental' => ['coordinador_comercial'],
             'completar_solicitud' => ['cliente'],
-            'analisis_sarlaft_financiero' => ['coordinador_comercial', 'oficial_cumplimiento'],
+            'pendiente_analisis_financiero' => ['coordinador_comercial'],
             'aprobacion_presentacion' => ['gerente'],
             'comite_evaluacion' => ['comite_credito'],
             'formalizacion_garantias' => ['coordinador_comercial', 'cliente', 'operativo'],
@@ -144,7 +144,7 @@ class CreditoOrdinarioController extends Controller
         // 2. Lógica de Máquina de Estados BPMN
         if ($accion === 'rechazar') {
             if ($estadoActual === 'aprobacion_presentacion') {
-                $estadoNuevo = 'analisis_sarlaft_financiero';
+                $estadoNuevo = 'pendiente_analisis_financiero';
                 $comentario = 'Presentación rechazada por Gerencia. Retorna a análisis financiero. ' . $comentario;
             } elseif ($estadoActual === 'comite_evaluacion') {
                 $estadoNuevo = 'rechazado';
@@ -202,8 +202,8 @@ class CreditoOrdinarioController extends Controller
         } elseif ($accion === 'aprobar' || $accion === 'subir_archivo') {
             switch ($estadoActual) {
                 case 'revision_documental':
-                    $estadoNuevo = 'analisis_sarlaft_financiero';
-                    $comentario = 'Documentación revisada y aprobada. Pasa a análisis paralelo (SARLAFT y Financiero).';
+                    $estadoNuevo = 'sarlaft_control_interno';
+                    $comentario = 'Documentación revisada y aprobada. Pasa a validación de Listas Restrictivas y SARLAFT.';
                     break;
 
                 case 'completar_solicitud':
@@ -211,14 +211,14 @@ class CreditoOrdinarioController extends Controller
                     $comentario = 'El cliente completó la solicitud. Retorna a revisión documental.';
                     break;
 
-                case 'analisis_sarlaft_financiero':
-                    // Si se cargan los documentos, validamos si ya están listos los del Oficial de Cumplimiento y los del Coordinador Comercial
-                    $hasSarlaft = !empty($documentos['sarlft_sintesis']) && !empty($documentos['sarlft_datacredito']);
+                case 'pendiente_analisis_financiero':
+                    // El Oficial de Cumplimiento ya emitió concepto favorable (módulo Listas
+                    // Restrictivas y SARLAFT, SCRUM-128). Aquí solo falta el Coordinador Comercial.
                     $hasFinancial = !empty($documentos['analisis_financiero']) && !empty($documentos['presentacion_comite']);
-                    
-                    if ($hasSarlaft && $hasFinancial) {
+
+                    if ($hasFinancial) {
                         $estadoNuevo = 'aprobacion_presentacion';
-                        $comentario = 'Análisis finalizado y documentos cargados por Cumplimiento y Comercial. Pasa a aprobación de presentación por Gerencia.';
+                        $comentario = 'Análisis financiero finalizado y documentos cargados por Comercial. Pasa a aprobación de presentación por Gerencia.';
                     } else {
                         $comentario = 'Archivo cargado en análisis financiero. Aún faltan documentos complementarios para transicionar de etapa.';
                     }
