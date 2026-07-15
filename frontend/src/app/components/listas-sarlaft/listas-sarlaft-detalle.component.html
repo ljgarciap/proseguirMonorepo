@@ -1,0 +1,141 @@
+<div class="view-container" *ngIf="!loading && credito">
+  <header class="view-header">
+    <div class="title-area">
+      <button class="btn-pro secondary sm back-btn" (click)="volver()">
+        <span class="material-symbols-outlined">arrow_back</span> Volver a la bandeja
+      </button>
+      <h1>Listas Restrictivas y SARLAFT — {{ credito.numero_solicitud }}</h1>
+      <p>Cliente: {{ cliente?.nombre || credito.cliente?.name || '—' }}</p>
+    </div>
+    <div class="header-actions">
+      <span class="status-pill" [ngClass]="{
+        'warning': estadoDerivado === 'Pendiente' || estadoDerivado === 'En revisión',
+        'success': estadoDerivado === 'Favorable',
+        'danger': estadoDerivado === 'Desfavorable'
+      }">{{ estadoDerivado }}</span>
+    </div>
+  </header>
+
+  <div class="alert-readonly" *ngIf="!puedeEditar">
+    <span class="material-symbols-outlined">visibility</span>
+    Estás viendo esta validación en modo solo lectura.
+  </div>
+
+  <div class="detail-grid">
+    <!-- Información del cliente -->
+    <div class="content-card">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">badge</span>
+        Información del Cliente (solo lectura)
+      </h3>
+
+      <ng-container *ngIf="esNatural; else juridicaBlock">
+        <div class="form-grid mt-4">
+          <div class="form-group"><label>Nombres</label><p class="readonly-value">{{ cliente?.nombres || '—' }}</p></div>
+          <div class="form-group"><label>Primer Apellido</label><p class="readonly-value">{{ cliente?.primer_apellido || '—' }}</p></div>
+          <div class="form-group"><label>Segundo Apellido</label><p class="readonly-value">{{ cliente?.segundo_apellido || '—' }}</p></div>
+          <div class="form-group"><label>Documento</label><p class="readonly-value">{{ cliente?.documentType?.nombre || '—' }} {{ cliente?.numero_documento || '' }}</p></div>
+          <div class="form-group"><label>Correo Electrónico</label><p class="readonly-value">{{ cliente?.correo_electronico || '—' }}</p></div>
+          <div class="form-group"><label>Teléfono</label><p class="readonly-value">{{ cliente?.telefono || '—' }}</p></div>
+          <div class="form-group span-2"><label>Dirección</label><p class="readonly-value">{{ cliente?.direccion || '—' }}</p></div>
+          <div class="form-group"><label>Ciudad</label><p class="readonly-value">{{ cliente?.ciudad || '—' }}, {{ cliente?.departamento || '—' }}</p></div>
+        </div>
+      </ng-container>
+
+      <ng-template #juridicaBlock>
+        <div class="form-grid mt-4">
+          <div class="form-group span-2"><label>Razón Social</label><p class="readonly-value">{{ cliente?.nombre_razon_social || '—' }}</p></div>
+          <div class="form-group"><label>Tipo de Empresa</label><p class="readonly-value">{{ cliente?.tipo_empresa || '—' }}</p></div>
+          <div class="form-group"><label>NIT</label><p class="readonly-value">{{ cliente?.numero_documento || '—' }}</p></div>
+          <div class="form-group"><label>Correo Electrónico</label><p class="readonly-value">{{ cliente?.correo_electronico_empresarial || '—' }}</p></div>
+          <div class="form-group"><label>Teléfono</label><p class="readonly-value">{{ cliente?.telefono || '—' }}</p></div>
+          <div class="form-group span-2"><label>Dirección</label><p class="readonly-value">{{ cliente?.direccion || '—' }}</p></div>
+          <div class="form-group"><label>Ciudad</label><p class="readonly-value">{{ cliente?.ciudad || '—' }}, {{ cliente?.departamento || '—' }}</p></div>
+        </div>
+
+        <h4 class="section-subtitle mt-4">Representante Legal</h4>
+        <div class="form-grid">
+          <div class="form-group"><label>Nombres</label><p class="readonly-value">{{ cliente?.rep_nombres || '—' }}</p></div>
+          <div class="form-group"><label>Apellidos</label><p class="readonly-value">{{ cliente?.rep_primer_apellido || '—' }} {{ cliente?.rep_segundo_apellido || '' }}</p></div>
+          <div class="form-group"><label>Documento</label><p class="readonly-value">{{ cliente?.repDocumentType?.nombre || '—' }} {{ cliente?.rep_numero_documento || '' }}</p></div>
+          <div class="form-group"><label>Cargo</label><p class="readonly-value">{{ cliente?.rep_cargo || '—' }}</p></div>
+          <div class="form-group"><label>Correo Electrónico</label><p class="readonly-value">{{ cliente?.rep_correo_electronico || '—' }}</p></div>
+          <div class="form-group"><label>Teléfono</label><p class="readonly-value">{{ cliente?.rep_telefono || '—' }}</p></div>
+        </div>
+      </ng-template>
+    </div>
+
+    <!-- Crédito solicitado -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">request_quote</span>
+        Crédito Solicitado (solo lectura)
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Tipo de Crédito</label><p class="readonly-value">{{ solicitud?.tipo_credito?.nombre || '—' }}</p></div>
+        <div class="form-group" *ngIf="solicitud?.proyecto"><label>Proyecto</label><p class="readonly-value">{{ solicitud?.proyecto }}</p></div>
+        <div class="form-group"><label>Monto Solicitado</label><p class="readonly-value">$ {{ (solicitud?.monto_solicitado || credito.monto || 0) | number:'1.0-0':'es-CO' }}</p></div>
+        <div class="form-group"><label>Plazo</label><p class="readonly-value">{{ solicitud?.plazo_meses || credito.plazo_meses || '—' }} meses</p></div>
+        <div class="form-group"><label>Amortización</label><p class="readonly-value">{{ solicitud?.amortizacion?.nombre || '—' }}</p></div>
+        <div class="form-group"><label>Destino del Recurso</label><p class="readonly-value">{{ solicitud?.destino_recurso || '—' }}</p></div>
+        <div class="form-group"><label>Garantía</label><p class="readonly-value">{{ solicitud?.garantia || '—' }}</p></div>
+        <div class="form-group"><label>Fuente de Pago</label><p class="readonly-value">{{ solicitud?.fuente_pago || '—' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Resultado de la validación -->
+    <div class="content-card mt-4 result-panel">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">gavel</span>
+        Resultado de la Validación
+      </h3>
+      <p class="card-subtitle">Concepto de Listas Restrictivas y SARLAFT (Oficial de Cumplimiento).</p>
+
+      <div class="radio-group mt-4">
+        <label class="radio-option" [class.selected]="concepto === 'favorable'">
+          <input type="radio" name="concepto" value="favorable" [(ngModel)]="concepto" [disabled]="!puedeEditar">
+          <span class="material-symbols-outlined">check_circle</span> Favorable
+        </label>
+        <label class="radio-option danger" [class.selected]="concepto === 'desfavorable'">
+          <input type="radio" name="concepto" value="desfavorable" [(ngModel)]="concepto" [disabled]="!puedeEditar">
+          <span class="material-symbols-outlined">cancel</span> Desfavorable
+        </label>
+      </div>
+
+      <div class="form-group span-full mt-4">
+        <label>Observaciones <span class="required">*</span></label>
+        <textarea class="pro-input textarea" [(ngModel)]="observaciones" [disabled]="!puedeEditar"
+                  placeholder="Observaciones que sustentan el concepto"></textarea>
+      </div>
+
+      <div class="form-group span-full mt-4">
+        <label>Síntesis Oficial de Cumplimiento (PDF) <span class="required">*</span></label>
+        <div class="upload-controls">
+          <input type="file" id="file-sintesis-oficial" (change)="onArchivoSeleccionado($event)"
+                 [disabled]="!puedeEditar" accept=".pdf" class="file-input-hide">
+          <label for="file-sintesis-oficial" class="btn-pro secondary sm btn-upload" *ngIf="puedeEditar">
+            <span class="material-symbols-outlined">upload</span>
+            {{ pdfActual ? 'Reemplazar PDF' : 'Cargar PDF' }}
+          </label>
+          <span class="file-status" *ngIf="archivoNombre">📎 {{ archivoNombre }}</span>
+          <a *ngIf="pdfActual && !archivoNombre" [href]="pdfActual" target="_blank" class="btn-view-doc">
+            <span class="material-symbols-outlined">open_in_new</span> Ver PDF cargado
+          </a>
+        </div>
+      </div>
+
+      <div class="form-footer mt-4" *ngIf="puedeEditar">
+        <button class="btn-pro secondary" (click)="guardarBorrador()">
+          <span class="material-symbols-outlined">save</span> Guardar Borrador
+        </button>
+        <button class="btn-pro primary" (click)="finalizar()">
+          <span class="material-symbols-outlined">check_circle</span> Finalizar Validación
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="view-container" *ngIf="loading">
+  <p class="text-center py-4">Cargando validación...</p>
+</div>

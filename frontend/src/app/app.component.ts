@@ -38,6 +38,9 @@ import { interval, Subscription } from 'rxjs';
             <a *ngIf="authService.isAuthorized(['ingeniero', 'coordinador_comercial', 'superadmin'])" routerLink="/informes-tecnicos" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">engineering</span> Informe Técnico
             </a>
+            <a *ngIf="authService.isAuthorized(['oficial_cumplimiento', 'superadmin'])" routerLink="/listas-sarlaft" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">gavel</span> Listas Restrictivas y SARLAFT
+            </a>
             <a *ngIf="authService.isAuthorized(['operativo'])" routerLink="/sheets" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">database</span> Base de Datos
             </a>
@@ -404,7 +407,11 @@ export class AppComponent implements OnInit, OnDestroy {
       this.router.navigate(['/solicitudes-credito']);
     } else if (role === 'ingeniero') {
       this.router.navigate(['/informes-tecnicos']);
-    } else if (['oficial_cumplimiento', 'comite_credito', 'tesoreria'].includes(role)) {
+    } else if (role === 'oficial_cumplimiento') {
+      // SCRUM-128: el trabajo del Oficial de Cumplimiento ya no ocurre
+      // dentro de /creditos — vive en la bandeja dedicada.
+      this.router.navigate(['/listas-sarlaft']);
+    } else if (['comite_credito', 'tesoreria'].includes(role)) {
       this.router.navigate(['/creditos']);
     } else {
       this.router.navigate(['/dashboard']);
