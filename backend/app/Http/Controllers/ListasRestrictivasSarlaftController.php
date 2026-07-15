@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 /**
  * Bandeja y detalle de Validación de Listas Restrictivas y SARLAFT
@@ -60,15 +61,19 @@ class ListasRestrictivasSarlaftController extends Controller
         $activeRole = $this->resolveActiveRole($request);
         $this->autorizarVisualizacion($activeRole);
 
-        $credito = CreditoOrdinario::with([
-            'cliente',
-            'solicitudCredito.cliente.tipoPersona',
-            'solicitudCredito.cliente.documentType',
-            'solicitudCredito.cliente.repDocumentType',
-            'solicitudCredito.tipoCredito',
-            'solicitudCredito.amortizacion',
-            'sarlaftDiligenciadoPor',
-        ])->findOrFail($creditoId);
+        $credito = CreditoOrdinario::where(function ($q) {
+                $q->whereNotNull('sarlaft_concepto')
+                    ->orWhere('estado', 'sarlaft_control_interno');
+            })
+            ->with([
+                'cliente',
+                'solicitudCredito.cliente.tipoPersona',
+                'solicitudCredito.cliente.documentType',
+                'solicitudCredito.cliente.repDocumentType',
+                'solicitudCredito.tipoCredito',
+                'solicitudCredito.amortizacion',
+                'sarlaftDiligenciadoPor',
+            ])->findOrFail($creditoId);
 
         return response()->json([
             'credito' => $credito,
@@ -165,11 +170,21 @@ class ListasRestrictivasSarlaftController extends Controller
      */
     private function guardarCamposYArchivo(Request $request, CreditoOrdinario $credito)
     {
-        $request->validate([
+        // mimes:pdf valida el contenido real del archivo (no la extensión que
+        // manda el cliente, fácilmente falseable) — mismo criterio ya usado en
+        // CreditoOrdinarioController::transition() para el resto de los PDFs.
+        $validator = Validator::make($request->all(), [
             'sarlaft_concepto' => 'nullable|string|in:favorable,desfavorable',
             'sarlaft_observaciones' => 'nullable|string',
-            'archivo' => 'nullable|file',
+            'archivo' => 'nullable|file|mimes:pdf|max:102400',
+        ], [
+            'archivo.mimes' => 'El archivo debe estar en formato PDF.',
+            'archivo.max' => 'El archivo debe estar en formato PDF.',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
 
         if ($request->has('sarlaft_concepto')) {
             $credito->sarlaft_concepto = $request->input('sarlaft_concepto') ?: null;
@@ -181,12 +196,6 @@ class ListasRestrictivasSarlaftController extends Controller
 
         if ($request->hasFile('archivo')) {
             $file = $request->file('archivo');
-            $esPdf = strtolower($file->getClientOriginalExtension()) === 'pdf' || $file->getMimeType() === 'application/pdf';
-
-            if (!$esPdf) {
-                return response()->json(['message' => 'El archivo debe estar en formato PDF.'], 422);
-            }
-
             $fileName = $file->getClientOriginalName();
             $path = $file->storeAs('credito_documentos/' . $credito->id, $fileName, 'public');
 

@@ -233,7 +233,7 @@ class SolicitudCreditoController extends Controller
 
             // 4. Create DocumentRequest in the database if document_preset_id is provided
             $documentosRequeridos = [];
-            if ($validated['document_preset_id']) {
+            if ($validated['document_preset_id'] ?? null) {
                 $preset = DocumentPreset::findOrFail($validated['document_preset_id']);
                 $requirementIds = $preset->requirements()->pluck('document_requirements.id')->toArray();
                 $documentosRequeridos = $preset->requirements()->pluck('nombre')->toArray();

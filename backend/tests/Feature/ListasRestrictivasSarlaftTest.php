@@ -319,6 +319,23 @@ class ListasRestrictivasSarlaftTest extends TestCase
             ->assertStatus(403);
     }
 
+    public function test_show_no_expone_creditos_que_todavia_no_llegaron_a_la_bandeja(): void
+    {
+        $credito = CreditoOrdinario::create([
+            'numero_solicitud' => 'CO-2026-FUERA1',
+            'cliente_id' => $this->coordinador->id,
+            'monto' => 10000000,
+            'plazo_meses' => 12,
+            'estado' => 'revision_documental',
+            'documentos' => [],
+            'historial_estados' => [],
+        ]);
+
+        Passport::actingAs($this->cumplimiento);
+        $this->getJson("/api/listas-sarlaft/{$credito->id}", ['X-Active-Role' => 'oficial_cumplimiento'])
+            ->assertStatus(404);
+    }
+
     public function test_superadmin_puede_actuar_en_cualquier_estado(): void
     {
         $credito = $this->crearCreditoEnSarlaftControlInterno();
