@@ -138,9 +138,36 @@ class CreditoOrdinarioTest extends TestCase
         $creditoId = $response->json('id');
         $this->assertDatabaseHas('credito_ordinarios', ['id' => $creditoId, 'estado' => 'revision_documental']);
 
-        // 2. Coordinador approves documental revision — pasa a la bandeja dedicada
-        // de Listas Restrictivas y SARLAFT (SCRUM-128), fuera del alcance de este test.
+        // 2. Cliente/coordinador suben el expediente inicial. Subir un archivo no
+        // transiciona por sí solo (SCRUM-142) — el crédito debe permanecer en
+        // revision_documental hasta que el Coordinador apruebe explícitamente.
+        Passport::actingAs($this->cliente);
+        $this->subirArchivo($creditoId, 'formulario_solicitud', 'cliente')
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'revision_documental');
+        $this->subirArchivo($creditoId, 'documentos_identidad', 'cliente')
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'revision_documental');
+
         Passport::actingAs($this->coordinador);
+        $this->subirArchivo($creditoId, 'estados_financieros', 'coordinador_comercial')
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'revision_documental');
+
+        // Aprobar sin el expediente completo no debe transicionar (SCRUM-142).
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion'     => 'aprobar',
+            'comentario' => 'Intento de aprobación incompleta.'
+        ], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'revision_documental');
+
+        $this->subirArchivo($creditoId, 'certificados_laborales', 'coordinador_comercial')
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'revision_documental');
+
+        // Coordinador approves documental revision — pasa a la bandeja dedicada
+        // de Listas Restrictivas y SARLAFT (SCRUM-128), fuera del alcance de este test.
         $this->postJson("/api/creditos/{$creditoId}/transition", [
             'accion'     => 'aprobar',
             'comentario' => 'Documentación inicial correcta.'

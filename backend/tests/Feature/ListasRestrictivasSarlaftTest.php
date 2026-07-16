@@ -123,6 +123,16 @@ class ListasRestrictivasSarlaftTest extends TestCase
         $this->assertEquals('revision_documental', $credito->estado);
 
         Passport::actingAs($this->coordinador);
+
+        // El expediente de Etapa 1 debe estar completo antes de aprobar (SCRUM-142).
+        foreach (['formulario_solicitud', 'documentos_identidad', 'estados_financieros', 'certificados_laborales'] as $campo) {
+            $this->postJson("/api/creditos/{$credito->id}/transition", [
+                'accion' => 'subir_archivo',
+                'campo_documento' => $campo,
+                'archivo' => $this->pdf("$campo.pdf"),
+            ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+        }
+
         $this->postJson("/api/creditos/{$credito->id}/transition", [
             'accion' => 'aprobar',
             'comentario' => 'Documentación inicial correcta.'

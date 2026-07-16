@@ -102,7 +102,7 @@ class CreditoOrdinarioController extends Controller
 
         // Mapa de roles autorizados por estado para transiciones
         $rolesAutorizados = [
-            'revision_documental' => ['coordinador_comercial'],
+            'revision_documental' => ['coordinador_comercial', 'cliente'],
             'completar_solicitud' => ['cliente'],
             'pendiente_analisis_financiero' => ['coordinador_comercial'],
             'aprobacion_presentacion' => ['gerente'],
@@ -202,13 +202,29 @@ class CreditoOrdinarioController extends Controller
         } elseif ($accion === 'aprobar' || $accion === 'subir_archivo') {
             switch ($estadoActual) {
                 case 'revision_documental':
-                    $estadoNuevo = 'sarlaft_control_interno';
-                    $comentario = 'Documentación revisada y aprobada. Pasa a validación de Listas Restrictivas y SARLAFT.';
+                    // La carga de un solo soporte (subir_archivo) no debe cerrar la
+                    // etapa: solo el Coordinador Comercial, con 'aprobar' explícito,
+                    // decide que el expediente inicial está completo.
+                    if ($accion === 'aprobar') {
+                        $hasEtapa1 = !empty($documentos['formulario_solicitud'])
+                            && !empty($documentos['documentos_identidad'])
+                            && !empty($documentos['estados_financieros'])
+                            && !empty($documentos['certificados_laborales']);
+
+                        if ($hasEtapa1) {
+                            $estadoNuevo = 'sarlaft_control_interno';
+                            $comentario = 'Documentación revisada y aprobada. Pasa a validación de Listas Restrictivas y SARLAFT.';
+                        } else {
+                            $comentario = 'Faltan documentos obligatorios del expediente inicial. No se puede aprobar todavía.';
+                        }
+                    }
                     break;
 
                 case 'completar_solicitud':
-                    $estadoNuevo = 'revision_documental';
-                    $comentario = 'El cliente completó la solicitud. Retorna a revisión documental.';
+                    if ($accion === 'aprobar') {
+                        $estadoNuevo = 'revision_documental';
+                        $comentario = 'El cliente completó la solicitud. Retorna a revisión documental.';
+                    }
                     break;
 
                 case 'pendiente_analisis_financiero':
