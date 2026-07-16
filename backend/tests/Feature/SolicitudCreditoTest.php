@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Models\Cliente;
+use App\Models\Departamento;
+use App\Models\Ciudad;
 use App\Models\TipoPersona;
 use App\Models\DocumentType;
 use App\Models\TipoCredito;
@@ -34,6 +36,10 @@ class SolicitudCreditoTest extends TestCase
     private $clientNatural;
     private $clientJuridico;
     private $preset;
+    private $departamentoValle;
+    private $ciudadCali;
+    private $departamentoBogota;
+    private $ciudadBogota;
 
     protected function setUp(): void
     {
@@ -49,6 +55,11 @@ class SolicitudCreditoTest extends TestCase
         
         $this->creditoOrdinario = TipoCredito::firstOrCreate(['codigo' => 'ORDINARIO'], ['nombre' => 'Crédito Ordinario']);
         $this->amortizacionMensual = Amortizacion::firstOrCreate(['codigo' => 'MENSUAL'], ['nombre' => 'Mensual']);
+
+        $this->departamentoValle = Departamento::create(['nombre' => 'Valle']);
+        $this->ciudadCali = Ciudad::create(['nombre' => 'Cali', 'departamento_id' => $this->departamentoValle->id]);
+        $this->departamentoBogota = Departamento::create(['nombre' => 'Bogotá D.C.']);
+        $this->ciudadBogota = Ciudad::create(['nombre' => 'Bogotá', 'departamento_id' => $this->departamentoBogota->id]);
 
         // Create document preset and requirements
         $this->preset = DocumentPreset::create(['nombre' => 'Preset Crédito', 'descripcion' => 'Requisitos de crédito']);
@@ -183,8 +194,8 @@ class SolicitudCreditoTest extends TestCase
             'telefono' => '3119999999',
             'direccion' => 'Avenida Principal 12',
             'pais' => 'Colombia',
-            'departamento' => 'Valle',
-            'ciudad' => 'Cali'
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id
         ];
 
         $response = $this->postJson('/api/solicitudes-credito', $payload);
@@ -263,8 +274,8 @@ class SolicitudCreditoTest extends TestCase
             'telefono' => '601999999',
             'direccion' => 'Calle Falsa 123',
             'pais' => 'Colombia',
-            'departamento' => 'Bogota',
-            'ciudad' => 'Bogota'
+            'departamento_id' => $this->departamentoBogota->id,
+            'ciudad_id' => $this->ciudadBogota->id
         ];
 
         $response = $this->postJson('/api/solicitudes-credito', $payload);
@@ -279,5 +290,39 @@ class SolicitudCreditoTest extends TestCase
             'rep_correo_electronico',
             'rep_telefono'
         ]);
+    }
+
+    /**
+     * SCRUM-118: la ciudad debe pertenecer al departamento elegido.
+     */
+    public function test_store_rejects_ciudad_that_does_not_belong_to_departamento(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $payload = [
+            'cliente_id' => $this->clientNatural->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Documentación para Crédito',
+            'mensaje_notificacion' => 'Por favor adjunta los archivos.',
+            'nombres' => 'Juan Carlos',
+            'primer_apellido' => 'Perez',
+            'correo_electronico' => 'juan@test.com',
+            'telefono' => '3119999999',
+            'direccion' => 'Avenida Principal 12',
+            'pais' => 'Colombia',
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadBogota->id, // pertenece a Bogotá D.C., no a Valle
+        ];
+
+        $response = $this->postJson('/api/solicitudes-credito', $payload);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['ciudad_id']);
     }
 }

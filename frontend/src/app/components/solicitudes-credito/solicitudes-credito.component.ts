@@ -27,6 +27,10 @@ export class SolicitudesCreditoComponent implements OnInit {
   // Pending visits list
   pendingVisits: any[] = [];
   loadingPending = false;
+
+  // Ubicación (Departamento -> Ciudad anidados)
+  departamentos: any[] = [];
+  ciudadesDelDepartamento: any[] = [];
   
   // History list
   historyRequests: any[] = [];
@@ -50,9 +54,9 @@ export class SolicitudesCreditoComponent implements OnInit {
     telefono: '',
     direccion: '',
     pais: 'Colombia',
-    departamento: '',
-    ciudad: '',
-    
+    departamento_id: '',
+    ciudad_id: '',
+
     // Juridica fields
     nombre_razon_social: '',
     tipo_empresa: '',
@@ -91,6 +95,24 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.loadPendingVisits();
     this.loadDropdowns();
     this.loadHistory();
+    this.loadDepartamentos();
+  }
+
+  loadDepartamentos() {
+    this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/departamentos`).subscribe({ next: data => this.departamentos = data, error: () => {} });
+  }
+
+  onDepartamentoChange(preservarCiudad = false) {
+    if (!preservarCiudad) {
+      this.form.ciudad_id = '';
+    }
+    this.ciudadesDelDepartamento = [];
+    if (this.form.departamento_id) {
+      this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/ciudades?departamento_id=${this.form.departamento_id}`).subscribe({
+        next: data => this.ciudadesDelDepartamento = data,
+        error: () => {}
+      });
+    }
   }
 
   loadPendingVisits() {
@@ -161,8 +183,11 @@ export class SolicitudesCreditoComponent implements OnInit {
       this.form.telefono = cliente.telefono || '';
       this.form.direccion = cliente.direccion || '';
       this.form.pais = cliente.pais || 'Colombia';
-      this.form.departamento = cliente.departamento || '';
-      this.form.ciudad = cliente.ciudad || '';
+      this.form.departamento_id = cliente.departamento_id || '';
+      this.form.ciudad_id = cliente.ciudad_id || '';
+      if (this.form.departamento_id) {
+        this.onDepartamentoChange(true);
+      }
 
       this.form.nombre_razon_social = cliente.nombre_razon_social || '';
       this.form.tipo_empresa = cliente.tipo_empresa || '';
@@ -246,8 +271,11 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.form.telefono = selected.telefono || '';
     this.form.direccion = selected.direccion || '';
     this.form.pais = selected.pais || 'Colombia';
-    this.form.departamento = selected.departamento || '';
-    this.form.ciudad = selected.ciudad || '';
+    this.form.departamento_id = selected.departamento_id || '';
+    this.form.ciudad_id = selected.ciudad_id || '';
+    if (this.form.departamento_id) {
+      this.onDepartamentoChange(true);
+    }
 
     this.form.nombre_razon_social = selected.nombre_razon_social || '';
     this.form.tipo_empresa = selected.tipo_empresa || '';
@@ -378,7 +406,8 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.selectedVisitId = null;
     this.selectedPresetId = null;
     this.selectedPresetDocs = [];
-    
+    this.ciudadesDelDepartamento = [];
+
     this.form = {
       cliente_id: '',
       tipo_persona_id: '',
@@ -391,9 +420,9 @@ export class SolicitudesCreditoComponent implements OnInit {
       telefono: '',
       direccion: '',
       pais: 'Colombia',
-      departamento: '',
-      ciudad: '',
-      
+      departamento_id: '',
+      ciudad_id: '',
+
       nombre_razon_social: '',
       tipo_empresa: '',
       actividad_economica: '',

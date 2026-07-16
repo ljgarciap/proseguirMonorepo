@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class SolicitudCreditoController extends Controller
 {
@@ -86,8 +87,13 @@ class SolicitudCreditoController extends Controller
             $rules['telefono'] = 'required|string';
             $rules['direccion'] = 'required|string';
             $rules['pais'] = 'required|string';
-            $rules['departamento'] = 'required|string';
-            $rules['ciudad'] = 'required|string';
+            $rules['departamento_id'] = 'required|exists:departamentos,id';
+            $rules['ciudad_id'] = [
+                'required',
+                Rule::exists('ciudades', 'id')->where(function ($query) use ($request) {
+                    $query->where('departamento_id', $request->departamento_id);
+                }),
+            ];
         } else {
             // Juridica
             $rules['nombre_razon_social'] = 'required|string';
@@ -97,8 +103,13 @@ class SolicitudCreditoController extends Controller
             $rules['telefono'] = 'required|string';
             $rules['direccion'] = 'required|string';
             $rules['pais'] = 'required|string';
-            $rules['departamento'] = 'required|string';
-            $rules['ciudad'] = 'required|string';
+            $rules['departamento_id'] = 'required|exists:departamentos,id';
+            $rules['ciudad_id'] = [
+                'required',
+                Rule::exists('ciudades', 'id')->where(function ($query) use ($request) {
+                    $query->where('departamento_id', $request->departamento_id);
+                }),
+            ];
 
             // Representative Legal
             $rules['rep_tipo_documento_id'] = 'required|exists:document_types,id';
@@ -124,8 +135,8 @@ class SolicitudCreditoController extends Controller
                     'telefono' => $validated['telefono'],
                     'direccion' => $validated['direccion'],
                     'pais' => $validated['pais'],
-                    'departamento' => $validated['departamento'],
-                    'ciudad' => $validated['ciudad'],
+                    'departamento_id' => $validated['departamento_id'],
+                    'ciudad_id' => $validated['ciudad_id'],
                 ]);
             } else {
                 $cliente->update([
@@ -136,8 +147,8 @@ class SolicitudCreditoController extends Controller
                     'telefono' => $validated['telefono'],
                     'direccion' => $validated['direccion'],
                     'pais' => $validated['pais'],
-                    'departamento' => $validated['departamento'],
-                    'ciudad' => $validated['ciudad'],
+                    'departamento_id' => $validated['departamento_id'],
+                    'ciudad_id' => $validated['ciudad_id'],
                     'rep_tipo_documento_id' => $validated['rep_tipo_documento_id'],
                     'rep_numero_documento' => $validated['rep_numero_documento'],
                     'rep_nombres' => $validated['rep_nombres'],

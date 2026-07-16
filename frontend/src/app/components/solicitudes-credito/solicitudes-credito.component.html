@@ -227,12 +227,18 @@
 
             <div class="form-group">
               <label>Departamento <span class="required">*</span></label>
-              <input type="text" [(ngModel)]="form.departamento" name="departamento" [disabled]="isFromVisit" required class="pro-input" />
+              <select name="departamento_id" [(ngModel)]="form.departamento_id" (ngModelChange)="onDepartamentoChange()" [disabled]="isFromVisit" required class="pro-input">
+                <option value="" disabled>Seleccione...</option>
+                <option *ngFor="let d of departamentos" [value]="d.id">{{ d.nombre }}</option>
+              </select>
             </div>
 
             <div class="form-group">
               <label>Ciudad <span class="required">*</span></label>
-              <input type="text" [(ngModel)]="form.ciudad" name="ciudad" [disabled]="isFromVisit" required class="pro-input" />
+              <select name="ciudad_id" [(ngModel)]="form.ciudad_id" [disabled]="isFromVisit || !form.departamento_id" required class="pro-input">
+                <option value="" disabled>{{ form.departamento_id ? 'Seleccione...' : 'Elija primero un departamento' }}</option>
+                <option *ngFor="let c of ciudadesDelDepartamento" [value]="c.id">{{ c.nombre }}</option>
+              </select>
             </div>
           </div>
         </div>

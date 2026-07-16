@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Models\Cliente;
+use App\Models\Departamento;
+use App\Models\Ciudad;
 use App\Models\TipoPersona;
 use App\Models\DocumentType;
 use App\Models\TipoCredito;
@@ -38,6 +40,8 @@ class InformeTecnicoTest extends TestCase
     private $preset;
     private $requirement;
     private $clienteNatural;
+    private $departamentoValle;
+    private $ciudadCali;
 
     protected function setUp(): void
     {
@@ -54,6 +58,9 @@ class InformeTecnicoTest extends TestCase
         $this->preset = DocumentPreset::create(['nombre' => 'Preset Constructor', 'descripcion' => 'Requisitos Constructor']);
         $this->requirement = DocumentRequirement::create(['nombre' => 'Estudio de Suelos', 'activo' => true]);
         $this->preset->requirements()->attach([$this->requirement->id]);
+
+        $this->departamentoValle = Departamento::create(['nombre' => 'Valle']);
+        $this->ciudadCali = Ciudad::create(['nombre' => 'Cali', 'departamento_id' => $this->departamentoValle->id]);
 
         $this->clienteNatural = Cliente::create([
             'tipo_persona_id' => $this->tipoNatural->id,
@@ -151,8 +158,8 @@ class InformeTecnicoTest extends TestCase
             'telefono' => '3001112233',
             'direccion' => 'Calle Constructor 1',
             'pais' => 'Colombia',
-            'departamento' => 'Valle',
-            'ciudad' => 'Cali'
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id
         ];
 
         $response = $this->postJson('/api/solicitudes-credito', $payload);

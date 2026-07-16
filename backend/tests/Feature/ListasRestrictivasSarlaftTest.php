@@ -6,6 +6,8 @@ use App\Mail\SarlaftDesfavorableClienteMail;
 use App\Mail\SarlaftDesfavorableCoordinadorMail;
 use App\Models\User;
 use App\Models\Cliente;
+use App\Models\Departamento;
+use App\Models\Ciudad;
 use App\Models\TipoPersona;
 use App\Models\DocumentType;
 use App\Models\TipoCredito;
@@ -31,6 +33,8 @@ class ListasRestrictivasSarlaftTest extends TestCase
     private $tipoOrdinario;
     private $amortizacionMensual;
     private $clienteNatural;
+    private $departamentoValle;
+    private $ciudadCali;
 
     protected function setUp(): void
     {
@@ -43,6 +47,9 @@ class ListasRestrictivasSarlaftTest extends TestCase
         $this->tipoNatural = TipoPersona::firstOrCreate(['codigo' => 'NATURAL'], ['nombre' => 'Persona Natural']);
         $this->tipoOrdinario = TipoCredito::firstOrCreate(['codigo' => 'ORDINARIO'], ['nombre' => 'Crédito Ordinario']);
         $this->amortizacionMensual = Amortizacion::firstOrCreate(['codigo' => 'MENSUAL'], ['nombre' => 'Mensual']);
+
+        $this->departamentoValle = Departamento::create(['nombre' => 'Valle']);
+        $this->ciudadCali = Ciudad::create(['nombre' => 'Cali', 'departamento_id' => $this->departamentoValle->id]);
 
         $this->clienteNatural = Cliente::create([
             'tipo_persona_id' => $this->tipoNatural->id,
@@ -112,8 +119,8 @@ class ListasRestrictivasSarlaftTest extends TestCase
             'telefono' => '3005556677',
             'direccion' => 'Calle Sarlaft 1',
             'pais' => 'Colombia',
-            'departamento' => 'Valle',
-            'ciudad' => 'Cali'
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id
         ];
 
         $this->postJson('/api/solicitudes-credito', $payload)->assertStatus(201);
