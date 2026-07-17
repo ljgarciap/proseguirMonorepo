@@ -52,9 +52,14 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
             ->middleware(['auth:api', 'checkrole:superadmin']);
         
         // Clientes (Superadmin, Gerente, Operativo)
+        // El listado/búsqueda (index) además lo necesita Coordinador Comercial
+        // para el autocompletar de Cliente en Registro Solicitud de Crédito
+        // (SCRUM-134) — sin darle acceso al CRUD completo de Clientes.
+        Route::get('clientes', [\App\Http\Controllers\ClienteController::class, 'index'])
+            ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo,coordinador_comercial']);
         Route::post('clientes/quick', [\App\Http\Controllers\ClienteController::class, 'quickStore'])
             ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
-        Route::apiResource('clientes', \App\Http\Controllers\ClienteController::class)
+        Route::apiResource('clientes', \App\Http\Controllers\ClienteController::class)->except(['index'])
             ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
         
         // Visitas a Clientes (Superadmin, Gerente, Operativo)
@@ -62,7 +67,10 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
             ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
 
         // Departamentos/Ciudades de Colombia (SCRUM-118)
-        Route::prefix('ubicaciones')->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo'])->group(function () {
+        // Coordinador Comercial además lo necesita para los selects de
+        // ubicación (cliente y proyecto) en Registro Solicitud de Crédito
+        // (SCRUM-118 / SCRUM-141).
+        Route::prefix('ubicaciones')->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo,coordinador_comercial'])->group(function () {
             Route::get('/departamentos', [\App\Http\Controllers\UbicacionController::class, 'departamentos']);
             Route::get('/ciudades', [\App\Http\Controllers\UbicacionController::class, 'ciudades']);
             Route::get('/ciudades/buscar', [\App\Http\Controllers\UbicacionController::class, 'buscarCiudades']);

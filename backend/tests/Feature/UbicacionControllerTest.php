@@ -95,4 +95,23 @@ class UbicacionControllerTest extends TestCase
         $response = $this->getJson('/api/ubicaciones/departamentos');
         $response->assertStatus(401);
     }
+
+    /**
+     * SCRUM-118/141: Coordinador Comercial usa los selects de ubicación en
+     * Registro Solicitud de Crédito (cliente y proyecto).
+     */
+    public function test_coordinador_comercial_can_access_ubicaciones(): void
+    {
+        $coordinador = User::create([
+            'name' => 'Coordinador Test',
+            'email' => 'coordinador.ubicacion@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'ubi_coord_' . uniqid(),
+            'tipo_documento_id' => $this->user->tipo_documento_id,
+            'roles' => ['coordinador_comercial'],
+        ]);
+
+        Passport::actingAs($coordinador);
+        $this->getJson('/api/ubicaciones/departamentos')->assertStatus(200);
+    }
 }

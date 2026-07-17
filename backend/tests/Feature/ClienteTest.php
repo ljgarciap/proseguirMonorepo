@@ -425,4 +425,35 @@ class ClienteTest extends TestCase
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['numero_documento']);
     }
+
+    /**
+     * SCRUM-134: Coordinador Comercial necesita listar/buscar clientes para el
+     * autocompletar de Registro Solicitud de Crédito, aunque no gestione el
+     * CRUD completo de Clientes.
+     */
+    public function test_coordinador_comercial_can_list_but_not_manage_clientes(): void
+    {
+        $coordinador = User::create([
+            'name' => 'Coordinador Test',
+            'email' => 'coordinador.cliente.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'coord_' . uniqid(),
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['coordinador_comercial']
+        ]);
+
+        Passport::actingAs($coordinador);
+
+        $this->getJson('/api/clientes?activo=true')->assertStatus(200);
+        $this->getJson('/api/clientes?q=Perez')->assertStatus(200);
+
+        $this->postJson('/api/clientes', [
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => '444444',
+            'nombres' => 'No', 'primer_apellido' => 'Autorizado',
+            'pais' => 'Colombia', 'departamento_id' => $this->departamento->id,
+            'ciudad_id' => $this->ciudad->id, 'activo' => true
+        ])->assertStatus(403);
+    }
 }
