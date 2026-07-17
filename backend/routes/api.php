@@ -52,6 +52,8 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
             ->middleware(['auth:api', 'checkrole:superadmin']);
         
         // Clientes (Superadmin, Gerente, Operativo)
+        Route::post('clientes/quick', [\App\Http\Controllers\ClienteController::class, 'quickStore'])
+            ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
         Route::apiResource('clientes', \App\Http\Controllers\ClienteController::class)
             ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
         

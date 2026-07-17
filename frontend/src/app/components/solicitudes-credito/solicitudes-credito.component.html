@@ -130,12 +130,13 @@
           <div class="form-grid mt-4">
             <div class="form-group span-full" *ngIf="!isFromVisit">
               <label>Asociar Cliente Existente</label>
-              <select [(ngModel)]="form.cliente_id" name="cliente_id" (change)="onClientChange()" class="pro-input">
-                <option value="">-- Crear solicitud para un cliente nuevo / completar manual --</option>
-                <option *ngFor="let c of activeClientes" [value]="c.id">
-                  {{ c.nombre }} ({{ c.numero_documento }})
-                </option>
-              </select>
+              <app-cliente-autocomplete
+                name="cliente_id"
+                [(ngModel)]="form.cliente_id"
+                (ngModelChange)="onClientChange()"
+                [clientesPreCargados]="activeClientes"
+                placeholder="Buscar cliente por nombre o documento, o dejar vacío para uno nuevo...">
+              </app-cliente-autocomplete>
             </div>
 
             <div class="form-group" *ngIf="isFromVisit">

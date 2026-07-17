@@ -35,9 +35,24 @@ class ClienteController extends Controller
             }
         }
 
+        // Búsqueda combinada para autocompletar (SCRUM-134): nombre O número de
+        // documento, con límite para no traer cientos de filas por tecleo.
+        $isAutocomplete = $request->filled('q');
+        if ($isAutocomplete) {
+            $q = $request->q;
+            $query->where(function ($sub) use ($q) {
+                $sub->where('clientes.nombre', 'like', "%{$q}%")
+                    ->orWhere('clientes.numero_documento', 'like', "%{$q}%");
+            });
+        }
+
         // Sorting: Alphabetical by Name/Razón Social, and then by Tipo de Persona
         $query->orderBy('clientes.nombre', 'asc')
               ->orderBy('tipo_personas.nombre', 'asc');
+
+        if ($isAutocomplete) {
+            $query->limit(20);
+        }
 
         return response()->json($query->get());
     }
@@ -98,6 +113,41 @@ class ClienteController extends Controller
         }
 
         $validated = $request->validate($rules);
+
+        return DB::transaction(function () use ($validated, $codigo) {
+            $cliente = Cliente::create($validated);
+            $this->syncUserAccess($cliente, $codigo);
+            return response()->json($cliente, 201);
+        });
+    }
+
+    /**
+     * Alta rápida de cliente (SCRUM-134): solo los datos mínimos para poder
+     * registrar una visita o solicitud en el momento. El resto del perfil
+     * (dirección, ubicación, representante legal, etc.) se completa después
+     * desde el formulario completo de Clientes.
+     */
+    public function quickStore(Request $request)
+    {
+        $tipoPersonaId = $request->tipo_persona_id;
+        $tipoPersona = $tipoPersonaId ? TipoPersona::find($tipoPersonaId) : null;
+        $codigo = $tipoPersona ? strtoupper($tipoPersona->codigo) : '';
+
+        $rules = [
+            'tipo_persona_id' => 'required|exists:tipo_personas,id',
+            'tipo_documento_id' => 'required|exists:document_types,id',
+            'numero_documento' => 'required|string|unique:clientes,numero_documento',
+        ];
+
+        if ($codigo === 'NATURAL') {
+            $rules['nombres'] = 'required|string';
+            $rules['primer_apellido'] = 'required|string';
+        } else {
+            $rules['nombre_razon_social'] = 'required|string';
+        }
+
+        $validated = $request->validate($rules);
+        $validated['activo'] = true;
 
         return DB::transaction(function () use ($validated, $codigo) {
             $cliente = Cliente::create($validated);

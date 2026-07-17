@@ -287,4 +287,142 @@ class ClienteTest extends TestCase
         // Verify user is soft-deleted
         $this->assertTrue($user->fresh()->trashed());
     }
+
+    /**
+     * SCRUM-134: búsqueda combinada (?q=) para el autocompletar de cliente —
+     * debe encontrar tanto por nombre como por número de documento.
+     */
+    public function test_index_q_searches_by_nombre_or_numero_documento(): void
+    {
+        Cliente::create([
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => '111222333',
+            'identificacion' => '111222333',
+            'nombre' => 'Roberto Gaviria',
+            'nombres' => 'Roberto',
+            'primer_apellido' => 'Gaviria',
+            'activo' => true
+        ]);
+        Cliente::create([
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => '444555666',
+            'identificacion' => '444555666',
+            'nombre' => 'Marta Londoño',
+            'nombres' => 'Marta',
+            'primer_apellido' => 'Londoño',
+            'activo' => true
+        ]);
+
+        Passport::actingAs($this->admin);
+
+        $byNombre = $this->getJson('/api/clientes?q=Gavi');
+        $byNombre->assertStatus(200);
+        $this->assertCount(1, $byNombre->json());
+        $this->assertEquals('Roberto Gaviria', $byNombre->json()[0]['nombre']);
+
+        $byDocumento = $this->getJson('/api/clientes?q=444555');
+        $byDocumento->assertStatus(200);
+        $this->assertCount(1, $byDocumento->json());
+        $this->assertEquals('Marta Londoño', $byDocumento->json()[0]['nombre']);
+
+        $sinCoincidencias = $this->getJson('/api/clientes?q=noexiste');
+        $sinCoincidencias->assertStatus(200);
+        $this->assertCount(0, $sinCoincidencias->json());
+    }
+
+    /**
+     * SCRUM-134: alta rápida de cliente Natural con datos mínimos.
+     */
+    public function test_quick_store_creates_natural_client_with_minimal_data(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $response = $this->postJson('/api/clientes/quick', [
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => '999888777',
+            'nombres' => 'Carlos',
+            'primer_apellido' => 'Ramirez',
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('clientes', [
+            'numero_documento' => '999888777',
+            'nombres' => 'Carlos',
+            'primer_apellido' => 'Ramirez',
+            'activo' => true,
+            'pais' => null,
+            'departamento_id' => null,
+        ]);
+
+        // El acceso de usuario se aprovisiona igual que en el alta completa
+        $this->assertDatabaseHas('users', [
+            'numero_documento' => '999888777',
+        ]);
+    }
+
+    /**
+     * SCRUM-134: alta rápida de cliente Jurídico — no debe exigir representante legal.
+     */
+    public function test_quick_store_creates_juridica_client_without_representative(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $response = $this->postJson('/api/clientes/quick', [
+            'tipo_persona_id' => $this->tipoJuridica->id,
+            'tipo_documento_id' => $this->docNIT->id,
+            'numero_documento' => '900111222',
+            'nombre_razon_social' => 'Constructora ABC',
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('clientes', [
+            'numero_documento' => '900111222',
+            'nombre_razon_social' => 'Constructora ABC',
+            'rep_nombres' => null,
+        ]);
+    }
+
+    public function test_quick_store_requires_minimal_natural_fields(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $response = $this->postJson('/api/clientes/quick', [
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => '111000111',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['nombres', 'primer_apellido']);
+    }
+
+    public function test_quick_store_rejects_duplicate_numero_documento(): void
+    {
+        Cliente::create([
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => '555000555',
+            'identificacion' => '555000555',
+            'nombre' => 'Ya Existe',
+            'nombres' => 'Ya',
+            'primer_apellido' => 'Existe',
+            'activo' => true
+        ]);
+
+        Passport::actingAs($this->admin);
+
+        $response = $this->postJson('/api/clientes/quick', [
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => '555000555',
+            'nombres' => 'Otro',
+            'primer_apellido' => 'Cliente',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['numero_documento']);
+    }
 }

@@ -4,12 +4,13 @@ import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
 import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
+import { ClienteAutocompleteComponent } from '../shared/cliente-autocomplete/cliente-autocomplete.component';
 import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-visitas',
   standalone: true,
-  imports: [CommonModule, FormsModule, MilesSeparatorDirective],
+  imports: [CommonModule, FormsModule, MilesSeparatorDirective, ClienteAutocompleteComponent],
   template: `
     <div class="view-container">
       <header class="view-header">
@@ -173,12 +174,18 @@ import Swal from 'sweetalert2';
               <div class="form-row one-col">
                 <div class="pro-input-group">
                   <label>Cliente <span class="required">*</span></label>
-                  <select name="cliente_id" [(ngModel)]="form.cliente_id" required class="pro-input" [disabled]="isEdit">
-                    <option value="" disabled selected>Buscar / seleccionar cliente activo...</option>
-                    <option *ngFor="let c of activeClientes" [value]="c.id">
-                      {{ c.nombre }} ({{ c.tipo_persona?.nombre || 'Tipo N/A' }} - {{ c.numero_documento }})
-                    </option>
-                  </select>
+                  <div class="cliente-field-with-action">
+                    <app-cliente-autocomplete
+                      name="cliente_id"
+                      [(ngModel)]="form.cliente_id"
+                      [disabled]="isEdit"
+                      [clientesPreCargados]="activeClientes"
+                      placeholder="Buscar cliente activo (mínimo 3 letras)...">
+                    </app-cliente-autocomplete>
+                    <button type="button" class="btn-pro secondary sm" (click)="openQuickCreateCliente()" [disabled]="isEdit" title="Crear cliente rápido">
+                      <span class="material-symbols-outlined">person_add</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -281,6 +288,8 @@ import Swal from 'sweetalert2';
     </div>
   `,
   styles: [`
+    .cliente-field-with-action { display: flex; gap: 8px; align-items: flex-start; }
+    .cliente-field-with-action app-cliente-autocomplete { flex: 1; }
     .view-container { padding: 2rem; max-width: 1200px; margin: 0 auto; }
     .view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
     .title-area { h1 { margin: 0; font-size: 1.75rem; font-weight: 700; color: #1e293b; } p { margin: 4px 0 0 0; color: #64748b; font-size: 0.95rem; } }
@@ -656,6 +665,8 @@ export class VisitasComponent implements OnInit {
   activeClientes: any[] = [];
   tipoCreditos: any[] = [];
   amortizaciones: any[] = [];
+  documentTypes: any[] = [];
+  tipoPersonas: any[] = [];
   loading = false;
 
   // Pagination & Filtering
@@ -743,6 +754,113 @@ export class VisitasComponent implements OnInit {
   loadParameters() {
     this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_creditos`).subscribe({ next: data => this.tipoCreditos = data, error: () => {} });
     this.http.get<any[]>(`${environment.apiUrl}/parameters/amortizaciones`).subscribe({ next: data => this.amortizaciones = data, error: () => {} });
+    this.http.get<any[]>(`${environment.apiUrl}/document-types`).subscribe({ next: data => this.documentTypes = data, error: () => {} });
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_personas`).subscribe({ next: data => this.tipoPersonas = data, error: () => {} });
+  }
+
+  // SCRUM-134: alta rápida de cliente desde el formulario de visita — solo
+  // datos mínimos, el resto del perfil se completa después en Clientes.
+  async openQuickCreateCliente() {
+    const tipoPersonaOptions = this.tipoPersonas.map(t => `<option value="${t.id}" data-codigo="${t.codigo}">${t.nombre}</option>`).join('');
+    const tipoDocumentoOptions = this.documentTypes.map(d => `<option value="${d.id}">${d.nombre}</option>`).join('');
+
+    const { value: formValues } = await Swal.fire({
+      title: 'Crear cliente rápido',
+      html: `
+        <div style="text-align: left;">
+          <div class="pro-input-group" style="margin-bottom: 1rem;">
+            <label style="display:block; margin-bottom:5px; font-weight:600; font-size: 0.85rem;">Tipo de Persona</label>
+            <select id="quick-tipo-persona" class="pro-input" style="width:100%;">${tipoPersonaOptions}</select>
+          </div>
+          <div class="pro-input-group" style="margin-bottom: 1rem;">
+            <label style="display:block; margin-bottom:5px; font-weight:600; font-size: 0.85rem;">Tipo de Documento</label>
+            <select id="quick-tipo-documento" class="pro-input" style="width:100%;">${tipoDocumentoOptions}</select>
+          </div>
+          <div class="pro-input-group" style="margin-bottom: 1rem;">
+            <label style="display:block; margin-bottom:5px; font-weight:600; font-size: 0.85rem;">Número de Documento</label>
+            <input id="quick-numero-documento" class="pro-input" style="width:100%;" type="text">
+          </div>
+          <div id="quick-natural-fields">
+            <div class="pro-input-group" style="margin-bottom: 1rem;">
+              <label style="display:block; margin-bottom:5px; font-weight:600; font-size: 0.85rem;">Nombres</label>
+              <input id="quick-nombres" class="pro-input" style="width:100%;" type="text">
+            </div>
+            <div class="pro-input-group" style="margin-bottom: 1rem;">
+              <label style="display:block; margin-bottom:5px; font-weight:600; font-size: 0.85rem;">Primer Apellido</label>
+              <input id="quick-primer-apellido" class="pro-input" style="width:100%;" type="text">
+            </div>
+          </div>
+          <div id="quick-juridica-fields" style="display:none;">
+            <div class="pro-input-group" style="margin-bottom: 1rem;">
+              <label style="display:block; margin-bottom:5px; font-weight:600; font-size: 0.85rem;">Nombre o Razón Social</label>
+              <input id="quick-razon-social" class="pro-input" style="width:100%;" type="text">
+            </div>
+          </div>
+        </div>
+      `,
+      didOpen: () => {
+        const select = document.getElementById('quick-tipo-persona') as HTMLSelectElement;
+        const natural = document.getElementById('quick-natural-fields') as HTMLElement;
+        const juridica = document.getElementById('quick-juridica-fields') as HTMLElement;
+        const toggle = () => {
+          const esJuridica = select.options[select.selectedIndex]?.getAttribute('data-codigo') === 'JURIDICA';
+          natural.style.display = esJuridica ? 'none' : 'block';
+          juridica.style.display = esJuridica ? 'block' : 'none';
+        };
+        select.addEventListener('change', toggle);
+        toggle();
+      },
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: 'Crear',
+      cancelButtonText: 'Cancelar',
+      preConfirm: () => {
+        const tipoPersonaSelect = document.getElementById('quick-tipo-persona') as HTMLSelectElement;
+        const codigo = tipoPersonaSelect.options[tipoPersonaSelect.selectedIndex]?.getAttribute('data-codigo');
+        const payload: any = {
+          tipo_persona_id: tipoPersonaSelect.value,
+          tipo_documento_id: (document.getElementById('quick-tipo-documento') as HTMLSelectElement).value,
+          numero_documento: (document.getElementById('quick-numero-documento') as HTMLInputElement).value.trim()
+        };
+
+        if (!payload.tipo_persona_id || !payload.tipo_documento_id || !payload.numero_documento) {
+          Swal.showValidationMessage('Tipo de persona, tipo de documento y número de documento son obligatorios.');
+          return false;
+        }
+
+        if (codigo === 'JURIDICA') {
+          payload.nombre_razon_social = (document.getElementById('quick-razon-social') as HTMLInputElement).value.trim();
+          if (!payload.nombre_razon_social) {
+            Swal.showValidationMessage('El nombre o razón social es obligatorio.');
+            return false;
+          }
+        } else {
+          payload.nombres = (document.getElementById('quick-nombres') as HTMLInputElement).value.trim();
+          payload.primer_apellido = (document.getElementById('quick-primer-apellido') as HTMLInputElement).value.trim();
+          if (!payload.nombres || !payload.primer_apellido) {
+            Swal.showValidationMessage('Nombres y primer apellido son obligatorios.');
+            return false;
+          }
+        }
+
+        return payload;
+      }
+    });
+
+    if (formValues) {
+      this.http.post<any>(`${environment.apiUrl}/clientes/quick`, formValues).subscribe({
+        next: (nuevoCliente) => {
+          this.activeClientes = [...this.activeClientes, nuevoCliente];
+          this.form.cliente_id = nuevoCliente.id;
+          Swal.fire('Cliente creado', 'Ya podés continuar con la visita. Completá el resto de sus datos luego desde el módulo de Clientes.', 'success');
+        },
+        error: (err) => {
+          const errors = err?.error?.errors;
+          const msg = errors ? Object.values(errors).flat().join(' ') : (err?.error?.message || 'No se pudo crear el cliente.');
+          Swal.fire('Error', msg, 'error');
+        }
+      });
+    }
   }
 
   applyFilters() {

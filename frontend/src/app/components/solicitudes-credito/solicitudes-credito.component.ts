@@ -4,12 +4,13 @@ import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
 import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
+import { ClienteAutocompleteComponent } from '../shared/cliente-autocomplete/cliente-autocomplete.component';
 import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-solicitudes-credito',
   standalone: true,
-  imports: [CommonModule, FormsModule, MilesSeparatorDirective],
+  imports: [CommonModule, FormsModule, MilesSeparatorDirective, ClienteAutocompleteComponent],
   templateUrl: './solicitudes-credito.component.html',
   styleUrls: ['./solicitudes-credito.component.css']
 })
