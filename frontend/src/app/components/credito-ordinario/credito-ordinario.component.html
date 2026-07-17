@@ -32,11 +32,15 @@
     <!-- Sidebar List -->
     <aside class="sidebar-list">
       <div class="list-header">
-        <h3>Solicitudes ({{ creditos.length }})</h3>
+        <h3>Solicitudes ({{ filteredCreditos.length }})</h3>
+        <div class="search-group">
+          <span class="material-symbols-outlined">search</span>
+          <input type="text" [(ngModel)]="searchTerm" placeholder="Buscar por cliente o documento..." class="pro-input" />
+        </div>
       </div>
-      
+
       <div class="credit-items-container">
-        <div *ngFor="let item of creditos" 
+        <div *ngFor="let item of filteredCreditos"
              class="credit-item-card" 
              [class.active]="selectedCredito?.id === item.id"
              (click)="selectCredito(item)">
@@ -57,6 +61,7 @@
             </div>
           </div>
         </div>
+        <p class="no-results-hint" *ngIf="filteredCreditos.length === 0">Sin resultados para "{{ searchTerm }}".</p>
       </div>
     </aside>
 
@@ -135,8 +140,8 @@
         </div>
       </div>
 
-      <!-- BPMN Stepper Map -->
-      <div class="card bpmn-stepper-card">
+      <!-- BPMN Stepper Map — uso interno, el cliente no debe verlo (SCRUM-143) -->
+      <div class="card bpmn-stepper-card" *ngIf="activeRole !== 'cliente'">
         <h3>Mapa del Flujo del Proceso (BPMN)</h3>
         <p class="section-desc">Visualización secuencial del estado actual de la solicitud en las distintas etapas de aprobación.</p>
         

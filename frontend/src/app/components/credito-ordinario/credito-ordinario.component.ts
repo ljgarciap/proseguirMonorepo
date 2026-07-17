@@ -18,6 +18,7 @@ export class CreditoOrdinarioComponent implements OnInit {
   creditos: any[] = [];
   selectedCredito: any = null;
   activeRole: string = 'cliente';
+  searchTerm: string = '';
   
   // Modal state
   showNewRequestModal = false;
@@ -84,6 +85,18 @@ export class CreditoOrdinarioComponent implements OnInit {
 
   selectCredito(credito: any) {
     this.selectedCredito = credito;
+  }
+
+  // SCRUM-143: filtro client-side por cliente o número de documento —
+  // la lista ya llega completa del backend, no hace falta re-consultarlo.
+  get filteredCreditos(): any[] {
+    const term = this.searchTerm.trim().toLowerCase();
+    if (!term) return this.creditos;
+    return this.creditos.filter(item => {
+      const nombre = (item.cliente?.name || '').toLowerCase();
+      const documento = (item.cliente?.numero_documento || '').toLowerCase();
+      return nombre.includes(term) || documento.includes(term);
+    });
   }
 
   // Get index of a state in the BPMN workflow
