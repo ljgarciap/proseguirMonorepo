@@ -94,9 +94,11 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
         Route::delete('/asignaciones/{id}', [\App\Http\Controllers\AsignacionController::class, 'destroy'])
             ->middleware(['auth:api', 'checkrole:superadmin']);
         
-        // Pending count (dashboard related)
+        // Pending count (dashboard related) — el propio controller ya calcula
+        // y devuelve el contador de 'contable' (bandeja interna), así que ese
+        // rol también necesita poder pegarle a este endpoint.
         Route::get('/uploads/pending-count', [\App\Http\Controllers\ClientUploadController::class, 'pendingCount'])
-            ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
+            ->middleware(['auth:api', 'checkrole:gerente,operativo,contable,superadmin']);
         
         // Uploads group with granular auth
         Route::prefix('uploads')->middleware(['auth:api', 'checkrole'])->group(function () {
@@ -282,11 +284,17 @@ Route::prefix('document-requirements')->middleware(['auth:api', 'checkrole:super
 });
 
 // Presets de Documentos (Superadmin, Operativo)
-Route::prefix('document-presets')->middleware(['auth:api', 'checkrole:superadmin,operativo'])->group(function () {
-    Route::get('/', [\App\Http\Controllers\DocumentPresetController::class, 'index']);
-    Route::post('/', [\App\Http\Controllers\DocumentPresetController::class, 'store']);
-    Route::put('/{id}', [\App\Http\Controllers\DocumentPresetController::class, 'update']);
-    Route::delete('/{id}', [\App\Http\Controllers\DocumentPresetController::class, 'destroy']);
+Route::prefix('document-presets')->middleware(['auth:api'])->group(function () {
+    // Coordinador Comercial necesita leer los presets para el dropdown de
+    // Registro Solicitud de Crédito, aunque no gestione el CRUD de presets.
+    Route::get('/', [\App\Http\Controllers\DocumentPresetController::class, 'index'])
+        ->middleware('checkrole:superadmin,operativo,coordinador_comercial');
+    Route::post('/', [\App\Http\Controllers\DocumentPresetController::class, 'store'])
+        ->middleware('checkrole:superadmin,operativo');
+    Route::put('/{id}', [\App\Http\Controllers\DocumentPresetController::class, 'update'])
+        ->middleware('checkrole:superadmin,operativo');
+    Route::delete('/{id}', [\App\Http\Controllers\DocumentPresetController::class, 'destroy'])
+        ->middleware('checkrole:superadmin,operativo');
 });
 
 // Solicitudes de Documentos a Clientes

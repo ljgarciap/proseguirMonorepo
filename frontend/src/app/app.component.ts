@@ -353,6 +353,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   checkPendingTasks() {
     if (!this.authService.isAuthenticated()) return;
+    if (!this.authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])) return;
     this.http.get<any>(`${environment.apiUrl}/uploads/pending-count`).subscribe({
       next: (res) => {
         this.pendingCounts = res;
