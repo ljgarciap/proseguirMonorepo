@@ -32,6 +32,7 @@ class SolicitudCreditoTest extends TestCase
     private $docCC;
     private $docNIT;
     private $creditoOrdinario;
+    private $tipoConstructor;
     private $amortizacionMensual;
     private $clientNatural;
     private $clientJuridico;
@@ -54,6 +55,7 @@ class SolicitudCreditoTest extends TestCase
         $this->tipoJuridica = TipoPersona::firstOrCreate(['codigo' => 'JURIDICA'], ['nombre' => 'Persona Jurídica']);
         
         $this->creditoOrdinario = TipoCredito::firstOrCreate(['codigo' => 'ORDINARIO'], ['nombre' => 'Crédito Ordinario']);
+        $this->tipoConstructor = TipoCredito::firstOrCreate(['codigo' => 'CONSTRUCTOR'], ['nombre' => 'Crédito Constructor']);
         $this->amortizacionMensual = Amortizacion::firstOrCreate(['codigo' => 'MENSUAL'], ['nombre' => 'Mensual']);
 
         $this->departamentoValle = Departamento::create(['nombre' => 'Valle']);
@@ -324,5 +326,117 @@ class SolicitudCreditoTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['ciudad_id']);
+    }
+
+    /**
+     * SCRUM-141: Crédito Constructor requiere la sección "Información del Proyecto".
+     */
+    public function test_store_requires_informacion_del_proyecto_for_constructor(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $payload = [
+            'cliente_id' => $this->clientNatural->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'proyecto' => 'Torres del Valle',
+            'monto_solicitado' => 500000000.00,
+            'plazo_meses' => 24,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Construcción',
+            'fuente_pago' => 'Ventas del proyecto',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Documentación para Crédito',
+            'mensaje_notificacion' => 'Por favor adjunta los archivos.',
+            'nombres' => 'Juan Carlos',
+            'primer_apellido' => 'Perez',
+            'correo_electronico' => 'juan@test.com',
+            'telefono' => '3119999999',
+            'direccion' => 'Avenida Principal 12',
+            'pais' => 'Colombia',
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id,
+            // sin proyecto_direccion / proyecto_departamento_id / proyecto_ciudad_id
+        ];
+
+        $response = $this->postJson('/api/solicitudes-credito', $payload);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['proyecto_direccion', 'proyecto_departamento_id', 'proyecto_ciudad_id']);
+    }
+
+    public function test_store_creates_constructor_request_with_proyecto_info(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $payload = [
+            'cliente_id' => $this->clientNatural->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'proyecto' => 'Torres del Valle',
+            'proyecto_direccion' => 'Avenida Libertador No. 96 - 50',
+            'proyecto_departamento_id' => $this->departamentoBogota->id,
+            'proyecto_ciudad_id' => $this->ciudadBogota->id,
+            'monto_solicitado' => 500000000.00,
+            'plazo_meses' => 24,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Construcción',
+            'fuente_pago' => 'Ventas del proyecto',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Documentación para Crédito',
+            'mensaje_notificacion' => 'Por favor adjunta los archivos.',
+            'nombres' => 'Juan Carlos',
+            'primer_apellido' => 'Perez',
+            'correo_electronico' => 'juan@test.com',
+            'telefono' => '3119999999',
+            'direccion' => 'Avenida Principal 12',
+            'pais' => 'Colombia',
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id,
+        ];
+
+        $response = $this->postJson('/api/solicitudes-credito', $payload);
+
+        $response->assertStatus(201);
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'cliente_id' => $this->clientNatural->id,
+            'proyecto' => 'Torres del Valle',
+            'proyecto_direccion' => 'Avenida Libertador No. 96 - 50',
+            'proyecto_departamento_id' => $this->departamentoBogota->id,
+            'proyecto_ciudad_id' => $this->ciudadBogota->id,
+        ]);
+    }
+
+    public function test_store_rejects_proyecto_ciudad_that_does_not_belong_to_proyecto_departamento(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $payload = [
+            'cliente_id' => $this->clientNatural->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'proyecto' => 'Torres del Valle',
+            'proyecto_direccion' => 'Avenida Libertador No. 96 - 50',
+            'proyecto_departamento_id' => $this->departamentoValle->id,
+            'proyecto_ciudad_id' => $this->ciudadBogota->id, // pertenece a Bogotá D.C., no a Valle
+            'monto_solicitado' => 500000000.00,
+            'plazo_meses' => 24,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Construcción',
+            'fuente_pago' => 'Ventas del proyecto',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Documentación para Crédito',
+            'mensaje_notificacion' => 'Por favor adjunta los archivos.',
+            'nombres' => 'Juan Carlos',
+            'primer_apellido' => 'Perez',
+            'correo_electronico' => 'juan@test.com',
+            'telefono' => '3119999999',
+            'direccion' => 'Avenida Principal 12',
+            'pais' => 'Colombia',
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id,
+        ];
+
+        $response = $this->postJson('/api/solicitudes-credito', $payload);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['proyecto_ciudad_id']);
     }
 }

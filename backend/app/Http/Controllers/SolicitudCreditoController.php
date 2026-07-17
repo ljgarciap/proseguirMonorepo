@@ -71,12 +71,20 @@ class SolicitudCreditoController extends Controller
         $tipoPersona = $cliente->tipoPersona;
         $codigoPersona = $tipoPersona ? strtoupper($tipoPersona->codigo) : 'NATURAL';
 
-        // Proyecto es obligatorio solo para Crédito Constructor (SCRUM-120 Fase 2) —
-        // la bandeja de Informe Técnico lo necesita para mostrar/filtrar.
+        // Información del Proyecto es obligatoria solo para Crédito Constructor
+        // (SCRUM-120 Fase 2 / SCRUM-141) — la bandeja de Informe Técnico la necesita.
         $tipoCreditoSolicitud = \App\Models\TipoCredito::find($request->tipo_credito_id);
         $codigoTipoCreditoSolicitud = $tipoCreditoSolicitud ? strtoupper($tipoCreditoSolicitud->codigo) : null;
         if ($codigoTipoCreditoSolicitud === 'CONSTRUCTOR') {
             $rules['proyecto'] = 'required|string';
+            $rules['proyecto_direccion'] = 'required|string';
+            $rules['proyecto_departamento_id'] = 'required|exists:departamentos,id';
+            $rules['proyecto_ciudad_id'] = [
+                'required',
+                Rule::exists('ciudades', 'id')->where(function ($query) use ($request) {
+                    $query->where('departamento_id', $request->proyecto_departamento_id);
+                }),
+            ];
         }
 
         if ($codigoPersona === 'NATURAL') {
@@ -193,6 +201,9 @@ class SolicitudCreditoController extends Controller
                 'usuario_registra_id' => $request->user()->id,
                 'tipo_credito_id' => $validated['tipo_credito_id'],
                 'proyecto' => $validated['proyecto'] ?? null,
+                'proyecto_direccion' => $validated['proyecto_direccion'] ?? null,
+                'proyecto_departamento_id' => $validated['proyecto_departamento_id'] ?? null,
+                'proyecto_ciudad_id' => $validated['proyecto_ciudad_id'] ?? null,
                 'monto_solicitado' => $validated['monto_solicitado'],
                 'plazo_meses' => $validated['plazo_meses'],
                 'amortizacion_id' => $validated['amortizacion_id'],

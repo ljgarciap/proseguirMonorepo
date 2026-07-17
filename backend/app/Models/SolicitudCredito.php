@@ -17,6 +17,9 @@ class SolicitudCredito extends Model
         'usuario_registra_id',
         'tipo_credito_id',
         'proyecto',
+        'proyecto_direccion',
+        'proyecto_departamento_id',
+        'proyecto_ciudad_id',
         'monto_solicitado',
         'plazo_meses',
         'amortizacion_id',
@@ -68,5 +71,15 @@ class SolicitudCredito extends Model
     public function preset()
     {
         return $this->belongsTo(DocumentPreset::class, 'document_preset_id');
+    }
+
+    public function proyectoDepartamento()
+    {
+        return $this->belongsTo(Departamento::class, 'proyecto_departamento_id');
+    }
+
+    public function proyectoCiudad()
+    {
+        return $this->belongsTo(Ciudad::class, 'proyecto_ciudad_id');
     }
 }

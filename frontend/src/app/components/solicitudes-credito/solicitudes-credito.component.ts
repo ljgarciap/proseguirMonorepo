@@ -32,6 +32,9 @@ export class SolicitudesCreditoComponent implements OnInit {
   // Ubicación (Departamento -> Ciudad anidados)
   departamentos: any[] = [];
   ciudadesDelDepartamento: any[] = [];
+  // Ubicación del proyecto (Crédito Constructor, SCRUM-141) — independiente
+  // de la ubicación del cliente.
+  ciudadesDelDepartamentoProyecto: any[] = [];
   
   // History list
   historyRequests: any[] = [];
@@ -77,6 +80,9 @@ export class SolicitudesCreditoComponent implements OnInit {
     // Credit fields
     tipo_credito_id: '',
     proyecto: '',
+    proyecto_direccion: '',
+    proyecto_departamento_id: '',
+    proyecto_ciudad_id: '',
     monto_solicitado: null,
     plazo_meses: null,
     amortizacion_id: '',
@@ -111,6 +117,19 @@ export class SolicitudesCreditoComponent implements OnInit {
     if (this.form.departamento_id) {
       this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/ciudades?departamento_id=${this.form.departamento_id}`).subscribe({
         next: data => this.ciudadesDelDepartamento = data,
+        error: () => {}
+      });
+    }
+  }
+
+  onDepartamentoProyectoChange(preservarCiudad = false) {
+    if (!preservarCiudad) {
+      this.form.proyecto_ciudad_id = '';
+    }
+    this.ciudadesDelDepartamentoProyecto = [];
+    if (this.form.proyecto_departamento_id) {
+      this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/ciudades?departamento_id=${this.form.proyecto_departamento_id}`).subscribe({
+        next: data => this.ciudadesDelDepartamentoProyecto = data,
         error: () => {}
       });
     }
@@ -344,7 +363,7 @@ export class SolicitudesCreditoComponent implements OnInit {
   isFormValid(): boolean {
     if (!this.form.cliente_id && !this.form.numero_documento) return false;
     if (!this.form.tipo_credito_id || !this.form.monto_solicitado || !this.form.plazo_meses || !this.form.amortizacion_id) return false;
-    if (this.isTipoCreditoConstructor() && !this.form.proyecto) return false;
+    if (this.isTipoCreditoConstructor() && (!this.form.proyecto || !this.form.proyecto_direccion || !this.form.proyecto_departamento_id || !this.form.proyecto_ciudad_id)) return false;
     if (!this.form.destino_recurso || !this.form.fuente_pago) return false;
     if (!this.form.correo_notificacion || !this.form.asunto_notificacion || !this.form.mensaje_notificacion) return false;
 
@@ -408,6 +427,7 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.selectedPresetId = null;
     this.selectedPresetDocs = [];
     this.ciudadesDelDepartamento = [];
+    this.ciudadesDelDepartamentoProyecto = [];
 
     this.form = {
       cliente_id: '',
@@ -440,6 +460,9 @@ export class SolicitudesCreditoComponent implements OnInit {
 
       tipo_credito_id: '',
       proyecto: '',
+      proyecto_direccion: '',
+      proyecto_departamento_id: '',
+      proyecto_ciudad_id: '',
       monto_solicitado: null,
       plazo_meses: null,
       amortizacion_id: '',
