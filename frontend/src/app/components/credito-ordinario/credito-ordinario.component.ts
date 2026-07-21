@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
 import Swal from 'sweetalert2';
@@ -9,7 +10,7 @@ import Swal from 'sweetalert2';
 @Component({
   selector: 'app-credito-ordinario',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './credito-ordinario.component.html',
   styleUrls: ['./credito-ordinario.component.css']
 })
@@ -147,6 +148,79 @@ export class CreditoOrdinarioComponent implements OnInit {
 
     const currentStep = this.bpmnSteps.find(step => step.key === currentStatus);
     return currentStep ? currentStep.role === this.activeRole : false;
+  }
+
+  // SCRUM-151: el crédito es "Constructor" según el tipo de crédito de su
+  // Solicitud de Crédito asociada. Créditos legacy sin solicitud asociada se
+  // tratan como Ordinario (no tienen el sub-flujo de Informe Técnico).
+  get isCreditoConstructor(): boolean {
+    return (this.selectedCredito?.solicitud_credito?.tipo_credito?.codigo || '').toUpperCase() === 'CONSTRUCTOR';
+  }
+
+  // SCRUM-151: Crédito Constructor inserta la etapa de Informe Técnico antes
+  // de SARLAFT, corriendo en 1 la numeración de las etapas siguientes en el
+  // checklist "Expediente de Documentos de Crédito".
+  get etapaOffset(): number {
+    return this.isCreditoConstructor ? 1 : 0;
+  }
+
+  get informeTecnicoStatusLabel(): string {
+    if (this.selectedCredito?.informe_tecnico?.estado === 'registrado') return 'Completado';
+    const estadosEnProceso = ['validacion_documental_constructor', 'informe_tecnico_ingeniero', 'informe_tecnico_coordinador', 'informe_tecnico_finalizado'];
+    if (this.selectedCredito?.informe_tecnico || estadosEnProceso.includes(this.selectedCredito?.estado)) return 'En Proceso';
+    return 'Pendiente';
+  }
+
+  // SCRUM-151: algunos estados del flujo no tienen panel de acción en esta
+  // pantalla porque se gestionan en un módulo dedicado (Informe Técnico,
+  // Listas Restrictivas y SARLAFT) o avanzan automáticamente al completar la
+  // aprobación de documentos en otra pantalla. Mostrar "Acceso Restringido"
+  // ahí es engañoso — no es un problema de permisos de rol.
+  get managedElsewhereInfo(): { title: string; message: string; link?: string; linkLabel?: string; roles?: string[] } | null {
+    if (!this.selectedCredito) return null;
+    const creditoId = this.selectedCredito.id;
+
+    switch (this.selectedCredito.estado) {
+      case 'validacion_documental_constructor':
+        return {
+          title: 'Validación documental en curso',
+          message: 'El crédito está esperando que se complete la validación y aprobación de los documentos del expediente inicial (Crédito Constructor). Este paso avanza automáticamente cuando Operaciones valida y aprueba todos los soportes cargados por el cliente.',
+          link: '/validation',
+          linkLabel: 'Ir a Validación de Documentos',
+          roles: ['operativo', 'gerente']
+        };
+      case 'informe_tecnico_ingeniero':
+        return {
+          title: 'Informe Técnico en elaboración',
+          message: 'El Ingeniero está elaborando el Informe Técnico del proyecto. El flujo continuará automáticamente cuando lo envíe a revisión del Coordinador Comercial.',
+          link: `/informes-tecnicos/${creditoId}`,
+          linkLabel: 'Ver Informe Técnico',
+          roles: ['ingeniero', 'coordinador_comercial']
+        };
+      case 'informe_tecnico_coordinador':
+        return {
+          title: 'Informe Técnico en revisión',
+          message: 'El Informe Técnico está pendiente de revisión y registro por el Coordinador Comercial. El flujo continuará automáticamente al finalizar esa revisión.',
+          link: `/informes-tecnicos/${creditoId}`,
+          linkLabel: 'Ver Informe Técnico',
+          roles: ['ingeniero', 'coordinador_comercial']
+        };
+      case 'informe_tecnico_finalizado':
+        return {
+          title: 'Informe Técnico finalizado',
+          message: 'El Informe Técnico fue registrado. El crédito continuará automáticamente a la etapa de Listas Restrictivas y SARLAFT.'
+        };
+      case 'sarlaft_control_interno':
+        return {
+          title: 'Listas Restrictivas y SARLAFT en curso',
+          message: 'La validación de Listas Restrictivas y el concepto SARLAFT se gestionan desde el módulo dedicado.',
+          link: `/listas-sarlaft/${creditoId}`,
+          linkLabel: 'Ir a Listas Restrictivas y SARLAFT',
+          roles: ['oficial_cumplimiento']
+        };
+      default:
+        return null;
+    }
   }
 
   // SCRUM-146: los documentos de Etapa 1 se derivan de la Solicitud de

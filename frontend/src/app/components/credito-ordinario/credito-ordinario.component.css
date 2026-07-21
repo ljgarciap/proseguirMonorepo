@@ -461,6 +461,28 @@
   color: #B45309;
 }
 
+/* SCRUM-151: variante informativa (etapa gestionada en otro módulo o de forma automática) */
+.info-alert {
+  display: flex;
+  gap: 12px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  padding: 1rem;
+  border-radius: 12px;
+  color: #1D4ED8;
+}
+
+.info-alert .material-symbols-outlined {
+  color: #2563EB;
+  font-size: 24px;
+}
+
+.info-alert p {
+  margin: 4px 0 0.75rem 0;
+  font-size: 0.8rem;
+  color: #1D4ED8;
+}
+
 /* Parallel actions grid */
 .parallel-actions-grid {
   display: grid;

@@ -233,6 +233,22 @@ class InformeTecnicoTest extends TestCase
         ]);
     }
 
+    /**
+     * SCRUM-151: el frontend necesita el tipo de crédito (para insertar la
+     * etapa "Informe Técnico" en el checklist, solo para Constructor) y el
+     * estado del Informe Técnico, sin llamadas adicionales — deben venir
+     * incluidos en el detalle del crédito.
+     */
+    public function test_show_credito_incluye_tipo_credito_e_informe_tecnico(): void
+    {
+        $credito = $this->registrarSolicitudConstructor();
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->getJson("/api/creditos/{$credito->id}")->assertStatus(200);
+
+        $response->assertJsonPath('solicitud_credito.tipo_credito.codigo', 'CONSTRUCTOR');
+    }
+
     public function test_aprobar_documentacion_transiciona_credito_a_informe_tecnico_ingeniero(): void
     {
         $credito = $this->crearCreditoEnEstadoIngeniero();

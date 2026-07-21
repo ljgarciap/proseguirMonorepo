@@ -177,7 +177,19 @@
         <div class="action-body">
           <!-- UNAUTHORIZED ROLE MESSAGE -->
           <div class="unauthorized-message" *ngIf="!isUserRoleAuthorized()">
-            <div class="warning-alert">
+            <!-- SCRUM-151: etapas gestionadas en otro módulo o de forma automática — no es un problema de permisos -->
+            <div class="info-alert" *ngIf="managedElsewhereInfo as info">
+              <span class="material-symbols-outlined">info</span>
+              <div>
+                <strong>{{ info.title }}</strong>
+                <p>{{ info.message }}</p>
+                <a *ngIf="info.link && (!info.roles || authService.isAuthorized(info.roles))" [routerLink]="info.link" class="btn-pro secondary">
+                  {{ info.linkLabel }}
+                </a>
+              </div>
+            </div>
+
+            <div class="warning-alert" *ngIf="!managedElsewhereInfo">
               <span class="material-symbols-outlined">warning</span>
               <div>
                 <strong>Acceso Restringido</strong>
@@ -527,9 +539,35 @@
             </div>
           </div>
 
-          <!-- ETAPA 2 -->
+          <!-- ETAPA 2 (SOLO CONSTRUCTOR): Informe Técnico -->
+          <!-- SCRUM-151: solo aplica a Crédito Constructor, corre en 1 la numeración de las etapas siguientes -->
+          <div class="stage-doc-group" *ngIf="isCreditoConstructor">
+            <h4>Etapa 2: Informe Técnico <span class="stage-owner">Ingeniero / Coordinador Comercial</span></h4>
+            <div class="documents-grid-grouped">
+              <div class="doc-box-new">
+                <div class="doc-main-info">
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="informeTecnicoStatusLabel === 'Completado'">engineering</span>
+                  <div class="doc-title-desc">
+                    <h5>Informe Técnico del Proyecto</h5>
+                    <p>Diligenciado por el Ingeniero y revisado/registrado por el Coordinador Comercial.</p>
+                  </div>
+                </div>
+                <div class="doc-action-status">
+                  <span class="doc-status-pill success" *ngIf="informeTecnicoStatusLabel === 'Completado'">Completado</span>
+                  <span class="doc-status-pill warning" *ngIf="informeTecnicoStatusLabel === 'En Proceso'">En Proceso</span>
+                  <span class="doc-status-pill error" *ngIf="informeTecnicoStatusLabel === 'Pendiente'">Pendiente</span>
+
+                  <a [routerLink]="'/informes-tecnicos/' + selectedCredito.id" class="btn-view-doc" *ngIf="authService.isAuthorized(['ingeniero', 'coordinador_comercial'])">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver Informe Técnico
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ETAPA 2 / 3 (según tipo de crédito) -->
           <div class="stage-doc-group">
-            <h4>Etapa 2: Análisis SARLAFT y Financiero <span class="stage-owner">Cumplimiento / Comercial</span></h4>
+            <h4>Etapa {{ 2 + etapaOffset }}: Análisis SARLAFT y Financiero <span class="stage-owner">Cumplimiento / Comercial</span></h4>
             <div class="documents-grid-grouped">
               <!-- Síntesis SARLAFT -->
               <div class="doc-box-new">
@@ -543,12 +581,7 @@
                 <div class="doc-action-status">
                   <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.sarlft_sintesis">Cargado</span>
                   <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.sarlft_sintesis">Pendiente</span>
-                  
-                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'analisis_sarlaft_financiero' && (activeRole === 'oficial_cumplimiento' || activeRole === 'superadmin')">
-                    <input type="file" id="inline-file-sintesis" (change)="onFileUpload($event, 'sarlft_sintesis')" accept=".pdf" hidden>
-                    <label for="inline-file-sintesis" class="btn-inline-upload">Subir</label>
-                  </div>
-                  
+
                   <a *ngIf="selectedCredito.documentos?.sarlft_sintesis" [href]="selectedCredito.documentos.sarlft_sintesis" target="_blank" class="btn-view-doc">
                     <span class="material-symbols-outlined">open_in_new</span> Ver
                   </a>
@@ -567,11 +600,6 @@
                 <div class="doc-action-status">
                   <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.sarlft_datacredito">Cargado</span>
                   <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.sarlft_datacredito">Pendiente</span>
-                  
-                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'analisis_sarlaft_financiero' && (activeRole === 'oficial_cumplimiento' || activeRole === 'superadmin')">
-                    <input type="file" id="inline-file-datacredito" (change)="onFileUpload($event, 'sarlft_datacredito')" accept=".pdf" hidden>
-                    <label for="inline-file-datacredito" class="btn-inline-upload">Subir</label>
-                  </div>
 
                   <a *ngIf="selectedCredito.documentos?.sarlft_datacredito" [href]="selectedCredito.documentos.sarlft_datacredito" target="_blank" class="btn-view-doc">
                     <span class="material-symbols-outlined">open_in_new</span> Ver
@@ -591,8 +619,8 @@
                 <div class="doc-action-status">
                   <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.analisis_financiero">Cargado</span>
                   <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.analisis_financiero">Pendiente</span>
-                  
-                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'analisis_sarlaft_financiero' && (activeRole === 'coordinador_comercial' || activeRole === 'superadmin')">
+
+                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'pendiente_analisis_financiero' && (activeRole === 'coordinador_comercial' || activeRole === 'superadmin')">
                     <input type="file" id="inline-file-analisis" (change)="onFileUpload($event, 'analisis_financiero')" accept=".pdf" hidden>
                     <label for="inline-file-analisis" class="btn-inline-upload">Subir</label>
                   </div>
@@ -615,8 +643,8 @@
                 <div class="doc-action-status">
                   <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.presentacion_comite">Cargado</span>
                   <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.presentacion_comite">Pendiente</span>
-                  
-                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'analisis_sarlaft_financiero' && (activeRole === 'coordinador_comercial' || activeRole === 'superadmin')">
+
+                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'pendiente_analisis_financiero' && (activeRole === 'coordinador_comercial' || activeRole === 'superadmin')">
                     <input type="file" id="inline-file-presentacion" (change)="onFileUpload($event, 'presentacion_comite')" accept=".pdf" hidden>
                     <label for="inline-file-presentacion" class="btn-inline-upload">Subir</label>
                   </div>
@@ -629,9 +657,9 @@
             </div>
           </div>
 
-          <!-- ETAPA 3 -->
+          <!-- ETAPA 3 / 4 (según tipo de crédito) -->
           <div class="stage-doc-group">
-            <h4>Etapa 3: Comité de Crédito <span class="stage-owner">Comité de Crédito</span></h4>
+            <h4>Etapa {{ 3 + etapaOffset }}: Comité de Crédito <span class="stage-owner">Comité de Crédito</span></h4>
             <div class="documents-grid-grouped">
               <div class="doc-box-new">
                 <div class="doc-main-info">
@@ -658,9 +686,9 @@
             </div>
           </div>
 
-          <!-- ETAPA 4 -->
+          <!-- ETAPA 4 / 5 (según tipo de crédito) -->
           <div class="stage-doc-group">
-            <h4>Etapa 4: Formalización de Garantías <span class="stage-owner">Cliente / Dirección Administrativa</span></h4>
+            <h4>Etapa {{ 4 + etapaOffset }}: Formalización de Garantías <span class="stage-owner">Cliente / Dirección Administrativa</span></h4>
             <div class="documents-grid-grouped">
               <!-- Borradores (Pagaré, Carta Inst, Contrato) -->
               <div class="doc-box-new">
@@ -740,9 +768,9 @@
             </div>
           </div>
 
-          <!-- ETAPA 5 -->
+          <!-- ETAPA 5 / 6 (según tipo de crédito) -->
           <div class="stage-doc-group">
-            <h4>Etapa 5: Registro y Aprobación Core CYF <span class="stage-owner">Comercial / Dirección Administrativa / Gerente</span></h4>
+            <h4>Etapa {{ 5 + etapaOffset }}: Registro y Aprobación Core CYF <span class="stage-owner">Comercial / Dirección Administrativa / Gerente</span></h4>
             <div class="documents-grid-grouped">
               <!-- Registro CYF -->
               <div class="doc-box-new">
@@ -794,9 +822,9 @@
             </div>
           </div>
 
-          <!-- ETAPA 6 -->
+          <!-- ETAPA 6 / 7 (según tipo de crédito) -->
           <div class="stage-doc-group">
-            <h4>Etapa 6: Cierre y Pago <span class="stage-owner">Tesorería</span></h4>
+            <h4>Etapa {{ 6 + etapaOffset }}: Cierre y Pago <span class="stage-owner">Tesorería</span></h4>
             <div class="documents-grid-grouped">
               <div class="doc-box-new">
                 <div class="doc-main-info">
