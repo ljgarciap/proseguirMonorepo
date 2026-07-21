@@ -192,7 +192,7 @@ import Swal from 'sweetalert2';
               <div class="form-row one-col">
                 <div class="pro-input-group">
                   <label>Asistentes a la visita <span class="required">*</span></label>
-                  <input type="text" name="asistentes" [(ngModel)]="form.asistentes" required placeholder="Nombres de asistentes internos y del cliente" class="pro-input" />
+                  <textarea name="asistentes" [(ngModel)]="form.asistentes" required rows="3" placeholder="Nombres de asistentes internos y del cliente (uno por línea, Enter para agregar otro)" class="pro-input textarea"></textarea>
                 </div>
               </div>
 
