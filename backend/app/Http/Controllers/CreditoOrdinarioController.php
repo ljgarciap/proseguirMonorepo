@@ -21,7 +21,7 @@ class CreditoOrdinarioController extends Controller
         $user = Auth::user();
         $activeRole = $this->resolveActiveRole($request);
         
-        $query = CreditoOrdinario::with('cliente');
+        $query = CreditoOrdinario::with(['cliente', 'solicitudCredito.documentRequest.items.requirement']);
 
         // Si el rol es cliente, solo puede ver sus propias solicitudes
         if ($activeRole === 'cliente') {
@@ -72,8 +72,27 @@ class CreditoOrdinarioController extends Controller
      */
     public function show($id)
     {
-        $credito = CreditoOrdinario::with('cliente')->findOrFail($id);
+        $credito = CreditoOrdinario::with(['cliente', 'solicitudCredito.documentRequest.items.requirement'])->findOrFail($id);
         return response()->json($credito);
+    }
+
+    /**
+     * Claves de documentos que debe satisfacer la Etapa 1 (Registro e
+     * Identificación) para este crédito. Si la SolicitudCredito que lo
+     * originó tiene una Solicitud de Documentos (DocumentRequest) ligada a
+     * un preset, se usa un ítem por cada documento del preset
+     * (SCRUM-146). Si no (créditos legacy sin preset), se mantiene la
+     * lista fija original.
+     */
+    private function etapa1DocumentKeys(CreditoOrdinario $credito): array
+    {
+        $items = $credito->solicitudCredito?->documentRequest?->items;
+
+        if ($items && $items->count() > 0) {
+            return $items->map(fn ($item) => 'req_item_' . $item->id)->all();
+        }
+
+        return ['formulario_solicitud', 'documentos_identidad', 'estados_financieros', 'certificados_laborales'];
     }
 
     /**
@@ -81,14 +100,16 @@ class CreditoOrdinarioController extends Controller
      */
     public function transition(Request $request, $id)
     {
-        $credito = CreditoOrdinario::findOrFail($id);
+        $credito = CreditoOrdinario::with('solicitudCredito.documentRequest.items')->findOrFail($id);
         $user = Auth::user();
         $activeRole = $this->resolveActiveRole($request);
-        
+
         $request->validate([
             'accion'          => 'required|string|in:aprobar,rechazar,completar,subir_archivo,devolver',
             'comentario'      => 'nullable|string',
             'archivo'         => 'nullable|file|mimes:pdf|max:102400',
+            'archivos'        => 'nullable|array',
+            'archivos.*'      => 'file|mimes:pdf|max:102400',
             'campo_documento' => 'nullable|string',
         ]);
 
@@ -128,7 +149,30 @@ class CreditoOrdinarioController extends Controller
         $documentos = $credito->documentos ?? [];
 
         // 1. Manejo de Carga de Archivos
-        if ($request->hasFile('archivo') && $request->filled('campo_documento')) {
+        // Documentos de Etapa 1 dirigidos por preset (claves 'req_item_{id}',
+        // SCRUM-146) admiten varios archivos por documento; el resto del
+        // flujo BPMN sigue aceptando un único archivo por campo.
+        if ($request->hasFile('archivos') && $request->filled('campo_documento')) {
+            $campoDoc = $request->campo_documento;
+            $existing = $documentos[$campoDoc] ?? [];
+            if (!is_array($existing)) {
+                $existing = $existing ? [$existing] : [];
+            }
+
+            $nombres = [];
+            foreach ($request->file('archivos') as $file) {
+                $fileName   = $file->getClientOriginalName();
+                $path       = $file->storeAs('credito_documentos/' . $credito->id, $fileName, 'public');
+                $existing[] = Storage::disk('public')->url($path);
+                $nombres[]  = $fileName;
+            }
+
+            $documentos[$campoDoc] = $existing;
+            $credito->documentos   = $documentos;
+            $credito->save();
+
+            $comentario .= ' (' . count($nombres) . " archivo(s) cargado(s) en '$campoDoc': " . implode(', ', $nombres) . ').';
+        } elseif ($request->hasFile('archivo') && $request->filled('campo_documento')) {
             $file     = $request->file('archivo');
             $fileName = $file->getClientOriginalName();
             $path     = $file->storeAs('credito_documentos/' . $credito->id, $fileName, 'public');
@@ -206,10 +250,10 @@ class CreditoOrdinarioController extends Controller
                     // etapa: solo el Coordinador Comercial, con 'aprobar' explícito,
                     // decide que el expediente inicial está completo.
                     if ($accion === 'aprobar') {
-                        $hasEtapa1 = !empty($documentos['formulario_solicitud'])
-                            && !empty($documentos['documentos_identidad'])
-                            && !empty($documentos['estados_financieros'])
-                            && !empty($documentos['certificados_laborales']);
+                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(function ($key) use ($documentos) {
+                            $valor = $documentos[$key] ?? null;
+                            return is_array($valor) ? count($valor) > 0 : !empty($valor);
+                        });
 
                         if ($hasEtapa1) {
                             $estadoNuevo = 'sarlaft_control_interno';

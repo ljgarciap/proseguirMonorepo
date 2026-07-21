@@ -73,6 +73,15 @@ class SolicitudCredito extends Model
         return $this->belongsTo(DocumentPreset::class, 'document_preset_id');
     }
 
+    /**
+     * Solicitud de Documentos (DocumentRequest) generada a partir del
+     * preset elegido al registrar esta solicitud (SCRUM-146).
+     */
+    public function documentRequest()
+    {
+        return $this->hasOne(DocumentRequest::class, 'solicitud_credito_id');
+    }
+
     public function proyectoDepartamento()
     {
         return $this->belongsTo(Departamento::class, 'proyecto_departamento_id');

@@ -507,98 +507,26 @@
           <div class="stage-doc-group">
             <h4>Etapa 1: Registro e Identificación <span class="stage-owner">Cliente / Comercial</span></h4>
             <div class="documents-grid-grouped">
-              <!-- Formulario de Solicitud -->
-              <div class="doc-box-new">
+              <!-- SCRUM-146: documentos dirigidos por el preset elegido en la Solicitud de Crédito (fallback a la lista fija si el crédito no tiene preset asociado) -->
+              <div class="doc-box-new" *ngFor="let doc of etapa1Docs">
                 <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.formulario_solicitud">description</span>
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="getDocFiles(doc.key).length > 0">description</span>
                   <div class="doc-title-desc">
-                    <h5>Formulario de Solicitud</h5>
-                    <p>Formulario de solicitud del cliente diligenciado.</p>
+                    <h5>{{ doc.nombre }}</h5>
+                    <p>{{ doc.descripcion }}</p>
                   </div>
                 </div>
                 <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.formulario_solicitud">Cargado</span>
-                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.formulario_solicitud">Pendiente</span>
-                  
-                  <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
-                    <input type="file" id="inline-file-formulario" (change)="onFileUpload($event, 'formulario_solicitud')" accept=".pdf" hidden>
-                    <label for="inline-file-formulario" class="btn-inline-upload">Subir</label>
-                  </div>
-                  
-                  <a *ngIf="selectedCredito.documentos?.formulario_solicitud" [href]="selectedCredito.documentos.formulario_solicitud" target="_blank" class="btn-view-doc">
-                    <span class="material-symbols-outlined">open_in_new</span> Ver
-                  </a>
-                </div>
-              </div>
+                  <span class="doc-status-pill success" *ngIf="getDocFiles(doc.key).length > 0">Cargado ({{ getDocFiles(doc.key).length }})</span>
+                  <span class="doc-status-pill error" *ngIf="getDocFiles(doc.key).length === 0">Pendiente</span>
 
-              <!-- Documentos de Identidad -->
-              <div class="doc-box-new">
-                <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.documentos_identidad">badge</span>
-                  <div class="doc-title-desc">
-                    <h5>Documentos de Identidad</h5>
-                    <p>Copia de Cédula de Ciudadanía o NIT del cliente.</p>
-                  </div>
-                </div>
-                <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.documentos_identidad">Cargado</span>
-                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.documentos_identidad">Pendiente</span>
-                  
                   <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
-                    <input type="file" id="inline-file-identidad" (change)="onFileUpload($event, 'documentos_identidad')" accept=".pdf" hidden>
-                    <label for="inline-file-identidad" class="btn-inline-upload">Subir</label>
+                    <input type="file" id="inline-file-{{doc.key}}" (change)="onMultiFileUpload($event, doc.key)" accept=".pdf" multiple hidden>
+                    <label for="inline-file-{{doc.key}}" class="btn-inline-upload">Subir</label>
                   </div>
-                  
-                  <a *ngIf="selectedCredito.documentos?.documentos_identidad" [href]="selectedCredito.documentos.documentos_identidad" target="_blank" class="btn-view-doc">
-                    <span class="material-symbols-outlined">open_in_new</span> Ver
-                  </a>
-                </div>
-              </div>
 
-              <!-- Estados Financieros -->
-              <div class="doc-box-new">
-                <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.estados_financieros">account_balance_wallet</span>
-                  <div class="doc-title-desc">
-                    <h5>Estados Financieros</h5>
-                    <p>Balance y Estados Financieros firmados por contador.</p>
-                  </div>
-                </div>
-                <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.estados_financieros">Cargado</span>
-                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.estados_financieros">Pendiente</span>
-                  
-                  <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
-                    <input type="file" id="inline-file-financieros" (change)="onFileUpload($event, 'estados_financieros')" accept=".pdf" hidden>
-                    <label for="inline-file-financieros" class="btn-inline-upload">Subir</label>
-                  </div>
-                  
-                  <a *ngIf="selectedCredito.documentos?.estados_financieros" [href]="selectedCredito.documentos.estados_financieros" target="_blank" class="btn-view-doc">
-                    <span class="material-symbols-outlined">open_in_new</span> Ver
-                  </a>
-                </div>
-              </div>
-
-              <!-- Certificados Laborales -->
-              <div class="doc-box-new">
-                <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.certificados_laborales">badge</span>
-                  <div class="doc-title-desc">
-                    <h5>Certificados Laborales / Comerciales</h5>
-                    <p>Soporte de ingresos o referencias de la empresa.</p>
-                  </div>
-                </div>
-                <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.certificados_laborales">Cargado</span>
-                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.certificados_laborales">Pendiente</span>
-                  
-                  <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
-                    <input type="file" id="inline-file-laborales" (change)="onFileUpload($event, 'certificados_laborales')" accept=".pdf" hidden>
-                    <label for="inline-file-laborales" class="btn-inline-upload">Subir</label>
-                  </div>
-                  
-                  <a *ngIf="selectedCredito.documentos?.certificados_laborales" [href]="selectedCredito.documentos.certificados_laborales" target="_blank" class="btn-view-doc">
-                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  <a *ngFor="let url of getDocFiles(doc.key)" [href]="url" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> {{ getDocFileName(url) }}
                   </a>
                 </div>
               </div>

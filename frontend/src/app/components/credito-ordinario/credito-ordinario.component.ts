@@ -157,6 +157,28 @@ export class CreditoOrdinarioComponent implements OnInit {
     return currentStep ? currentStep.role === this.activeRole : false;
   }
 
+  // SCRUM-146: los documentos de Etapa 1 se derivan de la Solicitud de
+  // Documentos (DocumentRequestItem) creada a partir del preset elegido al
+  // registrar la SolicitudCredito. Si el crédito no tiene preset asociado
+  // (créditos legacy anteriores a SCRUM-120/146), se mantiene la lista fija
+  // original de 4 documentos.
+  get etapa1Docs(): { key: string; nombre: string; descripcion: string }[] {
+    const items = this.selectedCredito?.solicitud_credito?.document_request?.items;
+    if (items && items.length > 0) {
+      return items.map((item: any) => ({
+        key: 'req_item_' + item.id,
+        nombre: item.requirement?.nombre || 'Documento requerido',
+        descripcion: item.requirement?.descripcion || ''
+      }));
+    }
+    return [
+      { key: 'formulario_solicitud', nombre: 'Formulario de Solicitud', descripcion: 'Formulario de solicitud del cliente diligenciado.' },
+      { key: 'documentos_identidad', nombre: 'Documentos de Identidad', descripcion: 'Copia de Cédula de Ciudadanía o NIT del cliente.' },
+      { key: 'estados_financieros', nombre: 'Estados Financieros', descripcion: 'Balance y Estados Financieros firmados por contador.' },
+      { key: 'certificados_laborales', nombre: 'Certificados Laborales / Comerciales', descripcion: 'Soporte de ingresos o referencias de la empresa.' }
+    ];
+  }
+
   onFileUpload(event: Event, campoDoc: string) {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];
@@ -171,6 +193,42 @@ export class CreditoOrdinarioComponent implements OnInit {
       _file: file,
       campo_documento: campoDoc
     });
+  }
+
+  // SCRUM-146: documentos de Etapa 1 dirigidos por preset admiten varios
+  // archivos por documento (input con atributo "multiple").
+  onMultiFileUpload(event: Event, campoDoc: string) {
+    const target = event.target as HTMLInputElement;
+    const files = target.files ? Array.from(target.files) : [];
+    if (!files.length) return;
+
+    const invalido = files.find(f => f.type !== 'application/pdf');
+    if (invalido) {
+      Swal.fire('Formato Inválido', 'Solo se permite subir archivos en formato PDF.', 'warning');
+      return;
+    }
+
+    this.executeTransition('subir_archivo', `Carga de soporte(s) PDF en campo: ${campoDoc}`, {
+      _files: files,
+      campo_documento: campoDoc
+    });
+  }
+
+  // Devuelve siempre un arreglo, sin importar si documentos[campoDoc] quedó
+  // guardado como string único (documentos legacy de una sola etapa) o como
+  // arreglo (Etapa 1 dirigida por preset, SCRUM-146).
+  getDocFiles(campoDoc: string): string[] {
+    const valor = this.selectedCredito?.documentos?.[campoDoc];
+    if (!valor) return [];
+    return Array.isArray(valor) ? valor : [valor];
+  }
+
+  getDocFileName(url: string): string {
+    try {
+      return decodeURIComponent(url.split('/').pop() || url);
+    } catch {
+      return url;
+    }
   }
 
   executeTransition(accion: string, comentarioDefecto: string = '', extraData: any = {}) {
@@ -191,7 +249,16 @@ export class CreditoOrdinarioComponent implements OnInit {
         const headers = { 'X-Active-Role': this.activeRole };
         const url = `${environment.apiUrl}/creditos/${this.selectedCredito.id}/transition`;
 
-        const request$ = (extraData._file instanceof File)
+        const request$ = (extraData._files && extraData._files.length)
+          ? (() => {
+              const formData = new FormData();
+              formData.append('accion', accion);
+              formData.append('comentario', comentario);
+              extraData._files.forEach((f: File) => formData.append('archivos[]', f, f.name));
+              formData.append('campo_documento', extraData.campo_documento);
+              return this.http.post(url, formData, { headers });
+            })()
+          : (extraData._file instanceof File)
           ? (() => {
               const formData = new FormData();
               formData.append('accion', accion);
