@@ -286,11 +286,19 @@ class ClientUploadController extends Controller
             }
         }
         
-        if (!Storage::exists($upload->filename)) {
-            return response()->json(['message' => 'Archivo no encontrado físicamente en el servidor.'], 404);
+        if (Storage::exists($upload->filename)) {
+            return Storage::download($upload->filename, $upload->original_name);
         }
 
-        return Storage::download($upload->filename, $upload->original_name);
+        // SCRUM-146: los archivos sincronizados desde Crédito Ordinario
+        // Etapa 1 se guardan en el disco 'public' (para el link directo de
+        // esa vista), no en el disco por defecto que usa el resto de cargas
+        // de cliente.
+        if (Storage::disk('public')->exists($upload->filename)) {
+            return Storage::disk('public')->download($upload->filename, $upload->original_name);
+        }
+
+        return response()->json(['message' => 'Archivo no encontrado físicamente en el servidor.'], 404);
     }
 
     public function destroy(Request $request, $id)
@@ -317,9 +325,11 @@ class ClientUploadController extends Controller
             ]);
         }
 
-        // Borrar archivo físico
+        // Borrar archivo físico (ver nota de disco en download())
         if (Storage::exists($upload->filename)) {
             Storage::delete($upload->filename);
+        } elseif (Storage::disk('public')->exists($upload->filename)) {
+            Storage::disk('public')->delete($upload->filename);
         }
 
         $upload->delete();

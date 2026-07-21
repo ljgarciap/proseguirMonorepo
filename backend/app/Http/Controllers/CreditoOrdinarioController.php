@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesActiveRole;
+use App\Models\ClientUpload;
 use App\Models\CreditoOrdinario;
+use App\Models\DocumentRequestItem;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -159,12 +161,40 @@ class CreditoOrdinarioController extends Controller
                 $existing = $existing ? [$existing] : [];
             }
 
+            // Si el campo corresponde a un documento de Etapa 1 dirigido por
+            // preset ('req_item_{id}'), sincronizamos también el
+            // DocumentRequestItem asociado: sin esto, las pantallas de
+            // "Solicitudes Documentos" y "sube tus documentos" del cliente
+            // seguían mostrando el documento como pendiente aunque ya se
+            // hubiera cargado desde Crédito Ordinario (SCRUM-146).
+            $requestItemId = str_starts_with($campoDoc, 'req_item_')
+                ? (int) substr($campoDoc, strlen('req_item_'))
+                : null;
+
             $nombres = [];
             foreach ($request->file('archivos') as $file) {
                 $fileName   = $file->getClientOriginalName();
                 $path       = $file->storeAs('credito_documentos/' . $credito->id, $fileName, 'public');
                 $existing[] = Storage::disk('public')->url($path);
                 $nombres[]  = $fileName;
+
+                if ($requestItemId) {
+                    $upload = ClientUpload::create([
+                        'user_id'       => $user->id,
+                        'upload_role'   => $activeRole,
+                        'filename'      => $path,
+                        'original_name' => $fileName,
+                        'status'        => 'pendiente',
+                        'ocr_status'    => 'exitoso',
+                        'ocr_message'   => 'No requiere procesamiento OCR',
+                    ]);
+
+                    DocumentRequestItem::where('id', $requestItemId)->update([
+                        'client_upload_id' => $upload->id,
+                        'estado'           => 'subido',
+                        'observaciones'    => null,
+                    ]);
+                }
             }
 
             $documentos[$campoDoc] = $existing;
