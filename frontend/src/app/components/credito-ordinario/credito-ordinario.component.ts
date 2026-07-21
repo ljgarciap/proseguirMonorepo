@@ -4,13 +4,12 @@ import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
-import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-credito-ordinario',
   standalone: true,
-  imports: [CommonModule, FormsModule, MilesSeparatorDirective],
+  imports: [CommonModule, FormsModule],
   templateUrl: './credito-ordinario.component.html',
   styleUrls: ['./credito-ordinario.component.css']
 })
@@ -19,13 +18,6 @@ export class CreditoOrdinarioComponent implements OnInit {
   selectedCredito: any = null;
   activeRole: string = 'cliente';
   searchTerm: string = '';
-  
-  // Modal state
-  showNewRequestModal = false;
-  newRequest = {
-    monto: null as number | null,
-    plazo_meses: 12
-  };
 
   // BPMN Stepper definition
   bpmnSteps = [
@@ -282,30 +274,4 @@ export class CreditoOrdinarioComponent implements OnInit {
     });
   }
 
-  // Open creation modal
-  openNewRequestModal() {
-    this.newRequest = { monto: null, plazo_meses: 12 };
-    this.showNewRequestModal = true;
-  }
-
-  // Submit new request
-  submitNewRequest() {
-    if (!this.newRequest.monto || this.newRequest.monto <= 0) {
-      Swal.fire('Error', 'Por favor ingresa un monto válido superior a cero.', 'warning');
-      return;
-    }
-
-    this.http.post(`${environment.apiUrl}/creditos`, this.newRequest, {
-      headers: { 'X-Active-Role': this.activeRole }
-    }).subscribe({
-      next: (created) => {
-        this.showNewRequestModal = false;
-        Swal.fire('¡Solicitud Creada!', 'Tu solicitud de crédito ordinario fue registrada con éxito.', 'success');
-        this.loadCreditos();
-      },
-      error: (err) => {
-        Swal.fire('Error', err.error.message || 'No se pudo crear la solicitud.', 'error');
-      }
-    });
-  }
 }

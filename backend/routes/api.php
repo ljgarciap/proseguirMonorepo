@@ -51,16 +51,13 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
         Route::apiResource('users', \App\Http\Controllers\UserController::class)
             ->middleware(['auth:api', 'checkrole:superadmin']);
         
-        // Clientes (Superadmin, Gerente, Operativo)
-        // El listado/búsqueda (index) además lo necesita Coordinador Comercial
-        // para el autocompletar de Cliente en Registro Solicitud de Crédito
-        // (SCRUM-134) — sin darle acceso al CRUD completo de Clientes.
+        // Clientes (Superadmin, Gerente, Operativo, Coordinador Comercial — SCRUM-149)
         Route::get('clientes', [\App\Http\Controllers\ClienteController::class, 'index'])
             ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo,coordinador_comercial']);
         Route::post('clientes/quick', [\App\Http\Controllers\ClienteController::class, 'quickStore'])
-            ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
+            ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo,coordinador_comercial']);
         Route::apiResource('clientes', \App\Http\Controllers\ClienteController::class)->except(['index'])
-            ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
+            ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo,coordinador_comercial']);
         
         // Visitas a Clientes (Superadmin, Gerente, Operativo)
         Route::apiResource('visitas', \App\Http\Controllers\VisitaController::class)

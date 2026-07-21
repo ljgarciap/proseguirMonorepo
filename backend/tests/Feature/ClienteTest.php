@@ -427,11 +427,11 @@ class ClienteTest extends TestCase
     }
 
     /**
-     * SCRUM-134: Coordinador Comercial necesita listar/buscar clientes para el
-     * autocompletar de Registro Solicitud de Crédito, aunque no gestione el
-     * CRUD completo de Clientes.
+     * SCRUM-149: Coordinador Comercial tiene acceso completo a la vista de
+     * Registro de Clientes (listar, buscar y crear/gestionar), no solo al
+     * autocompletar de Registro Solicitud de Crédito (SCRUM-134).
      */
-    public function test_coordinador_comercial_can_list_but_not_manage_clientes(): void
+    public function test_coordinador_comercial_can_list_and_manage_clientes(): void
     {
         $coordinador = User::create([
             'name' => 'Coordinador Test',
@@ -451,9 +451,9 @@ class ClienteTest extends TestCase
             'tipo_persona_id' => $this->tipoNatural->id,
             'tipo_documento_id' => $this->docCC->id,
             'numero_documento' => '444444',
-            'nombres' => 'No', 'primer_apellido' => 'Autorizado',
+            'nombres' => 'Si', 'primer_apellido' => 'Autorizado',
             'pais' => 'Colombia', 'departamento_id' => $this->departamento->id,
             'ciudad_id' => $this->ciudad->id, 'activo' => true
-        ])->assertStatus(403);
+        ])->assertStatus(201);
     }
 }

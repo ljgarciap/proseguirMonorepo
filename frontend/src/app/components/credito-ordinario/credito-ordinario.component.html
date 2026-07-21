@@ -11,9 +11,6 @@
         <span class="material-symbols-outlined">shield_person</span>
         Perfil Activo: {{ activeRole | titlecase }}
       </span>
-      <button *ngIf="['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)" class="btn-pro primary" (click)="openNewRequestModal()">
-        <span class="material-symbols-outlined">add_circle</span> Nueva Solicitud
-      </button>
     </div>
   </header>
 
@@ -22,9 +19,6 @@
     <span class="material-symbols-outlined icon">receipt_long</span>
     <h3>No hay solicitudes registradas</h3>
     <p>No se encontraron solicitudes de crédito ordinario asociadas a tu cuenta en este momento.</p>
-    <button *ngIf="['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)" class="btn-pro primary" (click)="openNewRequestModal()">
-      Crear Primera Solicitud
-    </button>
   </div>
 
   <!-- Main Content Grid -->
@@ -857,46 +851,5 @@
         </div>
       </div>
     </main>
-  </div>
-</div>
-
-<!-- Creative Glassmorphism Modal for New Credit Solicitud -->
-<div class="modal-backdrop" *ngIf="showNewRequestModal">
-  <div class="modal-card card">
-    <header class="modal-header">
-      <h3>Nueva Solicitud de Crédito Ordinario</h3>
-      <button class="btn-close" (click)="showNewRequestModal = false">
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </header>
-    
-    <div class="modal-body">
-      <div class="pro-input-group">
-        <label>Monto del Crédito (COP)</label>
-        <input type="text" inputmode="decimal" [(ngModel)]="newRequest.monto" milesSeparator placeholder="Ej: 15.000.000" class="pro-input">
-      </div>
-      
-      <div class="pro-input-group">
-        <label>Plazo en Meses</label>
-        <select [(ngModel)]="newRequest.plazo_meses" class="pro-input">
-          <option [value]="6">6 meses</option>
-          <option [value]="12">12 meses</option>
-          <option [value]="18">18 meses</option>
-          <option [value]="24">24 meses</option>
-          <option [value]="36">36 meses</option>
-          <option [value]="48">48 meses</option>
-        </select>
-      </div>
-
-      <div class="info-note">
-        <span class="material-symbols-outlined">info</span>
-        <p>Al crear esta solicitud, el crédito iniciará automáticamente en la etapa de <strong>Revisión de Solicitud y Documentación</strong> para ser evaluada por un Coordinador Comercial.</p>
-      </div>
-    </div>
-
-    <footer class="modal-footer">
-      <button class="btn-pro secondary" (click)="showNewRequestModal = false">Cancelar</button>
-      <button class="btn-pro primary" (click)="submitNewRequest()">Crear Solicitud</button>
-    </footer>
   </div>
 </div>

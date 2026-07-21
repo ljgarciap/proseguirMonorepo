@@ -185,7 +185,7 @@ export const routes: Routes = [
         path: 'clientes',
         loadComponent: () => import('./components/clientes/clientes.component').then(m => m.ClientesComponent),
         canActivate: [roleGuard],
-        data: { roles: ['superadmin', 'gerente', 'operativo'] }
+        data: { roles: ['superadmin', 'gerente', 'operativo', 'coordinador_comercial'] }
     },
     {
         path: 'visitas',
