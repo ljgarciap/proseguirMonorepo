@@ -9,7 +9,6 @@ use App\Models\DocumentRequestItem;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 
 class CreditoOrdinarioController extends Controller
 {
@@ -148,7 +147,11 @@ class CreditoOrdinarioController extends Controller
             }
         }
 
-        $documentos = $credito->documentos ?? [];
+        // documentos_raw (no documentos): esto se relee y se reescribe
+        // completo más abajo; si leyéramos la versión ya resuelta a URL
+        // absoluta, cada transición hornearía de nuevo el APP_URL vigente
+        // en todos los campos, no solo en el que cambia (SCRUM-148).
+        $documentos = $credito->documentos_raw ?? [];
 
         // 1. Manejo de Carga de Archivos
         // Documentos de Etapa 1 dirigidos por preset (claves 'req_item_{id}',
@@ -175,7 +178,9 @@ class CreditoOrdinarioController extends Controller
             foreach ($request->file('archivos') as $file) {
                 $fileName   = $file->getClientOriginalName();
                 $path       = $file->storeAs('credito_documentos/' . $credito->id, $fileName, 'public');
-                $existing[] = Storage::disk('public')->url($path);
+                // Se guarda la ruta relativa, no la URL absoluta: el modelo
+                // la resuelve al leer con el APP_URL vigente (SCRUM-148).
+                $existing[] = $path;
                 $nombres[]  = $fileName;
 
                 if ($requestItemId) {
@@ -208,7 +213,8 @@ class CreditoOrdinarioController extends Controller
             $path     = $file->storeAs('credito_documentos/' . $credito->id, $fileName, 'public');
 
             $campoDoc              = $request->campo_documento;
-            $documentos[$campoDoc] = Storage::disk('public')->url($path);
+            // Ruta relativa; el modelo resuelve la URL al leer (SCRUM-148).
+            $documentos[$campoDoc] = $path;
             $credito->documentos   = $documentos;
             $credito->save();
 

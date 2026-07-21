@@ -341,4 +341,68 @@ class CreditoOrdinarioTest extends TestCase
             ->assertStatus(200)
             ->assertJsonPath('estado', 'completado');
     }
+
+    // SCRUM-148: un documento subido en un ambiente (ej. test, APP_URL
+    // http://173.201.39.180:8080) no debe quedar inaccesible si luego se lee
+    // con un APP_URL distinto (ej. porque esa vez el deploy cayó en fallback
+    // a PROD.env) — la URL se resuelve con el APP_URL vigente en el momento
+    // de la lectura, no con el que estaba activo al subir el archivo.
+    public function test_documento_subido_guarda_ruta_relativa_y_url_se_resuelve_con_app_url_vigente(): void
+    {
+        Passport::actingAs($this->admin);
+        $creditoId = $this->postJson('/api/creditos', [
+            'monto' => 50000000.00,
+            'plazo_meses' => 24,
+            'cliente_id' => $this->cliente->id,
+        ], ['X-Active-Role' => 'superadmin'])->json('id');
+
+        Passport::actingAs($this->cliente);
+        $this->subirArchivo($creditoId, 'formulario_solicitud', 'cliente')->assertStatus(200);
+
+        // En BD debe quedar solo la ruta relativa, no una URL horneada con
+        // el APP_URL de este momento.
+        $rawDocumentos = json_decode(
+            \DB::table('credito_ordinarios')->where('id', $creditoId)->value('documentos'),
+            true
+        );
+        $rutaRelativa = $rawDocumentos['formulario_solicitud'];
+        $this->assertStringStartsNotWith('http', $rutaRelativa);
+        $this->assertStringContainsString('credito_documentos/' . $creditoId . '/', $rutaRelativa);
+
+        // Al leer el modelo, se resuelve a la URL pública del disco vigente
+        // (ya no es la ruta cruda: pasó por Storage::disk('public')->url()).
+        $credito = CreditoOrdinario::find($creditoId);
+        $urlResuelta = $credito->documentos['formulario_solicitud'];
+        $this->assertNotEquals($rutaRelativa, $urlResuelta);
+        $this->assertStringContainsString('/storage/' . $rutaRelativa, $urlResuelta);
+
+        // Simula el escenario real del ticket: el registro quedó con una URL
+        // absoluta horneada con OTRO dominio (bug ya ocurrido antes del fix,
+        // o dato legacy). Debe normalizarse a la MISMA URL que resolvería un
+        // documento nuevo, sin rastro del dominio viejo.
+        \DB::table('credito_ordinarios')->where('id', $creditoId)->update([
+            'documentos' => json_encode(array_merge($rawDocumentos, [
+                'formulario_solicitud' => 'http://dominio-viejo-incorrecto.test/storage/' . $rutaRelativa,
+            ])),
+        ]);
+
+        $creditoConUrlVieja = CreditoOrdinario::find($creditoId);
+        $this->assertEquals($urlResuelta, $creditoConUrlVieja->documentos['formulario_solicitud']);
+        $this->assertStringNotContainsString('dominio-viejo-incorrecto', $creditoConUrlVieja->documentos['formulario_solicitud']);
+
+        // Restaura el valor correcto y confirma que una transición NO
+        // relacionada (otro campo) no vuelve a hornear el resto del JSON
+        // como URLs absolutas.
+        \DB::table('credito_ordinarios')->where('id', $creditoId)->update([
+            'documentos' => json_encode($rawDocumentos),
+        ]);
+
+        $this->subirArchivo($creditoId, 'documentos_identidad', 'cliente')->assertStatus(200);
+
+        $rawTrasSegundaSubida = json_decode(
+            \DB::table('credito_ordinarios')->where('id', $creditoId)->value('documentos'),
+            true
+        );
+        $this->assertStringStartsNotWith('http', $rawTrasSegundaSubida['formulario_solicitud']);
+    }
 }

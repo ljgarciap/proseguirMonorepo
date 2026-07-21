@@ -81,6 +81,7 @@ Las API keys **no van en `.env`** — se cargan desde la tabla `configuraciones`
 - El enlace simbólico de storage debe ser **relativo**: `ln -s ../storage/app/public public/storage` (no absoluto)
 - El script de extracción de PDF es `extract_pdf.cjs` (CommonJS, no `.js`) para evitar errores ESM
 - Uploads de CreditoOrdinario son `multipart/form-data` (no base64) — el campo se llama `archivo` y acepta solo PDF ≤ 100 MB
+- El JSON `documentos` de `CreditoOrdinario` guarda **ruta relativa** del disco `public` (no URL absoluta) — `CreditoOrdinario::getDocumentosAttribute()` resuelve la URL con el `APP_URL` vigente al leer. Si un controlador hace lectura-modificación-guardado del JSON completo, debe leer con `$credito->documentos_raw`, no `$credito->documentos` (si no, hornea de nuevo el `APP_URL` en todos los campos, no solo el que cambia). Ver SCRUM-148: un fallback de deploy a `TEST.env` faltante horneó URLs de producción en archivos que solo existían en test.
 
 ---
 

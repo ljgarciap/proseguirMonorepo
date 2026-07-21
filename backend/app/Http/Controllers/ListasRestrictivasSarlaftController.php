@@ -10,7 +10,6 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -199,8 +198,11 @@ class ListasRestrictivasSarlaftController extends Controller
             $fileName = $file->getClientOriginalName();
             $path = $file->storeAs('credito_documentos/' . $credito->id, $fileName, 'public');
 
-            $documentos = $credito->documentos ?? [];
-            $documentos['sintesis_oficial_cumplimiento'] = Storage::disk('public')->url($path);
+            // documentos_raw: se reescribe el JSON completo más abajo, no
+            // solo el campo que cambia (ver nota en CreditoOrdinarioController).
+            $documentos = $credito->documentos_raw ?? [];
+            // Ruta relativa; el modelo resuelve la URL al leer (SCRUM-148).
+            $documentos['sintesis_oficial_cumplimiento'] = $path;
             $credito->documentos = $documentos;
         }
 
