@@ -250,6 +250,73 @@ class SolicitudCreditoTest extends TestCase
     }
 
     /**
+     * SCRUM-152: cada SolicitudCredito debe tener su propio DocumentRequest,
+     * con exactamente los documentos de SU preset — antes, si el cliente ya
+     * tenía un DocumentRequest "pendiente" de una solicitud anterior (muy
+     * común con clientes con varios créditos activos), la segunda solicitud
+     * mezclaba sus requisitos en ese request ajeno y quedaba sin
+     * documentRequest propio, mostrando el fallback genérico en Etapa 1 en
+     * vez de los documentos del preset elegido.
+     */
+    public function test_store_creates_separate_document_request_per_solicitud_with_own_preset(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $presetB = DocumentPreset::create(['nombre' => 'Preset Otro', 'descripcion' => 'Otro set de requisitos']);
+        $reqB = DocumentRequirement::create(['nombre' => 'Certificado Cámara de Comercio', 'activo' => true]);
+        $presetB->requirements()->attach([$reqB->id]);
+
+        $basePayload = [
+            'cliente_id' => $this->clientNatural->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Documentación para Crédito',
+            'mensaje_notificacion' => 'Por favor adjunta los archivos.',
+            'nombres' => 'Juan',
+            'primer_apellido' => 'Perez',
+            'correo_electronico' => 'juan@test.com',
+            'telefono' => '3001234567',
+            'direccion' => 'Calle 123',
+            'pais' => 'Colombia',
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id,
+        ];
+
+        // Primera solicitud, con el preset A ($this->preset, 2 requisitos) —
+        // se deja su DocumentRequest en 'pendiente' (nadie aprobó nada), tal
+        // como ocurre en producción con un cliente con varios créditos activos.
+        $resp1 = $this->postJson('/api/solicitudes-credito', $basePayload + [
+            'monto_solicitado' => 10000000.00,
+            'document_preset_id' => $this->preset->id,
+        ]);
+        $resp1->assertStatus(201);
+        $solicitud1Id = $resp1->json('id');
+
+        // Segunda solicitud del MISMO cliente, con el preset B (1 requisito).
+        $resp2 = $this->postJson('/api/solicitudes-credito', $basePayload + [
+            'monto_solicitado' => 20000000.00,
+            'document_preset_id' => $presetB->id,
+        ]);
+        $resp2->assertStatus(201);
+        $solicitud2Id = $resp2->json('id');
+
+        $solicitud1 = SolicitudCredito::with('documentRequest.items')->findOrFail($solicitud1Id);
+        $solicitud2 = SolicitudCredito::with('documentRequest.items')->findOrFail($solicitud2Id);
+
+        $this->assertNotNull($solicitud1->documentRequest, 'La primera solicitud debe conservar su propio DocumentRequest.');
+        $this->assertNotNull($solicitud2->documentRequest, 'La segunda solicitud debe tener su propio DocumentRequest, no compartir el de la primera.');
+        $this->assertNotEquals($solicitud1->documentRequest->id, $solicitud2->documentRequest->id);
+
+        $this->assertCount(2, $solicitud1->documentRequest->items, 'La solicitud 1 debe tener exactamente los 2 requisitos de su preset.');
+        $this->assertCount(1, $solicitud2->documentRequest->items, 'La solicitud 2 debe tener exactamente el 1 requisito de su preset, sin mezclarse con el de la solicitud 1.');
+        $this->assertEquals($reqB->id, $solicitud2->documentRequest->items->first()->document_requirement_id);
+    }
+
+    /**
      * Test registering a credit request for a juridical client triggers validations.
      */
     public function test_store_validates_representative_legal_fields_for_juridica(): void

@@ -138,6 +138,13 @@ export class CreditoOrdinarioComponent implements OnInit {
       return false;
     }
 
+    // SCRUM-151: expediente inicial de Constructor, revisado por Coordinador
+    // Comercial igual que revision_documental en Ordinario (no está en
+    // bpmnSteps porque Constructor no sigue el stepper de 11 pasos completo).
+    if (currentStatus === 'validacion_documental_constructor') {
+      return ['coordinador_comercial', 'cliente'].includes(this.activeRole);
+    }
+
     if (currentStatus === 'formalizacion_garantias') {
       return ['cliente', 'operativo', 'coordinador_comercial'].includes(this.activeRole);
     }
@@ -182,9 +189,14 @@ export class CreditoOrdinarioComponent implements OnInit {
 
     switch (this.selectedCredito.estado) {
       case 'validacion_documental_constructor':
+        // SCRUM-151: este panel solo lo ve un rol distinto de Coordinador
+        // Comercial/Cliente (isUserRoleAuthorized ya los autoriza a ellos con
+        // acciones propias). El paso avanza cuando Coordinador Comercial
+        // aprueba el expediente en esta pantalla; Operaciones conserva
+        // /validation como vía alterna (avanza igual si aprueba ahí primero).
         return {
           title: 'Validación documental en curso',
-          message: 'El crédito está esperando que se complete la validación y aprobación de los documentos del expediente inicial (Crédito Constructor). Este paso avanza automáticamente cuando Operaciones valida y aprueba todos los soportes cargados por el cliente.',
+          message: 'El expediente inicial de este crédito Constructor está siendo revisado por el Coordinador Comercial. Alternativamente, este paso también avanza si Operaciones valida y aprueba todos los soportes desde el módulo de Validación de Documentos.',
           link: '/validation',
           linkLabel: 'Ir a Validación de Documentos',
           roles: ['operativo', 'gerente']

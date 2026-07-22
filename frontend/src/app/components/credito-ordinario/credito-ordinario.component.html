@@ -200,6 +200,23 @@
 
           <!-- AUTHORIZED ACTIONS BY STATE -->
           <div class="authorized-actions" *ngIf="isUserRoleAuthorized()">
+            <!-- Stage 1 (Constructor): validacion_documental_constructor (Coordinador Comercial) -->
+            <!-- SCRUM-151: expediente inicial de Constructor, mismo mecanismo que revision_documental -->
+            <div *ngIf="selectedCredito.estado === 'validacion_documental_constructor' && activeRole !== 'cliente'" class="action-buttons-layout">
+              <p class="action-instructions">Como <strong>Coordinador Comercial</strong>, debes verificar que los documentos del expediente inicial cargados por el cliente estén correctos.</p>
+              <div class="flex-actions">
+                <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Documentación inicial verificada y aprobada.')">
+                  <span class="material-symbols-outlined">check_circle</span> Aprobar Documentos
+                </button>
+                <button class="btn-pro danger" (click)="executeTransition('rechazar', 'Solicitud rechazada en revisión inicial.')">
+                  <span class="material-symbols-outlined">cancel</span> Rechazar Solicitud
+                </button>
+              </div>
+            </div>
+            <div *ngIf="selectedCredito.estado === 'validacion_documental_constructor' && activeRole === 'cliente'">
+              <p class="action-instructions">Como <strong>Cliente</strong>, carga los documentos requeridos del expediente inicial en la sección "Expediente de Documentos de Crédito" más abajo.</p>
+            </div>
+
             <!-- Stage 1: revision_documental (Coordinador Comercial) -->
             <div *ngIf="selectedCredito.estado === 'revision_documental'" class="action-buttons-layout">
               <p class="action-instructions">Como <strong>Coordinador Comercial</strong>, debes verificar que los documentos iniciales cargados en el expediente del cliente estén correctos.</p>
@@ -526,7 +543,7 @@
                   <span class="doc-status-pill success" *ngIf="getDocFiles(doc.key).length > 0">Cargado ({{ getDocFiles(doc.key).length }})</span>
                   <span class="doc-status-pill error" *ngIf="getDocFiles(doc.key).length === 0">Pendiente</span>
 
-                  <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
+                  <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud', 'validacion_documental_constructor'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
                     <input type="file" id="inline-file-{{doc.key}}" (change)="onMultiFileUpload($event, doc.key)" accept=".pdf" multiple hidden>
                     <label for="inline-file-{{doc.key}}" class="btn-inline-upload">Subir</label>
                   </div>

@@ -124,6 +124,7 @@ class CreditoOrdinarioController extends Controller
 
         // Mapa de roles autorizados por estado para transiciones
         $rolesAutorizados = [
+            'validacion_documental_constructor' => ['coordinador_comercial', 'cliente'],
             'revision_documental' => ['coordinador_comercial', 'cliente'],
             'completar_solicitud' => ['cliente'],
             'pendiente_analisis_financiero' => ['coordinador_comercial'],
@@ -281,6 +282,27 @@ class CreditoOrdinarioController extends Controller
             }
         } elseif ($accion === 'aprobar' || $accion === 'subir_archivo') {
             switch ($estadoActual) {
+                case 'validacion_documental_constructor':
+                    // SCRUM-151: Coordinador Comercial revisa y aprueba el
+                    // expediente inicial de Constructor en esta misma pantalla,
+                    // igual que revision_documental en Ordinario. Al aprobar,
+                    // pasa directo a Informe Técnico (no a SARLAFT, que en
+                    // Constructor corre después del Informe Técnico).
+                    if ($accion === 'aprobar') {
+                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(function ($key) use ($documentos) {
+                            $valor = $documentos[$key] ?? null;
+                            return is_array($valor) ? count($valor) > 0 : !empty($valor);
+                        });
+
+                        if ($hasEtapa1) {
+                            $estadoNuevo = 'informe_tecnico_ingeniero';
+                            $comentario = 'Documentación revisada y aprobada. Bandeja de Informe Técnico habilitada para el Ingeniero.';
+                        } else {
+                            $comentario = 'Faltan documentos obligatorios del expediente inicial. No se puede aprobar todavía.';
+                        }
+                    }
+                    break;
+
                 case 'revision_documental':
                     // La carga de un solo soporte (subir_archivo) no debe cerrar la
                     // etapa: solo el Coordinador Comercial, con 'aprobar' explícito,

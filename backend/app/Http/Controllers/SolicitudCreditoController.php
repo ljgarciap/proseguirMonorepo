@@ -254,6 +254,13 @@ class SolicitudCreditoController extends Controller
             }
 
             // 4. Create DocumentRequest in the database if document_preset_id is provided
+            // SCRUM-152: cada SolicitudCredito tiene su propio DocumentRequest 1:1
+            // (SolicitudCredito::documentRequest() es hasOne por solicitud_credito_id).
+            // Antes se reutilizaba cualquier DocumentRequest "pendiente" del mismo
+            // cliente y se le mezclaban los requisitos del preset nuevo — si ese
+            // request ya pertenecía a otra solicitud, esta solicitud quedaba sin
+            // documentRequest propio y Etapa 1 caía al fallback genérico de 4
+            // documentos fijos en vez de mostrar los del preset elegido.
             $documentosRequeridos = [];
             if ($validated['document_preset_id'] ?? null) {
                 $preset = DocumentPreset::findOrFail($validated['document_preset_id']);
@@ -261,52 +268,19 @@ class SolicitudCreditoController extends Controller
                 $documentosRequeridos = $preset->requirements()->pluck('nombre')->toArray();
 
                 if (count($requirementIds) > 0) {
-                    // Check if there is an existing pending request
-                    $existingDocRequest = DocumentRequest::where('cliente_id', $user->id)
-                        ->where('estado', 'pendiente')
-                        ->first();
+                    $docRequest = DocumentRequest::create([
+                        'cliente_id' => $user->id,
+                        'creado_por' => $request->user()->id,
+                        'solicitud_credito_id' => $solicitud->id,
+                        'estado' => 'pendiente'
+                    ]);
 
-                    if ($existingDocRequest) {
-                        // Si la solicitud pendiente encontrada todavía no está
-                        // ligada a ninguna SolicitudCredito, la asociamos a
-                        // esta (SCRUM-120). Si ya estaba ligada a otra (cliente
-                        // con dos solicitudes activas a la vez), la dejamos
-                        // como está — es una limitación conocida, no se
-                        // reasigna para no romper el vínculo existente.
-                        if (!$existingDocRequest->solicitud_credito_id) {
-                            $existingDocRequest->update(['solicitud_credito_id' => $solicitud->id]);
-                        }
-
-                        // Add new requirements to the existing request
-                        foreach ($requirementIds as $reqId) {
-                            $itemExists = DocumentRequestItem::where('document_request_id', $existingDocRequest->id)
-                                ->where('document_requirement_id', $reqId)
-                                ->exists();
-                            
-                            if (!$itemExists) {
-                                DocumentRequestItem::create([
-                                    'document_request_id' => $existingDocRequest->id,
-                                    'document_requirement_id' => $reqId,
-                                    'estado' => 'pendiente'
-                                ]);
-                            }
-                        }
-                    } else {
-                        // Create a new request
-                        $docRequest = DocumentRequest::create([
-                            'cliente_id' => $user->id,
-                            'creado_por' => $request->user()->id,
-                            'solicitud_credito_id' => $solicitud->id,
+                    foreach ($requirementIds as $reqId) {
+                        DocumentRequestItem::create([
+                            'document_request_id' => $docRequest->id,
+                            'document_requirement_id' => $reqId,
                             'estado' => 'pendiente'
                         ]);
-
-                        foreach ($requirementIds as $reqId) {
-                            DocumentRequestItem::create([
-                                'document_request_id' => $docRequest->id,
-                                'document_requirement_id' => $reqId,
-                                'estado' => 'pendiente'
-                            ]);
-                        }
                     }
                 }
             }

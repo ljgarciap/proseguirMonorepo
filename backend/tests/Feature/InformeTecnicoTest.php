@@ -234,6 +234,49 @@ class InformeTecnicoTest extends TestCase
     }
 
     /**
+     * SCRUM-151: antes de este fix, ni Coordinador Comercial ni Cliente
+     * tenían ninguna acción disponible en validacion_documental_constructor
+     * desde esta pantalla — el único camino era el módulo separado de
+     * Operaciones (/validation, ver aprobarDocumentoRequerido arriba). Ahora
+     * Coordinador Comercial puede revisar y aprobar el expediente inicial
+     * directamente, igual que revision_documental en Ordinario.
+     */
+    public function test_coordinador_comercial_aprueba_expediente_inicial_constructor_directamente(): void
+    {
+        $credito = $this->registrarSolicitudConstructor();
+        $credito->load('solicitudCredito.documentRequest.items');
+        $item = $credito->solicitudCredito->documentRequest->items->first();
+
+        // Cliente sube el soporte requerido directamente en esta pantalla
+        // (mecanismo 'documentos' JSON, no el ClientUpload de /client-upload).
+        Passport::actingAs($credito->cliente);
+        $this->postJson("/api/creditos/{$credito->id}/transition", [
+            'accion'          => 'subir_archivo',
+            'campo_documento' => 'req_item_' . $item->id,
+            'archivos'        => [UploadedFile::fake()->create('estudio-suelos.pdf', 100, 'application/pdf')],
+        ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
+
+        // Un rol sin autorización (operativo) no puede aprobar acá.
+        Passport::actingAs($this->operativo);
+        $this->postJson("/api/creditos/{$credito->id}/transition", [
+            'accion' => 'aprobar',
+        ], ['X-Active-Role' => 'operativo'])->assertStatus(403);
+
+        // Coordinador Comercial aprueba el expediente completo.
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/creditos/{$credito->id}/transition", [
+            'accion' => 'aprobar',
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('estado', 'informe_tecnico_ingeniero');
+        $this->assertDatabaseHas('credito_ordinarios', [
+            'id' => $credito->id,
+            'estado' => 'informe_tecnico_ingeniero',
+        ]);
+    }
+
+    /**
      * SCRUM-151: el frontend necesita el tipo de crédito (para insertar la
      * etapa "Informe Técnico" en el checklist, solo para Constructor) y el
      * estado del Informe Técnico, sin llamadas adicionales — deben venir
