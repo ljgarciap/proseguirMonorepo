@@ -7,6 +7,7 @@ use App\Models\Departamento;
 use App\Models\Ciudad;
 use App\Models\Cliente;
 use App\Models\Visita;
+use App\Models\SolicitudCredito;
 use Illuminate\Support\Facades\Schema;
 
 class ColombiaGeografiaSeeder extends Seeder
@@ -51,6 +52,14 @@ class ColombiaGeografiaSeeder extends Seeder
      * las referencias de las demás antes de borrarlas. Luego hace lo mismo
      * a nivel de ciudad, por si la fusión de departamentos dejó ciudades
      * duplicadas dentro de un mismo departamento.
+     *
+     * SCRUM-151 (auditoría de datos 2026-07-23): sumado el mismo tratamiento
+     * para SolicitudCredito.proyecto_departamento_id/proyecto_ciudad_id
+     * (columnas de "Información del Proyecto" de Crédito Constructor,
+     * agregadas el 07-17, después de que este método se escribiera el
+     * 07-14). Sin esto, el FK `onDelete('set null')` dejaba esas columnas
+     * en NULL silenciosamente al fusionar un duplicado — se perdía la
+     * ubicación del proyecto de la solicitud sin ningún error visible.
      */
     private function fusionarDuplicados(): void
     {
@@ -68,6 +77,9 @@ class ColombiaGeografiaSeeder extends Seeder
                 if (Schema::hasColumn('visitas', 'departamento_id')) {
                     Visita::where('departamento_id', $duplicado->id)->update(['departamento_id' => $canonico->id]);
                 }
+                if (Schema::hasColumn('solicitudes_credito', 'proyecto_departamento_id')) {
+                    SolicitudCredito::where('proyecto_departamento_id', $duplicado->id)->update(['proyecto_departamento_id' => $canonico->id]);
+                }
                 $duplicado->delete();
             }
         }
@@ -84,6 +96,9 @@ class ColombiaGeografiaSeeder extends Seeder
                 Cliente::where('ciudad_id', $duplicado->id)->update(['ciudad_id' => $canonico->id]);
                 if (Schema::hasColumn('visitas', 'ciudad_id')) {
                     Visita::where('ciudad_id', $duplicado->id)->update(['ciudad_id' => $canonico->id]);
+                }
+                if (Schema::hasColumn('solicitudes_credito', 'proyecto_ciudad_id')) {
+                    SolicitudCredito::where('proyecto_ciudad_id', $duplicado->id)->update(['proyecto_ciudad_id' => $canonico->id]);
                 }
                 $duplicado->delete();
             }
