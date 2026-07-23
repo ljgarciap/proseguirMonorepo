@@ -277,6 +277,57 @@ class InformeTecnicoTest extends TestCase
     }
 
     /**
+     * SCRUM-151 (comentario 2026-07-23 de Juan): Constructor no tenía el
+     * botón "Solicitar Completar Soportes" que sí existe en
+     * revision_documental (Ordinario). El ciclo completar_solicitud_constructor
+     * -> aprobar debe regresar a validacion_documental_constructor, no a
+     * revision_documental (estado inicial de Ordinario, no de Constructor).
+     */
+    public function test_coordinador_comercial_solicita_completar_soportes_constructor_y_cliente_reenvia(): void
+    {
+        $credito = $this->registrarSolicitudConstructor();
+
+        // Camino de ruptura: un rol sin permiso en el estado actual no puede
+        // ejecutar 'completar' (gate de $rolesAutorizados, previo al switch).
+        Passport::actingAs($this->operativo);
+        $this->postJson("/api/creditos/{$credito->id}/transition", [
+            'accion' => 'completar',
+        ], ['X-Active-Role' => 'operativo'])->assertStatus(403);
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/creditos/{$credito->id}/transition", [
+            'accion' => 'completar',
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('estado', 'completar_solicitud_constructor');
+        $this->assertDatabaseHas('credito_ordinarios', [
+            'id' => $credito->id,
+            'estado' => 'completar_solicitud_constructor',
+        ]);
+
+        // Un rol distinto de cliente no puede reenviar la solicitud completada.
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/creditos/{$credito->id}/transition", [
+            'accion' => 'aprobar',
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(403);
+
+        // Cliente reenvía la solicitud completada; debe volver a
+        // validacion_documental_constructor (no a revision_documental).
+        Passport::actingAs($credito->cliente);
+        $response = $this->postJson("/api/creditos/{$credito->id}/transition", [
+            'accion' => 'aprobar',
+        ], ['X-Active-Role' => 'cliente']);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('estado', 'validacion_documental_constructor');
+        $this->assertDatabaseHas('credito_ordinarios', [
+            'id' => $credito->id,
+            'estado' => 'validacion_documental_constructor',
+        ]);
+    }
+
+    /**
      * SCRUM-151: el frontend necesita el tipo de crédito (para insertar la
      * etapa "Informe Técnico" en el checklist, solo para Constructor) y el
      * estado del Informe Técnico, sin llamadas adicionales — deben venir

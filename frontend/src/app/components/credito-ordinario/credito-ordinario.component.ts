@@ -92,11 +92,30 @@ export class CreditoOrdinarioComponent implements OnInit {
     });
   }
 
+  // SCRUM-151 (comentarios 2026-07-23): Crédito Constructor corre su propio
+  // expediente inicial + Informe Técnico antes de continuar por el resto del
+  // stepper de Ordinario sin cambios. Los 3 estados de Informe Técnico
+  // (ingeniero/coordinador/finalizado, ver InformeTecnicoController) se
+  // consolidan en un solo paso visual, igual que ya hace el checklist de
+  // "Expediente de Documentos" (informeTecnicoStatusLabel).
+  get bpmnStepsConstructor() {
+    return [
+      { key: 'validacion_documental_constructor', label: 'Revisión Solicitud', role: 'coordinador_comercial', roleLabel: 'Coordinador Comercial', desc: 'Revisar el expediente inicial del cliente y verificar que los soportes estén completos.' },
+      { key: 'completar_solicitud_constructor', label: 'Completar Sop.', role: 'cliente', roleLabel: 'Cliente', desc: 'Completar la documentación faltante solicitada por el Coordinador Comercial.' },
+      { key: 'informe_tecnico', label: 'Informe Técnico', role: 'ingeniero', roleLabel: 'Ingeniero / Coordinador Comercial', desc: 'Elaboración y registro del Informe Técnico del proyecto.', altKeys: ['informe_tecnico_ingeniero', 'informe_tecnico_coordinador', 'informe_tecnico_finalizado'] },
+      ...this.bpmnSteps.slice(2)
+    ];
+  }
+
+  get displaySteps() {
+    return this.isCreditoConstructor ? this.bpmnStepsConstructor : this.bpmnSteps;
+  }
+
   // Get index of a state in the BPMN workflow
   getStateIndex(state: string): number {
     if (state === 'completado') return 99;
     if (state === 'rechazado') return -1;
-    return this.bpmnSteps.findIndex(step => step.key === state);
+    return this.displaySteps.findIndex(step => step.key === state || (step as any).altKeys?.includes(state));
   }
 
   getProgressPercent(): number {
@@ -106,7 +125,7 @@ export class CreditoOrdinarioComponent implements OnInit {
     if (currentStatus === 'rechazado') return 0;
     const idx = this.getStateIndex(currentStatus);
     if (idx < 0) return 0;
-    return Math.round(((idx + 1) / this.bpmnSteps.length) * 100);
+    return Math.round(((idx + 1) / this.displaySteps.length) * 100);
   }
 
   // Determine class for a stepper node
@@ -117,7 +136,7 @@ export class CreditoOrdinarioComponent implements OnInit {
     if (currentStatus === 'rechazado') return 'disabled';
 
     const currentIndex = this.getStateIndex(currentStatus);
-    const stepIndex = this.bpmnSteps.findIndex(s => s.key === stepKey);
+    const stepIndex = this.displaySteps.findIndex(s => s.key === stepKey);
 
     if (stepIndex < currentIndex) return 'completed';
     if (stepIndex === currentIndex) return 'active';
@@ -143,6 +162,10 @@ export class CreditoOrdinarioComponent implements OnInit {
     // bpmnSteps porque Constructor no sigue el stepper de 11 pasos completo).
     if (currentStatus === 'validacion_documental_constructor') {
       return ['coordinador_comercial', 'cliente'].includes(this.activeRole);
+    }
+
+    if (currentStatus === 'completar_solicitud_constructor') {
+      return this.activeRole === 'cliente';
     }
 
     if (currentStatus === 'formalizacion_garantias') {
@@ -173,7 +196,7 @@ export class CreditoOrdinarioComponent implements OnInit {
 
   get informeTecnicoStatusLabel(): string {
     if (this.selectedCredito?.informe_tecnico?.estado === 'registrado') return 'Completado';
-    const estadosEnProceso = ['validacion_documental_constructor', 'informe_tecnico_ingeniero', 'informe_tecnico_coordinador', 'informe_tecnico_finalizado'];
+    const estadosEnProceso = ['validacion_documental_constructor', 'completar_solicitud_constructor', 'informe_tecnico_ingeniero', 'informe_tecnico_coordinador', 'informe_tecnico_finalizado'];
     if (this.selectedCredito?.informe_tecnico || estadosEnProceso.includes(this.selectedCredito?.estado)) return 'En Proceso';
     return 'Pendiente';
   }

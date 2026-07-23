@@ -110,19 +110,19 @@
               <span class="milestone-dot"></span>
               <span class="milestone-label">Registro</span>
             </div>
-            <div class="milestone" [class.completed]="getStateIndex(selectedCredito.estado) >= 2">
+            <div class="milestone" [class.completed]="getStateIndex(selectedCredito.estado) >= 2 + etapaOffset">
               <span class="milestone-dot"></span>
               <span class="milestone-label">Análisis</span>
             </div>
-            <div class="milestone" [class.completed]="getStateIndex(selectedCredito.estado) >= 4">
+            <div class="milestone" [class.completed]="getStateIndex(selectedCredito.estado) >= 4 + etapaOffset">
               <span class="milestone-dot"></span>
               <span class="milestone-label">Comité</span>
             </div>
-            <div class="milestone" [class.completed]="getStateIndex(selectedCredito.estado) >= 5">
+            <div class="milestone" [class.completed]="getStateIndex(selectedCredito.estado) >= 5 + etapaOffset">
               <span class="milestone-dot"></span>
               <span class="milestone-label">Garantías</span>
             </div>
-            <div class="milestone" [class.completed]="getStateIndex(selectedCredito.estado) >= 8">
+            <div class="milestone" [class.completed]="getStateIndex(selectedCredito.estado) >= 8 + etapaOffset">
               <span class="milestone-dot"></span>
               <span class="milestone-label">Desembolso</span>
             </div>
@@ -140,7 +140,7 @@
         <p class="section-desc">Visualización secuencial del estado actual de la solicitud en las distintas etapas de aprobación.</p>
         
         <div class="bpmn-stepper">
-          <div *ngFor="let step of bpmnSteps; let i = index" 
+          <div *ngFor="let step of displaySteps; let i = index"
                class="bpmn-step" 
                [ngClass]="getStepClass(step.key)"
                [title]="step.desc">
@@ -208,6 +208,9 @@
                 <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Documentación inicial verificada y aprobada.')">
                   <span class="material-symbols-outlined">check_circle</span> Aprobar Documentos
                 </button>
+                <button class="btn-pro warning" (click)="executeTransition('completar', 'Se solicita al cliente completar la documentación del expediente inicial.')">
+                  <span class="material-symbols-outlined">assignment_return</span> Solicitar Completar Soportes
+                </button>
                 <button class="btn-pro danger" (click)="executeTransition('rechazar', 'Solicitud rechazada en revisión inicial.')">
                   <span class="material-symbols-outlined">cancel</span> Rechazar Solicitud
                 </button>
@@ -215,6 +218,14 @@
             </div>
             <div *ngIf="selectedCredito.estado === 'validacion_documental_constructor' && activeRole === 'cliente'">
               <p class="action-instructions">Como <strong>Cliente</strong>, carga los documentos requeridos del expediente inicial en la sección "Expediente de Documentos de Crédito" más abajo.</p>
+            </div>
+
+            <!-- Stage 1b (Constructor): completar_solicitud_constructor (Cliente) -->
+            <div *ngIf="selectedCredito.estado === 'completar_solicitud_constructor'">
+              <p class="action-instructions">Como <strong>Cliente</strong>, debes completar la información del expediente inicial solicitada por el Coordinador Comercial. Una vez realizado, confirma el envío.</p>
+              <button class="btn-pro primary" (click)="executeTransition('aprobar', 'El cliente ha enviado la información complementaria solicitada del expediente inicial.')">
+                <span class="material-symbols-outlined">send</span> Enviar Solicitud Completada
+              </button>
             </div>
 
             <!-- Stage 1: revision_documental (Coordinador Comercial) -->
@@ -543,7 +554,7 @@
                   <span class="doc-status-pill success" *ngIf="getDocFiles(doc.key).length > 0">Cargado ({{ getDocFiles(doc.key).length }})</span>
                   <span class="doc-status-pill error" *ngIf="getDocFiles(doc.key).length === 0">Pendiente</span>
 
-                  <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud', 'validacion_documental_constructor'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
+                  <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud', 'validacion_documental_constructor', 'completar_solicitud_constructor'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
                     <input type="file" id="inline-file-{{doc.key}}" (change)="onMultiFileUpload($event, doc.key)" accept=".pdf" multiple hidden>
                     <label for="inline-file-{{doc.key}}" class="btn-inline-upload">Subir</label>
                   </div>

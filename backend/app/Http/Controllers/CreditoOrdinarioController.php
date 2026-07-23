@@ -125,6 +125,7 @@ class CreditoOrdinarioController extends Controller
         // Mapa de roles autorizados por estado para transiciones
         $rolesAutorizados = [
             'validacion_documental_constructor' => ['coordinador_comercial', 'cliente'],
+            'completar_solicitud_constructor' => ['cliente'],
             'revision_documental' => ['coordinador_comercial', 'cliente'],
             'completar_solicitud' => ['cliente'],
             'pendiente_analisis_financiero' => ['coordinador_comercial'],
@@ -279,6 +280,9 @@ class CreditoOrdinarioController extends Controller
             if ($estadoActual === 'revision_documental') {
                 $estadoNuevo = 'completar_solicitud';
                 $comentario = 'Documentación incompleta. Solicitud enviada al cliente para completar. ' . $comentario;
+            } elseif ($estadoActual === 'validacion_documental_constructor') {
+                $estadoNuevo = 'completar_solicitud_constructor';
+                $comentario = 'Documentación incompleta del expediente inicial. Solicitud enviada al cliente para completar. ' . $comentario;
             }
         } elseif ($accion === 'aprobar' || $accion === 'subir_archivo') {
             switch ($estadoActual) {
@@ -326,6 +330,13 @@ class CreditoOrdinarioController extends Controller
                     if ($accion === 'aprobar') {
                         $estadoNuevo = 'revision_documental';
                         $comentario = 'El cliente completó la solicitud. Retorna a revisión documental.';
+                    }
+                    break;
+
+                case 'completar_solicitud_constructor':
+                    if ($accion === 'aprobar') {
+                        $estadoNuevo = 'validacion_documental_constructor';
+                        $comentario = 'El cliente completó la solicitud. Retorna a validación documental del expediente inicial (Constructor).';
                     }
                     break;
 
