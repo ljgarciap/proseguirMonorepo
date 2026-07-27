@@ -37,15 +37,19 @@ class InformeTecnicoController extends Controller
 
     /**
      * Bandeja de Informe Técnico: créditos tipo Constructor en alguno de los
-     * estados del flujo, filtrados por el rol activo.
+     * estados del flujo. Visible completa para Ingeniero y Coordinador
+     * Comercial por igual (a pedido de Juan, SCRUM-154 comentario
+     * 2026-07-27: ambos roles deben ver todos los informes en gestión, no
+     * solo los propios) — la EDICIÓN sigue restringida por turno
+     * (autorizarRolParaEstado). Roles ajenos al flujo no ven nada.
      *
      * SCRUM-154: un informe ya registrado no debe desaparecer de la bandeja.
      * SCRUM-128 hace que CreditoOrdinario.estado encadene automáticamente a
      * 'sarlaft_control_interno' apenas se registra el informe del Coordinador
      * — ese valor cae fuera de ESTADOS_INFORME_TECNICO, así que sin el OR
      * sobre InformeTecnico.estado === 'registrado' el crédito quedaría
-     * invisible para ambos roles en cuanto se finaliza (mismo criterio ya
-     * usado en findCreditoConstructorVisible()/autorizarVisualizacion()).
+     * invisible en cuanto se finaliza (mismo criterio ya usado en
+     * findCreditoConstructorVisible()/autorizarVisualizacion()).
      */
     public function index(Request $request)
     {
@@ -65,15 +69,7 @@ class InformeTecnicoController extends Controller
             })
             ->with(['cliente', 'solicitudCredito.cliente', 'informeTecnico']);
 
-        if ($activeRole === 'ingeniero') {
-            $query->where(function ($q) use ($registrado) {
-                $q->where('estado', 'informe_tecnico_ingeniero')->orWhere($registrado);
-            });
-        } elseif ($activeRole === 'coordinador_comercial') {
-            $query->where(function ($q) use ($registrado) {
-                $q->whereIn('estado', ['informe_tecnico_coordinador', 'informe_tecnico_finalizado'])->orWhere($registrado);
-            });
-        } elseif ($activeRole !== 'superadmin') {
+        if (!in_array($activeRole, ['ingeniero', 'coordinador_comercial', 'superadmin'], true)) {
             $query->whereRaw('1 = 0');
         }
 
@@ -101,7 +97,7 @@ class InformeTecnicoController extends Controller
         $credito = $this->findCreditoConstructorVisible($creditoId);
         $activeRole = $this->resolveActiveRole($request);
 
-        $this->autorizarVisualizacion($activeRole, $credito);
+        $this->autorizarVisualizacion($activeRole);
 
         $informe = $credito->informeTecnico ?? InformeTecnico::create([
             'credito_ordinario_id' => $credito->id,
@@ -206,15 +202,14 @@ class InformeTecnicoController extends Controller
      * Documento consolidado (PDF o Excel) del informe técnico — habilitado
      * apenas exista algún dato guardado, no solo cuando está finalizado
      * (así lo pide el prototipo). Reusa el mismo gate de visualización que
-     * el detalle (show()) para que el Coordinador no pueda descargar antes
-     * de que le corresponda ver el informe.
+     * el detalle (show()).
      */
     public function descargar(Request $request, $creditoId)
     {
         $credito = $this->findCreditoConstructorVisible($creditoId);
         $activeRole = $this->resolveActiveRole($request);
 
-        $this->autorizarVisualizacion($activeRole, $credito);
+        $this->autorizarVisualizacion($activeRole);
 
         $informe = $credito->informeTecnico;
         if (!$informe) {
@@ -280,29 +275,16 @@ class InformeTecnicoController extends Controller
     }
 
     /**
-     * Gatilla la visibilidad del detalle (no solo la edición): el Coordinador
-     * Comercial no debe poder ver el informe mientras todavía está en manos
-     * del Ingeniero (evita ver un borrador ajeno antes de que le corresponda).
-     * El Ingeniero sí puede ver en cualquiera de los 3 estados, ya que su
-     * fase siempre ocurre primero — no hay riesgo de ver "antes de tiempo".
-     *
-     * SCRUM-128: además de los 2 estados originales del Coordinador, un
-     * informe ya registrado (InformeTecnico.estado === 'registrado') sigue
-     * siendo visible sin importar a qué estado haya avanzado el
-     * CreditoOrdinario después (sarlaft_control_interno, etc.) — mismo
-     * criterio que findCreditoConstructorVisible().
+     * Gate de visualización del detalle/descarga: antes bloqueaba al
+     * Coordinador Comercial mientras el informe seguía en manos del
+     * Ingeniero. A pedido de Juan (SCRUM-154, comentario 2026-07-27) ambos
+     * roles pueden ver el informe en cualquier etapa — solo la EDICIÓN sigue
+     * restringida por turno (autorizarRolParaEstado). Roles ajenos al flujo
+     * (ej. tesorería) siguen sin poder ver nada.
      */
-    private function autorizarVisualizacion(string $activeRole, CreditoOrdinario $credito): void
+    private function autorizarVisualizacion(string $activeRole): void
     {
-        if ($activeRole === 'superadmin' || $activeRole === 'ingeniero') {
-            return;
-        }
-
-        $estado = $credito->estado;
-        $informeRegistrado = $credito->informeTecnico && $credito->informeTecnico->estado === 'registrado';
-
-        if ($activeRole === 'coordinador_comercial'
-            && (in_array($estado, ['informe_tecnico_coordinador', 'informe_tecnico_finalizado']) || $informeRegistrado)) {
+        if (in_array($activeRole, ['superadmin', 'ingeniero', 'coordinador_comercial'], true)) {
             return;
         }
 

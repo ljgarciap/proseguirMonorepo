@@ -354,7 +354,7 @@ class InformeTecnicoTest extends TestCase
         ]);
     }
 
-    public function test_ingeniero_ve_bandeja_y_coordinador_no_todavia(): void
+    public function test_ambos_roles_ven_la_bandeja_completa(): void
     {
         $credito = $this->crearCreditoEnEstadoIngeniero();
 
@@ -364,11 +364,14 @@ class InformeTecnicoTest extends TestCase
         $ids = array_column($response->json(), 'id');
         $this->assertContains($credito->id, $ids);
 
+        // El Coordinador también ve el crédito en la bandeja aunque todavía
+        // sea turno del Ingeniero (SCRUM-154, comentario de Juan
+        // 2026-07-27: ambos roles deben ver todos los informes en gestión).
         Passport::actingAs($this->coordinador);
         $response = $this->getJson('/api/informes-tecnicos', ['X-Active-Role' => 'coordinador_comercial']);
         $response->assertStatus(200);
         $ids = array_column($response->json(), 'id');
-        $this->assertNotContains($credito->id, $ids);
+        $this->assertContains($credito->id, $ids);
     }
 
     public function test_ingeniero_guarda_borrador_sin_cambiar_estado_del_credito(): void
@@ -665,7 +668,7 @@ class InformeTecnicoTest extends TestCase
         ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(403);
     }
 
-    public function test_coordinador_no_puede_ver_el_detalle_mientras_es_turno_del_ingeniero(): void
+    public function test_coordinador_puede_ver_el_detalle_durante_turno_del_ingeniero_pero_no_editar(): void
     {
         $credito = $this->crearCreditoEnEstadoIngeniero();
 
@@ -674,13 +677,17 @@ class InformeTecnicoTest extends TestCase
         $this->getJson("/api/informes-tecnicos/{$credito->id}", ['X-Active-Role' => 'ingeniero'])
             ->assertStatus(200);
 
-        // El coordinador no debe poder ver el detalle todavía (evita ver un
-        // borrador ajeno antes de que le corresponda).
+        // El coordinador también puede ver el detalle aunque todavía sea
+        // turno del ingeniero (SCRUM-154, comentario de Juan 2026-07-27:
+        // solo visibilidad, la edición sigue restringida por turno).
         Passport::actingAs($this->coordinador);
         $this->getJson("/api/informes-tecnicos/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial'])
-            ->assertStatus(403);
+            ->assertStatus(200);
+        $this->putJson("/api/informes-tecnicos/{$credito->id}/borrador", [
+            'observaciones_coordinador' => 'Muy pronto',
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(403);
 
-        // Una vez que el ingeniero registra, el coordinador ya puede ver
+        // Una vez que el ingeniero registra, el coordinador sigue viendo
         // (y el ingeniero sigue pudiendo, aunque ya no editar).
         Passport::actingAs($this->ingeniero);
         $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
@@ -745,13 +752,21 @@ class InformeTecnicoTest extends TestCase
         $responseExcel->assertStatus(200);
     }
 
-    public function test_coordinador_no_puede_descargar_mientras_es_turno_del_ingeniero(): void
+    public function test_coordinador_puede_descargar_mientras_es_turno_del_ingeniero(): void
     {
         $credito = $this->crearCreditoEnEstadoIngeniero();
 
+        Passport::actingAs($this->ingeniero);
+        $this->putJson("/api/informes-tecnicos/{$credito->id}/borrador", [
+            'observaciones_ingeniero' => 'En progreso',
+        ], ['X-Active-Role' => 'ingeniero'])->assertStatus(200);
+
+        // SCRUM-154, comentario de Juan 2026-07-27: solo visibilidad, no
+        // acción — el Coordinador puede consultar/descargar aunque todavía
+        // sea turno del Ingeniero.
         Passport::actingAs($this->coordinador);
         $this->get("/api/informes-tecnicos/{$credito->id}/descargar?formato=pdf", [
             'X-Active-Role' => 'coordinador_comercial'
-        ])->assertStatus(403);
+        ])->assertStatus(200);
     }
 }
