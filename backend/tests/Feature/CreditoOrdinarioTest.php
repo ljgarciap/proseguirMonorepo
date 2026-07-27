@@ -182,10 +182,19 @@ class CreditoOrdinarioTest extends TestCase
         $credito->estado = 'pendiente_analisis_financiero';
         $credito->save();
 
-        // 3. Coordinador uploads financial docs
+        // 3. Coordinador confirma el Análisis Financiero (SCRUM-155 — reemplaza el
+        // upload manual de 'analisis_financiero'; se crea directamente en estado
+        // confirmado porque este test cubre las transiciones BPMN, no las reglas
+        // de validación del módulo, que tienen su propia suite en
+        // AnalisisFinancieroTest).
+        \App\Models\AnalisisFinanciero::create([
+            'credito_ordinario_id' => $creditoId,
+            'estado' => 'confirmado',
+            'anio_inicial' => 2024,
+            'cantidad_anios' => 2,
+        ]);
+
         Passport::actingAs($this->coordinador);
-        $this->subirArchivo($creditoId, 'analisis_financiero', 'coordinador_comercial', 'analisis.pdf')
-            ->assertStatus(200);
 
         // Last doc triggers auto-transition to aprobacion_presentacion
         $this->subirArchivo($creditoId, 'presentacion_comite', 'coordinador_comercial', 'presentacion.pdf')

@@ -195,6 +195,15 @@ Route::prefix('informes-tecnicos')->middleware('auth:api')->group(function () {
     Route::get('/{creditoId}/descargar', [\App\Http\Controllers\InformeTecnicoController::class, 'descargar']);
 });
 
+// Análisis Financiero (SCRUM-155)
+Route::prefix('analisis-financiero')->middleware('auth:api')->group(function () {
+    Route::get('/', [\App\Http\Controllers\AnalisisFinancieroController::class, 'index']);
+    Route::get('/{creditoId}', [\App\Http\Controllers\AnalisisFinancieroController::class, 'show']);
+    Route::put('/{creditoId}/borrador', [\App\Http\Controllers\AnalisisFinancieroController::class, 'guardarBorrador']);
+    Route::post('/{creditoId}/confirmar', [\App\Http\Controllers\AnalisisFinancieroController::class, 'confirmar']);
+    Route::get('/{creditoId}/descargar', [\App\Http\Controllers\AnalisisFinancieroController::class, 'descargar']);
+});
+
 // Listas Restrictivas y SARLAFT (SCRUM-128)
 Route::prefix('listas-sarlaft')->middleware('auth:api')->group(function () {
     Route::get('/', [\App\Http\Controllers\ListasRestrictivasSarlaftController::class, 'index']);

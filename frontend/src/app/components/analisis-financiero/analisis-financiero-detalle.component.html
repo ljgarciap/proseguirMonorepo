@@ -1,0 +1,522 @@
+<div class="view-container" *ngIf="!loading && credito">
+  <header class="view-header">
+    <div class="title-area">
+      <button class="btn-pro secondary sm back-btn" (click)="volver()">
+        <span class="material-symbols-outlined">arrow_back</span> Volver a la bandeja
+      </button>
+      <h1>Análisis Financiero — {{ credito.numero_solicitud }}</h1>
+      <p>Captura comparativa de estados financieros · Cifras en millones de COP</p>
+    </div>
+    <div class="header-actions">
+      <span class="status-pill success">SARLAFT Favorable</span>
+      <span class="status-pill" [ngClass]="esConfirmado ? 'success' : 'warning'">{{ esConfirmado ? 'Confirmado' : 'Borrador' }}</span>
+      <div class="download-actions" *ngIf="puedeDescargar">
+        <button class="btn-pro secondary sm" (click)="descargar('pdf')" title="Descargar PDF">
+          <span class="material-symbols-outlined">picture_as_pdf</span> PDF
+        </button>
+        <button class="btn-pro secondary sm" (click)="descargar('excel')" title="Descargar Excel">
+          <span class="material-symbols-outlined">grid_on</span> Excel
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="alert-readonly" *ngIf="esConfirmado">
+    <span class="material-symbols-outlined">verified</span>
+    El análisis financiero ya fue confirmado. Modo solo lectura.
+  </div>
+
+  <!-- Encabezado: cliente / representante legal / crédito solicitado (no editable) -->
+  <div class="info-grid mt-4">
+    <div class="content-card">
+      <h4 class="section-subtitle">Información del cliente</h4>
+      <div class="info-fields">
+        <div><span class="field-label">Tipo de persona</span><span class="field-value">{{ credito.solicitud_credito?.cliente?.tipo_persona?.nombre || '—' }}</span></div>
+        <div><span class="field-label">Identificación</span><span class="field-value">{{ credito.solicitud_credito?.cliente?.numero_documento || '—' }}</span></div>
+        <div><span class="field-label">Razón social</span><span class="field-value">{{ credito.solicitud_credito?.cliente?.nombre || '—' }}</span></div>
+        <div><span class="field-label">Representante legal</span><span class="field-value">{{ credito.solicitud_credito?.cliente?.rep_nombres || '—' }} {{ credito.solicitud_credito?.cliente?.rep_primer_apellido || '' }}</span></div>
+      </div>
+    </div>
+    <div class="content-card">
+      <h4 class="section-subtitle">Crédito solicitado</h4>
+      <div class="info-fields">
+        <div><span class="field-label">Tipo de crédito</span><span class="field-value">{{ credito.solicitud_credito?.tipo_credito?.nombre || '—' }}</span></div>
+        <div><span class="field-label">Monto solicitado</span><span class="field-value">$ {{ (credito.solicitud_credito?.monto_solicitado || 0) | number:'1.0-0':'es-CO' }}</span></div>
+        <div><span class="field-label">Plazo / amortización</span><span class="field-value">{{ credito.solicitud_credito?.plazo_meses || '—' }} meses / {{ credito.solicitud_credito?.amortizacion?.nombre || '—' }}</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Configuración: año inicial y cantidad de años -->
+  <div class="content-card mt-4">
+    <div class="config-bar">
+      <div class="form-group">
+        <label>Año inicial</label>
+        <input class="pro-input" type="number" [(ngModel)]="anioInicial" [disabled]="!puedeEditar" (change)="actualizarAnios()">
+      </div>
+      <div class="form-group">
+        <label>Cantidad de años (mín. 2 / máx. 3)</label>
+        <select class="pro-input" [(ngModel)]="cantidadAnios" [disabled]="!puedeEditar" (change)="actualizarAnios()">
+          <option [ngValue]="2">2</option>
+          <option [ngValue]="3">3</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Unidad</label>
+        <input class="pro-input" type="text" value="Millones de COP" disabled>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs-bar mt-4">
+    <button class="tab-btn" [class.active]="activeTab === 'activo'" (click)="cambiarTab('activo')">ACTIVO</button>
+    <button class="tab-btn" [class.active]="activeTab === 'pasivo'" (click)="cambiarTab('pasivo')">PASIVO</button>
+    <button class="tab-btn" [class.active]="activeTab === 'patrimonio'" (click)="cambiarTab('patrimonio')">PATRIMONIO</button>
+    <button class="tab-btn" [class.active]="activeTab === 'utilidad_neta'" (click)="cambiarTab('utilidad_neta')">UTILIDAD NETA</button>
+    <button class="tab-btn" [class.active]="activeTab === 'ori'" (click)="cambiarTab('ori')">ORI</button>
+    <button class="tab-btn" [class.active]="activeTab === 'cartera'" (click)="cambiarTab('cartera')">CARTERA</button>
+    <button class="tab-btn" [class.active]="activeTab === 'resumen'" (click)="cambiarTab('resumen')">RESUMEN</button>
+  </div>
+
+  <div class="content-card mt-2" (input)="puedeEditar && onCampoCambiado()">
+
+    <!-- ================= ACTIVO ================= -->
+    <div *ngIf="activeTab === 'activo'">
+      <h3 class="card-title">ACTIVO</h3>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Concepto</th>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <th>{{ anio }}</th>
+              <th>An. Estructural</th>
+              <th *ngIf="i > 0">Variación</th>
+            </ng-container>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let fila of activoCorriente">
+            <td>{{ fila.label }}</td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                     [ngModel]="campoInput('activo', fila.clave, anio)"
+                     (ngModelChange)="setCampoInput('activo', fila.clave, anio, $event)"
+                     [disabled]="!puedeEditar"></td>
+              <td class="pct-cell">{{ fmtPct(estructural('activo', fila.clave, anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('activo', fila.clave, anio)) }}</td>
+            </ng-container>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td>TOTAL ACTIVO CORRIENTE</td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td>$ {{ valorCalculado('activo', 'total_activo_corriente', anio) | number:'1.0-0':'es-CO' }}</td>
+              <td class="pct-cell">{{ fmtPct(estructural('activo', 'activo_corriente', anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('activo', 'activo_corriente', anio)) }}</td>
+            </ng-container>
+          </tr>
+        </tfoot>
+      </table>
+
+      <table class="items-table mt-2">
+        <tbody>
+          <tr *ngFor="let fila of activoNoCorriente">
+            <td>{{ fila.label }}</td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                     [ngModel]="campoInput('activo', fila.clave, anio)"
+                     (ngModelChange)="setCampoInput('activo', fila.clave, anio, $event)"
+                     [disabled]="!puedeEditar"></td>
+              <td class="pct-cell">{{ fmtPct(estructural('activo', fila.clave, anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('activo', fila.clave, anio)) }}</td>
+            </ng-container>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td>TOTAL ACTIVO NO CORRIENTE</td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td>$ {{ valorCalculado('activo', 'total_activo_no_corriente', anio) | number:'1.0-0':'es-CO' }}</td>
+              <td class="pct-cell">{{ fmtPct(estructural('activo', 'activo_no_corriente', anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('activo', 'activo_no_corriente', anio)) }}</td>
+            </ng-container>
+          </tr>
+          <tr class="total-row grand-total">
+            <td>TOTAL ACTIVO</td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td [attr.colspan]="i === 0 ? 2 : 3">$ {{ valorCalculado('activo', 'total_activo', anio) | number:'1.0-0':'es-CO' }}</td>
+            </ng-container>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- ================= PASIVO ================= -->
+    <div *ngIf="activeTab === 'pasivo'">
+      <h3 class="card-title">PASIVO</h3>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Concepto</th>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <th>{{ anio }}</th>
+              <th>An. Estructural</th>
+              <th *ngIf="i > 0">Variación</th>
+            </ng-container>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let fila of pasivoCorriente">
+            <td>{{ fila.label }}</td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                     [ngModel]="campoInput('pasivo', fila.clave, anio)"
+                     (ngModelChange)="setCampoInput('pasivo', fila.clave, anio, $event)"
+                     [disabled]="!puedeEditar"></td>
+              <td class="pct-cell">{{ fmtPct(estructural('pasivo', fila.clave, anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('pasivo', fila.clave, anio)) }}</td>
+            </ng-container>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td>TOTAL PASIVO CORRIENTE</td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td>$ {{ valorCalculado('pasivo', 'total_pasivo_corriente', anio) | number:'1.0-0':'es-CO' }}</td>
+              <td class="pct-cell">{{ fmtPct(estructural('pasivo', 'pasivo_corriente', anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('pasivo', 'pasivo_corriente', anio)) }}</td>
+            </ng-container>
+          </tr>
+        </tfoot>
+      </table>
+
+      <table class="items-table mt-2">
+        <tbody>
+          <tr *ngFor="let fila of pasivoNoCorriente">
+            <td>{{ fila.label }}</td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                     [ngModel]="campoInput('pasivo', fila.clave, anio)"
+                     (ngModelChange)="setCampoInput('pasivo', fila.clave, anio, $event)"
+                     [disabled]="!puedeEditar"></td>
+              <td class="pct-cell">{{ fmtPct(estructural('pasivo', fila.clave, anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('pasivo', fila.clave, anio)) }}</td>
+            </ng-container>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td>TOTAL PASIVO NO CORRIENTE</td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td>$ {{ valorCalculado('pasivo', 'total_pasivo_no_corriente', anio) | number:'1.0-0':'es-CO' }}</td>
+              <td class="pct-cell">{{ fmtPct(estructural('pasivo', 'pasivo_no_corriente', anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('pasivo', 'pasivo_no_corriente', anio)) }}</td>
+            </ng-container>
+          </tr>
+          <tr class="total-row grand-total">
+            <td>TOTAL PASIVO</td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td [attr.colspan]="i === 0 ? 2 : 3">$ {{ valorCalculado('pasivo', 'total_pasivo', anio) | number:'1.0-0':'es-CO' }}</td>
+            </ng-container>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- ================= PATRIMONIO ================= -->
+    <div *ngIf="activeTab === 'patrimonio'">
+      <h3 class="card-title">PATRIMONIO</h3>
+      <p class="field-note">
+        <span class="material-symbols-outlined">info</span>
+        Validación contable: TOTAL ACTIVO debe ser igual a TOTAL PASIVO + PATRIMONIO. Las diferencias se muestran en la pestaña RESUMEN.
+      </p>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Concepto</th>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <th>{{ anio }}</th>
+              <th>An. Estructural</th>
+              <th *ngIf="i > 0">Variación</th>
+            </ng-container>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let fila of patrimonioConceptos">
+            <td>{{ fila.label }}</td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                     [ngModel]="campoInput('patrimonio', fila.clave, anio)"
+                     (ngModelChange)="setCampoInput('patrimonio', fila.clave, anio, $event)"
+                     [disabled]="!puedeEditar"></td>
+              <td class="pct-cell">{{ fmtPct(estructural('patrimonio', fila.clave, anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('patrimonio', fila.clave, anio)) }}</td>
+            </ng-container>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row grand-total">
+            <td>TOTAL PATRIMONIO</td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td [attr.colspan]="i === 0 ? 2 : 3">$ {{ valorCalculado('patrimonio', 'total_patrimonio', anio) | number:'1.0-0':'es-CO' }}</td>
+            </ng-container>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- ================= UTILIDAD NETA ================= -->
+    <div *ngIf="activeTab === 'utilidad_neta'">
+      <h3 class="card-title">UTILIDAD NETA</h3>
+      <table class="items-table">
+        <thead>
+          <tr><th>Concepto</th><th *ngFor="let anio of anios">{{ anio }}</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Ingresos ordinarios</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('utilidad_neta', 'ingresos_ordinarios', anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', 'ingresos_ordinarios', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr>
+            <td>Costo de ventas</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('utilidad_neta', 'costo_ventas', anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', 'costo_ventas', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr class="total-row">
+            <td>UTILIDAD BRUTA</td>
+            <td *ngFor="let anio of anios">$ {{ valorCalculado('utilidadNeta', 'utilidad_bruta', anio) | number:'1.0-0':'es-CO' }}</td>
+          </tr>
+          <tr>
+            <td>Gastos de administración</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('utilidad_neta', 'gastos_administracion', anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', 'gastos_administracion', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr>
+            <td>Gastos de ventas y distribución</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('utilidad_neta', 'gastos_ventas_distribucion', anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', 'gastos_ventas_distribucion', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr class="total-row">
+            <td>UTILIDAD OPERACIONAL</td>
+            <td *ngFor="let anio of anios">$ {{ valorCalculado('utilidadNeta', 'utilidad_operacional', anio) | number:'1.0-0':'es-CO' }}</td>
+          </tr>
+          <tr>
+            <td>Ingreso financiero</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('utilidad_neta', 'ingreso_financiero', anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', 'ingreso_financiero', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr>
+            <td>Otros ingresos</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('utilidad_neta', 'otros_ingresos', anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', 'otros_ingresos', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr>
+            <td>Ingresos método de participación</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('utilidad_neta', 'ingresos_metodo_participacion', anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', 'ingresos_metodo_participacion', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr>
+            <td>Gasto financiero</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('utilidad_neta', 'gasto_financiero', anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', 'gasto_financiero', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr>
+            <td>Intereses</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('utilidad_neta', 'intereses', anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', 'intereses', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr>
+            <td>Otros gastos</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('utilidad_neta', 'otros_gastos', anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', 'otros_gastos', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr class="total-row">
+            <td>GANANCIA ANTES DE IMPUESTOS</td>
+            <td *ngFor="let anio of anios">$ {{ valorCalculado('utilidadNeta', 'ganancia_antes_impuestos', anio) | number:'1.0-0':'es-CO' }}</td>
+          </tr>
+          <tr>
+            <td>Impuesto a las ganancias</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('utilidad_neta', 'impuesto_ganancias', anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', 'impuesto_ganancias', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr>
+            <td>Impuesto de renta</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('utilidad_neta', 'impuesto_renta', anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', 'impuesto_renta', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row grand-total">
+            <td>UTILIDAD NETA</td>
+            <td *ngFor="let anio of anios">$ {{ valorCalculado('utilidadNeta', 'utilidad_neta', anio) | number:'1.0-0':'es-CO' }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- ================= ORI ================= -->
+    <div *ngIf="activeTab === 'ori'">
+      <h3 class="card-title">ORI - OTRO RESULTADO INTEGRAL</h3>
+      <table class="items-table">
+        <thead>
+          <tr><th>Concepto</th><th *ngFor="let anio of anios">{{ anio }}</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Superávit por revaluación de activos</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('ori', 'superavit_revaluacion_activos', anio)"
+                (ngModelChange)="setCampoInput('ori', 'superavit_revaluacion_activos', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr>
+            <td>Conversión moneda extranjera</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('ori', 'conversion_moneda_extranjera', anio)"
+                (ngModelChange)="setCampoInput('ori', 'conversion_moneda_extranjera', anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row grand-total">
+            <td>TOTAL ORI</td>
+            <td *ngFor="let anio of anios">$ {{ valorCalculado('ori', 'total_ori', anio) | number:'1.0-0':'es-CO' }}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <p class="field-note">
+        <span class="material-symbols-outlined">info</span>
+        El TOTAL ORI se calcula automáticamente. Los valores negativos se presentan con signo menos.
+      </p>
+    </div>
+
+    <!-- ================= CARTERA ================= -->
+    <div *ngIf="activeTab === 'cartera'">
+      <h3 class="card-title">CARTERA</h3>
+      <table class="items-table">
+        <thead>
+          <tr><th>Concepto</th><th *ngFor="let anio of anios">{{ anio }}</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let fila of carteraConceptos">
+            <td>{{ fila.label }}</td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('cartera', fila.clave, anio)"
+                (ngModelChange)="setCampoInput('cartera', fila.clave, anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row grand-total">
+            <td>CARTERA NETA</td>
+            <td *ngFor="let anio of anios">$ {{ valorCalculado('cartera', 'cartera_neta', anio) | number:'1.0-0':'es-CO' }}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div class="charts-grid mt-4">
+        <div class="chart-box doughnut" *ngFor="let anio of anios">
+          <h4>AÑO {{ anio }}</h4>
+          <canvas baseChart *ngIf="carteraChartData[anio]" [data]="carteraChartData[anio]" [options]="carteraChartOptions" [type]="'doughnut'"></canvas>
+        </div>
+      </div>
+      <p class="field-note">
+        <span class="material-symbols-outlined">info</span>
+        La provisión no se incluye en los gráficos circulares por ser un valor negativo; sí se considera en el cálculo de CARTERA NETA.
+      </p>
+    </div>
+
+    <!-- ================= RESUMEN ================= -->
+    <div *ngIf="activeTab === 'resumen'">
+      <h3 class="card-title">RESUMEN DEL ANÁLISIS — Año {{ calculado?.resumen?.anio_resumen }}</h3>
+
+      <div class="resumen-cards mt-4">
+        <div class="resumen-card">
+          <span class="label">Total Activo</span>
+          <span class="value">$ {{ calculado?.resumen?.total_activo | number:'1.0-0':'es-CO' }}</span>
+          <span class="variation" *ngIf="calculado?.resumen?.variacion_total_activo !== null">{{ fmtPct(calculado?.resumen?.variacion_total_activo) }}</span>
+        </div>
+        <div class="resumen-card">
+          <span class="label">Total Pasivo</span>
+          <span class="value">$ {{ calculado?.resumen?.total_pasivo | number:'1.0-0':'es-CO' }}</span>
+          <span class="variation" *ngIf="calculado?.resumen?.variacion_total_pasivo !== null">{{ fmtPct(calculado?.resumen?.variacion_total_pasivo) }}</span>
+        </div>
+        <div class="resumen-card">
+          <span class="label">Patrimonio</span>
+          <span class="value">$ {{ calculado?.resumen?.total_patrimonio | number:'1.0-0':'es-CO' }}</span>
+          <span class="variation" *ngIf="calculado?.resumen?.variacion_total_patrimonio !== null">{{ fmtPct(calculado?.resumen?.variacion_total_patrimonio) }}</span>
+        </div>
+        <div class="resumen-card">
+          <span class="label">Utilidad Neta</span>
+          <span class="value">$ {{ calculado?.resumen?.utilidad_neta | number:'1.0-0':'es-CO' }}</span>
+          <span class="variation" *ngIf="calculado?.resumen?.variacion_utilidad_neta !== null">{{ fmtPct(calculado?.resumen?.variacion_utilidad_neta) }}</span>
+        </div>
+        <div class="resumen-card">
+          <span class="label">Cartera Neta</span>
+          <span class="value">$ {{ calculado?.resumen?.cartera_neta | number:'1.0-0':'es-CO' }}</span>
+          <span class="variation" *ngIf="calculado?.resumen?.variacion_cartera_neta !== null">{{ fmtPct(calculado?.resumen?.variacion_cartera_neta) }}</span>
+        </div>
+      </div>
+
+      <div class="resumen-grid mt-4">
+        <div class="content-card">
+          <h4 class="section-subtitle">Validaciones automáticas</h4>
+          <div class="validacion-row">
+            <span>Años configurados (2 o 3)</span>
+            <span class="badge-ok" *ngIf="cantidadAnios >= 2 && cantidadAnios <= 3">OK</span>
+          </div>
+          <div class="validacion-row">
+            <span>Activo = Pasivo + Patrimonio</span>
+            <span class="badge-diff" [class.badge-ok]="calculado?.resumen?.diferencia_contable === 0">
+              {{ calculado?.resumen?.diferencia_contable === 0 ? 'OK' : ('Diferencia: $' + calculado?.resumen?.diferencia_contable) }}
+            </span>
+          </div>
+          <div class="validacion-row">
+            <span>Cartera neta calculada</span>
+            <span class="badge-ok">OK</span>
+          </div>
+          <div class="validacion-row">
+            <span>Utilidad neta calculada</span>
+            <span class="badge-ok">OK</span>
+          </div>
+        </div>
+
+        <div class="content-card">
+          <h4 class="section-subtitle">Observaciones del análisis</h4>
+          <textarea class="pro-input textarea" [(ngModel)]="observaciones" [disabled]="!puedeEditar" placeholder="Observaciones del análisis financiero"></textarea>
+        </div>
+      </div>
+
+      <div class="form-footer mt-4" *ngIf="puedeEditar">
+        <button class="btn-pro secondary" (click)="guardarBorrador()">
+          <span class="material-symbols-outlined">save</span> Guardar Borrador
+        </button>
+        <button class="btn-pro secondary" (click)="descargar('excel')" *ngIf="puedeDescargar">
+          <span class="material-symbols-outlined">grid_on</span> Exportar Excel
+        </button>
+        <button class="btn-pro secondary" (click)="descargar('pdf')" *ngIf="puedeDescargar">
+          <span class="material-symbols-outlined">picture_as_pdf</span> Exportar PDF
+        </button>
+        <button class="btn-pro primary" (click)="confirmar()">
+          <span class="material-symbols-outlined">check_circle</span> Confirmar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="view-container" *ngIf="loading">
+  <p class="text-center py-4">Cargando análisis financiero...</p>
+</div>

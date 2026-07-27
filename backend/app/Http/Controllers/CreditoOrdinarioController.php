@@ -342,12 +342,17 @@ class CreditoOrdinarioController extends Controller
 
                 case 'pendiente_analisis_financiero':
                     // El Oficial de Cumplimiento ya emitió concepto favorable (módulo Listas
-                    // Restrictivas y SARLAFT, SCRUM-128). Aquí solo falta el Coordinador Comercial.
-                    $hasFinancial = !empty($documentos['analisis_financiero']) && !empty($documentos['presentacion_comite']);
+                    // Restrictivas y SARLAFT, SCRUM-128). SCRUM-155 reemplazó el upload manual
+                    // de "Análisis Financiero" por el módulo interactivo dedicado — la
+                    // condición ya no depende de $documentos['analisis_financiero'], sino de
+                    // que AnalisisFinanciero quede confirmado allá. "Presentación Comité" sigue
+                    // siendo upload manual (elaborar esa presentación está fuera de alcance).
+                    $analisisConfirmado = $credito->analisisFinanciero?->estado === 'confirmado';
+                    $hasFinancial = $analisisConfirmado && !empty($documentos['presentacion_comite']);
 
                     if ($hasFinancial) {
                         $estadoNuevo = 'aprobacion_presentacion';
-                        $comentario = 'Análisis financiero finalizado y documentos cargados por Comercial. Pasa a aprobación de presentación por Gerencia.';
+                        $comentario = 'Análisis financiero confirmado y presentación cargada por Comercial. Pasa a aprobación de presentación por Gerencia.';
                     } else {
                         $comentario = 'Archivo cargado en análisis financiero. Aún faltan documentos complementarios para transicionar de etapa.';
                     }

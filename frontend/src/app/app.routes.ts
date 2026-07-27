@@ -140,6 +140,18 @@ export const routes: Routes = [
         data: { roles: ['ingeniero', 'coordinador_comercial', 'superadmin'] }
     },
     {
+        path: 'analisis-financiero',
+        loadComponent: () => import('./components/analisis-financiero/analisis-financiero-bandeja.component').then(m => m.AnalisisFinancieroBandejaComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['coordinador_comercial', 'superadmin'] }
+    },
+    {
+        path: 'analisis-financiero/:creditoId',
+        loadComponent: () => import('./components/analisis-financiero/analisis-financiero-detalle.component').then(m => m.AnalisisFinancieroDetalleComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['coordinador_comercial', 'superadmin'] }
+    },
+    {
         path: 'listas-sarlaft',
         loadComponent: () => import('./components/listas-sarlaft/listas-sarlaft-bandeja.component').then(m => m.ListasSarlaftBandejaComponent),
         canActivate: [roleGuard],

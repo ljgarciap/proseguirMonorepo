@@ -61,6 +61,9 @@ import { interval, Subscription } from 'rxjs';
           <!-- SCRUM-153: sección propia de Crédito, orden alfabético -->
           <div class="nav-section" *ngIf="authService.isAuthorized(['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin', 'ingeniero'])">
             <label>Crédito</label>
+            <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'superadmin'])" routerLink="/analisis-financiero" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">finance</span> Análisis Financiero
+            </a>
             <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'])" routerLink="/creditos" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">payments</span> Crédito Ordinario
             </a>

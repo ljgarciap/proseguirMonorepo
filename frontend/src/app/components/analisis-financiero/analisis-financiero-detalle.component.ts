@@ -1,0 +1,353 @@
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
+import { Subject, Subscription } from 'rxjs';
+import { debounceTime } from 'rxjs/operators';
+import { BaseChartDirective, provideCharts, withDefaultRegisterables } from 'ng2-charts';
+import { ChartData } from 'chart.js';
+import { environment } from '../../../environments/environment';
+import { AuthService } from '../../services/auth.service';
+import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
+import Swal from 'sweetalert2';
+
+export interface FilaConcepto {
+  label: string;
+  clave: string;
+}
+
+const ACTIVO_CORRIENTE: FilaConcepto[] = [
+  { label: 'Caja y bancos', clave: 'caja_bancos' },
+  { label: 'Cuentas por cobrar comerciales', clave: 'cxc_comerciales' },
+  { label: 'CXC vinculados económicos', clave: 'cxc_vinculados_economicos' },
+  { label: 'Impuestos corrientes', clave: 'impuestos_corrientes' },
+  { label: 'Otras cuentas por cobrar', clave: 'otras_cxc' },
+  { label: 'Inventarios', clave: 'inventarios' },
+  { label: 'Gastos pagados por anticipado', clave: 'gastos_pagados_anticipado' },
+];
+
+const ACTIVO_NO_CORRIENTE: FilaConcepto[] = [
+  { label: 'Propiedad, planta y equipo', clave: 'propiedad_planta_equipo' },
+  { label: 'Construcciones en curso', clave: 'construcciones_en_curso' },
+  { label: 'Inversiones en subsidiarias', clave: 'inversiones_subsidiarias' },
+  { label: 'Otras cuentas por cobrar no corrientes', clave: 'otras_cxc_no_corrientes' },
+  { label: 'Inversión en proyectos solares', clave: 'inversion_proyectos_solares' },
+  { label: 'Otros activos no financieros', clave: 'otros_activos_no_financieros' },
+  { label: 'Impuesto diferido', clave: 'impuesto_diferido' },
+  { label: 'Gastos pagados por anticipado', clave: 'gastos_pagados_anticipado_nc' },
+  { label: 'Inversión en posicionamiento de marca', clave: 'inversion_posicionamiento_marca' },
+  { label: 'Valorizaciones', clave: 'valorizaciones' },
+  { label: 'Inversiones en sociedades', clave: 'inversiones_sociedades' },
+  { label: 'CXC vinculados económicos', clave: 'cxc_vinculados_economicos_nc' },
+  { label: 'Impuesto a la renta', clave: 'impuesto_renta_activo' },
+  { label: 'Otros activos no corrientes', clave: 'otros_activos_no_corrientes' },
+];
+
+const PASIVO_CORRIENTE: FilaConcepto[] = [
+  { label: 'Obligaciones financieras', clave: 'obligaciones_financieras' },
+  { label: 'Obligaciones con particulares', clave: 'obligaciones_particulares' },
+  { label: 'Proveedores', clave: 'proveedores' },
+  { label: 'Otras cuentas por pagar', clave: 'otras_cxp' },
+  { label: 'Impuestos corrientes', clave: 'impuestos_corrientes_pasivo' },
+  { label: 'Beneficios a empleados', clave: 'beneficios_empleados' },
+  { label: 'Otros pasivos', clave: 'otros_pasivos' },
+  { label: 'Pasivos estimados y provisiones', clave: 'pasivos_estimados_provisiones' },
+];
+
+const PASIVO_NO_CORRIENTE: FilaConcepto[] = [
+  { label: 'Obligaciones financieras de largo plazo', clave: 'obligaciones_financieras_lp' },
+  { label: 'Obligaciones con vinculados de largo plazo', clave: 'obligaciones_vinculados_lp' },
+  { label: 'Impuesto diferido', clave: 'impuesto_diferido_pasivo' },
+];
+
+const PATRIMONIO_CONCEPTOS: FilaConcepto[] = [
+  { label: 'Capital suscrito y pagado', clave: 'capital_suscrito_pagado' },
+  { label: 'Reservas', clave: 'reservas' },
+  { label: 'Superávit por revaluación de activos', clave: 'superavit_revaluacion_activos' },
+  { label: 'Resultados acumulados', clave: 'resultados_acumulados' },
+  { label: 'Resultados acumulados por NIIF', clave: 'resultados_acumulados_niif' },
+  { label: 'Resultados del ejercicio', clave: 'resultados_ejercicio' },
+  { label: 'ORI - Conversión de moneda extranjera', clave: 'ori_conversion_moneda' },
+];
+
+const CARTERA_CONCEPTOS: FilaConcepto[] = [
+  { label: 'Cartera corriente', clave: 'cartera_corriente' },
+  { label: 'Vencida entre 0 y 60 días', clave: 'vencida_0_60' },
+  { label: 'Vencida con más de 60 días', clave: 'vencida_mas_60' },
+  { label: 'Deudas de difícil cobro', clave: 'dificil_cobro' },
+  { label: 'Provisión de cartera', clave: 'provision' },
+];
+
+type Tab = 'activo' | 'pasivo' | 'patrimonio' | 'utilidad_neta' | 'ori' | 'cartera' | 'resumen';
+
+@Component({
+  selector: 'app-analisis-financiero-detalle',
+  standalone: true,
+  imports: [CommonModule, FormsModule, RouterModule, MilesSeparatorDirective, BaseChartDirective],
+  providers: [provideCharts(withDefaultRegisterables())],
+  templateUrl: './analisis-financiero-detalle.component.html',
+  styleUrls: ['./analisis-financiero-detalle.component.css']
+})
+export class AnalisisFinancieroDetalleComponent implements OnInit, OnDestroy {
+  readonly activoCorriente = ACTIVO_CORRIENTE;
+  readonly activoNoCorriente = ACTIVO_NO_CORRIENTE;
+  readonly pasivoCorriente = PASIVO_CORRIENTE;
+  readonly pasivoNoCorriente = PASIVO_NO_CORRIENTE;
+  readonly patrimonioConceptos = PATRIMONIO_CONCEPTOS;
+  readonly carteraConceptos = CARTERA_CONCEPTOS;
+
+  creditoId!: number;
+  credito: any = null;
+  analisis: any = null;
+  calculado: any = null;
+  loading = false;
+  activeRole = '';
+  activeTab: Tab = 'activo';
+
+  // Inputs crudos por pestaña — hidratados desde `analisis.*` (lo persistido).
+  inputs: Record<string, any> = { activo: {}, pasivo: {}, patrimonio: {}, utilidad_neta: {}, ori: {}, cartera: {} };
+  observaciones = '';
+  anioInicial: number | null = null;
+  cantidadAnios: number = 2;
+
+  carteraChartData: Record<number, ChartData<'doughnut'>> = {};
+  carteraChartOptions = { plugins: { legend: { display: false } } };
+
+  private autoguardadoSubject = new Subject<void>();
+  private autoguardadoSub?: Subscription;
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private http: HttpClient,
+    public authService: AuthService
+  ) {}
+
+  ngOnInit(): void {
+    this.activeRole = this.authService.getActiveRole() || '';
+    this.creditoId = Number(this.route.snapshot.paramMap.get('creditoId'));
+    this.cargar();
+
+    this.autoguardadoSub = this.autoguardadoSubject.pipe(debounceTime(500)).subscribe(() => {
+      if (this.puedeEditar) this.guardarBorrador(true);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.autoguardadoSub?.unsubscribe();
+  }
+
+  onCampoCambiado(): void {
+    this.autoguardadoSubject.next();
+  }
+
+  cargar(): void {
+    this.loading = true;
+    this.http.get<any>(`${environment.apiUrl}/analisis-financiero/${this.creditoId}`, {
+      headers: { 'X-Active-Role': this.activeRole }
+    }).subscribe({
+      next: (data) => {
+        this.credito = data.credito;
+        this.analisis = data.analisis;
+        this.calculado = data.calculado;
+        this.hidratar();
+        this.actualizarGraficoCartera();
+        this.loading = false;
+      },
+      error: (err) => {
+        this.loading = false;
+        Swal.fire('Error', err.error?.message || 'No se pudo cargar el análisis financiero.', 'error')
+          .then(() => this.router.navigate(['/analisis-financiero']));
+      }
+    });
+  }
+
+  // PHP no distingue un objeto vacío de un array vacío: {} enviado al
+  // backend vuelve como json_decode(..., true) === [] y se persiste/serializa
+  // de vuelta como "[]", no "{}". Si se interpreta ese "[]" como ya-tiene-datos
+  // (era truthy) los inputs quedaban sobre un Array real, y las claves de
+  // concepto que se le asignan después se pierden en el próximo
+  // JSON.stringify (Array solo serializa índices numéricos).
+  private normalizarSeccion(valor: any): any {
+    return valor && !Array.isArray(valor) ? valor : {};
+  }
+
+  private hidratar(): void {
+    this.inputs = {
+      activo: this.normalizarSeccion(this.analisis?.activo),
+      pasivo: this.normalizarSeccion(this.analisis?.pasivo),
+      patrimonio: this.normalizarSeccion(this.analisis?.patrimonio),
+      utilidad_neta: this.normalizarSeccion(this.analisis?.utilidad_neta),
+      ori: this.normalizarSeccion(this.analisis?.ori),
+      cartera: this.normalizarSeccion(this.analisis?.cartera),
+    };
+    this.observaciones = this.analisis?.observaciones || '';
+    this.anioInicial = this.analisis?.anio_inicial ?? (new Date().getFullYear() - 1);
+    this.cantidadAnios = this.analisis?.cantidad_anios ?? 2;
+  }
+
+  get anios(): number[] {
+    return this.calculado?.anios || [];
+  }
+
+  get esConfirmado(): boolean {
+    return this.analisis?.estado === 'confirmado';
+  }
+
+  get puedeEditar(): boolean {
+    if (!this.credito || this.esConfirmado) return false;
+    return this.activeRole === 'coordinador_comercial' || this.activeRole === 'superadmin';
+  }
+
+  get puedeDescargar(): boolean {
+    return !!this.analisis && this.calculado?.resumen?.total_activo > 0;
+  }
+
+  cambiarTab(tab: Tab): void {
+    this.activeTab = tab;
+  }
+
+  campoInput(tab: string, clave: string, anio: number): number | null {
+    return this.inputs[tab]?.[clave]?.[anio] ?? null;
+  }
+
+  setCampoInput(tab: string, clave: string, anio: number, valor: number | null): void {
+    if (!this.inputs[tab][clave]) this.inputs[tab][clave] = {};
+    this.inputs[tab][clave][anio] = valor;
+  }
+
+  estructural(seccion: string, clave: string, anio: number): number | null {
+    return this.calculado?.[seccion]?.estructural?.[clave]?.[anio] ?? null;
+  }
+
+  variacion(seccion: string, clave: string, anio: number): number | null {
+    return this.calculado?.[seccion]?.variacion?.[clave]?.[anio] ?? null;
+  }
+
+  valorCalculado(seccion: string, clave: string, anio: number): number {
+    return this.calculado?.[seccion]?.[clave]?.[anio] ?? 0;
+  }
+
+  fmtPct(value: number | null): string {
+    if (value === null || value === undefined) return 'N/A';
+    return (value * 100).toFixed(2) + '%';
+  }
+
+  actualizarAnios(): void {
+    if (!this.anioInicial || this.cantidadAnios < 2 || this.cantidadAnios > 3) return;
+    this.guardarBorrador(true);
+  }
+
+  private actualizarGraficoCartera(): void {
+    const composicion = this.calculado?.cartera?.composicion_grafico;
+    if (!composicion) return;
+
+    this.carteraChartData = {};
+    for (const anio of this.anios) {
+      const data: number[] = [];
+      const labels: string[] = [];
+      for (const fila of this.carteraConceptos) {
+        if (fila.clave === 'provision') continue;
+        labels.push(fila.label);
+        data.push(this.calculado.cartera.valores[fila.clave]?.[anio] || 0);
+      }
+      this.carteraChartData[anio] = {
+        labels,
+        datasets: [{ data, backgroundColor: ['#3b82f6', '#ef4444', '#84cc16', '#a855f7', '#f59e0b'] }],
+      };
+    }
+  }
+
+  private payload(): any {
+    return {
+      anio_inicial: this.anioInicial,
+      cantidad_anios: this.cantidadAnios,
+      activo: this.inputs['activo'],
+      pasivo: this.inputs['pasivo'],
+      patrimonio: this.inputs['patrimonio'],
+      utilidad_neta: this.inputs['utilidad_neta'],
+      ori: this.inputs['ori'],
+      cartera: this.inputs['cartera'],
+      observaciones: this.observaciones,
+    };
+  }
+
+  guardarBorrador(silencioso = false): void {
+    this.http.put(`${environment.apiUrl}/analisis-financiero/${this.creditoId}/borrador`, this.payload(), {
+      headers: { 'X-Active-Role': this.activeRole }
+    }).subscribe({
+      next: (data: any) => {
+        // OJO: no llamar hidratar() acá. Esta respuesta puede llegar después
+        // de que el usuario ya siguió escribiendo en otro campo (autoguardado
+        // silencioso, sin esperar el roundtrip) — re-hidratar `inputs` desde
+        // lo que el servidor tenía AL MOMENTO DE ESTE REQUEST borraría esos
+        // cambios más nuevos. `this.inputs` (estado local) ya es la fuente de
+        // verdad de lo que el usuario está viendo; solo se refresca lo que el
+        // backend calcula (totales/porcentajes) y el estado del análisis.
+        this.analisis.estado = data.analisis.estado;
+        this.analisis.updated_at = data.analisis.updated_at;
+        this.calculado = data.calculado;
+        this.actualizarGraficoCartera();
+        if (!silencioso) {
+          Swal.fire('Guardado', 'El borrador del análisis financiero se guardó correctamente.', 'success');
+        }
+      },
+      error: (err) => {
+        if (!silencioso) {
+          Swal.fire('Error', err.error?.message || 'No se pudo guardar el borrador.', 'error');
+        }
+      }
+    });
+  }
+
+  confirmar(): void {
+    Swal.fire({
+      title: '¿Confirmar análisis financiero?',
+      text: '¿Confirma que la información está completa y desea continuar el flujo hacia el Comité de Crédito?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, confirmar y continuar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#1d4ed8'
+    }).then(result => {
+      if (!result.isConfirmed) return;
+
+      this.http.post(`${environment.apiUrl}/analisis-financiero/${this.creditoId}/confirmar`, this.payload(), {
+        headers: { 'X-Active-Role': this.activeRole }
+      }).subscribe({
+        next: () => {
+          Swal.fire('¡Confirmado!', 'El análisis financiero se confirmó correctamente.', 'success')
+            .then(() => this.router.navigate(['/analisis-financiero']));
+        },
+        error: (err) => {
+          Swal.fire('Error', err.error?.message || 'No se pudo confirmar el análisis financiero.', 'error');
+        }
+      });
+    });
+  }
+
+  descargar(formato: 'pdf' | 'excel'): void {
+    this.http.get(`${environment.apiUrl}/analisis-financiero/${this.creditoId}/descargar`, {
+      headers: { 'X-Active-Role': this.activeRole },
+      params: { formato },
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `analisis-financiero-${this.creditoId}.${formato === 'pdf' ? 'pdf' : 'xlsx'}`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: () => {
+        Swal.fire('Error', 'No se pudo descargar el análisis financiero.', 'error');
+      }
+    });
+  }
+
+  volver(): void {
+    this.router.navigate(['/analisis-financiero']);
+  }
+}

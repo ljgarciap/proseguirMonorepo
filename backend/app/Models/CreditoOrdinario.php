@@ -132,6 +132,11 @@ class CreditoOrdinario extends Model
         return $this->hasOne(InformeTecnico::class, 'credito_ordinario_id');
     }
 
+    public function analisisFinanciero()
+    {
+        return $this->hasOne(AnalisisFinanciero::class, 'credito_ordinario_id');
+    }
+
     /**
      * Usuario (Oficial de Cumplimiento) que diligenció el concepto de
      * Listas Restrictivas y SARLAFT (SCRUM-128).
