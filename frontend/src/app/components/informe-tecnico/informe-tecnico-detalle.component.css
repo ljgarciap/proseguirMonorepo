@@ -373,3 +373,85 @@
   font-size: 0.72rem;
   color: #94a3b8;
 }
+
+/* SCRUM-154: Historial de Trazabilidad (mismo patrón que credito-ordinario.component.css) */
+.audit-timeline {
+  position: relative;
+  padding-left: 20px;
+}
+
+.audit-timeline::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 5px;
+  width: 2px;
+  background: #e2e8f0;
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 1.5rem;
+}
+
+.timeline-badge {
+  position: absolute;
+  left: -20px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--primary, #3182ce);
+  border: 2px solid white;
+}
+
+.timeline-panel {
+  margin-left: 15px;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  border: 1px solid #e2e8f0;
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  margin-bottom: 8px;
+}
+
+.timeline-header .user-info { color: #2d3748; }
+.timeline-header .date { color: #a0aec0; }
+
+.timeline-states {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.state-node {
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #edf2f7;
+  color: #4a5568;
+}
+
+.state-node.next {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.timeline-states .arrow {
+  font-size: 14px;
+  color: #a0aec0;
+}
+
+.timeline-comment {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #4a5568;
+}

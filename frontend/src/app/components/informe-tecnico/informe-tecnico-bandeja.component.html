@@ -48,11 +48,11 @@
             <td>{{ credito.direccion || '—' }}</td>
             <td>
               <span class="status-pill" [ngClass]="{
-                'warning': credito.estado === 'informe_tecnico_ingeniero' || credito.estado === 'informe_tecnico_coordinador',
-                'success': credito.estado === 'informe_tecnico_finalizado'
-              }">{{ estadoLabel(credito.estado) }}</span>
+                'warning': estadoInformeTecnico(credito) === 'informe_tecnico_ingeniero' || estadoInformeTecnico(credito) === 'informe_tecnico_coordinador',
+                'success': estadoInformeTecnico(credito) === 'informe_tecnico_finalizado'
+              }">{{ estadoLabel(estadoInformeTecnico(credito)) }}</span>
             </td>
-            <td>{{ rolActual(credito.estado) }}</td>
+            <td>{{ rolActual(estadoInformeTecnico(credito)) }}</td>
             <td class="text-right actions-cell">
               <button class="btn-pro sm secondary" (click)="verSolicitud(credito)" title="Ver Solicitud">
                 <span class="material-symbols-outlined">description</span>

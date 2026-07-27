@@ -608,6 +608,43 @@ class InformeTecnicoTest extends TestCase
             ->assertStatus(200);
     }
 
+    /**
+     * SCRUM-154: un informe ya registrado no debe desaparecer de la bandeja.
+     * Antes de este fix, CreditoOrdinario.estado === 'sarlaft_control_interno'
+     * (fuera de ESTADOS_INFORME_TECNICO) hacía que index() lo excluyera para
+     * ambos roles apenas se finalizaba el informe.
+     */
+    public function test_informe_registrado_sigue_visible_en_bandeja_para_ambos_roles(): void
+    {
+        $credito = $this->crearCreditoEnEstadoIngeniero();
+
+        Passport::actingAs($this->ingeniero);
+        $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'ventas_totales_proyecto' => ['apartamentos' => 1000000],
+            'observaciones_ingeniero' => 'Proyecto viable.',
+        ], ['X-Active-Role' => 'ingeniero'])->assertStatus(200);
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'credito_solicitado' => ['monto' => 500000000],
+            'saldos_por_recaudar_contraentrega' => ['saldo' => 100000000],
+            'observaciones_coordinador' => 'Aprobado, informe consolidado.',
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+
+        $credito->refresh();
+        $this->assertEquals('sarlaft_control_interno', $credito->estado);
+
+        Passport::actingAs($this->ingeniero);
+        $response = $this->getJson('/api/informes-tecnicos', ['X-Active-Role' => 'ingeniero']);
+        $response->assertStatus(200);
+        $this->assertContains($credito->id, array_column($response->json(), 'id'));
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->getJson('/api/informes-tecnicos', ['X-Active-Role' => 'coordinador_comercial']);
+        $response->assertStatus(200);
+        $this->assertContains($credito->id, array_column($response->json(), 'id'));
+    }
+
     public function test_usuario_sin_rol_correspondiente_recibe_403(): void
     {
         $credito = $this->crearCreditoEnEstadoIngeniero();

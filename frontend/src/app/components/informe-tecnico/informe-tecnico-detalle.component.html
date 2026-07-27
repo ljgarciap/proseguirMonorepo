@@ -36,7 +36,7 @@
   </div>
 
   <!-- SECCIÓN INGENIERO -->
-  <div class="content-card mt-4" *ngIf="seccionIngenieroVisible">
+  <div class="content-card mt-4" *ngIf="seccionIngenieroVisible" (input)="seccionIngenieroEditable && onCampoCambiado()">
     <h3 class="card-title">
       <span class="material-symbols-outlined">engineering</span>
       Sección Ingeniero
@@ -52,37 +52,37 @@
       <tbody>
         <tr>
           <td>Casas</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.casas" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.casas" [disabled]="!seccionIngenieroEditable"></td>
           <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.casas || 0) | percent:'1.0-2' }}</td>
         </tr>
         <tr>
           <td>Apartamentos</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.apartamentos" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.apartamentos" [disabled]="!seccionIngenieroEditable"></td>
           <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.apartamentos || 0) | percent:'1.0-2' }}</td>
         </tr>
         <tr>
           <td>Parqueaderos</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.parqueaderos" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.parqueaderos" [disabled]="!seccionIngenieroEditable"></td>
           <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.parqueaderos || 0) | percent:'1.0-2' }}</td>
         </tr>
         <tr>
           <td>Conexión gas / arras desist.</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.conexion_gas_arras" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.conexion_gas_arras" [disabled]="!seccionIngenieroEditable"></td>
           <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.conexion_gas_arras || 0) | percent:'1.0-2' }}</td>
         </tr>
         <tr>
           <td>Local comercial</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.local_comercial" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.local_comercial" [disabled]="!seccionIngenieroEditable"></td>
           <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.local_comercial || 0) | percent:'1.0-2' }}</td>
         </tr>
         <tr>
           <td>Cuartos útiles</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.cuartos_utiles" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.cuartos_utiles" [disabled]="!seccionIngenieroEditable"></td>
           <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.cuartos_utiles || 0) | percent:'1.0-2' }}</td>
         </tr>
         <tr>
           <td>Otros</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="ventasInput.otros" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.otros" [disabled]="!seccionIngenieroEditable"></td>
           <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.otros || 0) | percent:'1.0-2' }}</td>
         </tr>
       </tbody>
@@ -107,37 +107,37 @@
       <tbody>
         <tr>
           <td>Lote</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.lote" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.lote" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
         <tr>
           <td>Directos</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.directos" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.directos" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
         <tr>
           <td>Directos Urbanismo</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.directos_urbanismo" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.directos_urbanismo" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
         <tr>
           <td>Indirectos</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.indirectos" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.indirectos" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
         <tr>
           <td>Honorarios <span class="tag-nota">no suma al total</span></td>
-          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.honorarios" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.honorarios" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
         <tr>
           <td>Incremento en costos</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.incremento_costos" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.incremento_costos" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
         <tr>
           <td>Financieros <span class="tag-nota">no suma al total</span></td>
-          <td><input class="pro-input" type="number" [(ngModel)]="costosInput.financieros" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.financieros" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
       </tbody>
@@ -159,17 +159,17 @@
       <tbody>
         <tr>
           <td>Lote</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="invertidoInput.lote" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="invertidoInput.lote" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
         <tr>
           <td>Costos Directos</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="invertidoInput.costos_directos" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="invertidoInput.costos_directos" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
         <tr>
           <td>Costos Indirectos</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="invertidoInput.costos_indirectos" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="invertidoInput.costos_indirectos" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
       </tbody>
@@ -186,12 +186,12 @@
       <tbody>
         <tr>
           <td>Recursos propios</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="invertidoInput.recursos_propios" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="invertidoInput.recursos_propios" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
         <tr>
           <td>Cuotas Iniciales Ya Pagadas</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="invertidoInput.cuotas_iniciales_ya_pagadas" [disabled]="!seccionIngenieroEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="invertidoInput.cuotas_iniciales_ya_pagadas" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
       </tbody>
@@ -222,7 +222,7 @@
   </div>
 
   <!-- SECCIÓN COORDINADOR COMERCIAL -->
-  <div class="content-card mt-4" *ngIf="seccionCoordinadorVisible">
+  <div class="content-card mt-4" *ngIf="seccionCoordinadorVisible" (input)="seccionCoordinadorEditable && onCampoCambiado()">
     <h3 class="card-title">
       <span class="material-symbols-outlined">badge</span>
       Sección Coordinador Comercial
@@ -243,7 +243,7 @@
       <tbody>
         <tr>
           <td>Crédito Solicitado</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="creditoSolicitadoInput.credito_solicitado" [disabled]="!seccionCoordinadorEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="creditoSolicitadoInput.credito_solicitado" [disabled]="!seccionCoordinadorEditable"></td>
           <td class="pct-cell">{{ (informe?.credito_solicitado?.porcentaje_sobre_ventas || 0) | percent:'1.0-2' }}</td>
         </tr>
         <tr>
@@ -299,7 +299,7 @@
         </tr>
         <tr>
           <td>Cuotas Iniciales Pendientes</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="saldosPorRecaudarInput.cuotas_iniciales_pendientes" [disabled]="!seccionCoordinadorEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="saldosPorRecaudarInput.cuotas_iniciales_pendientes" [disabled]="!seccionCoordinadorEditable"></td>
           <td></td>
         </tr>
       </tbody>
@@ -401,6 +401,33 @@
       <span class="material-symbols-outlined">hourglass_top</span>
       La sección del Coordinador Comercial se habilita una vez el Ingeniero registre su informe.
     </p>
+  </div>
+
+  <!-- SCRUM-154: trazabilidad del informe técnico (historial_estados del expediente) -->
+  <div class="content-card mt-4" *ngIf="credito.historial_estados?.length">
+    <h3 class="card-title">
+      <span class="material-symbols-outlined">history</span>
+      Historial de Trazabilidad
+    </h3>
+    <p class="card-subtitle">Línea de tiempo de cambios de estado del expediente relacionados con este informe técnico.</p>
+
+    <div class="audit-timeline">
+      <div *ngFor="let log of credito.historial_estados" class="timeline-item">
+        <div class="timeline-badge"></div>
+        <div class="timeline-panel">
+          <div class="timeline-header">
+            <span class="user-info"><strong>{{ log.usuario }}</strong> ({{ log.rol | titlecase }})</span>
+            <span class="date">{{ log.fecha | date:'medium' }}</span>
+          </div>
+          <div class="timeline-states">
+            <span class="state-node prev">{{ log.estado_anterior | titlecase }}</span>
+            <span class="material-symbols-outlined arrow">arrow_forward</span>
+            <span class="state-node next">{{ log.estado_nuevo | titlecase }}</span>
+          </div>
+          <p class="timeline-comment">{{ log.comentario }}</p>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 

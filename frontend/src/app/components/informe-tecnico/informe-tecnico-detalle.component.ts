@@ -1,10 +1,13 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { Subject, Subscription } from 'rxjs';
+import { debounceTime } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
+import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 import Swal from 'sweetalert2';
 
 /**
@@ -65,11 +68,11 @@ interface SaldosPorRecaudarInput {
 @Component({
   selector: 'app-informe-tecnico-detalle',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, MilesSeparatorDirective],
   templateUrl: './informe-tecnico-detalle.component.html',
   styleUrls: ['./informe-tecnico-detalle.component.css']
 })
-export class InformeTecnicoDetalleComponent implements OnInit {
+export class InformeTecnicoDetalleComponent implements OnInit, OnDestroy {
   creditoId!: number;
   credito: any = null;
   informe: any = null;
@@ -99,6 +102,13 @@ export class InformeTecnicoDetalleComponent implements OnInit {
   };
   observacionesCoordinador = '';
 
+  // SCRUM-154: autoguardado silencioso — el backend es la única fuente de
+  // cálculo de totales/porcentajes (SCRUM-120), así que para que se vean
+  // "en vivo" mientras se diligencia hace falta disparar guardarBorrador()
+  // en segundo plano, sin esperar al click explícito en "Guardar Borrador".
+  private autoguardadoSubject = new Subject<void>();
+  private autoguardadoSub?: Subscription;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -110,6 +120,20 @@ export class InformeTecnicoDetalleComponent implements OnInit {
     this.activeRole = this.authService.getActiveRole() || '';
     this.creditoId = Number(this.route.snapshot.paramMap.get('creditoId'));
     this.cargar();
+
+    this.autoguardadoSub = this.autoguardadoSubject.pipe(debounceTime(500)).subscribe(() => {
+      if (this.puedeEditar) this.guardarBorrador(true);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.autoguardadoSub?.unsubscribe();
+  }
+
+  // Enganchado a (input) en el contenedor de cada sección editable: dispara
+  // el autoguardado silencioso con debounce ante cualquier cambio de campo.
+  onCampoCambiado(): void {
+    this.autoguardadoSubject.next();
   }
 
   cargar(): void {
@@ -172,8 +196,13 @@ export class InformeTecnicoDetalleComponent implements OnInit {
     this.observacionesCoordinador = this.informe.observaciones_coordinador || '';
   }
 
+  // SCRUM-154: desde SCRUM-128 el CreditoOrdinario encadena automáticamente
+  // a 'sarlaft_control_interno' apenas se registra el informe — el estado
+  // 'informe_tecnico_finalizado' nunca llega a observarse en el frontend.
+  // InformeTecnico.estado === 'registrado' es la señal real de que ya quedó
+  // completo (mismo criterio que ya usa el backend en autorizarVisualizacion()).
   get esFinalizado(): boolean {
-    return this.credito?.estado === 'informe_tecnico_finalizado';
+    return this.credito?.estado === 'informe_tecnico_finalizado' || this.informe?.estado === 'registrado';
   }
 
   get puedeEditar(): boolean {
@@ -191,7 +220,9 @@ export class InformeTecnicoDetalleComponent implements OnInit {
   }
 
   get seccionCoordinadorVisible(): boolean {
-    return this.credito?.estado === 'informe_tecnico_coordinador' || this.credito?.estado === 'informe_tecnico_finalizado';
+    return this.credito?.estado === 'informe_tecnico_coordinador'
+      || this.credito?.estado === 'informe_tecnico_finalizado'
+      || this.informe?.estado === 'registrado';
   }
 
   get seccionCoordinadorEditable(): boolean {
@@ -225,17 +256,21 @@ export class InformeTecnicoDetalleComponent implements OnInit {
     return {};
   }
 
-  guardarBorrador(): void {
+  guardarBorrador(silencioso = false): void {
     this.http.put(`${environment.apiUrl}/informes-tecnicos/${this.creditoId}/borrador`, this.payloadSegunEstado(), {
       headers: { 'X-Active-Role': this.activeRole }
     }).subscribe({
       next: (informe) => {
         this.informe = informe;
         this.hidratarFormularios();
-        Swal.fire('Guardado', 'El borrador del informe técnico se guardó correctamente.', 'success');
+        if (!silencioso) {
+          Swal.fire('Guardado', 'El borrador del informe técnico se guardó correctamente.', 'success');
+        }
       },
       error: (err) => {
-        Swal.fire('Error', err.error?.message || 'No se pudo guardar el borrador.', 'error');
+        if (!silencioso) {
+          Swal.fire('Error', err.error?.message || 'No se pudo guardar el borrador.', 'error');
+        }
       }
     });
   }

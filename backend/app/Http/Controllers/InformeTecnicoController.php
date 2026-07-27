@@ -36,23 +36,43 @@ class InformeTecnicoController extends Controller
     ];
 
     /**
-     * Bandeja de Informe Técnico: solo créditos tipo Constructor en alguno
-     * de los estados del flujo, filtrados por el rol activo.
+     * Bandeja de Informe Técnico: créditos tipo Constructor en alguno de los
+     * estados del flujo, filtrados por el rol activo.
+     *
+     * SCRUM-154: un informe ya registrado no debe desaparecer de la bandeja.
+     * SCRUM-128 hace que CreditoOrdinario.estado encadene automáticamente a
+     * 'sarlaft_control_interno' apenas se registra el informe del Coordinador
+     * — ese valor cae fuera de ESTADOS_INFORME_TECNICO, así que sin el OR
+     * sobre InformeTecnico.estado === 'registrado' el crédito quedaría
+     * invisible para ambos roles en cuanto se finaliza (mismo criterio ya
+     * usado en findCreditoConstructorVisible()/autorizarVisualizacion()).
      */
     public function index(Request $request)
     {
         $activeRole = $this->resolveActiveRole($request);
 
+        $registrado = function ($q) {
+            $q->whereHas('informeTecnico', function ($iq) {
+                $iq->where('estado', 'registrado');
+            });
+        };
+
         $query = CreditoOrdinario::whereHas('solicitudCredito.tipoCredito', function ($q) {
                 $q->where('codigo', 'CONSTRUCTOR');
             })
-            ->whereIn('estado', self::ESTADOS_INFORME_TECNICO)
+            ->where(function ($q) use ($registrado) {
+                $q->whereIn('estado', self::ESTADOS_INFORME_TECNICO)->orWhere($registrado);
+            })
             ->with(['cliente', 'solicitudCredito.cliente', 'informeTecnico']);
 
         if ($activeRole === 'ingeniero') {
-            $query->where('estado', 'informe_tecnico_ingeniero');
+            $query->where(function ($q) use ($registrado) {
+                $q->where('estado', 'informe_tecnico_ingeniero')->orWhere($registrado);
+            });
         } elseif ($activeRole === 'coordinador_comercial') {
-            $query->whereIn('estado', ['informe_tecnico_coordinador', 'informe_tecnico_finalizado']);
+            $query->where(function ($q) use ($registrado) {
+                $q->whereIn('estado', ['informe_tecnico_coordinador', 'informe_tecnico_finalizado'])->orWhere($registrado);
+            });
         } elseif ($activeRole !== 'superadmin') {
             $query->whereRaw('1 = 0');
         }

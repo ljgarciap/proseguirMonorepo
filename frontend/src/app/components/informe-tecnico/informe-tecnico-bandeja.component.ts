@@ -85,11 +85,20 @@ export class InformeTecnicoBandejaComponent implements OnInit, OnDestroy {
         const ubicacion = `${credito.ciudad || ''} ${credito.direccion || ''}`.toLowerCase();
         if (!ubicacion.includes(q)) return false;
       }
-      if (this.filtroEstado && credito.estado !== this.filtroEstado) {
+      if (this.filtroEstado && this.estadoInformeTecnico(credito) !== this.filtroEstado) {
         return false;
       }
       return true;
     });
+  }
+
+  // SCRUM-154: una vez registrado el informe, CreditoOrdinario.estado
+  // encadena a 'sarlaft_control_interno' (SCRUM-128) y deja de reflejar el
+  // estado del informe técnico — informe_tecnico.estado === 'registrado' es
+  // la señal real de que quedó "Finalizado".
+  estadoInformeTecnico(credito: any): string {
+    if (credito.informe_tecnico?.estado === 'registrado') return 'informe_tecnico_finalizado';
+    return credito.estado;
   }
 
   estadoLabel(estado: string): string {
@@ -111,7 +120,7 @@ export class InformeTecnicoBandejaComponent implements OnInit, OnDestroy {
   }
 
   puedeEditar(credito: any): boolean {
-    if (credito.estado === 'informe_tecnico_finalizado') return false;
+    if (this.estadoInformeTecnico(credito) === 'informe_tecnico_finalizado') return false;
     if (this.activeRole === 'superadmin') return true;
     return ROL_POR_ESTADO[credito.estado] === this.activeRole;
   }
