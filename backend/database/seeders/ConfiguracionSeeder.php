@@ -75,6 +75,14 @@ class ConfiguracionSeeder extends Seeder
                 'grupo'       => 'email',
                 'es_secreto'  => false,
             ],
+            // Análisis Financiero (SCRUM-155)
+            [
+                'clave'       => 'ANALISIS_FINANCIERO_TOLERANCIA_DIFERENCIA_MM',
+                'valor'       => '5',
+                'descripcion' => 'Tolerancia (en millones de COP) para la diferencia Activo - (Pasivo + Patrimonio) del último año antes de bloquear la confirmación del Análisis Financiero.',
+                'grupo'       => 'analisis_financiero',
+                'es_secreto'  => false,
+            ],
         ];
 
         foreach ($configs as $config) {

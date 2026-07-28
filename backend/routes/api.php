@@ -51,16 +51,23 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
         Route::apiResource('users', \App\Http\Controllers\UserController::class)
             ->middleware(['auth:api', 'checkrole:superadmin']);
         
-        // Clientes (Superadmin, Gerente, Operativo)
-        Route::apiResource('clientes', \App\Http\Controllers\ClienteController::class)
-            ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
+        // Clientes (Superadmin, Gerente, Operativo, Coordinador Comercial — SCRUM-149)
+        Route::get('clientes', [\App\Http\Controllers\ClienteController::class, 'index'])
+            ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo,coordinador_comercial']);
+        Route::post('clientes/quick', [\App\Http\Controllers\ClienteController::class, 'quickStore'])
+            ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo,coordinador_comercial']);
+        Route::apiResource('clientes', \App\Http\Controllers\ClienteController::class)->except(['index'])
+            ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo,coordinador_comercial']);
         
         // Visitas a Clientes (Superadmin, Gerente, Operativo)
         Route::apiResource('visitas', \App\Http\Controllers\VisitaController::class)
             ->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo']);
 
         // Departamentos/Ciudades de Colombia (SCRUM-118)
-        Route::prefix('ubicaciones')->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo'])->group(function () {
+        // Coordinador Comercial además lo necesita para los selects de
+        // ubicación (cliente y proyecto) en Registro Solicitud de Crédito
+        // (SCRUM-118 / SCRUM-141).
+        Route::prefix('ubicaciones')->middleware(['auth:api', 'checkrole:superadmin,gerente,operativo,coordinador_comercial'])->group(function () {
             Route::get('/departamentos', [\App\Http\Controllers\UbicacionController::class, 'departamentos']);
             Route::get('/ciudades', [\App\Http\Controllers\UbicacionController::class, 'ciudades']);
             Route::get('/ciudades/buscar', [\App\Http\Controllers\UbicacionController::class, 'buscarCiudades']);
@@ -84,9 +91,11 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
         Route::delete('/asignaciones/{id}', [\App\Http\Controllers\AsignacionController::class, 'destroy'])
             ->middleware(['auth:api', 'checkrole:superadmin']);
         
-        // Pending count (dashboard related)
+        // Pending count (dashboard related) — el propio controller ya calcula
+        // y devuelve el contador de 'contable' (bandeja interna), así que ese
+        // rol también necesita poder pegarle a este endpoint.
         Route::get('/uploads/pending-count', [\App\Http\Controllers\ClientUploadController::class, 'pendingCount'])
-            ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
+            ->middleware(['auth:api', 'checkrole:gerente,operativo,contable,superadmin']);
         
         // Uploads group with granular auth
         Route::prefix('uploads')->middleware(['auth:api', 'checkrole'])->group(function () {
@@ -177,6 +186,32 @@ Route::prefix('creditos')->middleware('auth:api')->group(function () {
     Route::post('/{id}/transition', [CreditoOrdinarioController::class, 'transition']);
 });
 
+// Informe Técnico — Crédito Constructor (SCRUM-120)
+Route::prefix('informes-tecnicos')->middleware('auth:api')->group(function () {
+    Route::get('/', [\App\Http\Controllers\InformeTecnicoController::class, 'index']);
+    Route::get('/{creditoId}', [\App\Http\Controllers\InformeTecnicoController::class, 'show']);
+    Route::put('/{creditoId}/borrador', [\App\Http\Controllers\InformeTecnicoController::class, 'guardarBorrador']);
+    Route::post('/{creditoId}/registrar', [\App\Http\Controllers\InformeTecnicoController::class, 'registrar']);
+    Route::get('/{creditoId}/descargar', [\App\Http\Controllers\InformeTecnicoController::class, 'descargar']);
+});
+
+// Análisis Financiero (SCRUM-155)
+Route::prefix('analisis-financiero')->middleware('auth:api')->group(function () {
+    Route::get('/', [\App\Http\Controllers\AnalisisFinancieroController::class, 'index']);
+    Route::get('/{creditoId}', [\App\Http\Controllers\AnalisisFinancieroController::class, 'show']);
+    Route::put('/{creditoId}/borrador', [\App\Http\Controllers\AnalisisFinancieroController::class, 'guardarBorrador']);
+    Route::post('/{creditoId}/confirmar', [\App\Http\Controllers\AnalisisFinancieroController::class, 'confirmar']);
+    Route::get('/{creditoId}/descargar', [\App\Http\Controllers\AnalisisFinancieroController::class, 'descargar']);
+});
+
+// Listas Restrictivas y SARLAFT (SCRUM-128)
+Route::prefix('listas-sarlaft')->middleware('auth:api')->group(function () {
+    Route::get('/', [\App\Http\Controllers\ListasRestrictivasSarlaftController::class, 'index']);
+    Route::get('/{creditoId}', [\App\Http\Controllers\ListasRestrictivasSarlaftController::class, 'show']);
+    Route::put('/{creditoId}/borrador', [\App\Http\Controllers\ListasRestrictivasSarlaftController::class, 'guardarBorrador']);
+    Route::post('/{creditoId}/finalizar', [\App\Http\Controllers\ListasRestrictivasSarlaftController::class, 'finalizar']);
+});
+
 // Registro de Solicitudes de Crédito
 Route::prefix('solicitudes-credito')->middleware('auth:api')->group(function () {
     Route::get('/pendientes', [\App\Http\Controllers\SolicitudCreditoController::class, 'indexPending'])
@@ -255,11 +290,17 @@ Route::prefix('document-requirements')->middleware(['auth:api', 'checkrole:super
 });
 
 // Presets de Documentos (Superadmin, Operativo)
-Route::prefix('document-presets')->middleware(['auth:api', 'checkrole:superadmin,operativo'])->group(function () {
-    Route::get('/', [\App\Http\Controllers\DocumentPresetController::class, 'index']);
-    Route::post('/', [\App\Http\Controllers\DocumentPresetController::class, 'store']);
-    Route::put('/{id}', [\App\Http\Controllers\DocumentPresetController::class, 'update']);
-    Route::delete('/{id}', [\App\Http\Controllers\DocumentPresetController::class, 'destroy']);
+Route::prefix('document-presets')->middleware(['auth:api'])->group(function () {
+    // Coordinador Comercial necesita leer los presets para el dropdown de
+    // Registro Solicitud de Crédito, aunque no gestione el CRUD de presets.
+    Route::get('/', [\App\Http\Controllers\DocumentPresetController::class, 'index'])
+        ->middleware('checkrole:superadmin,operativo,coordinador_comercial');
+    Route::post('/', [\App\Http\Controllers\DocumentPresetController::class, 'store'])
+        ->middleware('checkrole:superadmin,operativo');
+    Route::put('/{id}', [\App\Http\Controllers\DocumentPresetController::class, 'update'])
+        ->middleware('checkrole:superadmin,operativo');
+    Route::delete('/{id}', [\App\Http\Controllers\DocumentPresetController::class, 'destroy'])
+        ->middleware('checkrole:superadmin,operativo');
 });
 
 // Solicitudes de Documentos a Clientes

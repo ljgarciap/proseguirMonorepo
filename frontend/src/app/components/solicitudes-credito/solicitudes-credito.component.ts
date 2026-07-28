@@ -4,12 +4,13 @@ import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
 import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
+import { ClienteAutocompleteComponent } from '../shared/cliente-autocomplete/cliente-autocomplete.component';
 import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-solicitudes-credito',
   standalone: true,
-  imports: [CommonModule, FormsModule, MilesSeparatorDirective],
+  imports: [CommonModule, FormsModule, MilesSeparatorDirective, ClienteAutocompleteComponent],
   templateUrl: './solicitudes-credito.component.html',
   styleUrls: ['./solicitudes-credito.component.css']
 })
@@ -27,6 +28,13 @@ export class SolicitudesCreditoComponent implements OnInit {
   // Pending visits list
   pendingVisits: any[] = [];
   loadingPending = false;
+
+  // Ubicación (Departamento -> Ciudad anidados)
+  departamentos: any[] = [];
+  ciudadesDelDepartamento: any[] = [];
+  // Ubicación del proyecto (Crédito Constructor, SCRUM-141) — independiente
+  // de la ubicación del cliente.
+  ciudadesDelDepartamentoProyecto: any[] = [];
   
   // History list
   historyRequests: any[] = [];
@@ -50,9 +58,9 @@ export class SolicitudesCreditoComponent implements OnInit {
     telefono: '',
     direccion: '',
     pais: 'Colombia',
-    departamento: '',
-    ciudad: '',
-    
+    departamento_id: '',
+    ciudad_id: '',
+
     // Juridica fields
     nombre_razon_social: '',
     tipo_empresa: '',
@@ -71,6 +79,10 @@ export class SolicitudesCreditoComponent implements OnInit {
 
     // Credit fields
     tipo_credito_id: '',
+    proyecto: '',
+    proyecto_direccion: '',
+    proyecto_departamento_id: '',
+    proyecto_ciudad_id: '',
     monto_solicitado: null,
     plazo_meses: null,
     amortizacion_id: '',
@@ -90,6 +102,37 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.loadPendingVisits();
     this.loadDropdowns();
     this.loadHistory();
+    this.loadDepartamentos();
+  }
+
+  loadDepartamentos() {
+    this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/departamentos`).subscribe({ next: data => this.departamentos = data, error: () => {} });
+  }
+
+  onDepartamentoChange(preservarCiudad = false) {
+    if (!preservarCiudad) {
+      this.form.ciudad_id = '';
+    }
+    this.ciudadesDelDepartamento = [];
+    if (this.form.departamento_id) {
+      this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/ciudades?departamento_id=${this.form.departamento_id}`).subscribe({
+        next: data => this.ciudadesDelDepartamento = data,
+        error: () => {}
+      });
+    }
+  }
+
+  onDepartamentoProyectoChange(preservarCiudad = false) {
+    if (!preservarCiudad) {
+      this.form.proyecto_ciudad_id = '';
+    }
+    this.ciudadesDelDepartamentoProyecto = [];
+    if (this.form.proyecto_departamento_id) {
+      this.http.get<any[]>(`${environment.apiUrl}/ubicaciones/ciudades?departamento_id=${this.form.proyecto_departamento_id}`).subscribe({
+        next: data => this.ciudadesDelDepartamentoProyecto = data,
+        error: () => {}
+      });
+    }
   }
 
   loadPendingVisits() {
@@ -160,8 +203,11 @@ export class SolicitudesCreditoComponent implements OnInit {
       this.form.telefono = cliente.telefono || '';
       this.form.direccion = cliente.direccion || '';
       this.form.pais = cliente.pais || 'Colombia';
-      this.form.departamento = cliente.departamento || '';
-      this.form.ciudad = cliente.ciudad || '';
+      this.form.departamento_id = cliente.departamento_id || '';
+      this.form.ciudad_id = cliente.ciudad_id || '';
+      if (this.form.departamento_id) {
+        this.onDepartamentoChange(true);
+      }
 
       this.form.nombre_razon_social = cliente.nombre_razon_social || '';
       this.form.tipo_empresa = cliente.tipo_empresa || '';
@@ -245,8 +291,11 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.form.telefono = selected.telefono || '';
     this.form.direccion = selected.direccion || '';
     this.form.pais = selected.pais || 'Colombia';
-    this.form.departamento = selected.departamento || '';
-    this.form.ciudad = selected.ciudad || '';
+    this.form.departamento_id = selected.departamento_id || '';
+    this.form.ciudad_id = selected.ciudad_id || '';
+    if (this.form.departamento_id) {
+      this.onDepartamentoChange(true);
+    }
 
     this.form.nombre_razon_social = selected.nombre_razon_social || '';
     this.form.tipo_empresa = selected.tipo_empresa || '';
@@ -292,6 +341,14 @@ export class SolicitudesCreditoComponent implements OnInit {
     return false;
   }
 
+  // SCRUM-120 Fase 2: el campo Proyecto solo aplica (y es obligatorio) para
+  // Crédito Constructor — la bandeja de Informe Técnico lo necesita.
+  isTipoCreditoConstructor(): boolean {
+    if (!this.form.tipo_credito_id || this.tipoCreditos.length === 0) return false;
+    const selected = this.tipoCreditos.find(tc => tc.id === Number(this.form.tipo_credito_id));
+    return !!selected && String(selected.codigo).toUpperCase() === 'CONSTRUCTOR';
+  }
+
   // Load preset documents
   onPresetChange() {
     if (!this.selectedPresetId) {
@@ -306,6 +363,7 @@ export class SolicitudesCreditoComponent implements OnInit {
   isFormValid(): boolean {
     if (!this.form.cliente_id && !this.form.numero_documento) return false;
     if (!this.form.tipo_credito_id || !this.form.monto_solicitado || !this.form.plazo_meses || !this.form.amortizacion_id) return false;
+    if (this.isTipoCreditoConstructor() && (!this.form.proyecto || !this.form.proyecto_direccion || !this.form.proyecto_departamento_id || !this.form.proyecto_ciudad_id)) return false;
     if (!this.form.destino_recurso || !this.form.fuente_pago) return false;
     if (!this.form.correo_notificacion || !this.form.asunto_notificacion || !this.form.mensaje_notificacion) return false;
 
@@ -368,7 +426,9 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.selectedVisitId = null;
     this.selectedPresetId = null;
     this.selectedPresetDocs = [];
-    
+    this.ciudadesDelDepartamento = [];
+    this.ciudadesDelDepartamentoProyecto = [];
+
     this.form = {
       cliente_id: '',
       tipo_persona_id: '',
@@ -381,9 +441,9 @@ export class SolicitudesCreditoComponent implements OnInit {
       telefono: '',
       direccion: '',
       pais: 'Colombia',
-      departamento: '',
-      ciudad: '',
-      
+      departamento_id: '',
+      ciudad_id: '',
+
       nombre_razon_social: '',
       tipo_empresa: '',
       actividad_economica: '',
@@ -399,6 +459,10 @@ export class SolicitudesCreditoComponent implements OnInit {
       rep_telefono: '',
 
       tipo_credito_id: '',
+      proyecto: '',
+      proyecto_direccion: '',
+      proyecto_departamento_id: '',
+      proyecto_ciudad_id: '',
       monto_solicitado: null,
       plazo_meses: null,
       amortizacion_id: '',

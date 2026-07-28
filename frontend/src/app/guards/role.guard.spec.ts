@@ -74,7 +74,16 @@ describe('roleGuard', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/solicitudes-credito']);
   });
 
-  ['oficial_cumplimiento', 'comite_credito', 'tesoreria'].forEach(rol => {
+  it('redirige ingeniero a /informes-tecnicos', () => {
+    authSpy.isAuthenticated.and.returnValue(true);
+    authSpy.isAuthorized.and.returnValue(false);
+    authSpy.getActiveRole.and.returnValue('ingeniero');
+
+    expect(run(['superadmin'])).toBeFalse();
+    expect(router.navigate).toHaveBeenCalledWith(['/informes-tecnicos']);
+  });
+
+  ['comite_credito', 'tesoreria'].forEach(rol => {
     it(`redirige ${rol} a /creditos`, () => {
       authSpy.isAuthenticated.and.returnValue(true);
       authSpy.isAuthorized.and.returnValue(false);
@@ -83,6 +92,17 @@ describe('roleGuard', () => {
       expect(run(['superadmin'])).toBeFalse();
       expect(router.navigate).toHaveBeenCalledWith(['/creditos']);
     });
+  });
+
+  // SCRUM-128: el trabajo del Oficial de Cumplimiento ya no ocurre dentro de
+  // /creditos — vive en la bandeja dedicada de Listas Restrictivas y SARLAFT.
+  it('redirige oficial_cumplimiento a /listas-sarlaft', () => {
+    authSpy.isAuthenticated.and.returnValue(true);
+    authSpy.isAuthorized.and.returnValue(false);
+    authSpy.getActiveRole.and.returnValue('oficial_cumplimiento');
+
+    expect(run(['superadmin'])).toBeFalse();
+    expect(router.navigate).toHaveBeenCalledWith(['/listas-sarlaft']);
   });
 
   it('redirige cualquier otro rol a /dashboard', () => {

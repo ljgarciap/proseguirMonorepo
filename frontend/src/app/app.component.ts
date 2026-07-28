@@ -24,16 +24,10 @@ import { interval, Subscription } from 'rxjs';
         </div>
 
         <nav class="sidebar-nav">
-          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria'])">
+          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])">
             <label>Operaciones</label>
             <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])" routerLink="/dashboard" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">dashboard</span> Dashboard
-            </a>
-            <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'])" routerLink="/creditos" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">payments</span> Crédito Ordinario
-            </a>
-            <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'gerente', 'superadmin', 'operativo'])" routerLink="/solicitudes-credito" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">assignment_turned_in</span> Registro Solicitud Crédito
             </a>
             <a *ngIf="authService.isAuthorized(['operativo'])" routerLink="/sheets" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">database</span> Base de Datos
@@ -43,33 +37,53 @@ import { interval, Subscription } from 'rxjs';
             </a>
             <a *ngIf="authService.isAuthorized(['operativo', 'gerente'])" routerLink="/validation" routerLinkActive="active" class="nav-link">
               <div class="nav-link-content">
-                <span class="material-symbols-outlined">rule</span> 
+                <span class="material-symbols-outlined">rule</span>
                 <span>Validación</span>
                 <span class="nav-badge" *ngIf="getValidationBadge() > 0">{{ getValidationBadge() }}</span>
               </div>
             </a>
             <a *ngIf="authService.isAuthorized(['operativo', 'contable', 'gerente', 'superadmin'])" routerLink="/internal-docs" routerLinkActive="active" class="nav-link">
               <div class="nav-link-content">
-                <span class="material-symbols-outlined">mail</span> 
+                <span class="material-symbols-outlined">mail</span>
                 <span>Bandeja Interna</span>
                 <span class="nav-badge" *ngIf="getInternalDocsBadge() > 0">{{ getInternalDocsBadge() }}</span>
               </div>
             </a>
             <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])" routerLink="/mandatos" routerLinkActive="active" class="nav-link">
               <div class="nav-link-content">
-                <span class="material-symbols-outlined">contract</span> 
+                <span class="material-symbols-outlined">contract</span>
                 <span>Revisión Mandatos</span>
                 <span class="nav-badge" *ngIf="getMandatosBadge() > 0">{{ getMandatosBadge() }}</span>
               </div>
             </a>
           </div>
 
-          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])">
+          <!-- SCRUM-153: sección propia de Crédito, orden alfabético -->
+          <div class="nav-section" *ngIf="authService.isAuthorized(['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin', 'ingeniero'])">
+            <label>Crédito</label>
+            <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'superadmin'])" routerLink="/analisis-financiero" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">finance</span> Análisis Financiero
+            </a>
+            <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'])" routerLink="/creditos" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">payments</span> Crédito Ordinario
+            </a>
+            <a *ngIf="authService.isAuthorized(['ingeniero', 'coordinador_comercial', 'superadmin'])" routerLink="/informes-tecnicos" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">engineering</span> Informe Técnico
+            </a>
+            <a *ngIf="authService.isAuthorized(['oficial_cumplimiento', 'superadmin'])" routerLink="/listas-sarlaft" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">gavel</span> Listas Restrictivas y SARLAFT
+            </a>
+            <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'gerente', 'superadmin', 'operativo'])" routerLink="/solicitudes-credito" routerLinkActive="active" class="nav-link">
+              <span class="material-symbols-outlined">assignment_turned_in</span> Registro Solicitud Crédito
+            </a>
+          </div>
+
+          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin', 'coordinador_comercial'])">
             <label>Administración</label>
-            <a routerLink="/conciliacion-susuerte" routerLinkActive="active" class="nav-link">
+            <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])" routerLink="/conciliacion-susuerte" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">fact_check</span> Conciliación Susuerte
             </a>
-            <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'superadmin'])" routerLink="/clientes" routerLinkActive="active" class="nav-link">
+            <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'superadmin', 'coordinador_comercial'])" routerLink="/clientes" routerLinkActive="active" class="nav-link">
               <span class="material-symbols-outlined">group</span> Registro de Clientes
             </a>
             <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'superadmin'])" routerLink="/visitas" routerLinkActive="active" class="nav-link">
@@ -347,6 +361,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   checkPendingTasks() {
     if (!this.authService.isAuthenticated()) return;
+    if (!this.authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])) return;
     this.http.get<any>(`${environment.apiUrl}/uploads/pending-count`).subscribe({
       next: (res) => {
         this.pendingCounts = res;
@@ -399,7 +414,13 @@ export class AppComponent implements OnInit, OnDestroy {
       this.router.navigate(['/client-upload']);
     } else if (role === 'coordinador_comercial') {
       this.router.navigate(['/solicitudes-credito']);
-    } else if (['oficial_cumplimiento', 'comite_credito', 'tesoreria'].includes(role)) {
+    } else if (role === 'ingeniero') {
+      this.router.navigate(['/informes-tecnicos']);
+    } else if (role === 'oficial_cumplimiento') {
+      // SCRUM-128: el trabajo del Oficial de Cumplimiento ya no ocurre
+      // dentro de /creditos — vive en la bandeja dedicada.
+      this.router.navigate(['/listas-sarlaft']);
+    } else if (['comite_credito', 'tesoreria'].includes(role)) {
       this.router.navigate(['/creditos']);
     } else {
       this.router.navigate(['/dashboard']);

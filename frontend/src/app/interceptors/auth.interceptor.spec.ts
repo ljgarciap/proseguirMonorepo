@@ -64,6 +64,19 @@ describe('authInterceptor', () => {
     req.flush({});
   });
 
+  it('preserva headers ya presentes en la request (p.ej. X-Active-Role) en vez de descartarlos', () => {
+    localStorage.setItem('auth_token', 'mitoken123');
+
+    http.post('/api/creditos/1/transition', { accion: 'aprobar' }, {
+      headers: { 'X-Active-Role': 'coordinador_comercial' }
+    }).subscribe();
+
+    const req = httpMock.expectOne('/api/creditos/1/transition');
+    expect(req.request.headers.get('X-Active-Role')).toBe('coordinador_comercial');
+    expect(req.request.headers.get('Authorization')).toBe('Bearer mitoken123');
+    req.flush({});
+  });
+
   // --- Manejo de 401 ---
 
   it('limpia localStorage y redirige a /login?expired=1 en 401', () => {

@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class SolicitudCreditoController extends Controller
 {
@@ -53,6 +54,7 @@ class SolicitudCreditoController extends Controller
             'cliente_id' => 'required|exists:clientes,id',
             'tipo_credito_id' => 'required|exists:tipo_creditos,id',
             'monto_solicitado' => 'required|numeric|min:0.01',
+            'proyecto' => 'nullable|string',
             'plazo_meses' => 'required|integer|min:1',
             'amortizacion_id' => 'required|exists:amortizaciones,id',
             'destino_recurso' => 'required|string',
@@ -69,6 +71,22 @@ class SolicitudCreditoController extends Controller
         $tipoPersona = $cliente->tipoPersona;
         $codigoPersona = $tipoPersona ? strtoupper($tipoPersona->codigo) : 'NATURAL';
 
+        // Información del Proyecto es obligatoria solo para Crédito Constructor
+        // (SCRUM-120 Fase 2 / SCRUM-141) — la bandeja de Informe Técnico la necesita.
+        $tipoCreditoSolicitud = \App\Models\TipoCredito::find($request->tipo_credito_id);
+        $codigoTipoCreditoSolicitud = $tipoCreditoSolicitud ? strtoupper($tipoCreditoSolicitud->codigo) : null;
+        if ($codigoTipoCreditoSolicitud === 'CONSTRUCTOR') {
+            $rules['proyecto'] = 'required|string';
+            $rules['proyecto_direccion'] = 'required|string';
+            $rules['proyecto_departamento_id'] = 'required|exists:departamentos,id';
+            $rules['proyecto_ciudad_id'] = [
+                'required',
+                Rule::exists('ciudades', 'id')->where(function ($query) use ($request) {
+                    $query->where('departamento_id', $request->proyecto_departamento_id);
+                }),
+            ];
+        }
+
         if ($codigoPersona === 'NATURAL') {
             $rules['nombres'] = 'required|string';
             $rules['primer_apellido'] = 'required|string';
@@ -77,8 +95,13 @@ class SolicitudCreditoController extends Controller
             $rules['telefono'] = 'required|string';
             $rules['direccion'] = 'required|string';
             $rules['pais'] = 'required|string';
-            $rules['departamento'] = 'required|string';
-            $rules['ciudad'] = 'required|string';
+            $rules['departamento_id'] = 'required|exists:departamentos,id';
+            $rules['ciudad_id'] = [
+                'required',
+                Rule::exists('ciudades', 'id')->where(function ($query) use ($request) {
+                    $query->where('departamento_id', $request->departamento_id);
+                }),
+            ];
         } else {
             // Juridica
             $rules['nombre_razon_social'] = 'required|string';
@@ -88,8 +111,13 @@ class SolicitudCreditoController extends Controller
             $rules['telefono'] = 'required|string';
             $rules['direccion'] = 'required|string';
             $rules['pais'] = 'required|string';
-            $rules['departamento'] = 'required|string';
-            $rules['ciudad'] = 'required|string';
+            $rules['departamento_id'] = 'required|exists:departamentos,id';
+            $rules['ciudad_id'] = [
+                'required',
+                Rule::exists('ciudades', 'id')->where(function ($query) use ($request) {
+                    $query->where('departamento_id', $request->departamento_id);
+                }),
+            ];
 
             // Representative Legal
             $rules['rep_tipo_documento_id'] = 'required|exists:document_types,id';
@@ -115,8 +143,8 @@ class SolicitudCreditoController extends Controller
                     'telefono' => $validated['telefono'],
                     'direccion' => $validated['direccion'],
                     'pais' => $validated['pais'],
-                    'departamento' => $validated['departamento'],
-                    'ciudad' => $validated['ciudad'],
+                    'departamento_id' => $validated['departamento_id'],
+                    'ciudad_id' => $validated['ciudad_id'],
                 ]);
             } else {
                 $cliente->update([
@@ -127,8 +155,8 @@ class SolicitudCreditoController extends Controller
                     'telefono' => $validated['telefono'],
                     'direccion' => $validated['direccion'],
                     'pais' => $validated['pais'],
-                    'departamento' => $validated['departamento'],
-                    'ciudad' => $validated['ciudad'],
+                    'departamento_id' => $validated['departamento_id'],
+                    'ciudad_id' => $validated['ciudad_id'],
                     'rep_tipo_documento_id' => $validated['rep_tipo_documento_id'],
                     'rep_numero_documento' => $validated['rep_numero_documento'],
                     'rep_nombres' => $validated['rep_nombres'],
@@ -172,6 +200,10 @@ class SolicitudCreditoController extends Controller
                 'cliente_id' => $cliente->id,
                 'usuario_registra_id' => $request->user()->id,
                 'tipo_credito_id' => $validated['tipo_credito_id'],
+                'proyecto' => $validated['proyecto'] ?? null,
+                'proyecto_direccion' => $validated['proyecto_direccion'] ?? null,
+                'proyecto_departamento_id' => $validated['proyecto_departamento_id'] ?? null,
+                'proyecto_ciudad_id' => $validated['proyecto_ciudad_id'] ?? null,
                 'monto_solicitado' => $validated['monto_solicitado'],
                 'plazo_meses' => $validated['plazo_meses'],
                 'amortizacion_id' => $validated['amortizacion_id'],
@@ -184,67 +216,71 @@ class SolicitudCreditoController extends Controller
                 'document_preset_id' => $validated['document_preset_id'] ?? null,
             ]);
 
-            // 3.1. Automatically start the BPMN CreditoOrdinario workflow if type is ORDINARIO
+            // 3.1. Automatically start the BPMN CreditoOrdinario workflow for
+            // ORDINARIO (comité completo) y CONSTRUCTOR (SCRUM-120: solo hasta
+            // Informe Técnico en esta fase, sin pasar por comité/desembolso).
             $tipoCredito = \App\Models\TipoCredito::find($validated['tipo_credito_id']);
-            if ($tipoCredito && strtoupper($tipoCredito->codigo) === 'ORDINARIO') {
+            $codigoTipoCredito = $tipoCredito ? strtoupper($tipoCredito->codigo) : null;
+
+            if (in_array($codigoTipoCredito, ['ORDINARIO', 'CONSTRUCTOR'])) {
                 $activeRole = $request->header('X-Active-Role')
                     ?? (($request->user()->roles && is_array($request->user()->roles))
                         ? ($request->user()->roles[0] ?? 'coordinador_comercial')
                         : 'coordinador_comercial');
 
-                \App\Models\CreditoOrdinario::iniciar(
-                    clienteId:  $user->id,
-                    monto:      $validated['monto_solicitado'],
-                    plazoMeses: $validated['plazo_meses'],
-                    usuario:    $request->user()->name,
-                    rol:        $activeRole,
-                    comentario: 'Solicitud de crédito ordinario registrada e iniciada desde el módulo de solicitudes.'
-                );
+                if ($codigoTipoCredito === 'CONSTRUCTOR') {
+                    \App\Models\CreditoOrdinario::iniciar(
+                        clienteId:  $user->id,
+                        monto:      $validated['monto_solicitado'],
+                        plazoMeses: $validated['plazo_meses'],
+                        usuario:    $request->user()->name,
+                        rol:        $activeRole,
+                        comentario: 'Solicitud de crédito Constructor registrada. Esperando validación de documentación para habilitar el Informe Técnico.',
+                        solicitudCreditoId: $solicitud->id,
+                        estadoInicial: 'validacion_documental_constructor',
+                        documentosIniciales: []
+                    );
+                } else {
+                    \App\Models\CreditoOrdinario::iniciar(
+                        clienteId:  $user->id,
+                        monto:      $validated['monto_solicitado'],
+                        plazoMeses: $validated['plazo_meses'],
+                        usuario:    $request->user()->name,
+                        rol:        $activeRole,
+                        comentario: 'Solicitud de crédito ordinario registrada e iniciada desde el módulo de solicitudes.',
+                        solicitudCreditoId: $solicitud->id
+                    );
+                }
             }
 
             // 4. Create DocumentRequest in the database if document_preset_id is provided
+            // SCRUM-152: cada SolicitudCredito tiene su propio DocumentRequest 1:1
+            // (SolicitudCredito::documentRequest() es hasOne por solicitud_credito_id).
+            // Antes se reutilizaba cualquier DocumentRequest "pendiente" del mismo
+            // cliente y se le mezclaban los requisitos del preset nuevo — si ese
+            // request ya pertenecía a otra solicitud, esta solicitud quedaba sin
+            // documentRequest propio y Etapa 1 caía al fallback genérico de 4
+            // documentos fijos en vez de mostrar los del preset elegido.
             $documentosRequeridos = [];
-            if ($validated['document_preset_id']) {
+            if ($validated['document_preset_id'] ?? null) {
                 $preset = DocumentPreset::findOrFail($validated['document_preset_id']);
                 $requirementIds = $preset->requirements()->pluck('document_requirements.id')->toArray();
                 $documentosRequeridos = $preset->requirements()->pluck('nombre')->toArray();
 
                 if (count($requirementIds) > 0) {
-                    // Check if there is an existing pending request
-                    $existingDocRequest = DocumentRequest::where('cliente_id', $user->id)
-                        ->where('estado', 'pendiente')
-                        ->first();
+                    $docRequest = DocumentRequest::create([
+                        'cliente_id' => $user->id,
+                        'creado_por' => $request->user()->id,
+                        'solicitud_credito_id' => $solicitud->id,
+                        'estado' => 'pendiente'
+                    ]);
 
-                    if ($existingDocRequest) {
-                        // Add new requirements to the existing request
-                        foreach ($requirementIds as $reqId) {
-                            $itemExists = DocumentRequestItem::where('document_request_id', $existingDocRequest->id)
-                                ->where('document_requirement_id', $reqId)
-                                ->exists();
-                            
-                            if (!$itemExists) {
-                                DocumentRequestItem::create([
-                                    'document_request_id' => $existingDocRequest->id,
-                                    'document_requirement_id' => $reqId,
-                                    'estado' => 'pendiente'
-                                ]);
-                            }
-                        }
-                    } else {
-                        // Create a new request
-                        $docRequest = DocumentRequest::create([
-                            'cliente_id' => $user->id,
-                            'creado_por' => $request->user()->id,
+                    foreach ($requirementIds as $reqId) {
+                        DocumentRequestItem::create([
+                            'document_request_id' => $docRequest->id,
+                            'document_requirement_id' => $reqId,
                             'estado' => 'pendiente'
                         ]);
-
-                        foreach ($requirementIds as $reqId) {
-                            DocumentRequestItem::create([
-                                'document_request_id' => $docRequest->id,
-                                'document_requirement_id' => $reqId,
-                                'estado' => 'pendiente'
-                            ]);
-                        }
                     }
                 }
             }

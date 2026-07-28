@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesActiveRole;
+use App\Models\ClientUpload;
 use App\Models\CreditoOrdinario;
+use App\Models\DocumentRequestItem;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
 
 class CreditoOrdinarioController extends Controller
 {
+    use ResolvesActiveRole;
+
     /**
      * Listar las solicitudes de crédito ordinario
      */
@@ -18,7 +22,7 @@ class CreditoOrdinarioController extends Controller
         $user = Auth::user();
         $activeRole = $this->resolveActiveRole($request);
         
-        $query = CreditoOrdinario::with('cliente');
+        $query = CreditoOrdinario::with(['cliente', 'informeTecnico', 'solicitudCredito.tipoCredito', 'solicitudCredito.documentRequest.items.requirement']);
 
         // Si el rol es cliente, solo puede ver sus propias solicitudes
         if ($activeRole === 'cliente') {
@@ -69,8 +73,27 @@ class CreditoOrdinarioController extends Controller
      */
     public function show($id)
     {
-        $credito = CreditoOrdinario::with('cliente')->findOrFail($id);
+        $credito = CreditoOrdinario::with(['cliente', 'informeTecnico', 'solicitudCredito.tipoCredito', 'solicitudCredito.documentRequest.items.requirement'])->findOrFail($id);
         return response()->json($credito);
+    }
+
+    /**
+     * Claves de documentos que debe satisfacer la Etapa 1 (Registro e
+     * Identificación) para este crédito. Si la SolicitudCredito que lo
+     * originó tiene una Solicitud de Documentos (DocumentRequest) ligada a
+     * un preset, se usa un ítem por cada documento del preset
+     * (SCRUM-146). Si no (créditos legacy sin preset), se mantiene la
+     * lista fija original.
+     */
+    private function etapa1DocumentKeys(CreditoOrdinario $credito): array
+    {
+        $items = $credito->solicitudCredito?->documentRequest?->items;
+
+        if ($items && $items->count() > 0) {
+            return $items->map(fn ($item) => 'req_item_' . $item->id)->all();
+        }
+
+        return ['formulario_solicitud', 'documentos_identidad', 'estados_financieros', 'certificados_laborales'];
     }
 
     /**
@@ -78,14 +101,16 @@ class CreditoOrdinarioController extends Controller
      */
     public function transition(Request $request, $id)
     {
-        $credito = CreditoOrdinario::findOrFail($id);
+        $credito = CreditoOrdinario::with('solicitudCredito.documentRequest.items')->findOrFail($id);
         $user = Auth::user();
         $activeRole = $this->resolveActiveRole($request);
-        
+
         $request->validate([
             'accion'          => 'required|string|in:aprobar,rechazar,completar,subir_archivo,devolver',
             'comentario'      => 'nullable|string',
             'archivo'         => 'nullable|file|mimes:pdf|max:102400',
+            'archivos'        => 'nullable|array',
+            'archivos.*'      => 'file|mimes:pdf|max:102400',
             'campo_documento' => 'nullable|string',
         ]);
 
@@ -99,9 +124,11 @@ class CreditoOrdinarioController extends Controller
 
         // Mapa de roles autorizados por estado para transiciones
         $rolesAutorizados = [
-            'revision_documental' => ['coordinador_comercial'],
+            'validacion_documental_constructor' => ['coordinador_comercial', 'cliente'],
+            'completar_solicitud_constructor' => ['cliente'],
+            'revision_documental' => ['coordinador_comercial', 'cliente'],
             'completar_solicitud' => ['cliente'],
-            'analisis_sarlaft_financiero' => ['coordinador_comercial', 'oficial_cumplimiento'],
+            'pendiente_analisis_financiero' => ['coordinador_comercial'],
             'aprobacion_presentacion' => ['gerente'],
             'comite_evaluacion' => ['comite_credito'],
             'formalizacion_garantias' => ['coordinador_comercial', 'cliente', 'operativo'],
@@ -122,16 +149,74 @@ class CreditoOrdinarioController extends Controller
             }
         }
 
-        $documentos = $credito->documentos ?? [];
+        // documentos_raw (no documentos): esto se relee y se reescribe
+        // completo más abajo; si leyéramos la versión ya resuelta a URL
+        // absoluta, cada transición hornearía de nuevo el APP_URL vigente
+        // en todos los campos, no solo en el que cambia (SCRUM-148).
+        $documentos = $credito->documentos_raw ?? [];
 
         // 1. Manejo de Carga de Archivos
-        if ($request->hasFile('archivo') && $request->filled('campo_documento')) {
+        // Documentos de Etapa 1 dirigidos por preset (claves 'req_item_{id}',
+        // SCRUM-146) admiten varios archivos por documento; el resto del
+        // flujo BPMN sigue aceptando un único archivo por campo.
+        if ($request->hasFile('archivos') && $request->filled('campo_documento')) {
+            $campoDoc = $request->campo_documento;
+            $existing = $documentos[$campoDoc] ?? [];
+            if (!is_array($existing)) {
+                $existing = $existing ? [$existing] : [];
+            }
+
+            // Si el campo corresponde a un documento de Etapa 1 dirigido por
+            // preset ('req_item_{id}'), sincronizamos también el
+            // DocumentRequestItem asociado: sin esto, las pantallas de
+            // "Solicitudes Documentos" y "sube tus documentos" del cliente
+            // seguían mostrando el documento como pendiente aunque ya se
+            // hubiera cargado desde Crédito Ordinario (SCRUM-146).
+            $requestItemId = str_starts_with($campoDoc, 'req_item_')
+                ? (int) substr($campoDoc, strlen('req_item_'))
+                : null;
+
+            $nombres = [];
+            foreach ($request->file('archivos') as $file) {
+                $fileName   = $file->getClientOriginalName();
+                $path       = $file->storeAs('credito_documentos/' . $credito->id, $fileName, 'public');
+                // Se guarda la ruta relativa, no la URL absoluta: el modelo
+                // la resuelve al leer con el APP_URL vigente (SCRUM-148).
+                $existing[] = $path;
+                $nombres[]  = $fileName;
+
+                if ($requestItemId) {
+                    $upload = ClientUpload::create([
+                        'user_id'       => $user->id,
+                        'upload_role'   => $activeRole,
+                        'filename'      => $path,
+                        'original_name' => $fileName,
+                        'status'        => 'pendiente',
+                        'ocr_status'    => 'exitoso',
+                        'ocr_message'   => 'No requiere procesamiento OCR',
+                    ]);
+
+                    DocumentRequestItem::where('id', $requestItemId)->update([
+                        'client_upload_id' => $upload->id,
+                        'estado'           => 'subido',
+                        'observaciones'    => null,
+                    ]);
+                }
+            }
+
+            $documentos[$campoDoc] = $existing;
+            $credito->documentos   = $documentos;
+            $credito->save();
+
+            $comentario .= ' (' . count($nombres) . " archivo(s) cargado(s) en '$campoDoc': " . implode(', ', $nombres) . ').';
+        } elseif ($request->hasFile('archivo') && $request->filled('campo_documento')) {
             $file     = $request->file('archivo');
             $fileName = $file->getClientOriginalName();
             $path     = $file->storeAs('credito_documentos/' . $credito->id, $fileName, 'public');
 
             $campoDoc              = $request->campo_documento;
-            $documentos[$campoDoc] = Storage::disk('public')->url($path);
+            // Ruta relativa; el modelo resuelve la URL al leer (SCRUM-148).
+            $documentos[$campoDoc] = $path;
             $credito->documentos   = $documentos;
             $credito->save();
 
@@ -141,7 +226,7 @@ class CreditoOrdinarioController extends Controller
         // 2. Lógica de Máquina de Estados BPMN
         if ($accion === 'rechazar') {
             if ($estadoActual === 'aprobacion_presentacion') {
-                $estadoNuevo = 'analisis_sarlaft_financiero';
+                $estadoNuevo = 'pendiente_analisis_financiero';
                 $comentario = 'Presentación rechazada por Gerencia. Retorna a análisis financiero. ' . $comentario;
             } elseif ($estadoActual === 'comite_evaluacion') {
                 $estadoNuevo = 'rechazado';
@@ -195,27 +280,79 @@ class CreditoOrdinarioController extends Controller
             if ($estadoActual === 'revision_documental') {
                 $estadoNuevo = 'completar_solicitud';
                 $comentario = 'Documentación incompleta. Solicitud enviada al cliente para completar. ' . $comentario;
+            } elseif ($estadoActual === 'validacion_documental_constructor') {
+                $estadoNuevo = 'completar_solicitud_constructor';
+                $comentario = 'Documentación incompleta del expediente inicial. Solicitud enviada al cliente para completar. ' . $comentario;
             }
         } elseif ($accion === 'aprobar' || $accion === 'subir_archivo') {
             switch ($estadoActual) {
+                case 'validacion_documental_constructor':
+                    // SCRUM-151: Coordinador Comercial revisa y aprueba el
+                    // expediente inicial de Constructor en esta misma pantalla,
+                    // igual que revision_documental en Ordinario. Al aprobar,
+                    // pasa directo a Informe Técnico (no a SARLAFT, que en
+                    // Constructor corre después del Informe Técnico).
+                    if ($accion === 'aprobar') {
+                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(function ($key) use ($documentos) {
+                            $valor = $documentos[$key] ?? null;
+                            return is_array($valor) ? count($valor) > 0 : !empty($valor);
+                        });
+
+                        if ($hasEtapa1) {
+                            $estadoNuevo = 'informe_tecnico_ingeniero';
+                            $comentario = 'Documentación revisada y aprobada. Bandeja de Informe Técnico habilitada para el Ingeniero.';
+                        } else {
+                            $comentario = 'Faltan documentos obligatorios del expediente inicial. No se puede aprobar todavía.';
+                        }
+                    }
+                    break;
+
                 case 'revision_documental':
-                    $estadoNuevo = 'analisis_sarlaft_financiero';
-                    $comentario = 'Documentación revisada y aprobada. Pasa a análisis paralelo (SARLAFT y Financiero).';
+                    // La carga de un solo soporte (subir_archivo) no debe cerrar la
+                    // etapa: solo el Coordinador Comercial, con 'aprobar' explícito,
+                    // decide que el expediente inicial está completo.
+                    if ($accion === 'aprobar') {
+                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(function ($key) use ($documentos) {
+                            $valor = $documentos[$key] ?? null;
+                            return is_array($valor) ? count($valor) > 0 : !empty($valor);
+                        });
+
+                        if ($hasEtapa1) {
+                            $estadoNuevo = 'sarlaft_control_interno';
+                            $comentario = 'Documentación revisada y aprobada. Pasa a validación de Listas Restrictivas y SARLAFT.';
+                        } else {
+                            $comentario = 'Faltan documentos obligatorios del expediente inicial. No se puede aprobar todavía.';
+                        }
+                    }
                     break;
 
                 case 'completar_solicitud':
-                    $estadoNuevo = 'revision_documental';
-                    $comentario = 'El cliente completó la solicitud. Retorna a revisión documental.';
+                    if ($accion === 'aprobar') {
+                        $estadoNuevo = 'revision_documental';
+                        $comentario = 'El cliente completó la solicitud. Retorna a revisión documental.';
+                    }
                     break;
 
-                case 'analisis_sarlaft_financiero':
-                    // Si se cargan los documentos, validamos si ya están listos los del Oficial de Cumplimiento y los del Coordinador Comercial
-                    $hasSarlaft = !empty($documentos['sarlft_sintesis']) && !empty($documentos['sarlft_datacredito']);
-                    $hasFinancial = !empty($documentos['analisis_financiero']) && !empty($documentos['presentacion_comite']);
-                    
-                    if ($hasSarlaft && $hasFinancial) {
+                case 'completar_solicitud_constructor':
+                    if ($accion === 'aprobar') {
+                        $estadoNuevo = 'validacion_documental_constructor';
+                        $comentario = 'El cliente completó la solicitud. Retorna a validación documental del expediente inicial (Constructor).';
+                    }
+                    break;
+
+                case 'pendiente_analisis_financiero':
+                    // El Oficial de Cumplimiento ya emitió concepto favorable (módulo Listas
+                    // Restrictivas y SARLAFT, SCRUM-128). SCRUM-155 reemplazó el upload manual
+                    // de "Análisis Financiero" por el módulo interactivo dedicado — la
+                    // condición ya no depende de $documentos['analisis_financiero'], sino de
+                    // que AnalisisFinanciero quede confirmado allá. "Presentación Comité" sigue
+                    // siendo upload manual (elaborar esa presentación está fuera de alcance).
+                    $analisisConfirmado = $credito->analisisFinanciero?->estado === 'confirmado';
+                    $hasFinancial = $analisisConfirmado && !empty($documentos['presentacion_comite']);
+
+                    if ($hasFinancial) {
                         $estadoNuevo = 'aprobacion_presentacion';
-                        $comentario = 'Análisis finalizado y documentos cargados por Cumplimiento y Comercial. Pasa a aprobación de presentación por Gerencia.';
+                        $comentario = 'Análisis financiero confirmado y presentación cargada por Comercial. Pasa a aprobación de presentación por Gerencia.';
                     } else {
                         $comentario = 'Archivo cargado en análisis financiero. Aún faltan documentos complementarios para transicionar de etapa.';
                     }
@@ -316,18 +453,5 @@ class CreditoOrdinarioController extends Controller
         $credito->save();
 
         return response()->json($credito->load('cliente'));
-    }
-
-    private function resolveActiveRole(Request $request): string
-    {
-        $user      = Auth::user();
-        $userRoles = is_array($user->roles) ? $user->roles : [];
-        $header    = $request->header('X-Active-Role');
-
-        if ($header && (in_array($header, $userRoles) || in_array('superadmin', $userRoles))) {
-            return $header;
-        }
-
-        return $userRoles[0] ?? 'cliente';
     }
 }

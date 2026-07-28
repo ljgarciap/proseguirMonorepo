@@ -149,4 +149,14 @@ class PendingCountTest extends TestCase
 
         $this->assertEquals(1, $response->json('expiring_operativo'));
     }
+
+    /**
+     * El endpoint ya calcula y devuelve el contador de 'contable' (bandeja
+     * interna) — ese rol también necesita poder consultarlo para su badge.
+     */
+    public function test_contable_role_can_access_pending_count(): void
+    {
+        Passport::actingAs($this->makeUser('contable', 'viewer2'));
+        $this->getJson('/api/uploads/pending-count')->assertStatus(200);
+    }
 }

@@ -11,6 +11,8 @@ class Visita extends Model
     protected $fillable = [
         'fecha',
         'ciudad',
+        'departamento_id',
+        'ciudad_id',
         'cliente_id',
         'asistentes',
         'observaciones',
@@ -36,6 +38,16 @@ class Visita extends Model
     public function cliente()
     {
         return $this->belongsTo(Cliente::class, 'cliente_id');
+    }
+
+    public function departamentoUbicacion()
+    {
+        return $this->belongsTo(Departamento::class, 'departamento_id');
+    }
+
+    public function ciudadUbicacion()
+    {
+        return $this->belongsTo(Ciudad::class, 'ciudad_id');
     }
 
     public function tipoCredito()

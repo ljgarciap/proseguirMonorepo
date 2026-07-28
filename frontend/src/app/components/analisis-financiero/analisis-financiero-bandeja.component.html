@@ -1,0 +1,84 @@
+<div class="view-container">
+  <header class="view-header">
+    <div class="title-area">
+      <h1>Análisis Financiero</h1>
+      <p>Rol: Coordinador Comercial · Solo se muestran solicitudes con concepto SARLAFT favorable.</p>
+    </div>
+  </header>
+
+  <div class="content-card">
+    <h3 class="card-title">Solicitudes pendientes de análisis financiero</h3>
+    <p class="card-subtitle">Créditos con documentación aprobada y concepto SARLAFT favorable, listos para el Análisis Financiero.</p>
+
+    <div class="filters-bar mt-4">
+      <input class="pro-input" type="text" [(ngModel)]="filtroTexto" placeholder="Buscar por número, cliente o NIT...">
+      <select class="pro-input" [(ngModel)]="filtroEstado">
+        <option value="">Estado: Todos</option>
+        <option value="pendiente">Pendiente</option>
+        <option value="borrador">En Borrador</option>
+        <option value="confirmado">Confirmado</option>
+      </select>
+      <select class="pro-input" [(ngModel)]="filtroTipoCredito">
+        <option value="">Tipo de crédito: Todos</option>
+        <option *ngFor="let tipo of tiposCredito()" [value]="tipo">{{ tipo }}</option>
+      </select>
+      <div class="badges-bar">
+        <span class="badge-count info">{{ totalPendientes }} PENDIENTES</span>
+        <span class="badge-count warning">{{ totalBorrador }} EN BORRADOR</span>
+      </div>
+    </div>
+
+    <div class="table-container mt-4">
+      <table class="modern-table">
+        <thead>
+          <tr>
+            <th>N.° Solicitud</th>
+            <th>Cliente / Razón Social</th>
+            <th>Tipo de Crédito</th>
+            <th>Monto</th>
+            <th>Fecha</th>
+            <th>SARLAFT</th>
+            <th>Estado</th>
+            <th class="text-right">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let credito of creditosFiltrados">
+            <td class="id-cell">{{ credito.numero_solicitud }}</td>
+            <td>
+              <div class="user-cell">
+                <span class="name">{{ cliente(credito) }}</span>
+                <span class="text-muted">NIT {{ nit(credito) }}</span>
+              </div>
+            </td>
+            <td>{{ credito.tipo_credito || '—' }}</td>
+            <td>{{ (credito.solicitud_credito?.monto_solicitado || 0) | number:'1.0-0':'es-CO' }}</td>
+            <td>{{ credito.created_at | date:'dd/MM/yyyy' }}</td>
+            <td>
+              <span class="status-pill success">Favorable</span>
+            </td>
+            <td>
+              <span class="status-pill" [ngClass]="{
+                'warning': estadoAnalisis(credito) === 'borrador',
+                'success': estadoAnalisis(credito) === 'confirmado'
+              }">{{ estadoLabel(credito) }}</span>
+            </td>
+            <td class="text-right actions-cell">
+              <button class="btn-pro sm" [class.primary]="puedeEditar(credito)" [class.secondary]="!puedeEditar(credito)"
+                      [routerLink]="['/analisis-financiero', credito.id]">
+                <span class="material-symbols-outlined">{{ accionIcono(credito) }}</span>
+                {{ accionLabel(credito) }}
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="creditosFiltrados.length === 0 && !loading">
+            <td colspan="8" class="text-center py-4 text-muted">No existen solicitudes pendientes de análisis financiero.</td>
+          </tr>
+          <tr *ngIf="loading">
+            <td colspan="8" class="text-center py-4">Cargando bandeja de Análisis Financiero...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

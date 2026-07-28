@@ -138,28 +138,63 @@ class CreditoOrdinarioTest extends TestCase
         $creditoId = $response->json('id');
         $this->assertDatabaseHas('credito_ordinarios', ['id' => $creditoId, 'estado' => 'revision_documental']);
 
-        // 2. Coordinador approves documental revision
+        // 2. Cliente/coordinador suben el expediente inicial. Subir un archivo no
+        // transiciona por sí solo (SCRUM-142) — el crédito debe permanecer en
+        // revision_documental hasta que el Coordinador apruebe explícitamente.
+        Passport::actingAs($this->cliente);
+        $this->subirArchivo($creditoId, 'formulario_solicitud', 'cliente')
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'revision_documental');
+        $this->subirArchivo($creditoId, 'documentos_identidad', 'cliente')
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'revision_documental');
+
         Passport::actingAs($this->coordinador);
+        $this->subirArchivo($creditoId, 'estados_financieros', 'coordinador_comercial')
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'revision_documental');
+
+        // Aprobar sin el expediente completo no debe transicionar (SCRUM-142).
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion'     => 'aprobar',
+            'comentario' => 'Intento de aprobación incompleta.'
+        ], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'revision_documental');
+
+        $this->subirArchivo($creditoId, 'certificados_laborales', 'coordinador_comercial')
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'revision_documental');
+
+        // Coordinador approves documental revision — pasa a la bandeja dedicada
+        // de Listas Restrictivas y SARLAFT (SCRUM-128), fuera del alcance de este test.
         $this->postJson("/api/creditos/{$creditoId}/transition", [
             'accion'     => 'aprobar',
             'comentario' => 'Documentación inicial correcta.'
         ], ['X-Active-Role' => 'coordinador_comercial'])
             ->assertStatus(200)
-            ->assertJsonPath('estado', 'analisis_sarlaft_financiero');
+            ->assertJsonPath('estado', 'sarlaft_control_interno');
 
-        // 3. Parallel analysis: Cumplimiento uploads SARLAFT docs
-        Passport::actingAs($this->cumplimiento);
-        $this->subirArchivo($creditoId, 'sarlft_sintesis', 'oficial_cumplimiento', 'sintesis.pdf')
-            ->assertStatus(200)
-            ->assertJsonPath('estado', 'analisis_sarlaft_financiero');
+        // El concepto SARLAFT favorable (probado en ListasRestrictivasSarlaftTest)
+        // deja el crédito en pendiente_analisis_financiero. Simulamos ese resultado
+        // directamente sobre el modelo para continuar el flujo BPMN desde ahí.
+        $credito = CreditoOrdinario::find($creditoId);
+        $credito->estado = 'pendiente_analisis_financiero';
+        $credito->save();
 
-        $this->subirArchivo($creditoId, 'sarlft_datacredito', 'oficial_cumplimiento', 'datacredito.pdf')
-            ->assertStatus(200);
+        // 3. Coordinador confirma el Análisis Financiero (SCRUM-155 — reemplaza el
+        // upload manual de 'analisis_financiero'; se crea directamente en estado
+        // confirmado porque este test cubre las transiciones BPMN, no las reglas
+        // de validación del módulo, que tienen su propia suite en
+        // AnalisisFinancieroTest).
+        \App\Models\AnalisisFinanciero::create([
+            'credito_ordinario_id' => $creditoId,
+            'estado' => 'confirmado',
+            'anio_inicial' => 2024,
+            'cantidad_anios' => 2,
+        ]);
 
-        // Coordinador uploads financial docs
         Passport::actingAs($this->coordinador);
-        $this->subirArchivo($creditoId, 'analisis_financiero', 'coordinador_comercial', 'analisis.pdf')
-            ->assertStatus(200);
 
         // Last doc triggers auto-transition to aprobacion_presentacion
         $this->subirArchivo($creditoId, 'presentacion_comite', 'coordinador_comercial', 'presentacion.pdf')
@@ -173,7 +208,7 @@ class CreditoOrdinarioTest extends TestCase
             'comentario' => 'Revisar datos financieros'
         ], ['X-Active-Role' => 'gerente'])
             ->assertStatus(200)
-            ->assertJsonPath('estado', 'analisis_sarlaft_financiero');
+            ->assertJsonPath('estado', 'pendiente_analisis_financiero');
 
         Passport::actingAs($this->coordinador);
         $this->subirArchivo($creditoId, 'presentacion_comite', 'coordinador_comercial', 'presentacion_v2.pdf')
@@ -314,5 +349,69 @@ class CreditoOrdinarioTest extends TestCase
         ], ['X-Active-Role' => 'tesoreria'])
             ->assertStatus(200)
             ->assertJsonPath('estado', 'completado');
+    }
+
+    // SCRUM-148: un documento subido en un ambiente (ej. test, APP_URL
+    // http://173.201.39.180:8080) no debe quedar inaccesible si luego se lee
+    // con un APP_URL distinto (ej. porque esa vez el deploy cayó en fallback
+    // a PROD.env) — la URL se resuelve con el APP_URL vigente en el momento
+    // de la lectura, no con el que estaba activo al subir el archivo.
+    public function test_documento_subido_guarda_ruta_relativa_y_url_se_resuelve_con_app_url_vigente(): void
+    {
+        Passport::actingAs($this->admin);
+        $creditoId = $this->postJson('/api/creditos', [
+            'monto' => 50000000.00,
+            'plazo_meses' => 24,
+            'cliente_id' => $this->cliente->id,
+        ], ['X-Active-Role' => 'superadmin'])->json('id');
+
+        Passport::actingAs($this->cliente);
+        $this->subirArchivo($creditoId, 'formulario_solicitud', 'cliente')->assertStatus(200);
+
+        // En BD debe quedar solo la ruta relativa, no una URL horneada con
+        // el APP_URL de este momento.
+        $rawDocumentos = json_decode(
+            \DB::table('credito_ordinarios')->where('id', $creditoId)->value('documentos'),
+            true
+        );
+        $rutaRelativa = $rawDocumentos['formulario_solicitud'];
+        $this->assertStringStartsNotWith('http', $rutaRelativa);
+        $this->assertStringContainsString('credito_documentos/' . $creditoId . '/', $rutaRelativa);
+
+        // Al leer el modelo, se resuelve a la URL pública del disco vigente
+        // (ya no es la ruta cruda: pasó por Storage::disk('public')->url()).
+        $credito = CreditoOrdinario::find($creditoId);
+        $urlResuelta = $credito->documentos['formulario_solicitud'];
+        $this->assertNotEquals($rutaRelativa, $urlResuelta);
+        $this->assertStringContainsString('/storage/' . $rutaRelativa, $urlResuelta);
+
+        // Simula el escenario real del ticket: el registro quedó con una URL
+        // absoluta horneada con OTRO dominio (bug ya ocurrido antes del fix,
+        // o dato legacy). Debe normalizarse a la MISMA URL que resolvería un
+        // documento nuevo, sin rastro del dominio viejo.
+        \DB::table('credito_ordinarios')->where('id', $creditoId)->update([
+            'documentos' => json_encode(array_merge($rawDocumentos, [
+                'formulario_solicitud' => 'http://dominio-viejo-incorrecto.test/storage/' . $rutaRelativa,
+            ])),
+        ]);
+
+        $creditoConUrlVieja = CreditoOrdinario::find($creditoId);
+        $this->assertEquals($urlResuelta, $creditoConUrlVieja->documentos['formulario_solicitud']);
+        $this->assertStringNotContainsString('dominio-viejo-incorrecto', $creditoConUrlVieja->documentos['formulario_solicitud']);
+
+        // Restaura el valor correcto y confirma que una transición NO
+        // relacionada (otro campo) no vuelve a hornear el resto del JSON
+        // como URLs absolutas.
+        \DB::table('credito_ordinarios')->where('id', $creditoId)->update([
+            'documentos' => json_encode($rawDocumentos),
+        ]);
+
+        $this->subirArchivo($creditoId, 'documentos_identidad', 'cliente')->assertStatus(200);
+
+        $rawTrasSegundaSubida = json_decode(
+            \DB::table('credito_ordinarios')->where('id', $creditoId)->value('documentos'),
+            true
+        );
+        $this->assertStringStartsNotWith('http', $rawTrasSegundaSubida['formulario_solicitud']);
     }
 }

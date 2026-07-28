@@ -2,15 +2,15 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
-import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-credito-ordinario',
   standalone: true,
-  imports: [CommonModule, FormsModule, MilesSeparatorDirective],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './credito-ordinario.component.html',
   styleUrls: ['./credito-ordinario.component.css']
 })
@@ -18,19 +18,19 @@ export class CreditoOrdinarioComponent implements OnInit {
   creditos: any[] = [];
   selectedCredito: any = null;
   activeRole: string = 'cliente';
-  
-  // Modal state
-  showNewRequestModal = false;
-  newRequest = {
-    monto: null as number | null,
-    plazo_meses: 12
-  };
+  searchTerm: string = '';
 
   // BPMN Stepper definition
   bpmnSteps = [
     { key: 'revision_documental', label: 'Revisión Solicitud', role: 'coordinador_comercial', roleLabel: 'Coordinador Comercial', desc: 'Revisar la solicitud inicial del cliente y verificar que los soportes y formularios estén completos.' },
     { key: 'completar_solicitud', label: 'Completar Sop.', role: 'cliente', roleLabel: 'Cliente', desc: 'Completar la documentación faltante solicitada por el Coordinador Comercial.' },
-    { key: 'analisis_sarlaft_financiero', label: 'Análisis Dual', role: 'cumplimiento_y_comercial', roleLabel: 'Cumplimiento & Comercial', desc: 'Validar listas restrictivas/SARLAFT (Cumplimiento) y realizar análisis financiero / presentación del cliente (Comercial).' },
+    // SCRUM-128: el paso combinado analisis_sarlaft_financiero se separó en dos
+    // etapas secuenciales. La validación de Listas Restrictivas y SARLAFT ahora
+    // se diligencia en el módulo dedicado (/listas-sarlaft, Oficial de
+    // Cumplimiento) — este paso del stepper solo queda como referencia visual
+    // de progreso, sin panel de acción propio en esta pantalla.
+    { key: 'sarlaft_control_interno', label: 'Listas Restrictivas / SARLAFT', role: 'oficial_cumplimiento', roleLabel: 'Oficial de Cumplimiento', desc: 'Validar Listas Restrictivas y emitir concepto SARLAFT (gestionado desde el módulo Listas Restrictivas y SARLAFT).' },
+    { key: 'pendiente_analisis_financiero', label: 'Análisis Financiero', role: 'coordinador_comercial', roleLabel: 'Coordinador Comercial', desc: 'Realizar el análisis financiero y preparar la presentación del cliente para el Comité.' },
     { key: 'aprobacion_presentacion', label: 'Aprobación Pres.', role: 'gerente', roleLabel: 'Gerencia', desc: 'Revisar y aprobar la presentación del cliente elaborada para el Comité de Créditos.' },
     { key: 'comite_evaluacion', label: 'Comité de Crédito', role: 'comite_credito', roleLabel: 'Comité de Crédito', desc: 'Evaluar el perfil de crédito y firmar el Acta oficial de decisión del Comité.' },
     { key: 'formalizacion_garantias', label: 'Garantías', role: 'operativo', roleLabel: 'Dirección Administrativa', desc: 'Revisar y registrar las garantías firmadas por el cliente.' },
@@ -80,11 +80,42 @@ export class CreditoOrdinarioComponent implements OnInit {
     this.selectedCredito = credito;
   }
 
+  // SCRUM-143: filtro client-side por cliente o número de documento —
+  // la lista ya llega completa del backend, no hace falta re-consultarlo.
+  get filteredCreditos(): any[] {
+    const term = this.searchTerm.trim().toLowerCase();
+    if (!term) return this.creditos;
+    return this.creditos.filter(item => {
+      const nombre = (item.cliente?.name || '').toLowerCase();
+      const documento = (item.cliente?.numero_documento || '').toLowerCase();
+      return nombre.includes(term) || documento.includes(term);
+    });
+  }
+
+  // SCRUM-151 (comentarios 2026-07-23): Crédito Constructor corre su propio
+  // expediente inicial + Informe Técnico antes de continuar por el resto del
+  // stepper de Ordinario sin cambios. Los 3 estados de Informe Técnico
+  // (ingeniero/coordinador/finalizado, ver InformeTecnicoController) se
+  // consolidan en un solo paso visual, igual que ya hace el checklist de
+  // "Expediente de Documentos" (informeTecnicoStatusLabel).
+  get bpmnStepsConstructor() {
+    return [
+      { key: 'validacion_documental_constructor', label: 'Revisión Solicitud', role: 'coordinador_comercial', roleLabel: 'Coordinador Comercial', desc: 'Revisar el expediente inicial del cliente y verificar que los soportes estén completos.' },
+      { key: 'completar_solicitud_constructor', label: 'Completar Sop.', role: 'cliente', roleLabel: 'Cliente', desc: 'Completar la documentación faltante solicitada por el Coordinador Comercial.' },
+      { key: 'informe_tecnico', label: 'Informe Técnico', role: 'ingeniero', roleLabel: 'Ingeniero / Coordinador Comercial', desc: 'Elaboración y registro del Informe Técnico del proyecto.', altKeys: ['informe_tecnico_ingeniero', 'informe_tecnico_coordinador', 'informe_tecnico_finalizado'] },
+      ...this.bpmnSteps.slice(2)
+    ];
+  }
+
+  get displaySteps() {
+    return this.isCreditoConstructor ? this.bpmnStepsConstructor : this.bpmnSteps;
+  }
+
   // Get index of a state in the BPMN workflow
   getStateIndex(state: string): number {
     if (state === 'completado') return 99;
     if (state === 'rechazado') return -1;
-    return this.bpmnSteps.findIndex(step => step.key === state);
+    return this.displaySteps.findIndex(step => step.key === state || (step as any).altKeys?.includes(state));
   }
 
   getProgressPercent(): number {
@@ -94,7 +125,7 @@ export class CreditoOrdinarioComponent implements OnInit {
     if (currentStatus === 'rechazado') return 0;
     const idx = this.getStateIndex(currentStatus);
     if (idx < 0) return 0;
-    return Math.round(((idx + 1) / this.bpmnSteps.length) * 100);
+    return Math.round(((idx + 1) / this.displaySteps.length) * 100);
   }
 
   // Determine class for a stepper node
@@ -105,7 +136,7 @@ export class CreditoOrdinarioComponent implements OnInit {
     if (currentStatus === 'rechazado') return 'disabled';
 
     const currentIndex = this.getStateIndex(currentStatus);
-    const stepIndex = this.bpmnSteps.findIndex(s => s.key === stepKey);
+    const stepIndex = this.displaySteps.findIndex(s => s.key === stepKey);
 
     if (stepIndex < currentIndex) return 'completed';
     if (stepIndex === currentIndex) return 'active';
@@ -120,9 +151,21 @@ export class CreditoOrdinarioComponent implements OnInit {
     const currentStatus = this.selectedCredito.estado;
     if (currentStatus === 'completado' || currentStatus === 'rechazado') return false;
 
-    // Custom check for parallel SARLAFT/Financial analysis step
-    if (currentStatus === 'analisis_sarlaft_financiero') {
-      return ['coordinador_comercial', 'oficial_cumplimiento'].includes(this.activeRole);
+    // SCRUM-128: sarlaft_control_interno no tiene panel de acción en esta
+    // pantalla (se gestiona en /listas-sarlaft) — nadie puede "actuar" acá.
+    if (currentStatus === 'sarlaft_control_interno') {
+      return false;
+    }
+
+    // SCRUM-151: expediente inicial de Constructor, revisado por Coordinador
+    // Comercial igual que revision_documental en Ordinario (no está en
+    // bpmnSteps porque Constructor no sigue el stepper de 11 pasos completo).
+    if (currentStatus === 'validacion_documental_constructor') {
+      return ['coordinador_comercial', 'cliente'].includes(this.activeRole);
+    }
+
+    if (currentStatus === 'completar_solicitud_constructor') {
+      return this.activeRole === 'cliente';
     }
 
     if (currentStatus === 'formalizacion_garantias') {
@@ -135,6 +178,106 @@ export class CreditoOrdinarioComponent implements OnInit {
 
     const currentStep = this.bpmnSteps.find(step => step.key === currentStatus);
     return currentStep ? currentStep.role === this.activeRole : false;
+  }
+
+  // SCRUM-151: el crédito es "Constructor" según el tipo de crédito de su
+  // Solicitud de Crédito asociada. Créditos legacy sin solicitud asociada se
+  // tratan como Ordinario (no tienen el sub-flujo de Informe Técnico).
+  get isCreditoConstructor(): boolean {
+    return (this.selectedCredito?.solicitud_credito?.tipo_credito?.codigo || '').toUpperCase() === 'CONSTRUCTOR';
+  }
+
+  // SCRUM-151: Crédito Constructor inserta la etapa de Informe Técnico antes
+  // de SARLAFT, corriendo en 1 la numeración de las etapas siguientes en el
+  // checklist "Expediente de Documentos de Crédito".
+  get etapaOffset(): number {
+    return this.isCreditoConstructor ? 1 : 0;
+  }
+
+  get informeTecnicoStatusLabel(): string {
+    if (this.selectedCredito?.informe_tecnico?.estado === 'registrado') return 'Completado';
+    const estadosEnProceso = ['validacion_documental_constructor', 'completar_solicitud_constructor', 'informe_tecnico_ingeniero', 'informe_tecnico_coordinador', 'informe_tecnico_finalizado'];
+    if (this.selectedCredito?.informe_tecnico || estadosEnProceso.includes(this.selectedCredito?.estado)) return 'En Proceso';
+    return 'Pendiente';
+  }
+
+  // SCRUM-151: algunos estados del flujo no tienen panel de acción en esta
+  // pantalla porque se gestionan en un módulo dedicado (Informe Técnico,
+  // Listas Restrictivas y SARLAFT) o avanzan automáticamente al completar la
+  // aprobación de documentos en otra pantalla. Mostrar "Acceso Restringido"
+  // ahí es engañoso — no es un problema de permisos de rol.
+  get managedElsewhereInfo(): { title: string; message: string; link?: string; linkLabel?: string; roles?: string[] } | null {
+    if (!this.selectedCredito) return null;
+    const creditoId = this.selectedCredito.id;
+
+    switch (this.selectedCredito.estado) {
+      case 'validacion_documental_constructor':
+        // SCRUM-151: este panel solo lo ve un rol distinto de Coordinador
+        // Comercial/Cliente (isUserRoleAuthorized ya los autoriza a ellos con
+        // acciones propias). El paso avanza cuando Coordinador Comercial
+        // aprueba el expediente en esta pantalla; Operaciones conserva
+        // /validation como vía alterna (avanza igual si aprueba ahí primero).
+        return {
+          title: 'Validación documental en curso',
+          message: 'El expediente inicial de este crédito Constructor está siendo revisado por el Coordinador Comercial. Alternativamente, este paso también avanza si Operaciones valida y aprueba todos los soportes desde el módulo de Validación de Documentos.',
+          link: '/validation',
+          linkLabel: 'Ir a Validación de Documentos',
+          roles: ['operativo', 'gerente']
+        };
+      case 'informe_tecnico_ingeniero':
+        return {
+          title: 'Informe Técnico en elaboración',
+          message: 'El Ingeniero está elaborando el Informe Técnico del proyecto. El flujo continuará automáticamente cuando lo envíe a revisión del Coordinador Comercial.',
+          link: `/informes-tecnicos/${creditoId}`,
+          linkLabel: 'Ver Informe Técnico',
+          roles: ['ingeniero', 'coordinador_comercial']
+        };
+      case 'informe_tecnico_coordinador':
+        return {
+          title: 'Informe Técnico en revisión',
+          message: 'El Informe Técnico está pendiente de revisión y registro por el Coordinador Comercial. El flujo continuará automáticamente al finalizar esa revisión.',
+          link: `/informes-tecnicos/${creditoId}`,
+          linkLabel: 'Ver Informe Técnico',
+          roles: ['ingeniero', 'coordinador_comercial']
+        };
+      case 'informe_tecnico_finalizado':
+        return {
+          title: 'Informe Técnico finalizado',
+          message: 'El Informe Técnico fue registrado. El crédito continuará automáticamente a la etapa de Listas Restrictivas y SARLAFT.'
+        };
+      case 'sarlaft_control_interno':
+        return {
+          title: 'Listas Restrictivas y SARLAFT en curso',
+          message: 'La validación de Listas Restrictivas y el concepto SARLAFT se gestionan desde el módulo dedicado.',
+          link: `/listas-sarlaft/${creditoId}`,
+          linkLabel: 'Ir a Listas Restrictivas y SARLAFT',
+          roles: ['oficial_cumplimiento']
+        };
+      default:
+        return null;
+    }
+  }
+
+  // SCRUM-146: los documentos de Etapa 1 se derivan de la Solicitud de
+  // Documentos (DocumentRequestItem) creada a partir del preset elegido al
+  // registrar la SolicitudCredito. Si el crédito no tiene preset asociado
+  // (créditos legacy anteriores a SCRUM-120/146), se mantiene la lista fija
+  // original de 4 documentos.
+  get etapa1Docs(): { key: string; nombre: string; descripcion: string }[] {
+    const items = this.selectedCredito?.solicitud_credito?.document_request?.items;
+    if (items && items.length > 0) {
+      return items.map((item: any) => ({
+        key: 'req_item_' + item.id,
+        nombre: item.requirement?.nombre || 'Documento requerido',
+        descripcion: item.requirement?.descripcion || ''
+      }));
+    }
+    return [
+      { key: 'formulario_solicitud', nombre: 'Formulario de Solicitud', descripcion: 'Formulario de solicitud del cliente diligenciado.' },
+      { key: 'documentos_identidad', nombre: 'Documentos de Identidad', descripcion: 'Copia de Cédula de Ciudadanía o NIT del cliente.' },
+      { key: 'estados_financieros', nombre: 'Estados Financieros', descripcion: 'Balance y Estados Financieros firmados por contador.' },
+      { key: 'certificados_laborales', nombre: 'Certificados Laborales / Comerciales', descripcion: 'Soporte de ingresos o referencias de la empresa.' }
+    ];
   }
 
   onFileUpload(event: Event, campoDoc: string) {
@@ -151,6 +294,42 @@ export class CreditoOrdinarioComponent implements OnInit {
       _file: file,
       campo_documento: campoDoc
     });
+  }
+
+  // SCRUM-146: documentos de Etapa 1 dirigidos por preset admiten varios
+  // archivos por documento (input con atributo "multiple").
+  onMultiFileUpload(event: Event, campoDoc: string) {
+    const target = event.target as HTMLInputElement;
+    const files = target.files ? Array.from(target.files) : [];
+    if (!files.length) return;
+
+    const invalido = files.find(f => f.type !== 'application/pdf');
+    if (invalido) {
+      Swal.fire('Formato Inválido', 'Solo se permite subir archivos en formato PDF.', 'warning');
+      return;
+    }
+
+    this.executeTransition('subir_archivo', `Carga de soporte(s) PDF en campo: ${campoDoc}`, {
+      _files: files,
+      campo_documento: campoDoc
+    });
+  }
+
+  // Devuelve siempre un arreglo, sin importar si documentos[campoDoc] quedó
+  // guardado como string único (documentos legacy de una sola etapa) o como
+  // arreglo (Etapa 1 dirigida por preset, SCRUM-146).
+  getDocFiles(campoDoc: string): string[] {
+    const valor = this.selectedCredito?.documentos?.[campoDoc];
+    if (!valor) return [];
+    return Array.isArray(valor) ? valor : [valor];
+  }
+
+  getDocFileName(url: string): string {
+    try {
+      return decodeURIComponent(url.split('/').pop() || url);
+    } catch {
+      return url;
+    }
   }
 
   executeTransition(accion: string, comentarioDefecto: string = '', extraData: any = {}) {
@@ -171,7 +350,16 @@ export class CreditoOrdinarioComponent implements OnInit {
         const headers = { 'X-Active-Role': this.activeRole };
         const url = `${environment.apiUrl}/creditos/${this.selectedCredito.id}/transition`;
 
-        const request$ = (extraData._file instanceof File)
+        const request$ = (extraData._files && extraData._files.length)
+          ? (() => {
+              const formData = new FormData();
+              formData.append('accion', accion);
+              formData.append('comentario', comentario);
+              extraData._files.forEach((f: File) => formData.append('archivos[]', f, f.name));
+              formData.append('campo_documento', extraData.campo_documento);
+              return this.http.post(url, formData, { headers });
+            })()
+          : (extraData._file instanceof File)
           ? (() => {
               const formData = new FormData();
               formData.append('accion', accion);
@@ -195,30 +383,4 @@ export class CreditoOrdinarioComponent implements OnInit {
     });
   }
 
-  // Open creation modal
-  openNewRequestModal() {
-    this.newRequest = { monto: null, plazo_meses: 12 };
-    this.showNewRequestModal = true;
-  }
-
-  // Submit new request
-  submitNewRequest() {
-    if (!this.newRequest.monto || this.newRequest.monto <= 0) {
-      Swal.fire('Error', 'Por favor ingresa un monto válido superior a cero.', 'warning');
-      return;
-    }
-
-    this.http.post(`${environment.apiUrl}/creditos`, this.newRequest, {
-      headers: { 'X-Active-Role': this.activeRole }
-    }).subscribe({
-      next: (created) => {
-        this.showNewRequestModal = false;
-        Swal.fire('¡Solicitud Creada!', 'Tu solicitud de crédito ordinario fue registrada con éxito.', 'success');
-        this.loadCreditos();
-      },
-      error: (err) => {
-        Swal.fire('Error', err.error.message || 'No se pudo crear la solicitud.', 'error');
-      }
-    });
-  }
 }

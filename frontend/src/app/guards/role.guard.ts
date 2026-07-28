@@ -23,7 +23,13 @@ export const roleGuard: CanActivateFn = (route, state) => {
     router.navigate(['/client-upload']);
   } else if (role === 'coordinador_comercial') {
     router.navigate(['/solicitudes-credito']);
-  } else if (['oficial_cumplimiento', 'comite_credito', 'tesoreria'].includes(role || '')) {
+  } else if (role === 'ingeniero') {
+    router.navigate(['/informes-tecnicos']);
+  } else if (role === 'oficial_cumplimiento') {
+    // SCRUM-128: el trabajo del Oficial de Cumplimiento ya no ocurre
+    // dentro de /creditos — vive en la bandeja dedicada.
+    router.navigate(['/listas-sarlaft']);
+  } else if (['comite_credito', 'tesoreria'].includes(role || '')) {
     router.navigate(['/creditos']);
   } else {
     router.navigate(['/dashboard']);

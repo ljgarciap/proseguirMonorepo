@@ -128,6 +128,42 @@ export const routes: Routes = [
         data: { roles: ['superadmin', 'gerente', 'coordinador_comercial', 'operativo'] }
     },
     {
+        path: 'informes-tecnicos',
+        loadComponent: () => import('./components/informe-tecnico/informe-tecnico-bandeja.component').then(m => m.InformeTecnicoBandejaComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['ingeniero', 'coordinador_comercial', 'superadmin'] }
+    },
+    {
+        path: 'informes-tecnicos/:creditoId',
+        loadComponent: () => import('./components/informe-tecnico/informe-tecnico-detalle.component').then(m => m.InformeTecnicoDetalleComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['ingeniero', 'coordinador_comercial', 'superadmin'] }
+    },
+    {
+        path: 'analisis-financiero',
+        loadComponent: () => import('./components/analisis-financiero/analisis-financiero-bandeja.component').then(m => m.AnalisisFinancieroBandejaComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['coordinador_comercial', 'superadmin'] }
+    },
+    {
+        path: 'analisis-financiero/:creditoId',
+        loadComponent: () => import('./components/analisis-financiero/analisis-financiero-detalle.component').then(m => m.AnalisisFinancieroDetalleComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['coordinador_comercial', 'superadmin'] }
+    },
+    {
+        path: 'listas-sarlaft',
+        loadComponent: () => import('./components/listas-sarlaft/listas-sarlaft-bandeja.component').then(m => m.ListasSarlaftBandejaComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['oficial_cumplimiento', 'superadmin'] }
+    },
+    {
+        path: 'listas-sarlaft/:creditoId',
+        loadComponent: () => import('./components/listas-sarlaft/listas-sarlaft-detalle.component').then(m => m.ListasSarlaftDetalleComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['oficial_cumplimiento', 'superadmin'] }
+    },
+    {
         path: 'db-cleaner',
         loadComponent: () => import('./components/db-cleaner/db-cleaner.component').then(m => m.DbCleanerComponent),
         canActivate: [roleGuard],
@@ -161,7 +197,7 @@ export const routes: Routes = [
         path: 'clientes',
         loadComponent: () => import('./components/clientes/clientes.component').then(m => m.ClientesComponent),
         canActivate: [roleGuard],
-        data: { roles: ['superadmin', 'gerente', 'operativo'] }
+        data: { roles: ['superadmin', 'gerente', 'operativo', 'coordinador_comercial'] }
     },
     {
         path: 'visitas',
