@@ -396,6 +396,62 @@ class InformeTecnicoTest extends TestCase
         ]);
     }
 
+    // ---------------------------------------------------------------
+    // SCRUM-162 — filas custom ad-hoc en Ventas Totales Proyecto/Costos.
+    // ---------------------------------------------------------------
+
+    public function test_ingeniero_guarda_borrador_con_filas_custom_se_suman_y_se_releen(): void
+    {
+        $credito = $this->crearCreditoEnEstadoIngeniero();
+
+        Passport::actingAs($this->ingeniero);
+        $response = $this->putJson("/api/informes-tecnicos/{$credito->id}/borrador", [
+            'ventas_totales_proyecto' => [
+                'apartamentos' => 1000000,
+                '_custom' => [
+                    ['clave' => 'custom_terrazas', 'label' => 'Terrazas', 'valor' => 200000],
+                ],
+            ],
+            'costos' => [
+                'lote' => 600000,
+                '_custom' => [
+                    ['clave' => 'custom_permiso', 'label' => 'Permiso especial', 'valor' => 50000],
+                ],
+            ],
+        ], ['X-Active-Role' => 'ingeniero']);
+
+        $response->assertStatus(200);
+        $this->assertEquals(1200000, $response->json('ventas_totales_proyecto.total_ventas'));
+        $this->assertEquals(650000, $response->json('costos.total_costos'));
+        $this->assertEquals('custom_terrazas', $response->json('ventas_totales_proyecto.custom.0.clave'));
+
+        // Releer (GET show) debe conservar las filas custom y sus totales.
+        $show = $this->getJson("/api/informes-tecnicos/{$credito->id}", ['X-Active-Role' => 'ingeniero']);
+        $show->assertStatus(200);
+        $this->assertEquals(1200000, $show->json('informe.ventas_totales_proyecto.total_ventas'));
+        $this->assertEquals(650000, $show->json('informe.costos.total_costos'));
+        $this->assertEquals('Terrazas', $show->json('informe.ventas_totales_proyecto.custom.0.label'));
+    }
+
+    public function test_ingeniero_guarda_borrador_con_lista_custom_vacia_no_rompe_rehidratado(): void
+    {
+        $credito = $this->crearCreditoEnEstadoIngeniero();
+
+        Passport::actingAs($this->ingeniero);
+        $response = $this->putJson("/api/informes-tecnicos/{$credito->id}/borrador", [
+            'ventas_totales_proyecto' => ['apartamentos' => 1000000, '_custom' => []],
+            'costos' => ['lote' => 600000, '_custom' => []],
+        ], ['X-Active-Role' => 'ingeniero']);
+
+        $response->assertStatus(200);
+        $this->assertEquals(1000000, $response->json('ventas_totales_proyecto.total_ventas'));
+        $this->assertEquals(600000, $response->json('costos.total_costos'));
+
+        $show = $this->getJson("/api/informes-tecnicos/{$credito->id}", ['X-Active-Role' => 'ingeniero']);
+        $show->assertStatus(200);
+        $this->assertEquals(1000000, $show->json('informe.ventas_totales_proyecto.total_ventas'));
+    }
+
     public function test_ingeniero_registrar_sin_observaciones_falla_422(): void
     {
         $credito = $this->crearCreditoEnEstadoIngeniero();

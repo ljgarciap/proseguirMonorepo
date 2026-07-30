@@ -80,6 +80,20 @@
 
 .field-note .material-symbols-outlined { font-size: 18px; }
 
+/* SCRUM-162 — botón de eliminar fila custom, inline junto al label */
+.btn-remove-fila {
+  border: none;
+  background: transparent;
+  color: #b91c1c;
+  cursor: pointer;
+  font-size: 0.75rem;
+  margin-left: 6px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.btn-remove-fila:hover { background: #fee2e2; }
+
 .pro-input {
   padding: 10px 14px;
   border: 1px solid #cbd5e1;

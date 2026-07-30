@@ -107,6 +107,27 @@
               <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('activo', fila.clave, anio)) }}</td>
             </ng-container>
           </tr>
+          <tr *ngFor="let fila of customFilas['activo_corriente']">
+            <td>{{ fila.label }}
+              <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
+                      (click)="eliminarFila('activo_corriente','activo',fila.clave)" title="Eliminar fila">✕</button>
+            </td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                     [ngModel]="campoInput('activo', fila.clave, anio)"
+                     (ngModelChange)="setCampoInput('activo', fila.clave, anio, $event)"
+                     [disabled]="!puedeEditar"></td>
+              <td class="pct-cell">{{ fmtPct(estructural('activo', fila.clave, anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('activo', fila.clave, anio)) }}</td>
+            </ng-container>
+          </tr>
+          <tr *ngIf="puedeEditar">
+            <td colspan="100">
+              <button type="button" class="btn-pro secondary sm" (click)="agregarFila('activo_corriente','activo')">
+                <span class="material-symbols-outlined">add</span> Agregar fila
+              </button>
+            </td>
+          </tr>
         </tbody>
         <tfoot>
           <tr class="total-row">
@@ -132,6 +153,27 @@
               <td class="pct-cell">{{ fmtPct(estructural('activo', fila.clave, anio)) }}</td>
               <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('activo', fila.clave, anio)) }}</td>
             </ng-container>
+          </tr>
+          <tr *ngFor="let fila of customFilas['activo_no_corriente']">
+            <td>{{ fila.label }}
+              <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
+                      (click)="eliminarFila('activo_no_corriente','activo',fila.clave)" title="Eliminar fila">✕</button>
+            </td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                     [ngModel]="campoInput('activo', fila.clave, anio)"
+                     (ngModelChange)="setCampoInput('activo', fila.clave, anio, $event)"
+                     [disabled]="!puedeEditar"></td>
+              <td class="pct-cell">{{ fmtPct(estructural('activo', fila.clave, anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('activo', fila.clave, anio)) }}</td>
+            </ng-container>
+          </tr>
+          <tr *ngIf="puedeEditar">
+            <td colspan="100">
+              <button type="button" class="btn-pro secondary sm" (click)="agregarFila('activo_no_corriente','activo')">
+                <span class="material-symbols-outlined">add</span> Agregar fila
+              </button>
+            </td>
           </tr>
         </tbody>
         <tfoot>
@@ -179,6 +221,27 @@
               <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('pasivo', fila.clave, anio)) }}</td>
             </ng-container>
           </tr>
+          <tr *ngFor="let fila of customFilas['pasivo_corriente']">
+            <td>{{ fila.label }}
+              <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
+                      (click)="eliminarFila('pasivo_corriente','pasivo',fila.clave)" title="Eliminar fila">✕</button>
+            </td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                     [ngModel]="campoInput('pasivo', fila.clave, anio)"
+                     (ngModelChange)="setCampoInput('pasivo', fila.clave, anio, $event)"
+                     [disabled]="!puedeEditar"></td>
+              <td class="pct-cell">{{ fmtPct(estructural('pasivo', fila.clave, anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('pasivo', fila.clave, anio)) }}</td>
+            </ng-container>
+          </tr>
+          <tr *ngIf="puedeEditar">
+            <td colspan="100">
+              <button type="button" class="btn-pro secondary sm" (click)="agregarFila('pasivo_corriente','pasivo')">
+                <span class="material-symbols-outlined">add</span> Agregar fila
+              </button>
+            </td>
+          </tr>
         </tbody>
         <tfoot>
           <tr class="total-row">
@@ -204,6 +267,27 @@
               <td class="pct-cell">{{ fmtPct(estructural('pasivo', fila.clave, anio)) }}</td>
               <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('pasivo', fila.clave, anio)) }}</td>
             </ng-container>
+          </tr>
+          <tr *ngFor="let fila of customFilas['pasivo_no_corriente']">
+            <td>{{ fila.label }}
+              <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
+                      (click)="eliminarFila('pasivo_no_corriente','pasivo',fila.clave)" title="Eliminar fila">✕</button>
+            </td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                     [ngModel]="campoInput('pasivo', fila.clave, anio)"
+                     (ngModelChange)="setCampoInput('pasivo', fila.clave, anio, $event)"
+                     [disabled]="!puedeEditar"></td>
+              <td class="pct-cell">{{ fmtPct(estructural('pasivo', fila.clave, anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('pasivo', fila.clave, anio)) }}</td>
+            </ng-container>
+          </tr>
+          <tr *ngIf="puedeEditar">
+            <td colspan="100">
+              <button type="button" class="btn-pro secondary sm" (click)="agregarFila('pasivo_no_corriente','pasivo')">
+                <span class="material-symbols-outlined">add</span> Agregar fila
+              </button>
+            </td>
           </tr>
         </tbody>
         <tfoot>
@@ -254,6 +338,27 @@
               <td class="pct-cell">{{ fmtPct(estructural('patrimonio', fila.clave, anio)) }}</td>
               <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('patrimonio', fila.clave, anio)) }}</td>
             </ng-container>
+          </tr>
+          <tr *ngFor="let fila of customFilas['patrimonio']">
+            <td>{{ fila.label }}
+              <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
+                      (click)="eliminarFila('patrimonio','patrimonio',fila.clave)" title="Eliminar fila">✕</button>
+            </td>
+            <ng-container *ngFor="let anio of anios; let i = index">
+              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                     [ngModel]="campoInput('patrimonio', fila.clave, anio)"
+                     (ngModelChange)="setCampoInput('patrimonio', fila.clave, anio, $event)"
+                     [disabled]="!puedeEditar"></td>
+              <td class="pct-cell">{{ fmtPct(estructural('patrimonio', fila.clave, anio)) }}</td>
+              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('patrimonio', fila.clave, anio)) }}</td>
+            </ng-container>
+          </tr>
+          <tr *ngIf="puedeEditar">
+            <td colspan="100">
+              <button type="button" class="btn-pro secondary sm" (click)="agregarFila('patrimonio','patrimonio')">
+                <span class="material-symbols-outlined">add</span> Agregar fila
+              </button>
+            </td>
           </tr>
         </tbody>
         <tfoot>
@@ -416,6 +521,22 @@
             <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
                 [ngModel]="campoInput('cartera', fila.clave, anio)"
                 (ngModelChange)="setCampoInput('cartera', fila.clave, anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr *ngFor="let fila of customFilas['cartera']">
+            <td>{{ fila.label }}
+              <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
+                      (click)="eliminarFila('cartera','cartera',fila.clave)" title="Eliminar fila">✕</button>
+            </td>
+            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
+                [ngModel]="campoInput('cartera', fila.clave, anio)"
+                (ngModelChange)="setCampoInput('cartera', fila.clave, anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr *ngIf="puedeEditar">
+            <td [attr.colspan]="1 + anios.length">
+              <button type="button" class="btn-pro secondary sm" (click)="agregarFila('cartera','cartera')">
+                <span class="material-symbols-outlined">add</span> Agregar fila
+              </button>
+            </td>
           </tr>
         </tbody>
         <tfoot>

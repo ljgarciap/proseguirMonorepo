@@ -252,4 +252,143 @@ class AnalisisFinancieroCalculoServiceTest extends TestCase
         // Variación 2025 vs 2024=0 -> N/A, nunca #DIV/0!/#REF! ni una excepción.
         $this->assertNull($resultado['variacion']['caja_bancos'][2025]);
     }
+
+    // ---------------------------------------------------------------
+    // SCRUM-162 — filas custom ad-hoc por informe.
+    // ---------------------------------------------------------------
+
+    public function test_activo_suma_fila_custom_del_grupo_correcto(): void
+    {
+        $inputs = $this->inputsActivo();
+        $inputs['_custom'] = [
+            ['grupo' => 'activo_corriente', 'clave' => 'custom_activo_c_1', 'label' => 'Anticipo especial'],
+            ['grupo' => 'activo_no_corriente', 'clave' => 'custom_activo_nc_1', 'label' => 'Otro activo especial'],
+        ];
+        $inputs['custom_activo_c_1'] = [2024 => 1000, 2025 => 2000];
+        $inputs['custom_activo_nc_1'] = [2024 => 500, 2025 => 700];
+
+        $sinCustom = $this->service->calcularActivo($this->inputsActivo(), [2024, 2025]);
+        $conCustom = $this->service->calcularActivo($inputs, [2024, 2025]);
+
+        // La fila custom de activo_corriente debe sumar ahí, no en no_corriente.
+        $this->assertEqualsWithDelta(
+            $sinCustom['total_activo_corriente'][2024] + 1000,
+            $conCustom['total_activo_corriente'][2024],
+            0.01
+        );
+        $this->assertEqualsWithDelta(
+            $sinCustom['total_activo_no_corriente'][2024] + 500,
+            $conCustom['total_activo_no_corriente'][2024],
+            0.01
+        );
+        $this->assertEqualsWithDelta(
+            $sinCustom['total_activo'][2024] + 1500,
+            $conCustom['total_activo'][2024],
+            0.01
+        );
+
+        // La fila custom aparece en `valores` y participa del análisis estructural.
+        $this->assertArrayHasKey('custom_activo_c_1', $conCustom['valores']);
+        $this->assertEqualsWithDelta(1000, $conCustom['valores']['custom_activo_c_1'][2024], 0.01);
+        $this->assertNotNull($conCustom['estructural']['custom_activo_c_1'][2024]);
+    }
+
+    public function test_activo_sin_filas_custom_calcula_igual_que_antes(): void
+    {
+        // Regresión: `_custom` ausente (informes ya persistidos antes de SCRUM-162)
+        // no debe cambiar ningún total existente.
+        $resultado = $this->service->calcularActivo($this->inputsActivo(), [2024, 2025]);
+
+        $this->assertEqualsWithDelta(220103, $resultado['total_activo'][2024], 0.01);
+        $this->assertEqualsWithDelta(223581, $resultado['total_activo'][2025], 0.01);
+    }
+
+    public function test_activo_con_lista_custom_vacia_no_rompe_el_calculo(): void
+    {
+        $inputs = $this->inputsActivo();
+        $inputs['_custom'] = [];
+
+        $resultado = $this->service->calcularActivo($inputs, [2024, 2025]);
+
+        $this->assertEqualsWithDelta(220103, $resultado['total_activo'][2024], 0.01);
+        $this->assertEqualsWithDelta(223581, $resultado['total_activo'][2025], 0.01);
+    }
+
+    public function test_fila_custom_no_puede_pisar_una_clave_fija(): void
+    {
+        $inputs = $this->inputsActivo();
+        // Intento malicioso/accidental: una fila custom que reutiliza una clave fija.
+        $inputs['_custom'] = [
+            ['grupo' => 'activo_corriente', 'clave' => 'caja_bancos', 'label' => 'Caja duplicada'],
+        ];
+
+        $conIntentoDuplicado = $this->service->calcularActivo($inputs, [2024, 2025]);
+        $sinCustom = $this->service->calcularActivo($this->inputsActivo(), [2024, 2025]);
+
+        // El total no cambia: 'caja_bancos' se sumó una sola vez, como concepto fijo.
+        $this->assertEqualsWithDelta($sinCustom['total_activo'][2024], $conIntentoDuplicado['total_activo'][2024], 0.01);
+    }
+
+    public function test_pasivo_suma_filas_custom(): void
+    {
+        $inputs = $this->inputsPasivo();
+        $inputs['_custom'] = [
+            ['grupo' => 'pasivo_corriente', 'clave' => 'custom_pasivo_1', 'label' => 'Obligación adicional'],
+        ];
+        $inputs['custom_pasivo_1'] = [2024 => 300, 2025 => 400];
+
+        $sinCustom = $this->service->calcularPasivo($this->inputsPasivo(), [2024, 2025]);
+        $conCustom = $this->service->calcularPasivo($inputs, [2024, 2025]);
+
+        $this->assertEqualsWithDelta($sinCustom['total_pasivo'][2024] + 300, $conCustom['total_pasivo'][2024], 0.01);
+    }
+
+    public function test_patrimonio_suma_fila_custom(): void
+    {
+        $activo = $this->service->calcularActivo($this->inputsActivo(), [2024, 2025]);
+        $pasivo = $this->service->calcularPasivo($this->inputsPasivo(), [2024, 2025]);
+
+        $inputs = $this->inputsPatrimonio();
+        $inputs['_custom'] = [
+            ['grupo' => 'patrimonio', 'clave' => 'custom_patrimonio_1', 'label' => 'Aporte adicional'],
+        ];
+        $inputs['custom_patrimonio_1'] = [2024 => 100, 2025 => 150];
+
+        $sinCustom = $this->service->calcularPatrimonio($this->inputsPatrimonio(), [2024, 2025], $activo['total_activo'], $pasivo['total_pasivo']);
+        $conCustom = $this->service->calcularPatrimonio($inputs, [2024, 2025], $activo['total_activo'], $pasivo['total_pasivo']);
+
+        $this->assertEqualsWithDelta($sinCustom['total_patrimonio'][2024] + 100, $conCustom['total_patrimonio'][2024], 0.01);
+    }
+
+    public function test_cartera_suma_fila_custom_y_la_incluye_en_composicion_grafico(): void
+    {
+        $inputs = $this->inputsCartera();
+        $inputs['_custom'] = [
+            ['grupo' => 'cartera', 'clave' => 'custom_cartera_1', 'label' => 'Cartera especial'],
+        ];
+        $inputs['custom_cartera_1'] = [2024 => 1000, 2025 => 900];
+
+        $sinCustom = $this->service->calcularCartera($this->inputsCartera(), [2024, 2025]);
+        $conCustom = $this->service->calcularCartera($inputs, [2024, 2025]);
+
+        $this->assertEqualsWithDelta($sinCustom['cartera_neta'][2024] + 1000, $conCustom['cartera_neta'][2024], 0.01);
+        // La fila custom sí participa en la composición del gráfico (no es la provisión).
+        $this->assertArrayHasKey('custom_cartera_1', $conCustom['composicion_grafico']);
+        $this->assertArrayNotHasKey('provision', $conCustom['composicion_grafico']);
+    }
+
+    public function test_custom_de_un_grupo_no_afecta_a_otro_grupo_de_la_misma_seccion(): void
+    {
+        $inputs = $this->inputsActivo();
+        $inputs['_custom'] = [
+            ['grupo' => 'activo_corriente', 'clave' => 'custom_solo_corriente', 'label' => 'Solo corriente'],
+        ];
+        $inputs['custom_solo_corriente'] = [2024 => 5000, 2025 => 6000];
+
+        $resultado = $this->service->calcularActivo($inputs, [2024, 2025]);
+
+        $this->assertArrayNotHasKey('custom_solo_corriente', $this->service->calcularActivo($this->inputsActivo(), [2024, 2025])['valores']);
+        $sinCustom = $this->service->calcularActivo($this->inputsActivo(), [2024, 2025]);
+        $this->assertEqualsWithDelta($sinCustom['total_activo_no_corriente'][2024], $resultado['total_activo_no_corriente'][2024], 0.01);
+    }
 }
