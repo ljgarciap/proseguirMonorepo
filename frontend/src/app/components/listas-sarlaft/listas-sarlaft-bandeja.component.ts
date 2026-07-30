@@ -112,6 +112,14 @@ export class ListasSarlaftBandejaComponent implements OnInit, OnDestroy {
     return credito.solicitud_credito?.tipo_credito?.nombre || '—';
   }
 
+  tipoDocumentoLabel(credito: any): string {
+    return credito.solicitud_credito?.cliente?.document_type?.codigo || '—';
+  }
+
+  tipoEmpresaLabel(credito: any): string {
+    return credito.solicitud_credito?.cliente?.tipo_empresa || '—';
+  }
+
   estadoPillClass(credito: any): any {
     const e = credito.sarlaft_estado_derivado;
     return {
