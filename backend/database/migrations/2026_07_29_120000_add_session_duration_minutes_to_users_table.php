@@ -12,7 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         // SCRUM-161: el usuario puede elegir cuánto dura su sesión (token de
-        // acceso) de una lista cerrada de opciones (ver config('auth.session_duration_options')).
+        // acceso) de una lista cerrada de opciones (ver tabla `configuraciones`,
+        // grupo 'sesion', clave SESSION_DURATION_OPTIONS — ConfiguracionSeeder).
         // Default 480 min (8h) — mismo orden de magnitud que el TTL que ya
         // vivía implícito en Passport antes de este ticket para tokens
         // personales de uso diario.

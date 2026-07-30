@@ -122,18 +122,14 @@ return [
     | Session Duration Options (SCRUM-161)
     |--------------------------------------------------------------------------
     |
-    | El usuario puede personalizar cuánto dura su sesión (token de acceso
-    | Passport) desde /perfil, pero solo eligiendo una de estas opciones
-    | cerradas (minutos) — nunca un valor numérico libre. Esto acota el
-    | máximo del token para no ampliar la ventana de exposición si un token
-    | se filtra. `max` es el techo absoluto server-side: si en el futuro se
-    | agrega una opción nueva a `options`, no puede superar `max` sin que
-    | alguien revise esta config a propósito.
+    | La lista de opciones, el default y el techo máximo dejaron de vivir acá
+    | como constantes (violaba la regla de no hardcodear umbrales de negocio
+    | en código — cambiarlos requería un deploy). Ahora son filas en la tabla
+    | `configuraciones` (grupo 'sesion', claves SESSION_DURATION_OPTIONS,
+    | SESSION_DURATION_DEFAULT, SESSION_DURATION_MAX — ver ConfiguracionSeeder)
+    | y se leen vía ConfiguracionService::get() desde AuthController. Un
+    | superadmin puede ajustarlas desde /configuraciones sin deploy.
     |
     */
-
-    'session_duration_options' => [30, 60, 240, 480, 1440], // 30min, 1h, 4h, 8h, 24h
-    'session_duration_default' => 480, // 8h
-    'session_duration_max' => 1440, // 24h
 
 ];

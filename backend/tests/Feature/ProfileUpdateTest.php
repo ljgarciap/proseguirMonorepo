@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Configuracion;
 use App\Models\DocumentType;
 use App\Models\User;
+use Database\Seeders\ConfiguracionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
@@ -18,6 +20,11 @@ class ProfileUpdateTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // SCRUM-161: session_duration_options/default/max viven en la tabla
+        // `configuraciones` (ver ConfiguracionSeeder), no en config('auth.*')
+        // — hay que sembrarla para que AuthController tenga de dónde leer.
+        $this->seed(ConfiguracionSeeder::class);
 
         $cc = DocumentType::where('codigo', 'CC')->first()
             ?? DocumentType::create(['nombre' => 'Cédula de Ciudadanía', 'codigo' => 'CC']);
@@ -153,5 +160,58 @@ class ProfileUpdateTest extends TestCase
             $expiresAt->between($expectedExpiresAt->copy()->subSeconds(10), $expectedExpiresAt->copy()->addSeconds(10)),
             "Se esperaba que el token expirara cerca de {$expectedExpiresAt}, pero expira en {$expiresAt}"
         );
+    }
+
+    public function test_endpoint_de_opciones_de_duracion_refleja_lo_que_hay_en_la_tabla_configuraciones(): void
+    {
+        // SCRUM-161: prueba deliberadamente con valores DISTINTOS a los del
+        // seeder — si el endpoint devolviera un array hardcodeado en el
+        // controlador (en vez de leer la tabla), esta aserción fallaría.
+        Configuracion::where('clave', 'SESSION_DURATION_OPTIONS')->update([
+            'valor' => json_encode([
+                ['value' => 15, 'label' => '15 minutos (custom)'],
+                ['value' => 90, 'label' => '90 minutos (custom)'],
+            ]),
+        ]);
+        Configuracion::where('clave', 'SESSION_DURATION_DEFAULT')->update(['valor' => '90']);
+        Configuracion::where('clave', 'SESSION_DURATION_MAX')->update(['valor' => '90']);
+
+        Passport::actingAs($this->user);
+
+        $response = $this->getJson('/api/profile/session-duration-options');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'options' => [
+                    ['value' => 15, 'label' => '15 minutos (custom)'],
+                    ['value' => 90, 'label' => '90 minutos (custom)'],
+                ],
+                'default' => 90,
+            ]);
+    }
+
+    public function test_endpoint_de_opciones_excluye_valores_que_superan_el_maximo_configurado(): void
+    {
+        // El máximo (SESSION_DURATION_MAX) se baja por debajo de una de las
+        // opciones sembradas por el seeder (1440) — esa opción no debe
+        // aparecer en la respuesta aunque siga listada en SESSION_DURATION_OPTIONS.
+        Configuracion::where('clave', 'SESSION_DURATION_MAX')->update(['valor' => '480']);
+
+        Passport::actingAs($this->user);
+
+        $response = $this->getJson('/api/profile/session-duration-options');
+
+        $response->assertStatus(200);
+        $values = collect($response->json('options'))->pluck('value');
+
+        $this->assertTrue($values->contains(480));
+        $this->assertFalse($values->contains(1440));
+    }
+
+    public function test_endpoint_de_opciones_requiere_autenticacion(): void
+    {
+        $response = $this->getJson('/api/profile/session-duration-options');
+
+        $response->assertStatus(401);
     }
 }

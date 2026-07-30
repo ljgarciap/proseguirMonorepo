@@ -207,21 +207,16 @@ export class ProfileSettingsComponent implements OnInit {
   successMessage = '';
   errorMessage = '';
 
-  // SCRUM-161: lista cerrada de opciones válidas — debe reflejar
-  // exactamente config('auth.session_duration_options') en el backend.
-  // Server-side es la fuente de verdad (AuthController::updateProfile valida
-  // contra la config), esta lista es solo para render del selector.
-  sessionDurationOptions = [
-    { value: 30, label: '30 minutos' },
-    { value: 60, label: '1 hora' },
-    { value: 240, label: '4 horas' },
-    { value: 480, label: '8 horas' },
-    { value: 1440, label: '24 horas' },
-  ];
+  // SCRUM-161: la lista de opciones válidas ya no vive hardcodeada acá — se
+  // carga desde GET /profile/session-duration-options (backend lee la tabla
+  // `configuraciones`, grupo 'sesion'). Server-side sigue siendo la fuente
+  // de verdad para la validación (AuthController::updateProfile), este
+  // array es solo para render del selector.
+  sessionDurationOptions: { value: number; label: string }[] = [];
 
   profileData = {
     name: '',
-    session_duration_minutes: 480,
+    session_duration_minutes: null as number | null,
   };
   isProfileLoading = false;
   profileSuccessMessage = '';
@@ -232,7 +227,25 @@ export class ProfileSettingsComponent implements OnInit {
   ngOnInit(): void {
     this.user = this.authService.getUser();
     this.profileData.name = this.user?.name ?? '';
-    this.profileData.session_duration_minutes = this.user?.session_duration_minutes ?? 480;
+    this.loadSessionDurationOptions();
+  }
+
+  private loadSessionDurationOptions(): void {
+    this.http.get<{ options: { value: number; label: string }[]; default: number }>(
+      `${environment.apiUrl}/profile/session-duration-options`
+    ).subscribe({
+      next: (res) => {
+        this.sessionDurationOptions = res.options ?? [];
+        this.profileData.session_duration_minutes =
+          this.user?.session_duration_minutes ?? res.default ?? null;
+      },
+      error: () => {
+        // El selector queda vacío si el endpoint falla; no se rellena con
+        // una lista fija en el cliente porque dejaría de reflejar lo que
+        // el backend realmente valida (tabla `configuraciones`).
+        this.profileData.session_duration_minutes = this.user?.session_duration_minutes ?? null;
+      }
+    });
   }
 
   onSaveProfile(): void {
