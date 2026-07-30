@@ -6,6 +6,7 @@ use App\Models\SolicitudCredito;
 use App\Models\Visita;
 use App\Models\Cliente;
 use App\Models\User;
+use App\Models\CreditoOrdinario;
 use App\Models\DocumentPreset;
 use App\Models\DocumentRequest;
 use App\Models\DocumentRequestItem;
@@ -39,7 +40,12 @@ class SolicitudCreditoController extends Controller
      */
     public function index(Request $request)
     {
-        $query = SolicitudCredito::with(['visita', 'cliente.tipoPersona', 'usuarioRegistra', 'tipoCredito', 'amortizacion', 'preset']);
+        // withExists('creditoOrdinario') agrega el flag boolean
+        // credito_ordinario_exists (subquery liviana) para que el frontend
+        // pueda deshabilitar tipo_credito_id en el formulario de edición sin
+        // una llamada extra (SCRUM-159, hallazgo Senior Reviewer).
+        $query = SolicitudCredito::with(['visita', 'cliente.tipoPersona', 'usuarioRegistra', 'tipoCredito', 'amortizacion', 'preset'])
+            ->withExists('creditoOrdinario');
 
         return response()->json($query->orderBy('created_at', 'desc')->get());
     }
@@ -314,6 +320,22 @@ class SolicitudCreditoController extends Controller
             'garantia' => 'nullable|string',
             'fuente_pago' => 'required|string',
         ]);
+
+        // SCRUM-159 (hallazgo Senior Reviewer): tipo_credito_id no se puede
+        // cambiar si ya existe un CreditoOrdinario (workflow BPMN) asociado
+        // a esta solicitud — InformeTecnicoController::index() filtra la
+        // bandeja con un join EN VIVO contra el tipo de crédito actual, así
+        // que cambiarlo con el flujo ya en curso desincroniza el expediente
+        // de esa bandeja. El resto de los campos siguen editables siempre.
+        if ((int) $validated['tipo_credito_id'] !== (int) $solicitudCredito->tipo_credito_id) {
+            $tieneCreditoOrdinario = CreditoOrdinario::where('solicitud_credito_id', $solicitudCredito->id)->exists();
+
+            if ($tieneCreditoOrdinario) {
+                return response()->json([
+                    'message' => 'No se puede cambiar el tipo de crédito: ya existe un flujo de Crédito Ordinario en curso para esta solicitud.',
+                ], 422);
+            }
+        }
 
         $solicitudCredito->update($validated);
 

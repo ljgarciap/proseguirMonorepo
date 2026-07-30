@@ -315,10 +315,13 @@
           <div class="form-grid mt-4">
             <div class="form-group">
               <label>Tipo de Crédito <span class="required">*</span></label>
-              <select [(ngModel)]="form.tipo_credito_id" name="tipo_credito_id" [disabled]="isFromVisit && !canEditCondicionesFinancieras()" required class="pro-input">
+              <select [(ngModel)]="form.tipo_credito_id" name="tipo_credito_id" [disabled]="(isFromVisit && !canEditCondicionesFinancieras()) || editingTieneCreditoOrdinario" required class="pro-input">
                 <option value="">Seleccione...</option>
                 <option *ngFor="let tc of tipoCreditos" [value]="tc.id">{{ tc.nombre }}</option>
               </select>
+              <small class="text-muted" *ngIf="isEditingSolicitud && editingTieneCreditoOrdinario">
+                No se puede cambiar: ya existe un flujo de Crédito Ordinario en curso para esta solicitud.
+              </small>
             </div>
 
             <div class="form-group">

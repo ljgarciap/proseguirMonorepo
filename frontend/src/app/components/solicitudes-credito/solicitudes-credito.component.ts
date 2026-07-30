@@ -51,6 +51,12 @@ export class SolicitudesCreditoComponent implements OnInit {
   // No nulo cuando el formulario está en modo edición en vez de creación.
   editingSolicitudId: number | null = null;
 
+  // SCRUM-159 (hallazgo Senior Reviewer): true cuando la solicitud en
+  // edición ya tiene un CreditoOrdinario asociado (workflow BPMN en curso).
+  // El backend es la fuente de verdad del bloqueo (422 en el PUT) — esto
+  // solo evita que el usuario intente un cambio que sabemos que va a fallar.
+  editingTieneCreditoOrdinario = false;
+
   // Form Fields
   form: any = {
     cliente_id: '',
@@ -291,6 +297,7 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.resetForm();
     this.isFromVisit = true;
     this.editingSolicitudId = req.id;
+    this.editingTieneCreditoOrdinario = !!req.credito_ordinario_exists;
     this.selectedVisitId = req.visita_id || null;
     this.selectedPresetId = req.document_preset_id || null;
 
@@ -560,6 +567,7 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.isFromVisit = false;
     this.selectedVisitId = null;
     this.editingSolicitudId = null;
+    this.editingTieneCreditoOrdinario = false;
     this.selectedPresetId = null;
     this.selectedPresetDocs = [];
     this.ciudadesDelDepartamento = [];

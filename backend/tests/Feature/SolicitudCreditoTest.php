@@ -16,6 +16,7 @@ use App\Models\DocumentRequirement;
 use App\Models\SolicitudCredito;
 use App\Models\DocumentRequest;
 use App\Models\DocumentRequestItem;
+use App\Models\CreditoOrdinario;
 use App\Mail\SolicitudCreditoMail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -660,6 +661,176 @@ class SolicitudCreditoTest extends TestCase
             'amortizacion_id',
             'destino_recurso',
             'fuente_pago',
+        ]);
+    }
+
+    /**
+     * SCRUM-159 (hallazgo Senior Reviewer): si todavía no existe ningún
+     * CreditoOrdinario (el workflow BPMN aún no arrancó) el Coordinador
+     * puede seguir cambiando tipo_credito_id libremente, para corregir un
+     * error de carga del Gerente antes de que el flujo arranque.
+     */
+    public function test_update_permite_cambiar_tipo_credito_si_no_existe_credito_ordinario(): void
+    {
+        $coordinador = User::create([
+            'name' => 'Coordinador Comercial',
+            'email' => 'coordinador3.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'coord997',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['coordinador_comercial']
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clientNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        // Sin CreditoOrdinario asociado: el workflow BPMN nunca arrancó.
+        Passport::actingAs($coordinador);
+
+        $response = $this->putJson("/api/solicitudes-credito/{$solicitud->id}", [
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'id' => $solicitud->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+        ]);
+    }
+
+    /**
+     * SCRUM-159 (hallazgo Senior Reviewer): si ya existe un CreditoOrdinario
+     * asociado (el workflow BPMN ya arrancó), cambiar tipo_credito_id se
+     * rechaza con 422 y el valor no se modifica en BD — evita que el
+     * expediente desaparezca o quede mal ubicado en la bandeja de Informe
+     * Técnico, que filtra con un join en vivo contra el tipo de crédito
+     * actual (InformeTecnicoController::index()).
+     */
+    public function test_update_bloquea_cambio_de_tipo_credito_si_existe_credito_ordinario(): void
+    {
+        $coordinador = User::create([
+            'name' => 'Coordinador Comercial',
+            'email' => 'coordinador4.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'coord996',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['coordinador_comercial']
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clientNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        CreditoOrdinario::create([
+            'numero_solicitud' => 'CO-TEST-' . $solicitud->id,
+            'solicitud_credito_id' => $solicitud->id,
+            'monto' => 20000000.00,
+            'plazo_meses' => 12,
+            'estado' => 'revision_documental',
+        ]);
+
+        Passport::actingAs($coordinador);
+
+        $response = $this->putJson("/api/solicitudes-credito/{$solicitud->id}", [
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonFragment([
+            'message' => 'No se puede cambiar el tipo de crédito: ya existe un flujo de Crédito Ordinario en curso para esta solicitud.',
+        ]);
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'id' => $solicitud->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+        ]);
+    }
+
+    /**
+     * SCRUM-159 (hallazgo Senior Reviewer): con CreditoOrdinario ya
+     * asociado, el bloqueo es SOLO sobre tipo_credito_id — el resto de los
+     * 6 campos de Condiciones Financieras siguen editables sin
+     * restricción, igual que antes del fix.
+     */
+    public function test_update_permite_otros_campos_si_existe_credito_ordinario_pero_tipo_no_cambia(): void
+    {
+        $coordinador = User::create([
+            'name' => 'Coordinador Comercial',
+            'email' => 'coordinador5.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'coord995',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['coordinador_comercial']
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clientNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        CreditoOrdinario::create([
+            'numero_solicitud' => 'CO-TEST-' . $solicitud->id,
+            'solicitud_credito_id' => $solicitud->id,
+            'monto' => 20000000.00,
+            'plazo_meses' => 12,
+            'estado' => 'revision_documental',
+        ]);
+
+        Passport::actingAs($coordinador);
+
+        $response = $this->putJson("/api/solicitudes-credito/{$solicitud->id}", [
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 45000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'id' => $solicitud->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 45000000.00,
         ]);
     }
 }
