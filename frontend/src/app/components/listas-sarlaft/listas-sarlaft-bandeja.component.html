@@ -70,7 +70,9 @@
             <th>No. de Crédito</th>
             <th>Tipo de Crédito</th>
             <th>Documento</th>
+            <th>Tipo de Documento</th>
             <th>Tipo Persona</th>
+            <th>Tipo de Empresa</th>
             <th>Cliente / Razón Social</th>
             <th>Estado</th>
             <th class="text-right">Acciones</th>
@@ -82,7 +84,9 @@
             <td class="id-cell">{{ credito.numero_solicitud }}</td>
             <td>{{ tipoCreditoLabel(credito) }}</td>
             <td>{{ clienteIdentificacion(credito) }}</td>
+            <td>{{ tipoDocumentoLabel(credito) }}</td>
             <td>{{ tipoPersonaLabel(credito) }}</td>
+            <td>{{ tipoEmpresaLabel(credito) }}</td>
             <td>
               <div class="user-cell">
                 <span class="name">{{ clienteNombre(credito) }}</span>
@@ -98,10 +102,10 @@
             </td>
           </tr>
           <tr *ngIf="creditosFiltrados.length === 0 && !loading">
-            <td colspan="8" class="text-center py-4 text-muted">No hay créditos para tu rol o los filtros aplicados.</td>
+            <td colspan="10" class="text-center py-4 text-muted">No hay créditos para tu rol o los filtros aplicados.</td>
           </tr>
           <tr *ngIf="loading">
-            <td colspan="8" class="text-center py-4">Cargando bandeja...</td>
+            <td colspan="10" class="text-center py-4">Cargando bandeja...</td>
           </tr>
         </tbody>
       </table>
