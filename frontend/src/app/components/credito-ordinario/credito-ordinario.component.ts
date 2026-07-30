@@ -201,6 +201,18 @@ export class CreditoOrdinarioComponent implements OnInit {
     return 'Pendiente';
   }
 
+  // SCRUM-164: la "Síntesis SARLAFT" de la Etapa de Análisis SARLAFT y
+  // Financiero se quedaba en "Pendiente" para siempre porque chequeaba
+  // documentos.sarlft_sintesis, un campo legacy que el módulo dedicado
+  // (ListasRestrictivasSarlaftController, SCRUM-128) nunca llena — el
+  // resultado real vive en la columna sarlaft_concepto del crédito.
+  get sarlaftEstadoLabel(): string {
+    const concepto = this.selectedCredito?.sarlaft_concepto;
+    if (concepto === 'favorable') return 'Favorable';
+    if (concepto === 'desfavorable') return 'Desfavorable';
+    return 'Pendiente';
+  }
+
   // SCRUM-151: algunos estados del flujo no tienen panel de acción en esta
   // pantalla porque se gestionan en un módulo dedicado (Informe Técnico,
   // Listas Restrictivas y SARLAFT) o avanzan automáticamente al completar la

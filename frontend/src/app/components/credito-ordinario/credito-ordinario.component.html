@@ -600,17 +600,18 @@
               <!-- Síntesis SARLAFT -->
               <div class="doc-box-new">
                 <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.sarlft_sintesis">verified_user</span>
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="sarlaftEstadoLabel !== 'Pendiente'">verified_user</span>
                   <div class="doc-title-desc">
                     <h5>Síntesis SARLAFT</h5>
                     <p>Reporte de validación de listas restrictivas. Responsable: Oficial de Cumplimiento.</p>
                   </div>
                 </div>
                 <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.sarlft_sintesis">Cargado</span>
-                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.sarlft_sintesis">Pendiente</span>
+                  <span class="doc-status-pill success" *ngIf="sarlaftEstadoLabel === 'Favorable'">Favorable</span>
+                  <span class="doc-status-pill error" *ngIf="sarlaftEstadoLabel === 'Desfavorable'">Desfavorable</span>
+                  <span class="doc-status-pill warning" *ngIf="sarlaftEstadoLabel === 'Pendiente'">Pendiente</span>
 
-                  <a *ngIf="selectedCredito.documentos?.sarlft_sintesis" [href]="selectedCredito.documentos.sarlft_sintesis" target="_blank" class="btn-view-doc">
+                  <a [routerLink]="'/listas-sarlaft/' + selectedCredito.id" class="btn-view-doc" *ngIf="authService.isAuthorized(['oficial_cumplimiento', 'superadmin'])">
                     <span class="material-symbols-outlined">open_in_new</span> Ver
                   </a>
                 </div>
