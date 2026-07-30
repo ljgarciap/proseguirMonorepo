@@ -6,7 +6,9 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Laravel\Passport\Passport;
 
 class AuthController extends Controller
 {
@@ -25,10 +27,62 @@ class AuthController extends Controller
             ]);
         }
 
+        // SCRUM-161: el usuario puede personalizar la duración de su sesión
+        // (ver AuthController::updateProfile). Passport::personalAccessTokensExpireIn()
+        // se lee de nuevo cada vez que se resuelve PersonalAccessTokenFactory
+        // (binding contextual, no singleton — ver PassportServiceProvider::registerAuthorizationServer),
+        // así que fijarlo acá, justo antes de createToken(), solo afecta al
+        // token que se emite en ESTE login. No hay riesgo de fuga entre
+        // requests: en PHP-FPM (sin Octane/Swoole en este proyecto) las
+        // propiedades estáticas se reinician en cada request.
+        $minutes = $user->session_duration_minutes ?? config('auth.session_duration_default');
+        Passport::personalAccessTokensExpireIn(now()->addMinutes($minutes));
+
         return response()->json([
             'token' => $user->createToken('authToken')->accessToken,
             'user' => $user,
             'roles' => $user->roles
+        ]);
+    }
+
+    /**
+     * SCRUM-161: actualiza nombre completo y/o preferencia de duración de
+     * sesión del usuario autenticado. Ambos campos son opcionales — se
+     * puede llamar para actualizar solo uno de los dos.
+     */
+    public function updateProfile(Request $request)
+    {
+        // El máximo permitido vive en configuración, no solo como comentario:
+        // cualquier opción de la lista que en el futuro supere el techo
+        // configurado queda excluida acá, no depende de mantener las dos
+        // constantes sincronizadas a mano.
+        $allowedDurations = array_filter(
+            config('auth.session_duration_options'),
+            fn ($minutes) => $minutes <= config('auth.session_duration_max')
+        );
+
+        $validated = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'min:2', 'max:255'],
+            'session_duration_minutes' => [
+                'sometimes',
+                'required',
+                'integer',
+                Rule::in($allowedDurations),
+            ],
+        ]);
+
+        if (empty($validated)) {
+            throw ValidationException::withMessages([
+                'name' => ['No se envió ningún campo para actualizar.'],
+            ]);
+        }
+
+        $user = $request->user();
+        $user->update($validated);
+
+        return response()->json([
+            'message' => 'Perfil actualizado correctamente',
+            'user' => $user->fresh(),
         ]);
     }
 

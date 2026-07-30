@@ -10,6 +10,7 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::get('/me', [AuthController::class, 'me'])->middleware('auth:api');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:api');
 Route::post('/change-password', [AuthController::class, 'changePassword'])->middleware('auth:api');
+Route::patch('/profile', [AuthController::class, 'updateProfile'])->middleware('auth:api');
 
 Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class, 'stats'])->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
 

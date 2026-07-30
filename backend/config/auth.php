@@ -117,4 +117,23 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Session Duration Options (SCRUM-161)
+    |--------------------------------------------------------------------------
+    |
+    | El usuario puede personalizar cuánto dura su sesión (token de acceso
+    | Passport) desde /perfil, pero solo eligiendo una de estas opciones
+    | cerradas (minutos) — nunca un valor numérico libre. Esto acota el
+    | máximo del token para no ampliar la ventana de exposición si un token
+    | se filtra. `max` es el techo absoluto server-side: si en el futuro se
+    | agrega una opción nueva a `options`, no puede superar `max` sin que
+    | alguien revise esta config a propósito.
+    |
+    */
+
+    'session_duration_options' => [30, 60, 240, 480, 1440], // 30min, 1h, 4h, 8h, 24h
+    'session_duration_default' => 480, // 8h
+    'session_duration_max' => 1440, // 24h
+
 ];
