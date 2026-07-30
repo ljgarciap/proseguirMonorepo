@@ -506,4 +506,160 @@ class SolicitudCreditoTest extends TestCase
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['proyecto_ciudad_id']);
     }
+
+    /**
+     * SCRUM-159: el Coordinador Comercial puede editar "Condiciones
+     * Financieras del Crédito" de una solicitud ya registrada.
+     */
+    public function test_coordinador_comercial_can_update_condiciones_financieras(): void
+    {
+        $coordinador = User::create([
+            'name' => 'Coordinador Comercial',
+            'email' => 'coordinador.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'coord999',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['coordinador_comercial']
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clientNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'garantia' => 'Firma personal',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        Passport::actingAs($coordinador);
+
+        $payload = [
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 35000000.00,
+            'plazo_meses' => 24,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Compra de maquinaria',
+            'garantia' => 'Hipoteca',
+            'fuente_pago' => 'Ventas del negocio',
+        ];
+
+        $response = $this->putJson("/api/solicitudes-credito/{$solicitud->id}", $payload);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'id' => $solicitud->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 35000000.00,
+            'plazo_meses' => 24,
+            'destino_recurso' => 'Compra de maquinaria',
+            'garantia' => 'Hipoteca',
+            'fuente_pago' => 'Ventas del negocio',
+        ]);
+
+        // No debe tocar campos fuera de alcance (cliente, notificación, etc.)
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'id' => $solicitud->id,
+            'cliente_id' => $this->clientNatural->id,
+            'correo_notificacion' => 'juan@test.com',
+        ]);
+    }
+
+    /**
+     * SCRUM-159: roles fuera de Coordinador Comercial / superadmin no pueden
+     * editar Condiciones Financieras vía este endpoint.
+     */
+    public function test_update_condiciones_financieras_rejects_unauthorized_role(): void
+    {
+        $gerente = User::create([
+            'name' => 'Gerente',
+            'email' => 'gerente.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'ger999',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['gerente']
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clientNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        Passport::actingAs($gerente);
+
+        $response = $this->putJson("/api/solicitudes-credito/{$solicitud->id}", [
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 99999999.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+        ]);
+
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'id' => $solicitud->id,
+            'monto_solicitado' => 20000000.00,
+        ]);
+    }
+
+    /**
+     * SCRUM-159: la validación reutiliza las mismas reglas de store() para
+     * los campos de Condiciones Financieras.
+     */
+    public function test_update_condiciones_financieras_validates_required_fields(): void
+    {
+        $coordinador = User::create([
+            'name' => 'Coordinador Comercial',
+            'email' => 'coordinador2.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'coord998',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['coordinador_comercial']
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clientNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        Passport::actingAs($coordinador);
+
+        $response = $this->putJson("/api/solicitudes-credito/{$solicitud->id}", [
+            'monto_solicitado' => -5,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors([
+            'tipo_credito_id',
+            'monto_solicitado',
+            'plazo_meses',
+            'amortizacion_id',
+            'destino_recurso',
+            'fuente_pago',
+        ]);
+    }
 }

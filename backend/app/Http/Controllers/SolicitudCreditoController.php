@@ -291,4 +291,34 @@ class SolicitudCreditoController extends Controller
             return response()->json($solicitud->load(['visita', 'cliente', 'usuarioRegistra', 'tipoCredito', 'amortizacion']), 201);
         });
     }
+
+    /**
+     * SCRUM-159: permite al Coordinador Comercial (y superadmin) editar la
+     * sección "Condiciones Financieras del Crédito" de una solicitud ya
+     * registrada por el Gerente desde el registro de visita. Alcance
+     * acotado a propósito a los 7 campos de esa sección — no toca cliente,
+     * representante legal, información del proyecto ni notificación.
+     *
+     * Decisión de negocio de Luis: editable en cualquier estado abierto de
+     * la solicitud (sin restricción por estado del workflow) y sin control
+     * de concurrencia adicional.
+     */
+    public function update(Request $request, SolicitudCredito $solicitudCredito)
+    {
+        $validated = $request->validate([
+            'tipo_credito_id' => 'required|exists:tipo_creditos,id',
+            'monto_solicitado' => 'required|numeric|min:0.01',
+            'plazo_meses' => 'required|integer|min:1',
+            'amortizacion_id' => 'required|exists:amortizaciones,id',
+            'destino_recurso' => 'required|string',
+            'garantia' => 'nullable|string',
+            'fuente_pago' => 'required|string',
+        ]);
+
+        $solicitudCredito->update($validated);
+
+        return response()->json(
+            $solicitudCredito->load(['visita', 'cliente', 'usuarioRegistra', 'tipoCredito', 'amortizacion'])
+        );
+    }
 }
