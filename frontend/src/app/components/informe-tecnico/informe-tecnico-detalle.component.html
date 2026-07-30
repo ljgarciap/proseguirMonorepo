@@ -50,40 +50,25 @@
         <tr><th>Campo</th><th>Valor</th><th>% Sobre Ventas</th></tr>
       </thead>
       <tbody>
-        <tr>
-          <td>Casas</td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.casas" [disabled]="!seccionIngenieroEditable"></td>
-          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.casas || 0) | percent:'1.0-2' }}</td>
+        <tr *ngFor="let fila of ventasConceptos">
+          <td>{{ fila.label }}</td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput[fila.clave]" [disabled]="!seccionIngenieroEditable"></td>
+          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.[fila.clave] || 0) | percent:'1.0-2' }}</td>
         </tr>
-        <tr>
-          <td>Apartamentos</td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.apartamentos" [disabled]="!seccionIngenieroEditable"></td>
-          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.apartamentos || 0) | percent:'1.0-2' }}</td>
+        <tr *ngFor="let fila of ventasCustomFilas">
+          <td>{{ fila.label }}
+            <button type="button" class="btn-remove-fila" *ngIf="seccionIngenieroEditable"
+                    (click)="eliminarFilaCustom('ventas', fila.clave)" title="Eliminar fila">✕</button>
+          </td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput[fila.clave]" [disabled]="!seccionIngenieroEditable"></td>
+          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.[fila.clave] || 0) | percent:'1.0-2' }}</td>
         </tr>
-        <tr>
-          <td>Parqueaderos</td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.parqueaderos" [disabled]="!seccionIngenieroEditable"></td>
-          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.parqueaderos || 0) | percent:'1.0-2' }}</td>
-        </tr>
-        <tr>
-          <td>Conexión gas / arras desist.</td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.conexion_gas_arras" [disabled]="!seccionIngenieroEditable"></td>
-          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.conexion_gas_arras || 0) | percent:'1.0-2' }}</td>
-        </tr>
-        <tr>
-          <td>Local comercial</td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.local_comercial" [disabled]="!seccionIngenieroEditable"></td>
-          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.local_comercial || 0) | percent:'1.0-2' }}</td>
-        </tr>
-        <tr>
-          <td>Cuartos útiles</td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.cuartos_utiles" [disabled]="!seccionIngenieroEditable"></td>
-          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.cuartos_utiles || 0) | percent:'1.0-2' }}</td>
-        </tr>
-        <tr>
-          <td>Otros</td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="ventasInput.otros" [disabled]="!seccionIngenieroEditable"></td>
-          <td class="pct-cell">{{ (informe?.ventas_totales_proyecto?.porcentajes?.otros || 0) | percent:'1.0-2' }}</td>
+        <tr *ngIf="seccionIngenieroEditable">
+          <td colspan="3">
+            <button type="button" class="btn-pro secondary sm" (click)="agregarFilaCustom('ventas')">
+              <span class="material-symbols-outlined">add</span> Agregar fila
+            </button>
+          </td>
         </tr>
       </tbody>
       <tfoot>
@@ -105,40 +90,25 @@
         <tr><th>Campo</th><th>Valor</th><th></th></tr>
       </thead>
       <tbody>
-        <tr>
-          <td>Lote</td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.lote" [disabled]="!seccionIngenieroEditable"></td>
+        <tr *ngFor="let fila of costosConceptos">
+          <td>{{ fila.label }} <span class="tag-nota" *ngIf="costosClavesNoSuman.includes(fila.clave)">no suma al total</span></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput[fila.clave]" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
-        <tr>
-          <td>Directos</td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.directos" [disabled]="!seccionIngenieroEditable"></td>
+        <tr *ngFor="let fila of costosCustomFilas">
+          <td>{{ fila.label }}
+            <button type="button" class="btn-remove-fila" *ngIf="seccionIngenieroEditable"
+                    (click)="eliminarFilaCustom('costos', fila.clave)" title="Eliminar fila">✕</button>
+          </td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput[fila.clave]" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
-        <tr>
-          <td>Directos Urbanismo</td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.directos_urbanismo" [disabled]="!seccionIngenieroEditable"></td>
-          <td></td>
-        </tr>
-        <tr>
-          <td>Indirectos</td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.indirectos" [disabled]="!seccionIngenieroEditable"></td>
-          <td></td>
-        </tr>
-        <tr>
-          <td>Honorarios <span class="tag-nota">no suma al total</span></td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.honorarios" [disabled]="!seccionIngenieroEditable"></td>
-          <td></td>
-        </tr>
-        <tr>
-          <td>Incremento en costos</td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.incremento_costos" [disabled]="!seccionIngenieroEditable"></td>
-          <td></td>
-        </tr>
-        <tr>
-          <td>Financieros <span class="tag-nota">no suma al total</span></td>
-          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput.financieros" [disabled]="!seccionIngenieroEditable"></td>
-          <td></td>
+        <tr *ngIf="seccionIngenieroEditable">
+          <td colspan="3">
+            <button type="button" class="btn-pro secondary sm" (click)="agregarFilaCustom('costos')">
+              <span class="material-symbols-outlined">add</span> Agregar fila
+            </button>
+          </td>
         </tr>
       </tbody>
       <tfoot>

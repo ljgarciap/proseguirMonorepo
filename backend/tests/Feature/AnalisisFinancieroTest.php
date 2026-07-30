@@ -332,4 +332,55 @@ class AnalisisFinancieroTest extends TestCase
             'X-Active-Role' => 'superadmin',
         ])->assertStatus(200);
     }
+
+    // ---------------------------------------------------------------
+    // SCRUM-162 — filas custom ad-hoc por informe (round-trip end to end).
+    // ---------------------------------------------------------------
+
+    public function test_guardar_borrador_con_fila_custom_de_activo_se_suma_y_se_relee_correctamente(): void
+    {
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+        $payload = $this->payloadValido();
+        $payload['activo']['_custom'] = [
+            ['grupo' => 'activo_corriente', 'clave' => 'custom_anticipo_especial', 'label' => 'Anticipo especial'],
+        ];
+        $payload['activo']['custom_anticipo_especial'] = ['2024' => 300, '2025' => 400];
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->putJson("/api/analisis-financiero/{$credito->id}/borrador", $payload, [
+            'X-Active-Role' => 'coordinador_comercial',
+        ]);
+
+        $response->assertStatus(200);
+        // 1000 (caja_bancos) + 300 (custom) = 1300 en 2024.
+        $this->assertEqualsWithDelta(1300, $response->json('calculado.activo.total_activo_corriente.2024'), 0.01);
+
+        // Releer (GET show) debe devolver el mismo total sin perder la fila custom.
+        $show = $this->getJson("/api/analisis-financiero/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial']);
+        $show->assertStatus(200);
+        $this->assertEqualsWithDelta(1300, $show->json('calculado.activo.total_activo_corriente.2024'), 0.01);
+        $this->assertEquals(
+            'custom_anticipo_especial',
+            $show->json('analisis.activo._custom.0.clave')
+        );
+    }
+
+    public function test_guardar_borrador_con_lista_custom_vacia_no_rompe_rehidratado(): void
+    {
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+        $payload = $this->payloadValido();
+        $payload['activo']['_custom'] = [];
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->putJson("/api/analisis-financiero/{$credito->id}/borrador", $payload, [
+            'X-Active-Role' => 'coordinador_comercial',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertEqualsWithDelta(1000, $response->json('calculado.activo.total_activo_corriente.2024'), 0.01);
+
+        $show = $this->getJson("/api/analisis-financiero/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial']);
+        $show->assertStatus(200);
+        $this->assertEqualsWithDelta(1000, $show->json('calculado.activo.total_activo_corriente.2024'), 0.01);
+    }
 }

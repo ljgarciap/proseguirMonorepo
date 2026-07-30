@@ -24,6 +24,11 @@ class InformeTecnicoCalculoService
 {
     /**
      * Sección Ingeniero — Ventas Totales Proyecto (celdas E7:F14 del Excel).
+     *
+     * SCRUM-162: además de los 7 campos fijos, suma las filas custom ad-hoc
+     * que el usuario haya agregado en el formulario (lista `_custom` del
+     * mismo payload, `{clave, label, valor}` — ver `filasCustom()`). Son
+     * ad-hoc por informe, no un catálogo reutilizable entre expedientes.
      */
     public function calcularVentasTotalesProyecto(array $inputs): array
     {
@@ -34,9 +39,24 @@ class InformeTecnicoCalculoService
         $localComercial = $this->num($inputs, 'local_comercial');
         $cuartosUtiles = $this->num($inputs, 'cuartos_utiles');
         $otros = $this->num($inputs, 'otros');
+        $custom = $this->filasCustom($inputs);
+        $totalCustom = array_sum(array_column($custom, 'valor'));
 
         $totalVentas = $casas + $apartamentos + $parqueaderos + $conexionGasArras
-            + $localComercial + $cuartosUtiles + $otros;
+            + $localComercial + $cuartosUtiles + $otros + $totalCustom;
+
+        $porcentajes = [
+            'casas' => $this->porcentaje($casas, $totalVentas),
+            'apartamentos' => $this->porcentaje($apartamentos, $totalVentas),
+            'parqueaderos' => $this->porcentaje($parqueaderos, $totalVentas),
+            'conexion_gas_arras' => $this->porcentaje($conexionGasArras, $totalVentas),
+            'local_comercial' => $this->porcentaje($localComercial, $totalVentas),
+            'cuartos_utiles' => $this->porcentaje($cuartosUtiles, $totalVentas),
+            'otros' => $this->porcentaje($otros, $totalVentas),
+        ];
+        foreach ($custom as $fila) {
+            $porcentajes[$fila['clave']] = $this->porcentaje($fila['valor'], $totalVentas);
+        }
 
         return [
             'casas' => $casas,
@@ -46,16 +66,9 @@ class InformeTecnicoCalculoService
             'local_comercial' => $localComercial,
             'cuartos_utiles' => $cuartosUtiles,
             'otros' => $otros,
+            'custom' => $custom,
             'total_ventas' => $this->round($totalVentas),
-            'porcentajes' => [
-                'casas' => $this->porcentaje($casas, $totalVentas),
-                'apartamentos' => $this->porcentaje($apartamentos, $totalVentas),
-                'parqueaderos' => $this->porcentaje($parqueaderos, $totalVentas),
-                'conexion_gas_arras' => $this->porcentaje($conexionGasArras, $totalVentas),
-                'local_comercial' => $this->porcentaje($localComercial, $totalVentas),
-                'cuartos_utiles' => $this->porcentaje($cuartosUtiles, $totalVentas),
-                'otros' => $this->porcentaje($otros, $totalVentas),
-            ],
+            'porcentajes' => $porcentajes,
         ];
     }
 
@@ -64,6 +77,11 @@ class InformeTecnicoCalculoService
      * es decir NO suma Honorarios (E20) ni Financieros (E23) pese al título
      * "Costos (Incluido Costo Financiero)" — así está en el documento de
      * control interno vigente, confirmado con Luis.
+     *
+     * SCRUM-162: las filas custom ad-hoc siempre suman al total — se
+     * agregan al mismo bucket que Lote/Directos/Directos Urbanismo/
+     * Indirectos/Incremento en costos, nunca al de Honorarios/Financieros
+     * (esos dos siguen siendo la excepción fija documentada arriba).
      */
     public function calcularCostos(array $inputs, float $totalVentas): array
     {
@@ -74,8 +92,10 @@ class InformeTecnicoCalculoService
         $honorarios = $this->num($inputs, 'honorarios');
         $incrementoCostos = $this->num($inputs, 'incremento_costos');
         $financieros = $this->num($inputs, 'financieros');
+        $custom = $this->filasCustom($inputs);
+        $totalCustom = array_sum(array_column($custom, 'valor'));
 
-        $totalCostos = $lote + $directos + $directosUrbanismo + $indirectos + $incrementoCostos;
+        $totalCostos = $lote + $directos + $directosUrbanismo + $indirectos + $incrementoCostos + $totalCustom;
 
         return [
             'lote' => $lote,
@@ -85,6 +105,7 @@ class InformeTecnicoCalculoService
             'honorarios' => $honorarios,
             'incremento_costos' => $incrementoCostos,
             'financieros' => $financieros,
+            'custom' => $custom,
             'total_costos' => $this->round($totalCostos),
             'porcentaje_costos' => $this->porcentaje($totalCostos, $totalVentas),
             'nota' => 'Honorarios y Financieros no se incluyen en el total de Costos (regla del documento de control CR-RO-09A).',
@@ -279,6 +300,41 @@ class InformeTecnicoCalculoService
                 'semaforo' => $garantiaCobertura > 0.6 ? 'rojo' : 'verde',
             ],
         ];
+    }
+
+    /**
+     * SCRUM-162 — extrae las filas custom ad-hoc de un payload de sección
+     * (Ventas Totales Proyecto o Costos). Vienen bajo la clave reservada
+     * `_custom` como lista de `{clave, label, valor}` — a diferencia de
+     * Análisis Financiero (multi-año, valor vive en `inputs[clave][anio]`),
+     * Informe Técnico es un punto en el tiempo: el valor de la fila custom
+     * viaja directo en el propio objeto `_custom`, no en `inputs[clave]`.
+     */
+    private function filasCustom(array $inputs): array
+    {
+        $lista = $inputs['_custom'] ?? [];
+        if (!is_array($lista)) {
+            return [];
+        }
+
+        $resultado = [];
+        $clavesVistas = [];
+        foreach ($lista as $fila) {
+            if (!is_array($fila)) {
+                continue;
+            }
+            $clave = $fila['clave'] ?? null;
+            if (!is_string($clave) || $clave === '' || isset($clavesVistas[$clave])) {
+                continue;
+            }
+            $clavesVistas[$clave] = true;
+            $resultado[] = [
+                'clave' => $clave,
+                'label' => (string) ($fila['label'] ?? $clave),
+                'valor' => $this->num($fila, 'valor'),
+            ];
+        }
+        return $resultado;
     }
 
     private function num(array $inputs, string $key, float $default = 0.0): float

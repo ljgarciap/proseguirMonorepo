@@ -81,6 +81,21 @@ const CARTERA_CONCEPTOS: FilaConcepto[] = [
 
 type Tab = 'activo' | 'pasivo' | 'patrimonio' | 'utilidad_neta' | 'ori' | 'cartera' | 'resumen';
 
+/**
+ * SCRUM-162 — grupos que soportan filas custom ad-hoc (los mismos que ya
+ * renderizan *ngFor sobre un array de FilaConcepto) y a qué pestaña/sección
+ * JSON pertenece cada uno. `_custom` viaja dentro de la sección persistida
+ * (`inputs[tab]._custom`) como lista de `{grupo, clave, label}` — el VALOR
+ * de cada fila custom se guarda en `inputs[tab][clave][anio]`, igual que
+ * cualquier concepto fijo (contrato definido en AnalisisFinancieroCalculoService).
+ */
+const GRUPOS_POR_TAB: Record<string, string[]> = {
+  activo: ['activo_corriente', 'activo_no_corriente'],
+  pasivo: ['pasivo_corriente', 'pasivo_no_corriente'],
+  patrimonio: ['patrimonio'],
+  cartera: ['cartera'],
+};
+
 @Component({
   selector: 'app-analisis-financiero-detalle',
   standalone: true,
@@ -107,6 +122,14 @@ export class AnalisisFinancieroDetalleComponent implements OnInit, OnDestroy {
 
   // Inputs crudos por pestaña — hidratados desde `analisis.*` (lo persistido).
   inputs: Record<string, any> = { activo: {}, pasivo: {}, patrimonio: {}, utilidad_neta: {}, ori: {}, cartera: {} };
+
+  // SCRUM-162 — filas custom agregadas por el usuario, indexadas por grupo.
+  customFilas: Record<string, FilaConcepto[]> = {
+    activo_corriente: [], activo_no_corriente: [],
+    pasivo_corriente: [], pasivo_no_corriente: [],
+    patrimonio: [], cartera: [],
+  };
+
   observaciones = '';
   anioInicial: number | null = null;
   cantidadAnios: number = 2;
@@ -185,6 +208,82 @@ export class AnalisisFinancieroDetalleComponent implements OnInit, OnDestroy {
     this.observaciones = this.analisis?.observaciones || '';
     this.anioInicial = this.analisis?.anio_inicial ?? (new Date().getFullYear() - 1);
     this.cantidadAnios = this.analisis?.cantidad_anios ?? 2;
+    this.hidratarCustomFilas();
+  }
+
+  // SCRUM-162 — reconstruye `customFilas` (por grupo) a partir de la lista
+  // `_custom` que viene dentro de cada sección persistida. Los valores en sí
+  // ya quedaron en `this.inputs[tab][clave]` porque `_custom` vive DENTRO de
+  // esa misma sección (no hace falta copiarlos aparte).
+  private hidratarCustomFilas(): void {
+    for (const grupo of Object.keys(this.customFilas)) {
+      this.customFilas[grupo] = [];
+    }
+    for (const tab of Object.keys(GRUPOS_POR_TAB)) {
+      const lista = this.inputs[tab]?.['_custom'];
+      if (!Array.isArray(lista)) continue;
+      for (const fila of lista) {
+        if (!fila || typeof fila.clave !== 'string' || !this.customFilas[fila.grupo]) continue;
+        this.customFilas[fila.grupo].push({ label: fila.label || fila.clave, clave: fila.clave });
+      }
+    }
+  }
+
+  // SCRUM-162 — abre un prompt para el label de la nueva fila, genera una
+  // clave (slug) única, la agrega al grupo y sincroniza `_custom` en el
+  // payload de la sección. Las filas custom son ad-hoc por informe (no
+  // salen de un catálogo reutilizable — decisión de negocio confirmada).
+  agregarFila(grupo: string, tab: string): void {
+    if (!this.puedeEditar) return;
+
+    Swal.fire({
+      title: 'Agregar fila',
+      input: 'text',
+      inputPlaceholder: 'Nombre del concepto',
+      showCancelButton: true,
+      confirmButtonText: 'Agregar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#1d4ed8',
+      inputValidator: (value) => (!value || !value.trim()) ? 'Escribe un nombre para el concepto' : undefined,
+    }).then(result => {
+      if (!result.isConfirmed) return;
+      const label = (result.value as string).trim();
+      const clave = this.generarClaveCustom(grupo, label);
+      this.customFilas[grupo].push({ label, clave });
+      this.sincronizarCustomEnInputs(tab);
+      this.onCampoCambiado();
+    });
+  }
+
+  eliminarFila(grupo: string, tab: string, clave: string): void {
+    if (!this.puedeEditar) return;
+    this.customFilas[grupo] = this.customFilas[grupo].filter(f => f.clave !== clave);
+    if (this.inputs[tab]?.[clave]) delete this.inputs[tab][clave];
+    this.sincronizarCustomEnInputs(tab);
+    this.onCampoCambiado();
+  }
+
+  private generarClaveCustom(grupo: string, label: string): string {
+    const slug = label
+      .toLowerCase()
+      .normalize('NFD').replace(/[^\x00-\x7f]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'concepto';
+    const sufijo = Date.now().toString(36);
+    return `custom_${grupo}_${slug}_${sufijo}`.slice(0, 80);
+  }
+
+  // Reconstruye `inputs[tab]._custom` a partir de `customFilas` de TODOS los
+  // grupos que pertenecen a esa pestaña (activo/pasivo tienen 2 grupos).
+  private sincronizarCustomEnInputs(tab: string): void {
+    const grupos = GRUPOS_POR_TAB[tab] || [];
+    const lista: any[] = [];
+    for (const grupo of grupos) {
+      for (const fila of this.customFilas[grupo]) {
+        lista.push({ grupo, clave: fila.clave, label: fila.label });
+      }
+    }
+    this.inputs[tab]['_custom'] = lista;
   }
 
   get anios(): number[] {

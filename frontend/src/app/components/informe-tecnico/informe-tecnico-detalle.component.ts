@@ -26,25 +26,44 @@ const ROL_POR_ESTADO: Record<string, string> = {
  * (InformeTecnicoCalculoService), nunca se recalculan aquí, para que no
  * puedan divergir del valor persistido.
  */
-interface VentasInput {
-  casas: number | null;
-  apartamentos: number | null;
-  parqueaderos: number | null;
-  conexion_gas_arras: number | null;
-  local_comercial: number | null;
-  cuartos_utiles: number | null;
-  otros: number | null;
+export interface FilaConcepto {
+  label: string;
+  clave: string;
 }
 
-interface CostosInput {
-  lote: number | null;
-  directos: number | null;
-  directos_urbanismo: number | null;
-  indirectos: number | null;
-  honorarios: number | null;
-  incremento_costos: number | null;
-  financieros: number | null;
-}
+/**
+ * SCRUM-162 — Ventas Totales Proyecto y Costos pasan de campos fijos
+ * nombrados a array-driven (mismo patrón que Análisis Financiero), para
+ * poder agregar filas custom ad-hoc por informe. `VentasInput`/`CostosInput`
+ * quedan como `Record<clave, valor>` — los 7 campos fijos siguen usando las
+ * mismas claves que antes (contrato con el backend sin cambios para ellos).
+ */
+const VENTAS_CONCEPTOS: FilaConcepto[] = [
+  { label: 'Casas', clave: 'casas' },
+  { label: 'Apartamentos', clave: 'apartamentos' },
+  { label: 'Parqueaderos', clave: 'parqueaderos' },
+  { label: 'Conexión gas / arras desist.', clave: 'conexion_gas_arras' },
+  { label: 'Local comercial', clave: 'local_comercial' },
+  { label: 'Cuartos útiles', clave: 'cuartos_utiles' },
+  { label: 'Otros', clave: 'otros' },
+];
+
+const COSTOS_CONCEPTOS: FilaConcepto[] = [
+  { label: 'Lote', clave: 'lote' },
+  { label: 'Directos', clave: 'directos' },
+  { label: 'Directos Urbanismo', clave: 'directos_urbanismo' },
+  { label: 'Indirectos', clave: 'indirectos' },
+  { label: 'Honorarios', clave: 'honorarios' },
+  { label: 'Incremento en costos', clave: 'incremento_costos' },
+  { label: 'Financieros', clave: 'financieros' },
+];
+
+// Los únicos dos campos fijos de Costos que NO suman al total (regla del
+// documento de control CR-RO-09A, ver InformeTecnicoCalculoService::calcularCostos()).
+const COSTOS_CLAVES_NO_SUMAN = ['honorarios', 'financieros'];
+
+type VentasInput = Record<string, number | null>;
+type CostosInput = Record<string, number | null>;
 
 interface InvertidoInput {
   lote: number | null;
@@ -79,6 +98,11 @@ export class InformeTecnicoDetalleComponent implements OnInit, OnDestroy {
   loading = false;
   activeRole: string = '';
 
+  // SCRUM-120 Fase 2 / SCRUM-162: config de filas fijas expuesta al template.
+  readonly ventasConceptos = VENTAS_CONCEPTOS;
+  readonly costosConceptos = COSTOS_CONCEPTOS;
+  readonly costosClavesNoSuman = COSTOS_CLAVES_NO_SUMAN;
+
   // Inputs editables — hidratados desde `informe` al cargar/guardar.
   ventasInput: VentasInput = {
     casas: null, apartamentos: null, parqueaderos: null, conexion_gas_arras: null,
@@ -88,6 +112,12 @@ export class InformeTecnicoDetalleComponent implements OnInit, OnDestroy {
     lote: null, directos: null, directos_urbanismo: null, indirectos: null,
     honorarios: null, incremento_costos: null, financieros: null
   };
+
+  // SCRUM-162 — filas custom ad-hoc de Ventas Totales Proyecto/Costos (no
+  // salen de un catálogo reutilizable, se escriben libres en el formulario).
+  ventasCustomFilas: FilaConcepto[] = [];
+  costosCustomFilas: FilaConcepto[] = [];
+
   invertidoInput: InvertidoInput = {
     lote: null, costos_directos: null, costos_indirectos: null,
     recursos_propios: null, cuotas_iniciales_ya_pagadas: null
@@ -164,6 +194,12 @@ export class InformeTecnicoDetalleComponent implements OnInit, OnDestroy {
       conexion_gas_arras: v.conexion_gas_arras ?? null, local_comercial: v.local_comercial ?? null,
       cuartos_utiles: v.cuartos_utiles ?? null, otros: v.otros ?? null
     };
+    this.ventasCustomFilas = [];
+    for (const fila of (v.custom || [])) {
+      if (!fila?.clave) continue;
+      this.ventasCustomFilas.push({ label: fila.label || fila.clave, clave: fila.clave });
+      this.ventasInput[fila.clave] = fila.valor ?? null;
+    }
 
     const c = this.informe.costos || {};
     this.costosInput = {
@@ -171,6 +207,12 @@ export class InformeTecnicoDetalleComponent implements OnInit, OnDestroy {
       indirectos: c.indirectos ?? null, honorarios: c.honorarios ?? null,
       incremento_costos: c.incremento_costos ?? null, financieros: c.financieros ?? null
     };
+    this.costosCustomFilas = [];
+    for (const fila of (c.custom || [])) {
+      if (!fila?.clave) continue;
+      this.costosCustomFilas.push({ label: fila.label || fila.clave, clave: fila.clave });
+      this.costosInput[fila.clave] = fila.valor ?? null;
+    }
 
     const i = this.informe.invertido || {};
     this.invertidoInput = {
@@ -237,11 +279,75 @@ export class InformeTecnicoDetalleComponent implements OnInit, OnDestroy {
     return !!(v && (v.total_ventas || 0) > 0) || !!this.informe.observaciones_ingeniero;
   }
 
+  // SCRUM-162 — construye el payload de una sección con filas custom: los
+  // campos fijos van tal cual (mismas claves de siempre) y las filas custom
+  // viajan aparte en `_custom` como `{clave, label, valor}` (el valor sale
+  // de `inputs[clave]`, donde también vive para el binding del formulario).
+  private construirPayloadConCustom(conceptos: FilaConcepto[], inputs: Record<string, any>, customFilas: FilaConcepto[]): any {
+    const payload: Record<string, any> = {};
+    for (const fila of conceptos) {
+      payload[fila.clave] = inputs[fila.clave] ?? null;
+    }
+    payload['_custom'] = customFilas.map(f => ({ clave: f.clave, label: f.label, valor: inputs[f.clave] ?? null }));
+    return payload;
+  }
+
+  // SCRUM-162 — agrega una fila custom ad-hoc (nombre libre, no sale de un
+  // catálogo reutilizable) a Ventas Totales Proyecto o Costos.
+  agregarFilaCustom(tipo: 'ventas' | 'costos'): void {
+    if (!this.seccionIngenieroEditable) return;
+
+    Swal.fire({
+      title: 'Agregar fila',
+      input: 'text',
+      inputPlaceholder: 'Nombre del concepto',
+      showCancelButton: true,
+      confirmButtonText: 'Agregar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#1d4ed8',
+      inputValidator: (value) => (!value || !value.trim()) ? 'Escribe un nombre para el concepto' : undefined,
+    }).then(result => {
+      if (!result.isConfirmed) return;
+      const label = (result.value as string).trim();
+      const clave = this.generarClaveCustom(tipo, label);
+      if (tipo === 'ventas') {
+        this.ventasCustomFilas.push({ label, clave });
+        this.ventasInput[clave] = null;
+      } else {
+        this.costosCustomFilas.push({ label, clave });
+        this.costosInput[clave] = null;
+      }
+      this.onCampoCambiado();
+    });
+  }
+
+  eliminarFilaCustom(tipo: 'ventas' | 'costos', clave: string): void {
+    if (!this.seccionIngenieroEditable) return;
+    if (tipo === 'ventas') {
+      this.ventasCustomFilas = this.ventasCustomFilas.filter(f => f.clave !== clave);
+      delete this.ventasInput[clave];
+    } else {
+      this.costosCustomFilas = this.costosCustomFilas.filter(f => f.clave !== clave);
+      delete this.costosInput[clave];
+    }
+    this.onCampoCambiado();
+  }
+
+  private generarClaveCustom(tipo: string, label: string): string {
+    const slug = label
+      .toLowerCase()
+      .normalize('NFD').replace(/[^\x00-\x7f]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'concepto';
+    const sufijo = Date.now().toString(36);
+    return `custom_${tipo}_${slug}_${sufijo}`.slice(0, 80);
+  }
+
   private payloadSegunEstado(): any {
     if (this.credito.estado === 'informe_tecnico_ingeniero') {
       return {
-        ventas_totales_proyecto: this.ventasInput,
-        costos: this.costosInput,
+        ventas_totales_proyecto: this.construirPayloadConCustom(this.ventasConceptos, this.ventasInput, this.ventasCustomFilas),
+        costos: this.construirPayloadConCustom(this.costosConceptos, this.costosInput, this.costosCustomFilas),
         invertido: this.invertidoInput,
         observaciones_ingeniero: this.observacionesIngeniero
       };

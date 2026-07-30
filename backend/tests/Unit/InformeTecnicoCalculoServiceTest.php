@@ -204,4 +204,92 @@ class InformeTecnicoCalculoServiceTest extends TestCase
         $this->assertEquals(0.0, $resultado['total_ventas']);
         $this->assertEquals(0.0, $resultado['porcentajes']['casas']);
     }
+
+    // ---------------------------------------------------------------
+    // SCRUM-162 — filas custom ad-hoc por informe.
+    // ---------------------------------------------------------------
+
+    public function test_ventas_totales_proyecto_suma_filas_custom(): void
+    {
+        $resultado = $this->service->calcularVentasTotalesProyecto([
+            'apartamentos' => 1000,
+            'casas' => 500,
+            '_custom' => [
+                ['clave' => 'custom_terrazas', 'label' => 'Terrazas', 'valor' => 300],
+                ['clave' => 'custom_bodegas', 'label' => 'Bodegas', 'valor' => 200],
+            ],
+        ]);
+
+        $this->assertEqualsWithDelta(2000, $resultado['total_ventas'], 0.01);
+        $this->assertCount(2, $resultado['custom']);
+        $this->assertEqualsWithDelta(0.15, $resultado['porcentajes']['custom_terrazas'], 0.0001);
+        $this->assertEquals('Terrazas', $resultado['custom'][0]['label']);
+    }
+
+    public function test_ventas_totales_proyecto_sin_custom_calcula_igual_que_antes(): void
+    {
+        $resultado = $this->service->calcularVentasTotalesProyecto(['apartamentos' => 32841282386]);
+
+        $this->assertEqualsWithDelta(32841282386, $resultado['total_ventas'], 0.01);
+        $this->assertSame([], $resultado['custom']);
+    }
+
+    public function test_ventas_totales_proyecto_con_lista_custom_vacia_no_rompe(): void
+    {
+        $resultado = $this->service->calcularVentasTotalesProyecto([
+            'apartamentos' => 1000,
+            '_custom' => [],
+        ]);
+
+        $this->assertEqualsWithDelta(1000, $resultado['total_ventas'], 0.01);
+        $this->assertSame([], $resultado['custom']);
+    }
+
+    public function test_costos_suma_filas_custom_al_total_pero_honorarios_financieros_siguen_sin_sumar(): void
+    {
+        $totalVentas = 10000;
+
+        $resultado = $this->service->calcularCostos([
+            'lote' => 1000,
+            'directos' => 500,
+            'honorarios' => 999,
+            'financieros' => 888,
+            '_custom' => [
+                ['clave' => 'custom_permiso_especial', 'label' => 'Permiso especial', 'valor' => 250],
+            ],
+        ], $totalVentas);
+
+        // 1000 + 500 + 250 (custom) = 1750 — honorarios/financieros siguen excluidos.
+        $this->assertEqualsWithDelta(1750, $resultado['total_costos'], 0.01);
+        $this->assertCount(1, $resultado['custom']);
+    }
+
+    public function test_costos_sin_custom_calcula_igual_que_antes(): void
+    {
+        $resultado = $this->service->calcularCostos([
+            'lote' => 5315952140,
+            'directos' => 12690962100,
+            'directos_urbanismo' => 865000000,
+            'indirectos' => 8771866121,
+            'honorarios' => 2495448000,
+            'incremento_costos' => 0,
+            'financieros' => 1596600000,
+        ], 32841282386);
+
+        $this->assertEqualsWithDelta(27643780361, $resultado['total_costos'], 0.01);
+        $this->assertSame([], $resultado['custom']);
+    }
+
+    public function test_filas_custom_con_clave_duplicada_se_deduplican(): void
+    {
+        $resultado = $this->service->calcularVentasTotalesProyecto([
+            '_custom' => [
+                ['clave' => 'custom_x', 'label' => 'Primera', 'valor' => 100],
+                ['clave' => 'custom_x', 'label' => 'Segunda (duplicada)', 'valor' => 999],
+            ],
+        ]);
+
+        $this->assertCount(1, $resultado['custom']);
+        $this->assertEqualsWithDelta(100, $resultado['total_ventas'], 0.01);
+    }
 }

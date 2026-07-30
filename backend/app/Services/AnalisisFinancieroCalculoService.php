@@ -58,8 +58,8 @@ class AnalisisFinancieroCalculoService
      */
     public function calcularActivo(array $inputs, array $anios): array
     {
-        $corriente = $this->sumarGrupo($inputs, self::ACTIVO_CORRIENTE, $anios);
-        $noCorriente = $this->sumarGrupo($inputs, self::ACTIVO_NO_CORRIENTE, $anios);
+        $corriente = $this->sumarGrupo($inputs, $this->conceptosConCustom($inputs, self::ACTIVO_CORRIENTE, 'activo_corriente'), $anios);
+        $noCorriente = $this->sumarGrupo($inputs, $this->conceptosConCustom($inputs, self::ACTIVO_NO_CORRIENTE, 'activo_no_corriente'), $anios);
 
         $totalActivo = $this->sumarSubtotales([$corriente['subtotal'], $noCorriente['subtotal']], $anios);
 
@@ -86,8 +86,8 @@ class AnalisisFinancieroCalculoService
      */
     public function calcularPasivo(array $inputs, array $anios): array
     {
-        $corriente = $this->sumarGrupo($inputs, self::PASIVO_CORRIENTE, $anios);
-        $noCorriente = $this->sumarGrupo($inputs, self::PASIVO_NO_CORRIENTE, $anios);
+        $corriente = $this->sumarGrupo($inputs, $this->conceptosConCustom($inputs, self::PASIVO_CORRIENTE, 'pasivo_corriente'), $anios);
+        $noCorriente = $this->sumarGrupo($inputs, $this->conceptosConCustom($inputs, self::PASIVO_NO_CORRIENTE, 'pasivo_no_corriente'), $anios);
 
         $totalPasivo = $this->sumarSubtotales([$corriente['subtotal'], $noCorriente['subtotal']], $anios);
 
@@ -116,7 +116,7 @@ class AnalisisFinancieroCalculoService
      */
     public function calcularPatrimonio(array $inputs, array $anios, array $totalActivo, array $totalPasivo): array
     {
-        $grupo = $this->sumarGrupo($inputs, self::PATRIMONIO_CONCEPTOS, $anios);
+        $grupo = $this->sumarGrupo($inputs, $this->conceptosConCustom($inputs, self::PATRIMONIO_CONCEPTOS, 'patrimonio'), $anios);
         $totalPatrimonio = $grupo['subtotal'];
 
         $pasivoMasPatrimonio = [];
@@ -218,19 +218,20 @@ class AnalisisFinancieroCalculoService
      */
     public function calcularCartera(array $inputs, array $anios): array
     {
-        $grupo = $this->sumarGrupo($inputs, self::CARTERA_CONCEPTOS, $anios);
+        $conceptos = $this->conceptosConCustom($inputs, self::CARTERA_CONCEPTOS, 'cartera');
+        $grupo = $this->sumarGrupo($inputs, $conceptos, $anios);
         $carteraNeta = $grupo['subtotal'];
 
         $composicion = [];
         foreach ($anios as $anio) {
             $totalPositivo = 0.0;
-            foreach (self::CARTERA_CONCEPTOS as $concepto) {
+            foreach ($conceptos as $concepto) {
                 if ($concepto === 'provision') {
                     continue;
                 }
                 $totalPositivo += $grupo['valores'][$concepto][$anio];
             }
-            foreach (self::CARTERA_CONCEPTOS as $concepto) {
+            foreach ($conceptos as $concepto) {
                 if ($concepto === 'provision') {
                     continue;
                 }
@@ -277,6 +278,47 @@ class AnalisisFinancieroCalculoService
             'variacion_cartera_neta' => $variacionUltimo($cartera['cartera_neta']),
             'diferencia_contable' => $patrimonio['validacion_contable'][$ultimoAnio] ?? 0.0,
         ];
+    }
+
+    /**
+     * SCRUM-162 — fusiona la lista fija de conceptos de un grupo con las
+     * filas custom que el usuario haya agregado ad-hoc en el formulario.
+     *
+     * Las filas custom son ad-hoc por informe (no un catálogo reutilizable):
+     * viajan en la propia sección (`activo`, `pasivo`, `patrimonio`,
+     * `cartera`) bajo la clave reservada `_custom`, como una lista de
+     * `{grupo, clave, label}`. El VALOR de cada fila custom vive en el
+     * mismo nivel que cualquier concepto fijo (`$inputs[$clave][$anio]`) —
+     * así `sumarGrupo()` no necesita saber que una clave es custom, solo
+     * necesita la lista completa de claves a sumar.
+     *
+     * Una clave custom nunca puede pisar una clave fija del grupo (se
+     * ignora silenciosamente si coincide) y las claves duplicadas se
+     * deduplican.
+     */
+    private function conceptosConCustom(array $inputs, array $conceptosFijos, string $grupo): array
+    {
+        $custom = $inputs['_custom'] ?? [];
+        if (!is_array($custom)) {
+            return $conceptosFijos;
+        }
+
+        $customClaves = [];
+        foreach ($custom as $fila) {
+            if (!is_array($fila)) {
+                continue;
+            }
+            if (($fila['grupo'] ?? null) !== $grupo) {
+                continue;
+            }
+            $clave = $fila['clave'] ?? null;
+            if (!is_string($clave) || $clave === '' || in_array($clave, $conceptosFijos, true)) {
+                continue;
+            }
+            $customClaves[] = $clave;
+        }
+
+        return array_merge($conceptosFijos, array_values(array_unique($customClaves)));
     }
 
     /**
