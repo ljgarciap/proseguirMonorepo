@@ -26,6 +26,7 @@ const GRUPO_LABELS: Record<string, string> = {
   email: 'Correo Electrónico',
   integraciones: 'Integraciones',
   general: 'General',
+  sesion: 'Duración de Sesión',
 };
 
 @Component({
@@ -282,6 +283,7 @@ export class ConfiguracionesComponent implements OnInit {
       email: 'mail',
       integraciones: 'hub',
       general: 'settings',
+      sesion: 'schedule',
     };
     return icons[grupo] ?? 'settings';
   }

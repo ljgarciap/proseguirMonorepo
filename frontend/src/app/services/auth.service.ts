@@ -58,6 +58,16 @@ export class AuthService {
     return this.userSubject.value;
   }
 
+  /**
+   * SCRUM-161: actualiza los datos del usuario en memoria/localStorage tras
+   * un cambio de perfil (nombre, duración de sesión), sin requerir un
+   * nuevo login.
+   */
+  setUser(user: any): void {
+    localStorage.setItem('user_data', JSON.stringify(user));
+    this.userSubject.next(user);
+  }
+
   isAuthenticated(): boolean {
     return !!localStorage.getItem('auth_token');
   }

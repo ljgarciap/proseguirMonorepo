@@ -24,14 +24,16 @@ import { AuthService } from '../../services/auth.service';
           <div class="card-header">
             <h3>Información Personal</h3>
           </div>
-          <div class="card-body">
+          <form (ngSubmit)="onSaveProfile()" #profileForm="ngForm" class="card-body">
             <div class="user-avatar-large">
                {{ authService.getActiveRole()?.charAt(0)?.toUpperCase() }}
             </div>
-            <div class="info-group">
+
+            <div class="pro-input-group full-width">
               <label>Nombre Completo</label>
-              <div class="value">{{ user?.name }}</div>
+              <input type="text" [(ngModel)]="profileData.name" name="name" required minlength="2" maxlength="255" class="pro-input">
             </div>
+
             <div class="info-group">
               <label>Correo Electrónico</label>
               <div class="value">{{ user?.email }}</div>
@@ -40,7 +42,29 @@ import { AuthService } from '../../services/auth.service';
               <label>Rol Asignado</label>
               <div class="value badge-role">{{ authService.getActiveRole() | titlecase }}</div>
             </div>
-          </div>
+
+            <div class="pro-input-group full-width">
+              <label>Duración de la Sesión</label>
+              <select [(ngModel)]="profileData.session_duration_minutes" name="session_duration_minutes" class="pro-input">
+                <option *ngFor="let opt of sessionDurationOptions" [ngValue]="opt.value">{{ opt.label }}</option>
+              </select>
+              <small class="field-hint">Aplica desde el próximo inicio de sesión.</small>
+            </div>
+
+            <div class="status-msg success" *ngIf="profileSuccessMessage">
+              <span class="material-symbols-outlined">check_circle</span>
+              {{ profileSuccessMessage }}
+            </div>
+            <div class="status-msg error" *ngIf="profileErrorMessage">
+              <span class="material-symbols-outlined">error</span>
+              {{ profileErrorMessage }}
+            </div>
+
+            <button type="submit" class="btn-pro primary" [disabled]="isProfileLoading || !profileForm.valid">
+              <span class="material-symbols-outlined">save</span>
+              {{ isProfileLoading ? 'Guardando...' : 'Guardar Cambios' }}
+            </button>
+          </form>
         </div>
 
         <!-- Password Change Card -->
@@ -131,6 +155,24 @@ import { AuthService } from '../../services/auth.service';
       }
     }
 
+    .pro-input-group.full-width {
+      width: 100%;
+      text-align: left;
+      label { display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 800; margin-bottom: 6px; letter-spacing: 0.5px; }
+    }
+
+    .field-hint {
+      display: block;
+      margin-top: 6px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .profile-info-card .btn-pro {
+      margin-top: 0.5rem;
+      width: 100%;
+    }
+
     .password-card {
       .card-body {
         padding: 2.5rem;
@@ -165,10 +207,67 @@ export class ProfileSettingsComponent implements OnInit {
   successMessage = '';
   errorMessage = '';
 
+  // SCRUM-161: la lista de opciones válidas ya no vive hardcodeada acá — se
+  // carga desde GET /profile/session-duration-options (backend lee la tabla
+  // `configuraciones`, grupo 'sesion'). Server-side sigue siendo la fuente
+  // de verdad para la validación (AuthController::updateProfile), este
+  // array es solo para render del selector.
+  sessionDurationOptions: { value: number; label: string }[] = [];
+
+  profileData = {
+    name: '',
+    session_duration_minutes: null as number | null,
+  };
+  isProfileLoading = false;
+  profileSuccessMessage = '';
+  profileErrorMessage = '';
+
   constructor(public authService: AuthService, private http: HttpClient) {}
 
   ngOnInit(): void {
     this.user = this.authService.getUser();
+    this.profileData.name = this.user?.name ?? '';
+    this.loadSessionDurationOptions();
+  }
+
+  private loadSessionDurationOptions(): void {
+    this.http.get<{ options: { value: number; label: string }[]; default: number }>(
+      `${environment.apiUrl}/profile/session-duration-options`
+    ).subscribe({
+      next: (res) => {
+        this.sessionDurationOptions = res.options ?? [];
+        this.profileData.session_duration_minutes =
+          this.user?.session_duration_minutes ?? res.default ?? null;
+      },
+      error: () => {
+        // El selector queda vacío si el endpoint falla; no se rellena con
+        // una lista fija en el cliente porque dejaría de reflejar lo que
+        // el backend realmente valida (tabla `configuraciones`).
+        this.profileData.session_duration_minutes = this.user?.session_duration_minutes ?? null;
+      }
+    });
+  }
+
+  onSaveProfile(): void {
+    this.isProfileLoading = true;
+    this.profileSuccessMessage = '';
+    this.profileErrorMessage = '';
+
+    this.http.patch<{ message: string; user: any }>(`${environment.apiUrl}/profile`, {
+      name: this.profileData.name,
+      session_duration_minutes: this.profileData.session_duration_minutes,
+    }).subscribe({
+      next: (res) => {
+        this.isProfileLoading = false;
+        this.profileSuccessMessage = 'Perfil actualizado con éxito.';
+        this.user = res.user;
+        this.authService.setUser(res.user);
+      },
+      error: (err) => {
+        this.isProfileLoading = false;
+        this.profileErrorMessage = err.error?.message || 'Error al actualizar el perfil.';
+      }
+    });
   }
 
   onChangePassword(): void {

@@ -117,4 +117,19 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Session Duration Options (SCRUM-161)
+    |--------------------------------------------------------------------------
+    |
+    | La lista de opciones, el default y el techo máximo dejaron de vivir acá
+    | como constantes (violaba la regla de no hardcodear umbrales de negocio
+    | en código — cambiarlos requería un deploy). Ahora son filas en la tabla
+    | `configuraciones` (grupo 'sesion', claves SESSION_DURATION_OPTIONS,
+    | SESSION_DURATION_DEFAULT, SESSION_DURATION_MAX — ver ConfiguracionSeeder)
+    | y se leen vía ConfiguracionService::get() desde AuthController. Un
+    | superadmin puede ajustarlas desde /configuraciones sin deploy.
+    |
+    */
+
 ];
