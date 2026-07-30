@@ -220,6 +220,10 @@ Route::prefix('solicitudes-credito')->middleware('auth:api')->group(function () 
         ->middleware('checkrole:superadmin,gerente,coordinador_comercial,operativo');
     Route::post('/', [\App\Http\Controllers\SolicitudCreditoController::class, 'store'])
         ->middleware('checkrole:superadmin,gerente,coordinador_comercial,operativo');
+    // SCRUM-159: edición de "Condiciones Financieras del Crédito" restringida a
+    // Coordinador Comercial (superadmin siempre pasa por CheckUserRole::handle).
+    Route::put('/{solicitudCredito}', [\App\Http\Controllers\SolicitudCreditoController::class, 'update'])
+        ->middleware('checkrole:coordinador_comercial');
 });
 
 // Parámetros Genéricos (Superadmin)

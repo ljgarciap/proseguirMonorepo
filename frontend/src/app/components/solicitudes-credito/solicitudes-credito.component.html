@@ -88,6 +88,7 @@
                 <th>Monto</th>
                 <th>Amortización</th>
                 <th>Registrado Por</th>
+                <th class="text-right" *ngIf="canEditCondicionesFinancieras()">Acción</th>
               </tr>
             </thead>
             <tbody>
@@ -109,9 +110,14 @@
                     <span class="subtext">{{ req.usuario_registra?.email }}</span>
                   </div>
                 </td>
+                <td class="text-right" *ngIf="canEditCondicionesFinancieras()">
+                  <button class="btn-pro secondary sm" (click)="onEditSolicitud(req)">
+                    <span class="material-symbols-outlined">edit</span> Editar
+                  </button>
+                </td>
               </tr>
               <tr *ngIf="historyRequests.length === 0">
-                <td colspan="7" class="text-center py-4 text-muted">Aún no se han registrado solicitudes formalizadas.</td>
+                <td [attr.colspan]="canEditCondicionesFinancieras() ? 8 : 7" class="text-center py-4 text-muted">Aún no se han registrado solicitudes formalizadas.</td>
               </tr>
             </tbody>
           </table>
@@ -139,9 +145,14 @@
               </app-cliente-autocomplete>
             </div>
 
-            <div class="form-group" *ngIf="isFromVisit">
+            <div class="form-group" *ngIf="isFromVisit && selectedVisitId && !isEditingSolicitud">
               <label>ID Visita de Origen</label>
               <input type="text" [value]="'#' + selectedVisitId" disabled class="pro-input readonly-input" />
+            </div>
+
+            <div class="form-group" *ngIf="isEditingSolicitud">
+              <label>Editando Solicitud</label>
+              <input type="text" [value]="'#' + editingSolicitudId" disabled class="pro-input readonly-input" />
             </div>
 
             <div class="form-group">
@@ -297,29 +308,35 @@
         <!-- SECTION 3: CREDITO -->
         <div class="content-card mt-4">
           <h3 class="card-title text-primary"><span class="material-symbols-outlined">paid</span> Condiciones Financieras del Crédito</h3>
-          
+          <p class="card-subtitle" *ngIf="isEditingSolicitud">
+            Estos son los únicos campos editables de esta solicitud. Las demás secciones se muestran solo como referencia.
+          </p>
+
           <div class="form-grid mt-4">
             <div class="form-group">
               <label>Tipo de Crédito <span class="required">*</span></label>
-              <select [(ngModel)]="form.tipo_credito_id" name="tipo_credito_id" [disabled]="isFromVisit" required class="pro-input">
+              <select [(ngModel)]="form.tipo_credito_id" name="tipo_credito_id" [disabled]="(isFromVisit && !canEditCondicionesFinancieras()) || editingTieneCreditoOrdinario" required class="pro-input">
                 <option value="">Seleccione...</option>
                 <option *ngFor="let tc of tipoCreditos" [value]="tc.id">{{ tc.nombre }}</option>
               </select>
+              <small class="text-muted" *ngIf="isEditingSolicitud && editingTieneCreditoOrdinario">
+                No se puede cambiar: ya existe un flujo de Crédito Ordinario en curso para esta solicitud.
+              </small>
             </div>
 
             <div class="form-group">
               <label>Monto Solicitado <span class="required">*</span></label>
-              <input type="text" inputmode="decimal" [(ngModel)]="form.monto_solicitado" name="monto_solicitado" milesSeparator [disabled]="isFromVisit" required placeholder="$ 0" class="pro-input" />
+              <input type="text" inputmode="decimal" [(ngModel)]="form.monto_solicitado" name="monto_solicitado" milesSeparator [disabled]="isFromVisit && !canEditCondicionesFinancieras()" required placeholder="$ 0" class="pro-input" />
             </div>
 
             <div class="form-group">
               <label>Plazo en Meses <span class="required">*</span></label>
-              <input type="number" [(ngModel)]="form.plazo_meses" name="plazo_meses" [disabled]="isFromVisit" required placeholder="Meses" class="pro-input" />
+              <input type="number" [(ngModel)]="form.plazo_meses" name="plazo_meses" [disabled]="isFromVisit && !canEditCondicionesFinancieras()" required placeholder="Meses" class="pro-input" />
             </div>
 
             <div class="form-group">
               <label>Amortización <span class="required">*</span></label>
-              <select [(ngModel)]="form.amortizacion_id" name="amortizacion_id" [disabled]="isFromVisit" required class="pro-input">
+              <select [(ngModel)]="form.amortizacion_id" name="amortizacion_id" [disabled]="isFromVisit && !canEditCondicionesFinancieras()" required class="pro-input">
                 <option value="">Seleccione...</option>
                 <option *ngFor="let am of amortizaciones" [value]="am.id">{{ am.nombre }}</option>
               </select>
@@ -327,17 +344,17 @@
 
             <div class="form-group span-full">
               <label>¿Para qué requiere el recurso? <span class="required">*</span></label>
-              <textarea [(ngModel)]="form.destino_recurso" name="destino_recurso" [disabled]="isFromVisit" required rows="2" class="pro-input textarea"></textarea>
+              <textarea [(ngModel)]="form.destino_recurso" name="destino_recurso" [disabled]="isFromVisit && !canEditCondicionesFinancieras()" required rows="2" class="pro-input textarea"></textarea>
             </div>
 
             <div class="form-group">
               <label>Garantía</label>
-              <input type="text" [(ngModel)]="form.garantia" name="garantia" [disabled]="isFromVisit" placeholder="Garantía ofrecida" class="pro-input" />
+              <input type="text" [(ngModel)]="form.garantia" name="garantia" [disabled]="isFromVisit && !canEditCondicionesFinancieras()" placeholder="Garantía ofrecida" class="pro-input" />
             </div>
 
             <div class="form-group">
               <label>Fuente de Pago <span class="required">*</span></label>
-              <input type="text" [(ngModel)]="form.fuente_pago" name="fuente_pago" [disabled]="isFromVisit" required placeholder="Ingresos ordinarios, etc." class="pro-input" />
+              <input type="text" [(ngModel)]="form.fuente_pago" name="fuente_pago" [disabled]="isFromVisit && !canEditCondicionesFinancieras()" required placeholder="Ingresos ordinarios, etc." class="pro-input" />
             </div>
           </div>
         </div>
@@ -349,17 +366,17 @@
           <div class="form-grid mt-4">
             <div class="form-group">
               <label>Nombre del Proyecto <span class="required">*</span></label>
-              <input type="text" [(ngModel)]="form.proyecto" name="proyecto" required placeholder="Nombre del proyecto constructor" class="pro-input" />
+              <input type="text" [(ngModel)]="form.proyecto" name="proyecto" [disabled]="isEditingSolicitud" required placeholder="Nombre del proyecto constructor" class="pro-input" />
             </div>
 
             <div class="form-group">
               <label>Dirección <span class="required">*</span></label>
-              <input type="text" [(ngModel)]="form.proyecto_direccion" name="proyecto_direccion" required placeholder="Dirección del proyecto" class="pro-input" />
+              <input type="text" [(ngModel)]="form.proyecto_direccion" name="proyecto_direccion" [disabled]="isEditingSolicitud" required placeholder="Dirección del proyecto" class="pro-input" />
             </div>
 
             <div class="form-group">
               <label>Departamento <span class="required">*</span></label>
-              <select name="proyecto_departamento_id" [(ngModel)]="form.proyecto_departamento_id" (ngModelChange)="onDepartamentoProyectoChange()" required class="pro-input">
+              <select name="proyecto_departamento_id" [(ngModel)]="form.proyecto_departamento_id" (ngModelChange)="onDepartamentoProyectoChange()" [disabled]="isEditingSolicitud" required class="pro-input">
                 <option value="" disabled>Seleccione...</option>
                 <option *ngFor="let d of departamentos" [value]="d.id">{{ d.nombre }}</option>
               </select>
@@ -367,7 +384,7 @@
 
             <div class="form-group">
               <label>Ciudad <span class="required">*</span></label>
-              <select name="proyecto_ciudad_id" [(ngModel)]="form.proyecto_ciudad_id" required class="pro-input" [disabled]="!form.proyecto_departamento_id">
+              <select name="proyecto_ciudad_id" [(ngModel)]="form.proyecto_ciudad_id" required class="pro-input" [disabled]="isEditingSolicitud || !form.proyecto_departamento_id">
                 <option value="" disabled>{{ form.proyecto_departamento_id ? 'Seleccione...' : 'Elija primero un departamento' }}</option>
                 <option *ngFor="let c of ciudadesDelDepartamentoProyecto" [value]="c.id">{{ c.nombre }}</option>
               </select>
@@ -375,8 +392,8 @@
           </div>
         </div>
 
-        <!-- SECTION 4: NOTIFICACION & PRESET -->
-        <div class="content-card mt-4">
+        <!-- SECTION 4: NOTIFICACION & PRESET (no aplica en edición de Condiciones Financieras, SCRUM-159) -->
+        <div class="content-card mt-4" *ngIf="!isEditingSolicitud">
           <h3 class="card-title text-primary"><span class="material-symbols-outlined">forward_to_inbox</span> Configuración de Notificación y Documentos</h3>
           <p class="card-subtitle">Especifique el correo de destino, edite la plantilla de notificación y seleccione el preset de documentos requeridos.</p>
           
@@ -430,8 +447,11 @@
         <!-- SUBMIT FOOTER -->
         <div class="form-footer mt-4">
           <button type="button" class="btn-pro secondary" (click)="resetForm(); switchTab('pendientes')">Cancelar</button>
-          <button type="submit" class="btn-pro primary" [disabled]="!isFormValid()">
+          <button type="submit" class="btn-pro primary" [disabled]="!isFormValid()" *ngIf="!isEditingSolicitud">
             <span class="material-symbols-outlined">send</span> Registrar y Enviar Notificación
+          </button>
+          <button type="submit" class="btn-pro primary" [disabled]="!isFormValid()" *ngIf="isEditingSolicitud">
+            <span class="material-symbols-outlined">save</span> Guardar Cambios
           </button>
         </div>
 
