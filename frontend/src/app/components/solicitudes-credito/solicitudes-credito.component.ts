@@ -57,6 +57,13 @@ export class SolicitudesCreditoComponent implements OnInit {
   // solo evita que el usuario intente un cambio que sabemos que va a fallar.
   editingTieneCreditoOrdinario = false;
 
+  // SCRUM-173: cuerpo del mensaje sin los datos de acceso al portal. Se
+  // guarda aparte para poder reconstruir el mensaje completo cuando el
+  // cliente se selecciona/cambia después de generar el template inicial
+  // (registro manual: al momento de mostrar el template todavía no hay
+  // cliente elegido, por lo que numero_documento/correo aún no existen).
+  mensajeBaseNotificacion = '';
+
   // Form Fields
   form: any = {
     cliente_id: '',
@@ -264,12 +271,29 @@ export class SolicitudesCreditoComponent implements OnInit {
     // Generate subject and message template
     const tcName = visit.tipo_credito?.nombre || 'Crédito Ordinario';
     this.form.asunto_notificacion = `Solicitud de documentos para solicitud de ${tcName.toLowerCase()}`;
-    this.form.mensaje_notificacion = `Estimado cliente, nos complace informarle que hemos registrado su solicitud de crédito de acuerdo con nuestra última reunión. Para proceder con el estudio, requerimos que adjunte los soportes correspondientes en su portal de cliente.`;
+    this.mensajeBaseNotificacion = `Estimado cliente, nos complace informarle que hemos registrado su solicitud de crédito de acuerdo con nuestra última reunión. Para proceder con el estudio, requerimos que adjunte los soportes correspondientes en su portal de cliente.`;
+    this.form.mensaje_notificacion = this.construirMensajeConAcceso(this.mensajeBaseNotificacion);
 
     // Attempt to auto-select a preset matching the credit type name
     this.autoSelectPreset(tcName);
 
     this.activeTab = 'registrar';
+  }
+
+  // SCRUM-173: agrega al mensaje base la URL del sistema, el usuario y la
+  // clave del cliente, para que pueda ingresar directamente a la plataforma.
+  // Usuario/clave replican exactamente la lógica de aprovisionamiento de
+  // ClienteController::syncUserAccess (backend): usuario = correo de
+  // notificación (o "<documento>@noreply.proseguir.local" si no tiene
+  // correo), clave = número de documento sin guiones.
+  private construirMensajeConAcceso(mensajeBase: string): string {
+    const numeroDocumento = (this.form.numero_documento || '').toString().replace(/-/g, '');
+    if (!numeroDocumento) return mensajeBase;
+
+    const usuario = this.form.correo_notificacion || `${numeroDocumento}@noreply.proseguir.local`;
+    const urlSistema = environment.apiUrl.replace('/api', '');
+
+    return `${mensajeBase}\n\nPuede ingresar a la plataforma en ${urlSistema} con el usuario ${usuario} y la contraseña ${numeroDocumento}.`;
   }
 
   autoSelectPreset(creditTypeName: string) {
@@ -370,7 +394,8 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.isFromVisit = false;
     this.selectedVisitId = null;
     this.form.asunto_notificacion = 'Solicitud de documentos para solicitud de crédito';
-    this.form.mensaje_notificacion = 'Estimado cliente, hemos iniciado el registro de su solicitud de crédito. Para continuar con el proceso, solicitamos cargue los documentos requeridos.';
+    this.mensajeBaseNotificacion = 'Estimado cliente, hemos iniciado el registro de su solicitud de crédito. Para continuar con el proceso, solicitamos cargue los documentos requeridos.';
+    this.form.mensaje_notificacion = this.mensajeBaseNotificacion;
     this.activeTab = 'registrar';
   }
 
@@ -412,12 +437,23 @@ export class SolicitudesCreditoComponent implements OnInit {
 
     const isJuridica = this.isPersonaJuridica();
     this.form.correo_notificacion = isJuridica ? selected.correo_electronico_empresarial : selected.correo_electronico;
+
+    // SCRUM-173: al elegir cliente en el registro manual recién se conocen
+    // numero_documento/correo, así que es acá donde el mensaje default
+    // (generado antes, sin esos datos) debe completarse con el acceso.
+    if (this.mensajeBaseNotificacion) {
+      this.form.mensaje_notificacion = this.construirMensajeConAcceso(this.mensajeBaseNotificacion);
+    }
   }
 
   // When type of persona changes manually
   onTipoPersonaChange() {
     const isJuridica = this.isPersonaJuridica();
     this.form.correo_notificacion = isJuridica ? this.form.correo_electronico_empresarial : this.form.correo_electronico;
+
+    if (this.mensajeBaseNotificacion) {
+      this.form.mensaje_notificacion = this.construirMensajeConAcceso(this.mensajeBaseNotificacion);
+    }
   }
 
   // Check if JURIDICA selected — uses tipoPersonas list by tipo_persona_id,
@@ -568,6 +604,7 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.selectedVisitId = null;
     this.editingSolicitudId = null;
     this.editingTieneCreditoOrdinario = false;
+    this.mensajeBaseNotificacion = '';
     this.selectedPresetId = null;
     this.selectedPresetDocs = [];
     this.ciudadesDelDepartamento = [];
