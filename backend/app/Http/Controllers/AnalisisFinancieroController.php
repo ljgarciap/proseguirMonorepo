@@ -271,7 +271,7 @@ class AnalisisFinancieroController extends Controller
     {
         return CreditoOrdinario::where('sarlaft_concepto', 'favorable')
             ->where('estado', 'pendiente_analisis_financiero')
-            ->with(['solicitudCredito.cliente', 'analisisFinanciero'])
+            ->with(['solicitudCredito.cliente.tipoPersona', 'solicitudCredito.tipoCredito', 'solicitudCredito.amortizacion', 'analisisFinanciero'])
             ->findOrFail($creditoId);
     }
 
@@ -289,7 +289,7 @@ class AnalisisFinancieroController extends Controller
                         $aq->where('estado', 'confirmado');
                     });
             })
-            ->with(['solicitudCredito.cliente', 'analisisFinanciero'])
+            ->with(['solicitudCredito.cliente.tipoPersona', 'solicitudCredito.tipoCredito', 'solicitudCredito.amortizacion', 'analisisFinanciero'])
             ->findOrFail($creditoId);
     }
 

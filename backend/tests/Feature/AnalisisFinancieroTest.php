@@ -161,6 +161,21 @@ class AnalisisFinancieroTest extends TestCase
             ->assertStatus(403);
     }
 
+    // SCRUM-174 — el encabezado (tipo de persona, tipo de crédito,
+    // amortización) debe venir poblado en el detalle, no solo en la bandeja.
+    public function test_show_incluye_tipo_persona_tipo_credito_y_amortizacion_en_el_encabezado(): void
+    {
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->getJson("/api/analisis-financiero/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200);
+        $this->assertEquals('Persona Natural', $response->json('credito.solicitud_credito.cliente.tipo_persona.nombre'));
+        $this->assertEquals('Crédito Ordinario', $response->json('credito.solicitud_credito.tipo_credito.nombre'));
+        $this->assertEquals('Mensual', $response->json('credito.solicitud_credito.amortizacion.nombre'));
+    }
+
     public function test_guardar_borrador_no_cambia_estado_del_credito(): void
     {
         $credito = $this->crearCreditoEnAnalisisFinanciero();
