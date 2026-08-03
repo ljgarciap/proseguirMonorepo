@@ -204,6 +204,8 @@ Route::prefix('analisis-financiero')->middleware('auth:api')->group(function () 
     Route::put('/{creditoId}/borrador', [\App\Http\Controllers\AnalisisFinancieroController::class, 'guardarBorrador']);
     Route::post('/{creditoId}/confirmar', [\App\Http\Controllers\AnalisisFinancieroController::class, 'confirmar']);
     Route::get('/{creditoId}/descargar', [\App\Http\Controllers\AnalisisFinancieroController::class, 'descargar']);
+    Route::post('/{creditoId}/adjuntos', [\App\Http\Controllers\AnalisisFinancieroController::class, 'subirAdjunto']);
+    Route::delete('/{creditoId}/adjuntos/{index}', [\App\Http\Controllers\AnalisisFinancieroController::class, 'eliminarAdjunto']);
 });
 
 // Actas del Comité de Crédito (SCRUM-169)

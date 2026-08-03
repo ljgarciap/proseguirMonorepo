@@ -133,6 +133,7 @@ export class AnalisisFinancieroDetalleComponent implements OnInit, OnDestroy {
   observaciones = '';
   anioInicial: number | null = null;
   cantidadAnios: number = 2;
+  subiendoAdjunto = false;
 
   carteraChartData: Record<number, ChartData<'doughnut'>> = {};
   carteraChartOptions = { plugins: { legend: { display: false } } };
@@ -424,6 +425,58 @@ export class AnalisisFinancieroDetalleComponent implements OnInit, OnDestroy {
         }
       });
     });
+  }
+
+  // SCRUM-175 — adjuntar/eliminar soportes libres en la pestaña Resumen.
+  subirAdjunto(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('archivo', file);
+
+    this.subiendoAdjunto = true;
+    this.http.post(`${environment.apiUrl}/analisis-financiero/${this.creditoId}/adjuntos`, formData, {
+      headers: { 'X-Active-Role': this.activeRole }
+    }).subscribe({
+      next: (data: any) => {
+        this.analisis = data.analisis;
+        this.subiendoAdjunto = false;
+        input.value = '';
+      },
+      error: (err) => {
+        this.subiendoAdjunto = false;
+        input.value = '';
+        Swal.fire('Error', err.error?.message || 'No se pudo adjuntar el archivo.', 'error');
+      }
+    });
+  }
+
+  eliminarAdjunto(index: number): void {
+    Swal.fire({
+      title: '¿Eliminar adjunto?',
+      text: 'Esta acción no se puede deshacer.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626'
+    }).then(result => {
+      if (!result.isConfirmed) return;
+
+      this.http.delete(`${environment.apiUrl}/analisis-financiero/${this.creditoId}/adjuntos/${index}`, {
+        headers: { 'X-Active-Role': this.activeRole }
+      }).subscribe({
+        next: (data: any) => { this.analisis = data.analisis; },
+        error: (err) => Swal.fire('Error', err.error?.message || 'No se pudo eliminar el adjunto.', 'error')
+      });
+    });
+  }
+
+  urlAdjunto(ruta: string): string {
+    const baseUrl = environment.apiUrl.replace('/api', '');
+    return `${baseUrl}/storage/${ruta}`;
   }
 
   descargar(formato: 'pdf' | 'excel'): void {

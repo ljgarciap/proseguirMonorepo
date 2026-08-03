@@ -15,6 +15,8 @@ use App\Models\TipoCredito;
 use App\Models\TipoPersona;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Passport\Passport;
 use Tests\TestCase;
 
@@ -159,6 +161,21 @@ class AnalisisFinancieroTest extends TestCase
         Passport::actingAs($this->gerente);
         $this->getJson("/api/analisis-financiero/{$credito->id}", ['X-Active-Role' => 'gerente'])
             ->assertStatus(403);
+    }
+
+    // SCRUM-174 — el encabezado (tipo de persona, tipo de crédito,
+    // amortización) debe venir poblado en el detalle, no solo en la bandeja.
+    public function test_show_incluye_tipo_persona_tipo_credito_y_amortizacion_en_el_encabezado(): void
+    {
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->getJson("/api/analisis-financiero/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200);
+        $this->assertEquals('Persona Natural', $response->json('credito.solicitud_credito.cliente.tipo_persona.nombre'));
+        $this->assertEquals('Crédito Ordinario', $response->json('credito.solicitud_credito.tipo_credito.nombre'));
+        $this->assertEquals('Mensual', $response->json('credito.solicitud_credito.amortizacion.nombre'));
     }
 
     public function test_guardar_borrador_no_cambia_estado_del_credito(): void
@@ -382,5 +399,90 @@ class AnalisisFinancieroTest extends TestCase
         $show = $this->getJson("/api/analisis-financiero/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial']);
         $show->assertStatus(200);
         $this->assertEqualsWithDelta(1000, $show->json('calculado.activo.total_activo_corriente.2024'), 0.01);
+    }
+
+    // ---------------------------------------------------------------
+    // SCRUM-175 — adjuntar/eliminar soportes libres en la pestaña Resumen.
+    // ---------------------------------------------------------------
+
+    public function test_subir_adjunto_agrega_el_archivo_a_la_lista(): void
+    {
+        Storage::fake('public');
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+        $archivo = UploadedFile::fake()->create('soporte.pdf', 100, 'application/pdf');
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/analisis-financiero/{$credito->id}/adjuntos", ['archivo' => $archivo], [
+            'X-Active-Role' => 'coordinador_comercial',
+        ]);
+
+        $response->assertStatus(200);
+        $adjuntos = $response->json('analisis.archivos_adjuntos');
+        $this->assertCount(1, $adjuntos);
+        $this->assertEquals('soporte.pdf', $adjuntos[0]['nombre']);
+        $this->assertEquals('Coordinador Test', $adjuntos[0]['subido_por']);
+        Storage::disk('public')->assertExists($adjuntos[0]['ruta']);
+    }
+
+    public function test_subir_adjunto_rechaza_tipo_de_archivo_no_permitido(): void
+    {
+        Storage::fake('public');
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+        $archivo = UploadedFile::fake()->create('virus.exe', 10, 'application/octet-stream');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/analisis-financiero/{$credito->id}/adjuntos", ['archivo' => $archivo], [
+            'X-Active-Role' => 'coordinador_comercial',
+        ])->assertStatus(422);
+    }
+
+    public function test_no_se_puede_adjuntar_a_un_analisis_ya_confirmado(): void
+    {
+        Storage::fake('public');
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+        AnalisisFinanciero::create([
+            'credito_ordinario_id' => $credito->id,
+            'estado' => 'confirmado',
+            'anio_inicial' => 2024,
+            'cantidad_anios' => 2,
+        ]);
+        $archivo = UploadedFile::fake()->create('soporte.pdf', 100, 'application/pdf');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/analisis-financiero/{$credito->id}/adjuntos", ['archivo' => $archivo], [
+            'X-Active-Role' => 'coordinador_comercial',
+        ])->assertStatus(422);
+    }
+
+    public function test_eliminar_adjunto_lo_quita_de_la_lista_y_del_disco(): void
+    {
+        Storage::fake('public');
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+        $archivo = UploadedFile::fake()->create('soporte.pdf', 100, 'application/pdf');
+
+        Passport::actingAs($this->coordinador);
+        $subida = $this->postJson("/api/analisis-financiero/{$credito->id}/adjuntos", ['archivo' => $archivo], [
+            'X-Active-Role' => 'coordinador_comercial',
+        ]);
+        $ruta = $subida->json('analisis.archivos_adjuntos.0.ruta');
+
+        $response = $this->deleteJson("/api/analisis-financiero/{$credito->id}/adjuntos/0", [], [
+            'X-Active-Role' => 'coordinador_comercial',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertCount(0, $response->json('analisis.archivos_adjuntos'));
+        Storage::disk('public')->assertMissing($ruta);
+    }
+
+    public function test_eliminar_adjunto_con_indice_inexistente_falla_404(): void
+    {
+        Storage::fake('public');
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+
+        Passport::actingAs($this->coordinador);
+        $this->deleteJson("/api/analisis-financiero/{$credito->id}/adjuntos/0", [], [
+            'X-Active-Role' => 'coordinador_comercial',
+        ])->assertStatus(404);
     }
 }
