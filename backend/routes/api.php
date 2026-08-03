@@ -206,6 +206,22 @@ Route::prefix('analisis-financiero')->middleware('auth:api')->group(function () 
     Route::get('/{creditoId}/descargar', [\App\Http\Controllers\AnalisisFinancieroController::class, 'descargar']);
 });
 
+// Actas del Comité de Crédito (SCRUM-169)
+Route::prefix('actas-comite')->middleware('auth:api')->group(function () {
+    Route::get('/', [\App\Http\Controllers\ActaComiteController::class, 'index']);
+    Route::post('/generar', [\App\Http\Controllers\ActaComiteController::class, 'generar']);
+    Route::get('/{acta}', [\App\Http\Controllers\ActaComiteController::class, 'show']);
+    Route::put('/{acta}', [\App\Http\Controllers\ActaComiteController::class, 'actualizar']);
+    Route::post('/{acta}/aprobar-orden-dia', [\App\Http\Controllers\ActaComiteController::class, 'aprobarOrdenDia']);
+    Route::post('/{acta}/solicitudes', [\App\Http\Controllers\ActaComiteController::class, 'agregarSolicitud']);
+    Route::put('/{acta}/solicitudes/{solicitud}', [\App\Http\Controllers\ActaComiteController::class, 'actualizarSolicitud']);
+    Route::delete('/{acta}/solicitudes/{solicitud}', [\App\Http\Controllers\ActaComiteController::class, 'eliminarSolicitud']);
+    Route::post('/{acta}/imagenes', [\App\Http\Controllers\ActaComiteController::class, 'subirImagen']);
+    Route::get('/{acta}/previsualizar', [\App\Http\Controllers\ActaComiteController::class, 'previsualizar']);
+    Route::get('/{acta}/descargar', [\App\Http\Controllers\ActaComiteController::class, 'descargar']);
+    Route::post('/{acta}/registrar', [\App\Http\Controllers\ActaComiteController::class, 'registrar']);
+});
+
 // Listas Restrictivas y SARLAFT (SCRUM-128)
 Route::prefix('listas-sarlaft')->middleware('auth:api')->group(function () {
     Route::get('/', [\App\Http\Controllers\ListasRestrictivasSarlaftController::class, 'index']);

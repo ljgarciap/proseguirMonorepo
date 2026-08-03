@@ -257,6 +257,7 @@ export class AppComponent implements OnInit, OnDestroy {
       title: 'Crédito',
       roles: ['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin', 'ingeniero'],
       items: [
+        { label: 'Actas Comité de Crédito', route: '/actas-comite', icon: 'history_edu', roles: ['coordinador_comercial', 'superadmin'] },
         { label: 'Análisis Financiero', route: '/analisis-financiero', icon: 'finance', roles: ['coordinador_comercial', 'superadmin'] },
         { label: 'Crédito Ordinario', route: '/creditos', icon: 'payments', roles: ['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'] },
         { label: 'Informe Técnico', route: '/informes-tecnicos', icon: 'engineering', roles: ['ingeniero', 'coordinador_comercial', 'superadmin'] },

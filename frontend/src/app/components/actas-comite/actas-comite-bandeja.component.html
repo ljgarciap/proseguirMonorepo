@@ -1,0 +1,70 @@
+<div class="view-container">
+  <header class="view-header">
+    <div class="title-area">
+      <h1>Actas Comité de Crédito</h1>
+      <p>Rol: Coordinador Comercial · Gestión del ciclo completo de las actas del Comité de Crédito.</p>
+    </div>
+    <button class="btn-pro primary" [disabled]="generando || hayActaSinRegistrar" (click)="generarActaPendiente()"
+            title="{{ hayActaSinRegistrar ? 'Ya existe un acta pendiente o en borrador. Regístrela antes de generar una nueva.' : '' }}">
+      <span class="material-symbols-outlined">add_circle</span>
+      {{ generando ? 'Generando...' : 'Generar acta pendiente' }}
+    </button>
+  </header>
+
+  <div class="content-card">
+    <h3 class="card-title">Actas registradas</h3>
+    <p class="card-subtitle">El acta pendiente se alimenta automáticamente con créditos activos con análisis financiero finalizado.</p>
+
+    <div class="filters-bar mt-4">
+      <input class="pro-input" type="text" [(ngModel)]="filtroTexto" placeholder="Buscar por número de acta...">
+      <select class="pro-input" [(ngModel)]="filtroEstado">
+        <option value="">Estado: Todos</option>
+        <option value="pendiente">Pendiente</option>
+        <option value="borrador">Borrador</option>
+        <option value="aprobada">Aprobada</option>
+      </select>
+    </div>
+
+    <div class="table-container mt-4">
+      <table class="modern-table">
+        <thead>
+          <tr>
+            <th>N.° Acta</th>
+            <th>Fecha de elaboración</th>
+            <th>Estado</th>
+            <th>Solicitudes incluidas</th>
+            <th>Elaborada por</th>
+            <th class="text-right">Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let acta of actasFiltradas">
+            <td class="id-cell">{{ acta.numero }}</td>
+            <td>{{ acta.created_at | date:'dd/MM/yyyy' }}</td>
+            <td>
+              <span class="status-pill" [ngClass]="{
+                'warning': acta.estado === 'pendiente' || acta.estado === 'borrador',
+                'success': acta.estado === 'aprobada'
+              }">{{ estadoLabel(acta) }}</span>
+            </td>
+            <td>{{ acta.solicitudes_count }}</td>
+            <td>{{ elaboradaPor(acta) }}</td>
+            <td class="text-right actions-cell">
+              <button class="btn-pro sm" [class.primary]="acta.estado !== 'aprobada'" [class.secondary]="acta.estado === 'aprobada'"
+                      [routerLink]="['/actas-comite', acta.id]">
+                <span class="material-symbols-outlined">{{ accionIcono(acta) }}</span>
+                {{ accionLabel(acta) }}
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="actasFiltradas.length === 0 && !loading">
+            <td colspan="6" class="text-center py-4 text-muted">No existen actas registradas.</td>
+          </tr>
+          <tr *ngIf="loading">
+            <td colspan="6" class="text-center py-4">Cargando bandeja de Actas Comité...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
