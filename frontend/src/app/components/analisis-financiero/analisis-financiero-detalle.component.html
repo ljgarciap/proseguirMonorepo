@@ -620,6 +620,43 @@
         </div>
       </div>
 
+      <!-- SCRUM-175: adjuntar soportes libres (no atados a un preset de documentación) -->
+      <div class="content-card mt-4">
+        <h4 class="section-subtitle">Archivos adjuntos</h4>
+
+        <table class="modern-table minimal mt-2" *ngIf="analisis?.archivos_adjuntos?.length">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Subido por</th>
+              <th>Fecha</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let adj of analisis.archivos_adjuntos; let i = index">
+              <td><a [href]="urlAdjunto(adj.ruta)" target="_blank" rel="noopener">{{ adj.nombre }}</a></td>
+              <td>{{ adj.subido_por }}</td>
+              <td>{{ adj.subido_en }}</td>
+              <td>
+                <button class="btn-pro secondary sm" *ngIf="puedeEditar" (click)="eliminarAdjunto(i)" title="Eliminar adjunto">
+                  <span class="material-symbols-outlined">delete</span>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p *ngIf="!analisis?.archivos_adjuntos?.length" class="card-subtitle">No hay archivos adjuntos.</p>
+
+        <div class="mt-2" *ngIf="puedeEditar">
+          <input type="file" id="file-adjunto-af" (change)="subirAdjunto($event)" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" hidden [disabled]="subiendoAdjunto">
+          <label for="file-adjunto-af" class="btn-pro secondary sm btn-upload">
+            <span class="material-symbols-outlined">attach_file</span> {{ subiendoAdjunto ? 'Subiendo...' : 'Adjuntar archivo' }}
+          </label>
+        </div>
+      </div>
+
       <div class="form-footer mt-4" *ngIf="puedeEditar">
         <button class="btn-pro secondary" (click)="guardarBorrador()">
           <span class="material-symbols-outlined">save</span> Guardar Borrador

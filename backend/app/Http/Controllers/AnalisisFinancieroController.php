@@ -11,6 +11,7 @@ use App\Services\ConfiguracionService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
 /**
@@ -203,6 +204,75 @@ class AnalisisFinancieroController extends Controller
             'analisis' => $analisis->fresh(),
             'calculado' => $this->calcularTodo($analisis->fresh()),
         ]);
+    }
+
+    /**
+     * SCRUM-175 — adjuntar un soporte libre en la pestaña Resumen (no está
+     * atado a un preset de documentación, a diferencia de los documentos de
+     * SolicitudCredito/CreditoOrdinario). Se acumulan en
+     * analisis.archivos_adjuntos, mismo gate de edición que guardarBorrador.
+     */
+    public function subirAdjunto(Request $request, $creditoId)
+    {
+        $credito = $this->findCredito($creditoId);
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarRol($activeRole);
+
+        if ($credito->analisisFinanciero?->estado === 'confirmado') {
+            return response()->json(['message' => 'El análisis financiero ya fue confirmado.'], 422);
+        }
+
+        $request->validate([
+            'archivo' => 'required|file|max:20480|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png',
+        ]);
+
+        $analisis = $credito->analisisFinanciero ?? AnalisisFinanciero::create([
+            'credito_ordinario_id' => $credito->id,
+            'estado' => 'borrador',
+        ]);
+
+        $file = $request->file('archivo');
+        $nombreOriginal = $file->getClientOriginalName();
+        $nombreAlmacenado = uniqid() . '_' . $nombreOriginal;
+        $ruta = $file->storeAs('analisis_financiero_adjuntos/' . $credito->id, $nombreAlmacenado, 'public');
+
+        $adjuntos = $analisis->archivos_adjuntos ?? [];
+        $adjuntos[] = [
+            'nombre' => $nombreOriginal,
+            'ruta' => $ruta,
+            'tamano' => $file->getSize(),
+            'subido_por' => Auth::user()->name,
+            'subido_en' => now()->toDateTimeString(),
+        ];
+        $analisis->archivos_adjuntos = $adjuntos;
+        $analisis->save();
+
+        return response()->json(['analisis' => $analisis->fresh()]);
+    }
+
+    public function eliminarAdjunto(Request $request, $creditoId, $index)
+    {
+        $credito = $this->findCredito($creditoId);
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarRol($activeRole);
+
+        if ($credito->analisisFinanciero?->estado === 'confirmado') {
+            return response()->json(['message' => 'El análisis financiero ya fue confirmado.'], 422);
+        }
+
+        $analisis = $credito->analisisFinanciero;
+        $adjuntos = $analisis?->archivos_adjuntos ?? [];
+
+        if (!isset($adjuntos[$index])) {
+            abort(404, 'Adjunto no encontrado.');
+        }
+
+        Storage::disk('public')->delete($adjuntos[$index]['ruta']);
+        unset($adjuntos[$index]);
+        $analisis->archivos_adjuntos = array_values($adjuntos);
+        $analisis->save();
+
+        return response()->json(['analisis' => $analisis->fresh()]);
     }
 
     public function descargar(Request $request, $creditoId)
