@@ -310,6 +310,12 @@
   width: 100%;
 }
 
+/* SCRUM-182: campos numéricos (moneda y number) alineados a la derecha */
+.items-table input[type="number"],
+.items-table input[inputmode="decimal"] {
+  text-align: right;
+}
+
 .items-table .pct-cell {
   color: #64748b;
   font-variant-numeric: tabular-nums;
