@@ -257,24 +257,21 @@
                  en la bandeja dedicada (Oficial de Cumplimiento) antes de llegar
                  acá — este estado solo cubre el análisis financiero comercial. -->
             <div *ngIf="selectedCredito.estado === 'pendiente_analisis_financiero'">
-              <p class="action-instructions">Sube los PDFs de análisis financiero requeridos para continuar:</p>
+              <p class="action-instructions">Completa el Análisis Financiero (módulo dedicado) y carga la Presentación del Comité para continuar:</p>
 
               <div class="parallel-actions-grid">
                 <!-- Coordinador Comercial Area -->
                 <div class="role-action-box" [class.active]="activeRole === 'coordinador_comercial' || activeRole === 'superadmin'">
                   <h5>📈 Coordinador Comercial</h5>
-                  <p>Debe elaborar la Planilla de Análisis Financiero y la Presentación del Comité.</p>
+                  <p>Debe confirmar el Análisis Financiero (módulo "Análisis Financiero") y cargar la Presentación del Comité.</p>
 
                   <div class="upload-controls">
                     <div class="upload-item">
-                      <label>1. Planilla de Análisis Financiero (PDF)</label>
-                      <input type="file" id="file-analisis" (change)="onFileUpload($event, 'analisis_financiero')"
-                             [disabled]="!(activeRole === 'coordinador_comercial' || activeRole === 'superadmin')" accept=".pdf" class="file-input-hide">
-                      <label for="file-analisis" class="btn-pro secondary sm btn-upload">
-                        <span class="material-symbols-outlined">upload</span>
-                        {{ selectedCredito.documentos?.analisis_financiero ? 'Reemplazar Análisis' : 'Cargar Análisis' }}
-                      </label>
-                      <span class="file-status" *ngIf="selectedCredito.documentos?.analisis_financiero">✅ Cargado</span>
+                      <label>1. Análisis Financiero</label>
+                      <span class="file-status" *ngIf="selectedCredito.analisis_financiero?.estado === 'confirmado'; else analisisPendienteTpl">✅ Confirmado</span>
+                      <ng-template #analisisPendienteTpl>
+                        <span class="file-status">⏳ Pendiente — se diligencia en el módulo Análisis Financiero</span>
+                      </ng-template>
                     </div>
 
                     <div class="upload-item">
@@ -291,10 +288,10 @@
                 </div>
               </div>
 
-              <div class="transition-trigger-box" *ngIf="selectedCredito.documentos?.analisis_financiero && selectedCredito.documentos?.presentacion_comite">
+              <div class="transition-trigger-box" *ngIf="selectedCredito.analisis_financiero?.estado === 'confirmado' && selectedCredito.documentos?.presentacion_comite">
                 <div class="info-alert">
                   <span class="material-symbols-outlined">info</span>
-                  <p>Todos los documentos requeridos de análisis financiero han sido cargados con éxito. Procede a confirmar el paso a Gerencia.</p>
+                  <p>Análisis financiero confirmado y presentación cargada con éxito. Procede a confirmar el paso a Gerencia.</p>
                 </div>
                 <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Análisis financiero completado con éxito.')">
                   Enviar a Aprobación de Gerencia
@@ -639,24 +636,15 @@
               <!-- Análisis Financiero -->
               <div class="doc-box-new">
                 <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.analisis_financiero">analytics</span>
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.analisis_financiero?.estado === 'confirmado'">analytics</span>
                   <div class="doc-title-desc">
                     <h5>Análisis Financiero de Solicitud</h5>
-                    <p>Cálculo de capacidad de endeudamiento. Responsable: Coordinador Comercial.</p>
+                    <p>Cálculo de capacidad de endeudamiento. Se diligencia en el módulo Análisis Financiero. Responsable: Coordinador Comercial.</p>
                   </div>
                 </div>
                 <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.analisis_financiero">Cargado</span>
-                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.analisis_financiero">Pendiente</span>
-
-                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'pendiente_analisis_financiero' && (activeRole === 'coordinador_comercial' || activeRole === 'superadmin')">
-                    <input type="file" id="inline-file-analisis" (change)="onFileUpload($event, 'analisis_financiero')" accept=".pdf" hidden>
-                    <label for="inline-file-analisis" class="btn-inline-upload">Subir</label>
-                  </div>
-
-                  <a *ngIf="selectedCredito.documentos?.analisis_financiero" [href]="selectedCredito.documentos.analisis_financiero" target="_blank" class="btn-view-doc">
-                    <span class="material-symbols-outlined">open_in_new</span> Ver
-                  </a>
+                  <span class="doc-status-pill success" *ngIf="selectedCredito.analisis_financiero?.estado === 'confirmado'">Confirmado</span>
+                  <span class="doc-status-pill error" *ngIf="selectedCredito.analisis_financiero?.estado !== 'confirmado'">Pendiente</span>
                 </div>
               </div>
 
