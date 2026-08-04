@@ -16,8 +16,12 @@ use Illuminate\Support\Facades\Storage;
  * SCRUM-169 — Actas del Comité de Crédito. Módulo independiente: registrar
  * un acta NO modifica el estado de CreditoOrdinario ni satisface
  * 'acta_comite_firmada' (decisión explícita de Luis, 2026-08-02 — ver
- * docs/specs/scrum-169-actas-comite-credito.md). Solo Crédito Ordinario
- * está en alcance.
+ * docs/specs/scrum-169-actas-comite-credito.md). La elegibilidad depende
+ * únicamente de CreditoOrdinario.estado === 'comite_evaluacion', sin
+ * distinguir tipo de crédito (decisión revisada 2026-08-04, SCRUM-183:
+ * Constructor también pasa por el módulo de Análisis Financiero y llega
+ * a este estado igual que Ordinario — la exclusión original asumía lo
+ * contrario).
  */
 class ActaComiteController extends Controller
 {

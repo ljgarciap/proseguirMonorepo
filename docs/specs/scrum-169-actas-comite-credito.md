@@ -20,9 +20,13 @@ modelo `ActaComite` relacionado con `CreditoOrdinario` a través de una tabla pi
 admite solicitudes agregadas manualmente (créditos que no existen en el sistema).
 
 Decisiones ya tomadas con Luis (2026-08-02):
-- **Alcance de créditos**: solo **Crédito Ordinario**. Constructor y Factoring quedan fuera de
-  esta versión — no tienen hoy un módulo de Análisis Financiero equivalente para calcular
-  elegibilidad.
+- **Alcance de créditos**: ~~solo Crédito Ordinario. Constructor y Factoring quedan fuera de esta
+  versión — no tienen hoy un módulo de Análisis Financiero equivalente para calcular
+  elegibilidad.~~ **Revisado 2026-08-04 (SCRUM-183)**: la premisa era incorrecta — Constructor sí
+  pasa por el mismo módulo de Análisis Financiero y por la misma máquina de estados de
+  `CreditoOrdinario`, así que también puede llegar a `comite_evaluacion`. Luis confirmó incluirlo:
+  la elegibilidad no filtra por tipo de crédito. Factoring sigue sin tipo seedeado en el sistema,
+  por lo que la pregunta no aplica todavía.
 - **Formato de salida**: solo **PDF**, vía `dompdf` (mismo patrón que Análisis Financiero e
   Informe Técnico — `Pdf::loadView(...)->download(...)`). No se agrega generación de `.docx`
   real; el texto "Word" del ticket se interpreta como PDF descargable.
@@ -188,7 +192,9 @@ sugerencia.
 - Generación de Word (`.docx`) real — solo PDF.
 - Firma electrónica o captura de firma manuscrita — "Firmantes" es solo registro de
   nombre + rol en texto, no un mecanismo de firma digital.
-- Constructor y Factoring como tipos de crédito elegibles.
+- ~~Constructor y Factoring como tipos de crédito elegibles~~ — revisado 2026-08-04 (SCRUM-183):
+  Constructor sí es elegible, ver decisión de alcance arriba. Factoring sigue sin tipo seedeado en
+  el sistema.
 - Integración con el workflow de `CreditoOrdinario` (el registro del acta no avanza
   automáticamente el estado del crédito ni reemplaza `acta_comite_firmada`).
 - Notificaciones/recordatorios automáticos de reunión de comité.
