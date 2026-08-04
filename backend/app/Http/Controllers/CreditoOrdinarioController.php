@@ -97,6 +97,40 @@ class CreditoOrdinarioController extends Controller
     }
 
     /**
+     * Determina si un documento de Etapa 1 (clave 'req_item_{id}' del preset,
+     * o clave fija legacy) ya está satisfecho. SCRUM-176: hay dos caminos de
+     * carga válidos que antes no se hablaban entre sí —
+     * a) directo en credito.documentos, vía el widget "Subir" dentro de
+     *    Crédito Ordinario / Mis Créditos (este mismo transition()), o
+     * b) el portal "Mis Cargas" (ClientUploadController), que es el nav más
+     *    visible del cliente y el que nombra el documento exacto requerido,
+     *    pero solo deja rastro en DocumentRequestItem.estado — nunca en
+     *    documentos_raw. Antes solo se miraba (a), así que una carga hecha
+     *    por (b) nunca destrababa la etapa: el crédito quedaba atascado en
+     *    'Faltan documentos obligatorios' para siempre, sin ningún error
+     *    visible ni para el cliente (ve "Carga Exitosa") ni para el
+     *    Coordinador. No se exige que el item llegue a 'aprobado' (eso
+     *    requeriría el circuito completo de validar+aprobar de Operativo,
+     *    ajeno a esta pantalla) — basta con que el cliente ya haya subido
+     *    algo ('subido' en adelante, distinto de 'pendiente'/'rechazado').
+     */
+    private function etapa1KeySatisfecha(string $key, array $documentos, CreditoOrdinario $credito): bool
+    {
+        $valor = $documentos[$key] ?? null;
+        if (is_array($valor) ? count($valor) > 0 : !empty($valor)) {
+            return true;
+        }
+
+        if (str_starts_with($key, 'req_item_')) {
+            $itemId = (int) substr($key, strlen('req_item_'));
+            $item = $credito->solicitudCredito?->documentRequest?->items?->firstWhere('id', $itemId);
+            return $item && !in_array($item->estado, ['pendiente', 'rechazado'], true);
+        }
+
+        return false;
+    }
+
+    /**
      * Procesar transición de estado y carga de archivos según el rol activo
      */
     public function transition(Request $request, $id)
@@ -293,10 +327,9 @@ class CreditoOrdinarioController extends Controller
                     // pasa directo a Informe Técnico (no a SARLAFT, que en
                     // Constructor corre después del Informe Técnico).
                     if ($accion === 'aprobar') {
-                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(function ($key) use ($documentos) {
-                            $valor = $documentos[$key] ?? null;
-                            return is_array($valor) ? count($valor) > 0 : !empty($valor);
-                        });
+                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(
+                            fn ($key) => $this->etapa1KeySatisfecha($key, $documentos, $credito)
+                        );
 
                         if ($hasEtapa1) {
                             $estadoNuevo = 'informe_tecnico_ingeniero';
@@ -312,10 +345,9 @@ class CreditoOrdinarioController extends Controller
                     // etapa: solo el Coordinador Comercial, con 'aprobar' explícito,
                     // decide que el expediente inicial está completo.
                     if ($accion === 'aprobar') {
-                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(function ($key) use ($documentos) {
-                            $valor = $documentos[$key] ?? null;
-                            return is_array($valor) ? count($valor) > 0 : !empty($valor);
-                        });
+                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(
+                            fn ($key) => $this->etapa1KeySatisfecha($key, $documentos, $credito)
+                        );
 
                         if ($hasEtapa1) {
                             $estadoNuevo = 'sarlaft_control_interno';
