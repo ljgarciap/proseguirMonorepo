@@ -25,6 +25,10 @@ class CreditoOrdinario extends Model
         'sarlaft_observaciones',
         'sarlaft_diligenciado_por_id',
         'sarlaft_diligenciado_at',
+        'solicitud_gestionada',
+        'fecha_gestion',
+        'resultado_origen',
+        'gestion_detalle',
     ];
 
     /**
@@ -42,6 +46,9 @@ class CreditoOrdinario extends Model
             'solicitud_credito_id' => 'integer',
             'sarlaft_diligenciado_por_id' => 'integer',
             'sarlaft_diligenciado_at' => 'datetime',
+            'solicitud_gestionada' => 'boolean',
+            'fecha_gestion' => 'datetime',
+            'gestion_detalle' => 'array',
         ];
     }
 
@@ -144,6 +151,18 @@ class CreditoOrdinario extends Model
     public function sarlaftDiligenciadoPor()
     {
         return $this->belongsTo(User::class, 'sarlaft_diligenciado_por_id');
+    }
+
+    /**
+     * Solicitudes de Acta de Comité en las que apareció este crédito
+     * (SCRUM-169/178). Puede haber más de una si el crédito volvió a
+     * evaluarse en una acta posterior — Gestión de Créditos usa la más
+     * reciente con acta ya registrada para resolver fecha/observaciones
+     * de la decisión del Comité.
+     */
+    public function actaComiteSolicitudes()
+    {
+        return $this->hasMany(ActaComiteSolicitud::class, 'credito_ordinario_id');
     }
 
     public static function iniciar(

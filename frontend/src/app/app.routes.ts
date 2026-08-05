@@ -176,6 +176,18 @@ export const routes: Routes = [
         data: { roles: ['oficial_cumplimiento', 'superadmin'] }
     },
     {
+        path: 'gestion-creditos',
+        loadComponent: () => import('./components/gestion-creditos/gestion-creditos-bandeja.component').then(m => m.GestionCreditosBandejaComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['coordinador_comercial', 'superadmin'] }
+    },
+    {
+        path: 'gestion-creditos/:creditoId',
+        loadComponent: () => import('./components/gestion-creditos/gestion-creditos-detalle.component').then(m => m.GestionCreditosDetalleComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['coordinador_comercial', 'superadmin'] }
+    },
+    {
         path: 'db-cleaner',
         loadComponent: () => import('./components/db-cleaner/db-cleaner.component').then(m => m.DbCleanerComponent),
         canActivate: [roleGuard],

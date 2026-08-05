@@ -13,15 +13,20 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * SCRUM-169 — Actas del Comité de Crédito. Módulo independiente: registrar
- * un acta NO modifica el estado de CreditoOrdinario ni satisface
- * 'acta_comite_firmada' (decisión explícita de Luis, 2026-08-02 — ver
- * docs/specs/scrum-169-actas-comite-credito.md). La elegibilidad depende
+ * SCRUM-169 — Actas del Comité de Crédito. La elegibilidad depende
  * únicamente de CreditoOrdinario.estado === 'comite_evaluacion', sin
  * distinguir tipo de crédito (decisión revisada 2026-08-04, SCRUM-183:
  * Constructor también pasa por el módulo de Análisis Financiero y llega
  * a este estado igual que Ordinario — la exclusión original asumía lo
  * contrario).
+ *
+ * SCRUM-178 (2026-08-04): registrar() SÍ mueve CreditoOrdinario.estado
+ * ahora (ver sincronizarCreditosOrdinarios()) — esto completa la
+ * integración que el diseño original de SCRUM-169 dejó explícitamente
+ * pendiente ("independiente por ahora", ver
+ * docs/specs/scrum-169-actas-comite-credito.md). El botón manual
+ * aprobar/rechazar de CreditoOrdinarioController para 'comite_evaluacion'
+ * quedó retirado — la única salida de ese estado es esta.
  */
 class ActaComiteController extends Controller
 {
@@ -352,15 +357,86 @@ class ActaComiteController extends Controller
             ], 422);
         }
 
-        $acta->estado = 'aprobada';
-        $acta->registrada_por_id = $user->id;
-        $acta->registrada_at = now();
-        $acta->save();
+        DB::transaction(function () use ($acta, $user) {
+            $acta->estado = 'aprobada';
+            $acta->registrada_por_id = $user->id;
+            $acta->registrada_at = now();
+            $acta->save();
+
+            $this->sincronizarCreditosOrdinarios($acta);
+        });
 
         return response()->json([
             'message' => 'El acta fue registrada correctamente y quedó disponible para consulta y descarga.',
             'acta' => $acta->fresh()->load('solicitudes'),
         ]);
+    }
+
+    /**
+     * SCRUM-178 — registrar el acta es lo que efectivamente mueve
+     * CreditoOrdinario.estado según la decisión tomada por solicitud
+     * (integración que SCRUM-169 dejó deliberadamente pendiente el
+     * 2026-08-02, ver docs/specs/scrum-169-actas-comite-credito.md). Las
+     * solicitudes agregadas manualmente (sin credito_ordinario_id, créditos
+     * que no existen en el sistema) se ignoran, igual que en el resto del
+     * módulo.
+     *
+     * Se copia el PDF del acta a documentos_raw['acta_comite_firmada'] para
+     * no perder la continuidad documental ahora que ese slot ya no bloquea
+     * el avance del estado (ver diseño §2, caso borde "acta_comite_firmada").
+     */
+    private function sincronizarCreditosOrdinarios(ActaComite $acta): void
+    {
+        $mapaDecision = [
+            'aprobado'  => ['estado' => 'aprobada_garantias', 'origen' => 'comite_aprobado'],
+            'rechazado' => ['estado' => 'rechazado', 'origen' => 'comite_rechazado'],
+            'pendiente' => ['estado' => 'pendiente_comite', 'origen' => 'comite_pendiente'],
+        ];
+
+        $solicitudesConCredito = $acta->solicitudes()->whereNotNull('credito_ordinario_id')->get();
+        if ($solicitudesConCredito->isEmpty()) {
+            return;
+        }
+
+        $pdfPath = "actas-comite/{$acta->id}/acta-comite-{$acta->numero}-firmada.pdf";
+        Storage::disk('public')->put($pdfPath, $this->generarPdf($acta)->output());
+
+        foreach ($solicitudesConCredito as $solicitud) {
+            $mapeo = $mapaDecision[$solicitud->estado_decision] ?? null;
+            $credito = CreditoOrdinario::find($solicitud->credito_ordinario_id);
+
+            // Defensivo: si el crédito ya no está en comite_evaluacion (por
+            // ejemplo, otra acta ya lo movió), no lo tocamos de nuevo.
+            if (!$mapeo || !$credito || $credito->estado !== 'comite_evaluacion') {
+                continue;
+            }
+
+            $estadoAnterior = $credito->estado;
+
+            // Caso borde de re-decisión: si ya estaba gestionado, una nueva
+            // decisión implica una nueva gestión pendiente.
+            $credito->solicitud_gestionada = false;
+            $credito->fecha_gestion = null;
+            $credito->resultado_origen = $mapeo['origen'];
+            $credito->estado = $mapeo['estado'];
+
+            $documentos = $credito->documentos_raw ?? [];
+            $documentos['acta_comite_firmada'] = $pdfPath;
+            $credito->documentos = $documentos;
+
+            $historial = $credito->historial_estados ?? [];
+            $historial[] = [
+                'fecha' => now()->toIso8601String(),
+                'usuario' => 'Acta de Comité N.° ' . $acta->numero,
+                'rol' => 'comite_credito',
+                'estado_anterior' => $estadoAnterior,
+                'estado_nuevo' => $mapeo['estado'],
+                'comentario' => 'Decisión registrada en el Acta de Comité N.° ' . $acta->numero . ': ' . $solicitud->estado_decision . '.',
+            ];
+            $credito->historial_estados = $historial;
+
+            $credito->save();
+        }
     }
 
     private function ordenDiaInicial(?ActaComite $ultimaAprobada): array

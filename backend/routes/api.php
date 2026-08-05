@@ -232,6 +232,14 @@ Route::prefix('listas-sarlaft')->middleware('auth:api')->group(function () {
     Route::post('/{creditoId}/finalizar', [\App\Http\Controllers\ListasRestrictivasSarlaftController::class, 'finalizar']);
 });
 
+// Gestión de Créditos (SCRUM-178)
+Route::prefix('gestion-creditos')->middleware(['auth:api', 'checkrole:superadmin,coordinador_comercial'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\GestionCreditoController::class, 'index']);
+    Route::get('/tarjetas', [\App\Http\Controllers\GestionCreditoController::class, 'tarjetas']);
+    Route::get('/{creditoId}', [\App\Http\Controllers\GestionCreditoController::class, 'show']);
+    Route::post('/{creditoId}/notificar', [\App\Http\Controllers\GestionCreditoController::class, 'notificar']);
+});
+
 // Registro de Solicitudes de Crédito
 Route::prefix('solicitudes-credito')->middleware('auth:api')->group(function () {
     Route::get('/pendientes', [\App\Http\Controllers\SolicitudCreditoController::class, 'indexPending'])

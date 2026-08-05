@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesActiveRole;
-use App\Mail\SarlaftDesfavorableClienteMail;
 use App\Mail\SarlaftDesfavorableCoordinadorMail;
 use App\Models\CreditoOrdinario;
 use App\Models\User;
@@ -137,6 +136,10 @@ class ListasRestrictivasSarlaftController extends Controller
         $estadoAnterior = $credito->estado;
         $estadoNuevo = $concepto === 'favorable' ? 'pendiente_analisis_financiero' : 'rechazado';
 
+        if ($concepto === 'desfavorable') {
+            $credito->resultado_origen = 'sarlaft';
+        }
+
         $historial = $credito->historial_estados ?? [];
         $historial[] = [
             'fecha' => now()->toIso8601String(),
@@ -258,13 +261,16 @@ class ListasRestrictivasSarlaftController extends Controller
         }
     }
 
+    /**
+     * SCRUM-178: el correo al cliente ya NO se envía automáticamente acá —
+     * pasa a depender de que el Coordinador Comercial lo gestione desde la
+     * bandeja Gestión de Créditos (redacta asunto/mensaje y dispara el
+     * envío manualmente). Este método solo avisa internamente a los
+     * Coordinadores que hay un nuevo resultado desfavorable por gestionar.
+     */
     private function notificarDesfavorable(CreditoOrdinario $credito): void
     {
         $credito->loadMissing('cliente');
-
-        if ($credito->cliente && $credito->cliente->email) {
-            Mail::to($credito->cliente->email)->send(new SarlaftDesfavorableClienteMail($credito));
-        }
 
         $coordinadores = User::whereJsonContains('roles', 'coordinador_comercial')->pluck('email')->filter()->all();
         if (!empty($coordinadores)) {

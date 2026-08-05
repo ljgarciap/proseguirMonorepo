@@ -156,6 +156,19 @@ class CreditoOrdinarioController extends Controller
         // Bypassear validaciones estrictas de rol si es superadmin (para facilitar pruebas)
         $isAuthorized = ($activeRole === 'superadmin');
 
+        // SCRUM-178: 'comite_evaluacion' ya no se transiciona manualmente
+        // desde acá — la única salida de ese estado es registrar el Acta de
+        // Comité (ActaComiteController::registrar()), que decide
+        // aprobado/rechazado/pendiente por solicitud. Cortamos temprano con
+        // un mensaje explícito en vez de dejar caer en el mapa de roles
+        // genérico de abajo (que, sin una entrada para este estado, dejaría
+        // pasar a cualquier rol).
+        if ($estadoActual === 'comite_evaluacion' && !$isAuthorized) {
+            return response()->json([
+                'message' => 'Esta transición ahora se ejecuta desde Actas de Comité al registrar el acta.',
+            ], 422);
+        }
+
         // Mapa de roles autorizados por estado para transiciones
         $rolesAutorizados = [
             'validacion_documental_constructor' => ['coordinador_comercial', 'cliente'],
@@ -164,7 +177,9 @@ class CreditoOrdinarioController extends Controller
             'completar_solicitud' => ['cliente'],
             'pendiente_analisis_financiero' => ['coordinador_comercial'],
             'aprobacion_presentacion' => ['gerente'],
-            'comite_evaluacion' => ['comite_credito'],
+            // 'comite_evaluacion' ya NO tiene rol autorizado acá: SCRUM-178
+            // retiró el botón manual de aprobar/rechazar — la única salida
+            // de ese estado es ActaComiteController::registrar().
             'formalizacion_garantias' => ['coordinador_comercial', 'cliente', 'operativo'],
             'aprobacion_registro_cyf' => ['coordinador_comercial', 'gerente'],
             'desembolso_ingreso' => ['operativo'],
@@ -263,6 +278,11 @@ class CreditoOrdinarioController extends Controller
                 $estadoNuevo = 'pendiente_analisis_financiero';
                 $comentario = 'Presentación rechazada por Gerencia. Retorna a análisis financiero. ' . $comentario;
             } elseif ($estadoActual === 'comite_evaluacion') {
+                // SCRUM-178: solo alcanzable por superadmin (el guard de más
+                // arriba bloquea a comite_credito). Se conserva como vía de
+                // escape manual; el camino normal es Actas de Comité, que
+                // además setea resultado_origen/gestión — este atajo no lo
+                // hace.
                 $estadoNuevo = 'rechazado';
                 $comentario = 'Crédito rechazado formalmente por el Comité de Crédito. ' . $comentario;
             } elseif ($estadoActual === 'formalizacion_garantias') {
@@ -289,6 +309,7 @@ class CreditoOrdinarioController extends Controller
             }
         } elseif ($accion === 'devolver') {
             if ($estadoActual === 'comite_evaluacion') {
+                // SCRUM-178: solo alcanzable por superadmin, ver nota en la rama 'rechazar'.
                 // Returns to Gerente Presentation approval (Revision e Aprobacion de Presentacion)
                 $estadoNuevo = 'aprobacion_presentacion';
                 $comentario = 'Crédito devuelto por el Comité para corrección de la presentación. ' . $comentario;
@@ -398,6 +419,7 @@ class CreditoOrdinarioController extends Controller
                     break;
 
                 case 'comite_evaluacion':
+                    // SCRUM-178: solo alcanzable por superadmin, ver nota en la rama 'rechazar'.
                     if ($accion === 'aprobar' && !empty($documentos['acta_comite_firmada'])) {
                         $estadoNuevo = 'formalizacion_garantias';
                         $comentario = 'Crédito aprobado por el Comité y Acta firmada cargada. Pasa a formalización de garantías.';
