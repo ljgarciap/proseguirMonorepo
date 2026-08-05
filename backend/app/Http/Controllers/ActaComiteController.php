@@ -86,7 +86,9 @@ class ActaComiteController extends Controller
 
         if ($creditosElegibles->isEmpty()) {
             return response()->json([
-                'message' => 'No existen créditos en estado Pendiente con análisis financiero realizado para incluir en el acta.',
+                'message' => 'No hay créditos listos para el Comité todavía. Tener el Análisis Financiero confirmado no es suficiente: '
+                    . 'también hace falta cargar la Presentación para el Comité y que Gerencia la apruebe.',
+                'casi_listos' => $this->creditosCasiListos(),
             ], 422);
         }
 
@@ -437,6 +439,46 @@ class ActaComiteController extends Controller
 
             $credito->save();
         }
+    }
+
+    /**
+     * SCRUM-183 (2026-08-05, comentario de Juan): el mensaje de "no hay
+     * créditos" no distinguía entre "nadie ha hecho nada" y "hay créditos
+     * con Análisis Financiero confirmado que quedaron a mitad de camino"
+     * — Análisis Financiero confirmado solo habilita
+     * 'pendiente_analisis_financiero'; para llegar a 'comite_evaluacion'
+     * (el único estado elegible) todavía faltan la Presentación para el
+     * Comité (upload manual, ver CreditoOrdinarioController case
+     * 'pendiente_analisis_financiero') y la aprobación de Gerencia sobre
+     * esa presentación (estado 'aprobacion_presentacion'). Esta lista
+     * resuelve, para cada crédito "casi listo", exactamente cuál de los
+     * dos pasos falta, para que el mensaje deje de ser un callejón sin
+     * salida.
+     */
+    private function creditosCasiListos()
+    {
+        return CreditoOrdinario::whereIn('estado', ['pendiente_analisis_financiero', 'aprobacion_presentacion'])
+            ->whereHas('analisisFinanciero', fn ($q) => $q->where('estado', 'confirmado'))
+            ->with(['solicitudCredito.cliente'])
+            ->get()
+            ->map(function (CreditoOrdinario $credito) {
+                $faltantes = [];
+                if (empty($credito->documentos['presentacion_comite'] ?? null)) {
+                    $faltantes[] = 'Cargar la Presentación para el Comité de Crédito';
+                }
+                if ($credito->estado !== 'aprobacion_presentacion') {
+                    $faltantes[] = 'Aprobación de Gerencia sobre la presentación';
+                }
+
+                return [
+                    'numero_solicitud' => $credito->numero_solicitud,
+                    'cliente' => $credito->solicitudCredito?->cliente?->nombre
+                        ?? $credito->solicitudCredito?->cliente?->nombre_razon_social,
+                    'estado' => $credito->estado,
+                    'falta' => $faltantes,
+                ];
+            })
+            ->values();
     }
 
     private function ordenDiaInicial(?ActaComite $ultimaAprobada): array

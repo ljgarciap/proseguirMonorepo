@@ -98,7 +98,58 @@ class ActaComiteTest extends TestCase
         Passport::actingAs($this->coordinador);
         $this->postJson('/api/actas-comite/generar', [], ['X-Active-Role' => 'coordinador_comercial'])
             ->assertStatus(422)
-            ->assertJsonFragment(['message' => 'No existen créditos en estado Pendiente con análisis financiero realizado para incluir en el acta.']);
+            ->assertJsonFragment([
+                'message' => 'No hay créditos listos para el Comité todavía. Tener el Análisis Financiero confirmado no es suficiente: '
+                    . 'también hace falta cargar la Presentación para el Comité y que Gerencia la apruebe.',
+            ])
+            ->assertJsonPath('casi_listos', []);
+    }
+
+    /**
+     * SCRUM-183 (2026-08-05): el mensaje de "no hay créditos" ahora lista
+     * los créditos con Análisis Financiero confirmado que quedaron a
+     * mitad de camino (falta Presentación Comité y/o aprobación de
+     * Gerencia), en vez de dejar la impresión de que nada avanzó.
+     */
+    public function test_generar_falla_con_casi_listos_lista_lo_que_falta(): void
+    {
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clienteNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->tipoOrdinario->id,
+            'monto_solicitado' => 30000000,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'garantia' => 'Pagaré',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'acta.cliente@test.com',
+            'asunto_notificacion' => 'Documentación',
+            'mensaje_notificacion' => 'Adjunta los archivos.',
+        ]);
+        $credito = CreditoOrdinario::create([
+            'numero_solicitud' => 'CO-TEST-CASILISTO',
+            'cliente_id' => $this->clienteNatural->id,
+            'solicitud_credito_id' => $solicitud->id,
+            'monto' => 30000000,
+            'plazo_meses' => 12,
+            'estado' => 'pendiente_analisis_financiero',
+            'documentos' => [],
+        ]);
+        \App\Models\AnalisisFinanciero::create([
+            'credito_ordinario_id' => $credito->id,
+            'estado' => 'confirmado',
+        ]);
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson('/api/actas-comite/generar', [], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(422);
+
+        $casiListos = $response->json('casi_listos');
+        $this->assertCount(1, $casiListos);
+        $this->assertSame('CO-TEST-CASILISTO', $casiListos[0]['numero_solicitud']);
+        $this->assertContains('Cargar la Presentación para el Comité de Crédito', $casiListos[0]['falta']);
+        $this->assertContains('Aprobación de Gerencia sobre la presentación', $casiListos[0]['falta']);
     }
 
     public function test_generar_crea_acta_con_creditos_elegibles(): void

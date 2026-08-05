@@ -52,7 +52,9 @@ class ListasRestrictivasSarlaftController extends Controller
 
     /**
      * Detalle solo lectura: datos completos del cliente (natural o jurídica)
-     * y del crédito solicitado. Solo Oficial de Cumplimiento/superadmin.
+     * y del crédito solicitado. Oficial de Cumplimiento/superadmin pueden
+     * editar; Coordinador Comercial puede consultarlo (SCRUM-184) pero
+     * queda en solo lectura por autorizarAccion().
      */
     public function show(Request $request, $creditoId)
     {
@@ -237,7 +239,10 @@ class ListasRestrictivasSarlaftController extends Controller
 
     private function autorizarVisualizacion(string $activeRole): void
     {
-        if ($activeRole === 'superadmin' || $activeRole === 'oficial_cumplimiento') {
+        // SCRUM-184: Coordinador Comercial puede consultar el detalle
+        // (solo lectura — autorizarAccion() abajo sigue exigiendo
+        // Oficial de Cumplimiento para guardar/finalizar).
+        if (in_array($activeRole, ['superadmin', 'oficial_cumplimiento', 'coordinador_comercial'], true)) {
             return;
         }
 

@@ -64,7 +64,28 @@ export class ActasComiteBandejaComponent implements OnInit {
       },
       error: (err) => {
         this.generando = false;
-        Swal.fire('No se pudo generar el acta', err?.error?.message || 'Intente nuevamente o contacte al administrador.', 'warning');
+        const mensaje = err?.error?.message || 'Intente nuevamente o contacte al administrador.';
+        const casiListos: any[] = err?.error?.casi_listos || [];
+
+        // SCRUM-183: si hay créditos con Análisis Financiero confirmado
+        // que quedaron a mitad de camino, mostrar cuál paso falta en cada
+        // uno en vez de solo decir "no hay créditos" — evita que parezca
+        // que nada avanzó cuando en realidad falta un paso puntual.
+        if (casiListos.length > 0) {
+          const filas = casiListos.map(c => `
+            <li style="text-align:left; margin-bottom:6px;">
+              <strong>${c.numero_solicitud}</strong> — ${c.cliente || 'Cliente sin nombre'}<br>
+              <span style="color:#718096; font-size:0.9em;">Falta: ${(c.falta || []).join(' y ') || '—'}</span>
+            </li>`).join('');
+
+          Swal.fire({
+            icon: 'warning',
+            title: 'No se pudo generar el acta',
+            html: `<p>${mensaje}</p><ul style="padding-left:1.2em; margin-top:12px;">${filas}</ul>`
+          });
+        } else {
+          Swal.fire('No se pudo generar el acta', mensaje, 'warning');
+        }
       }
     });
   }

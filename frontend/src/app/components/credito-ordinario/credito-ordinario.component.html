@@ -608,26 +608,7 @@
                   <span class="doc-status-pill error" *ngIf="sarlaftEstadoLabel === 'Desfavorable'">Desfavorable</span>
                   <span class="doc-status-pill warning" *ngIf="sarlaftEstadoLabel === 'Pendiente'">Pendiente</span>
 
-                  <a [routerLink]="'/listas-sarlaft/' + selectedCredito.id" class="btn-view-doc" *ngIf="authService.isAuthorized(['oficial_cumplimiento', 'superadmin'])">
-                    <span class="material-symbols-outlined">open_in_new</span> Ver
-                  </a>
-                </div>
-              </div>
-
-              <!-- Reporte Datacrédito -->
-              <div class="doc-box-new">
-                <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.sarlft_datacredito">credit_card</span>
-                  <div class="doc-title-desc">
-                    <h5>Reporte Centrales Datacrédito</h5>
-                    <p>Informe crediticio de centrales. Responsable: Oficial de Cumplimiento.</p>
-                  </div>
-                </div>
-                <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.sarlft_datacredito">Cargado</span>
-                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.sarlft_datacredito">Pendiente</span>
-
-                  <a *ngIf="selectedCredito.documentos?.sarlft_datacredito" [href]="selectedCredito.documentos.sarlft_datacredito" target="_blank" class="btn-view-doc">
+                  <a [routerLink]="'/listas-sarlaft/' + selectedCredito.id" class="btn-view-doc" *ngIf="authService.isAuthorized(['oficial_cumplimiento', 'coordinador_comercial', 'superadmin'])">
                     <span class="material-symbols-outlined">open_in_new</span> Ver
                   </a>
                 </div>
@@ -645,6 +626,10 @@
                 <div class="doc-action-status">
                   <span class="doc-status-pill success" *ngIf="selectedCredito.analisis_financiero?.estado === 'confirmado'">Confirmado</span>
                   <span class="doc-status-pill error" *ngIf="selectedCredito.analisis_financiero?.estado !== 'confirmado'">Pendiente</span>
+
+                  <a [routerLink]="'/analisis-financiero/' + selectedCredito.id" class="btn-view-doc" *ngIf="authService.isAuthorized(['coordinador_comercial', 'superadmin'])">
+                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  </a>
                 </div>
               </div>
 

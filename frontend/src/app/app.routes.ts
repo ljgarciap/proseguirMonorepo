@@ -170,10 +170,15 @@ export const routes: Routes = [
         data: { roles: ['oficial_cumplimiento', 'superadmin'] }
     },
     {
+        // SCRUM-184: Coordinador Comercial puede ver el detalle SARLAFT
+        // (link "Ver" desde Crédito Ordinario), igual que ya puede ver el
+        // Informe Técnico — la edición sigue restringida a Oficial de
+        // Cumplimiento vía `puedeEditar` dentro del propio componente, no
+        // por este guard.
         path: 'listas-sarlaft/:creditoId',
         loadComponent: () => import('./components/listas-sarlaft/listas-sarlaft-detalle.component').then(m => m.ListasSarlaftDetalleComponent),
         canActivate: [roleGuard],
-        data: { roles: ['oficial_cumplimiento', 'superadmin'] }
+        data: { roles: ['oficial_cumplimiento', 'coordinador_comercial', 'superadmin'] }
     },
     {
         path: 'gestion-creditos',
