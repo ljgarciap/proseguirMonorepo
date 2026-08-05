@@ -223,12 +223,17 @@ class CreditoOrdinarioTest extends TestCase
             ->assertStatus(200)
             ->assertJsonPath('estado', 'comite_evaluacion');
 
-        // 5. Comité devuelve a Gerente, luego re-aprueba
-        Passport::actingAs($this->comite);
+        // 5. Comité devuelve a Gerente, luego re-aprueba. SCRUM-178 retiró
+        // el botón manual de comite_credito en 'comite_evaluacion' — la
+        // única salida normal de ese estado ahora es Actas de Comité (ver
+        // ActaComiteTest). Acá se ejercita el atajo de superadmin que se
+        // mantiene como vía de escape (documentado en
+        // CreditoOrdinarioController::transition()).
+        Passport::actingAs($this->admin);
         $this->postJson("/api/creditos/{$creditoId}/transition", [
             'accion'     => 'devolver',
             'comentario' => 'El monto es muy alto, ajustar propuesta'
-        ], ['X-Active-Role' => 'comite_credito'])
+        ], ['X-Active-Role' => 'superadmin'])
             ->assertStatus(200)
             ->assertJsonPath('estado', 'aprobacion_presentacion');
 
@@ -239,15 +244,23 @@ class CreditoOrdinarioTest extends TestCase
             ->assertStatus(200)
             ->assertJsonPath('estado', 'comite_evaluacion');
 
-        // Comité sube acta y aprueba
+        // El rol comite_credito ya no puede transicionar directamente.
         Passport::actingAs($this->comite);
-        $this->subirArchivo($creditoId, 'acta_comite_firmada', 'comite_credito', 'acta.pdf')
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion'     => 'aprobar',
+            'comentario' => 'Aprobado por unanimidad.'
+        ], ['X-Active-Role' => 'comite_credito'])
+            ->assertStatus(422);
+
+        // Superadmin conserva el atajo manual (sube acta y aprueba).
+        Passport::actingAs($this->admin);
+        $this->subirArchivo($creditoId, 'acta_comite_firmada', 'superadmin', 'acta.pdf')
             ->assertStatus(200);
 
         $this->postJson("/api/creditos/{$creditoId}/transition", [
             'accion'     => 'aprobar',
             'comentario' => 'Aprobado por unanimidad.'
-        ], ['X-Active-Role' => 'comite_credito'])
+        ], ['X-Active-Role' => 'superadmin'])
             ->assertStatus(200)
             ->assertJsonPath('estado', 'formalizacion_garantias');
 

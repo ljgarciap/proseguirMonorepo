@@ -1,0 +1,181 @@
+<div class="view-container" *ngIf="!loading && credito">
+  <header class="view-header">
+    <div class="title-area">
+      <button class="btn-pro secondary sm back-btn" (click)="cancelar()">
+        <span class="material-symbols-outlined">arrow_back</span> Volver a la bandeja
+      </button>
+      <h1>{{ titulo }} — {{ credito.numero_solicitud }}</h1>
+      <p>Cliente: {{ cliente?.nombre || credito.cliente?.name || '—' }}</p>
+    </div>
+    <div class="header-actions">
+      <span class="status-pill" [ngClass]="{ 'success': credito.solicitud_gestionada, 'warning': !credito.solicitud_gestionada }">
+        {{ credito.solicitud_gestionada ? 'Gestionada' : 'Pendiente por gestionar' }}
+      </span>
+    </div>
+  </header>
+
+  <div class="alert-readonly" *ngIf="!puedeGestionar">
+    <span class="material-symbols-outlined">visibility</span>
+    Estás viendo esta solicitud en modo solo lectura.
+  </div>
+
+  <div class="detail-grid">
+    <!-- Información del cliente -->
+    <div class="content-card">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">badge</span>
+        Información del Cliente (solo lectura)
+      </h3>
+
+      <ng-container *ngIf="esNatural; else juridicaBlock">
+        <div class="form-grid mt-4">
+          <div class="form-group"><label>Nombres</label><p class="readonly-value">{{ cliente?.nombres || '—' }}</p></div>
+          <div class="form-group"><label>Primer Apellido</label><p class="readonly-value">{{ cliente?.primer_apellido || '—' }}</p></div>
+          <div class="form-group"><label>Segundo Apellido</label><p class="readonly-value">{{ cliente?.segundo_apellido || '—' }}</p></div>
+          <div class="form-group"><label>Ocupación</label><p class="readonly-value">{{ cliente?.ocupacion || '—' }}</p></div>
+          <div class="form-group"><label>Documento</label><p class="readonly-value">{{ cliente?.document_type?.nombre || '—' }} {{ cliente?.numero_documento || '' }}</p></div>
+          <div class="form-group"><label>Correo Electrónico</label><p class="readonly-value">{{ cliente?.correo_electronico || '—' }}</p></div>
+          <div class="form-group"><label>Teléfono</label><p class="readonly-value">{{ cliente?.telefono || '—' }}</p></div>
+          <div class="form-group span-2"><label>Dirección</label><p class="readonly-value">{{ cliente?.direccion || '—' }}</p></div>
+          <div class="form-group"><label>Ciudad</label><p class="readonly-value">{{ cliente?.ciudad || '—' }}, {{ cliente?.departamento || '—' }}</p></div>
+        </div>
+      </ng-container>
+
+      <ng-template #juridicaBlock>
+        <div class="form-grid mt-4">
+          <div class="form-group span-2"><label>Razón Social</label><p class="readonly-value">{{ cliente?.nombre_razon_social || cliente?.nombre || '—' }}</p></div>
+          <div class="form-group"><label>Tipo de Empresa</label><p class="readonly-value">{{ cliente?.tipo_empresa || '—' }}</p></div>
+          <div class="form-group"><label>Actividad Económica</label><p class="readonly-value">{{ cliente?.actividad_economica || '—' }}</p></div>
+          <div class="form-group"><label>NIT</label><p class="readonly-value">{{ cliente?.numero_documento || '—' }}</p></div>
+          <div class="form-group"><label>Correo Electrónico</label><p class="readonly-value">{{ cliente?.correo_electronico_empresarial || '—' }}</p></div>
+          <div class="form-group"><label>Página Web</label><p class="readonly-value">{{ cliente?.pagina_web || '—' }}</p></div>
+          <div class="form-group span-2"><label>Dirección</label><p class="readonly-value">{{ cliente?.direccion || '—' }}</p></div>
+          <div class="form-group"><label>Ciudad</label><p class="readonly-value">{{ cliente?.ciudad || '—' }}, {{ cliente?.departamento || '—' }}</p></div>
+        </div>
+
+        <h4 class="section-subtitle mt-4">Representante Legal</h4>
+        <div class="form-grid">
+          <div class="form-group"><label>Nombres</label><p class="readonly-value">{{ cliente?.rep_nombres || '—' }}</p></div>
+          <div class="form-group"><label>Apellidos</label><p class="readonly-value">{{ cliente?.rep_primer_apellido || '—' }} {{ cliente?.rep_segundo_apellido || '' }}</p></div>
+          <div class="form-group"><label>Documento</label><p class="readonly-value">{{ cliente?.rep_document_type?.nombre || '—' }} {{ cliente?.rep_numero_documento || '' }}</p></div>
+        </div>
+      </ng-template>
+    </div>
+
+    <!-- Crédito solicitado -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">request_quote</span>
+        Información del Crédito Solicitado (solo lectura)
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Fecha de Solicitud</label><p class="readonly-value">{{ credito.created_at | date:'dd/MM/yyyy' }}</p></div>
+        <div class="form-group"><label>Tipo de Crédito</label><p class="readonly-value">{{ solicitud?.tipo_credito?.nombre || '—' }}</p></div>
+        <div class="form-group"><label>Monto Solicitado</label><p class="readonly-value">$ {{ (solicitud?.monto_solicitado || credito.monto || 0) | number:'1.0-0':'es-CO' }}</p></div>
+        <div class="form-group"><label>Plazo</label><p class="readonly-value">{{ solicitud?.plazo_meses || credito.plazo_meses || '—' }} meses</p></div>
+        <div class="form-group"><label>Amortización</label><p class="readonly-value">{{ solicitud?.amortizacion?.nombre || '—' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Información de validación SARLAFT -->
+    <div class="content-card mt-4" *ngIf="resultado === 'sarlaft_desfavorable'">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">gavel</span>
+        Información de la Validación
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Fecha de Validación</label><p class="readonly-value">{{ credito.fecha_validacion ? (credito.fecha_validacion | date:'dd/MM/yyyy') : '—' }}</p></div>
+        <div class="form-group"><label>Auditor Interno</label><p class="readonly-value">{{ credito.sarlaft_diligenciado_por?.name || '—' }}</p></div>
+        <div class="form-group"><label>Estado</label><p class="readonly-value">Desfavorable</p></div>
+        <div class="form-group span-full"><label>Observaciones</label><p class="readonly-value">{{ credito.sarlaft_observaciones || '—' }}</p></div>
+        <div class="form-group span-full">
+          <label>Síntesis Oficial de Cumplimiento</label>
+          <a *ngIf="sintesisPdf" [href]="sintesisPdf" target="_blank" class="btn-view-doc">
+            <span class="material-symbols-outlined">open_in_new</span> Ver / descargar PDF
+          </a>
+          <p class="readonly-value" *ngIf="!sintesisPdf">No disponible.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Información del Comité -->
+    <div class="content-card mt-4" *ngIf="resultado !== 'sarlaft_desfavorable'">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">groups</span>
+        Información del Comité
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Fecha del Comité</label><p class="readonly-value">{{ credito.fecha_validacion ? (credito.fecha_validacion | date:'dd/MM/yyyy') : '—' }}</p></div>
+        <div class="form-group">
+          <label>Estado</label>
+          <p class="readonly-value">
+            {{ resultado === 'aprobada_garantias' ? 'Aprobado' : resultado === 'rechazada_comite' ? 'Rechazado' : 'Pendiente' }}
+          </p>
+        </div>
+        <div class="form-group span-full"><label>Observaciones</label><p class="readonly-value">{{ decisionComite?.observaciones || '—' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Formulario de notificación -->
+    <div class="content-card mt-4 result-panel">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">mail</span>
+        Notificación
+      </h3>
+      <p class="card-subtitle">Redacte el correo que se enviará al cliente al registrar la gestión.</p>
+
+      <div class="form-grid mt-4">
+        <div class="form-group span-full">
+          <label>Destino <span class="required">*</span></label>
+          <input class="pro-input" type="email" [(ngModel)]="destino" [disabled]="!puedeGestionar" placeholder="correo@cliente.com">
+        </div>
+        <div class="form-group span-full">
+          <label>Asunto <span class="required">*</span></label>
+          <input class="pro-input" type="text" [(ngModel)]="asunto" [disabled]="!puedeGestionar" placeholder="Asunto del correo">
+        </div>
+        <div class="form-group span-full">
+          <label>Mensaje de Acompañamiento <span class="required">*</span></label>
+          <textarea class="pro-input textarea" [(ngModel)]="mensaje" [disabled]="!puedeGestionar"
+                    placeholder="Mensaje que verá el cliente"></textarea>
+        </div>
+
+        <ng-container *ngIf="resultado === 'pendiente_comite'">
+          <div class="form-group span-full">
+            <label>¿Requiere envío de documentación por parte del cliente? <span class="required">*</span></label>
+            <div class="radio-group">
+              <label class="radio-option" [class.selected]="requiereDocumentos === true">
+                <input type="radio" name="requiereDocumentos" [value]="true" [(ngModel)]="requiereDocumentos" [disabled]="!puedeGestionar">
+                Sí
+              </label>
+              <label class="radio-option" [class.selected]="requiereDocumentos === false">
+                <input type="radio" name="requiereDocumentos" [value]="false" [(ngModel)]="requiereDocumentos" [disabled]="!puedeGestionar">
+                No
+              </label>
+            </div>
+          </div>
+        </ng-container>
+
+        <div class="form-group span-full" *ngIf="requierePresetObligatorio || resultado === 'aprobada_garantias'">
+          <label>Documentación Requerida <span class="required">*</span></label>
+          <select class="pro-input" [(ngModel)]="presetId" [disabled]="!puedeGestionar">
+            <option [ngValue]="null">Seleccione un preset...</option>
+            <option *ngFor="let preset of presets" [ngValue]="preset.id">{{ preset.nombre }}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-footer mt-4" *ngIf="puedeGestionar">
+        <button class="btn-pro secondary" (click)="cancelar()">
+          <span class="material-symbols-outlined">close</span> Cancelar
+        </button>
+        <button class="btn-pro primary" (click)="registrarYEnviar()">
+          <span class="material-symbols-outlined">send</span> Registrar y enviar notificación
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="view-container" *ngIf="loading">
+  <p class="text-center py-4">Cargando solicitud...</p>
+</div>

@@ -215,8 +215,12 @@ class ListasRestrictivasSarlaftTest extends TestCase
         Mail::assertNotSent(SarlaftDesfavorableCoordinadorMail::class);
     }
 
-    public function test_finalizar_desfavorable_transiciona_a_rechazado_y_envia_dos_correos(): void
+    public function test_finalizar_desfavorable_transiciona_a_rechazado_y_avisa_internamente_sin_notificar_al_cliente(): void
     {
+        // SCRUM-178: el correo al cliente ya no se dispara automáticamente
+        // acá — pasa a depender de que el Coordinador Comercial lo gestione
+        // desde la bandeja Gestión de Créditos. Solo se mantiene el aviso
+        // interno a Coordinadores.
         $credito = $this->crearCreditoEnSarlaftControlInterno();
 
         Passport::actingAs($this->cumplimiento);
@@ -232,11 +236,11 @@ class ListasRestrictivasSarlaftTest extends TestCase
             'id' => $credito->id,
             'estado' => 'rechazado',
             'sarlaft_concepto' => 'desfavorable',
+            'resultado_origen' => 'sarlaft',
+            'solicitud_gestionada' => false,
         ]);
 
-        Mail::assertSent(SarlaftDesfavorableClienteMail::class, function ($mail) use ($credito) {
-            return $mail->hasTo('sarlaft.cliente@test.com') && $mail->credito->id === $credito->id;
-        });
+        Mail::assertNotSent(SarlaftDesfavorableClienteMail::class);
 
         Mail::assertSent(SarlaftDesfavorableCoordinadorMail::class, function ($mail) use ($credito) {
             return $mail->hasTo('coordinador.sarlaft@test.com') && $mail->credito->id === $credito->id;
