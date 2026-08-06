@@ -29,6 +29,7 @@ class ActaComiteSolicitud extends Model
         'monto_decision',
         'vigencia_aprobacion',
         'observaciones',
+        'presentacion_comite',
     ];
 
     protected function casts(): array
@@ -39,6 +40,18 @@ class ActaComiteSolicitud extends Model
             'porcentaje_financiacion' => 'decimal:2',
             'monto_decision' => 'decimal:2',
         ];
+    }
+
+    /**
+     * SCRUM-183: guarda ruta relativa del disco 'public' (no URL absoluta),
+     * mismo patrón que CreditoOrdinario::getDocumentosAttribute() — resuelve
+     * la URL con el APP_URL vigente al leer, no al guardar (evita el bug de
+     * SCRUM-148 si el APP_URL cambia entre el momento en que se adjuntó el
+     * archivo y el momento en que se lee).
+     */
+    public function getPresentacionComiteAttribute($value): ?string
+    {
+        return $value ? CreditoOrdinario::resolveStorageUrl($value) : $value;
     }
 
     public function actaComite()

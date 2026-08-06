@@ -249,7 +249,14 @@ class AnalisisFinancieroTest extends TestCase
         $this->assertDatabaseHas('analisis_financieros', ['credito_ordinario_id' => $credito->id, 'estado' => 'borrador']);
     }
 
-    public function test_confirmar_exitoso_sin_presentacion_comite_no_transiciona_credito(): void
+    /**
+     * SCRUM-183 (2026-08-05, decisión de Luis tras hablar con Lorena): se
+     * eliminó el paso "Presentación para el Comité" + aprobación de
+     * Gerencia — confirmar el Análisis Financiero ya alcanza, por sí solo,
+     * para pasar a evaluación del Comité, sin importar si la Presentación
+     * ya se cargó o no (eso ahora se adjunta después, en el Acta).
+     */
+    public function test_confirmar_exitoso_transiciona_directo_a_comite_evaluacion(): void
     {
         $credito = $this->crearCreditoEnAnalisisFinanciero();
 
@@ -260,26 +267,12 @@ class AnalisisFinancieroTest extends TestCase
 
         $response->assertStatus(200);
         $this->assertEquals('confirmado', $response->json('analisis.estado'));
-        $this->assertDatabaseHas('credito_ordinarios', ['id' => $credito->id, 'estado' => 'pendiente_analisis_financiero']);
+        $this->assertDatabaseHas('credito_ordinarios', ['id' => $credito->id, 'estado' => 'comite_evaluacion']);
 
         $credito->refresh();
         $historial = $credito->historial_estados;
         $ultimo = end($historial);
-        $this->assertStringContainsString('Falta cargar la presentación', $ultimo['comentario']);
-    }
-
-    public function test_confirmar_exitoso_con_presentacion_comite_transiciona_a_aprobacion_presentacion(): void
-    {
-        $credito = $this->crearCreditoEnAnalisisFinanciero();
-        $credito->update(['documentos' => ['presentacion_comite' => 'clientes/presentacion.pdf']]);
-
-        Passport::actingAs($this->coordinador);
-        $response = $this->postJson("/api/analisis-financiero/{$credito->id}/confirmar", $this->payloadValido(), [
-            'X-Active-Role' => 'coordinador_comercial',
-        ]);
-
-        $response->assertStatus(200);
-        $this->assertDatabaseHas('credito_ordinarios', ['id' => $credito->id, 'estado' => 'aprobacion_presentacion']);
+        $this->assertStringContainsString('Pasa a evaluación del Comité', $ultimo['comentario']);
     }
 
     public function test_no_se_puede_editar_ni_reconfirmar_un_analisis_ya_confirmado(): void
@@ -305,7 +298,6 @@ class AnalisisFinancieroTest extends TestCase
     public function test_show_sigue_visible_tras_confirmar_aunque_el_credito_avance(): void
     {
         $credito = $this->crearCreditoEnAnalisisFinanciero();
-        $credito->update(['documentos' => ['presentacion_comite' => 'clientes/presentacion.pdf']]);
 
         Passport::actingAs($this->coordinador);
         $this->postJson("/api/analisis-financiero/{$credito->id}/confirmar", $this->payloadValido(), [
@@ -313,7 +305,7 @@ class AnalisisFinancieroTest extends TestCase
         ])->assertStatus(200);
 
         $credito->refresh();
-        $this->assertEquals('aprobacion_presentacion', $credito->estado);
+        $this->assertEquals('comite_evaluacion', $credito->estado);
 
         $this->getJson("/api/analisis-financiero/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial'])
             ->assertStatus(200);

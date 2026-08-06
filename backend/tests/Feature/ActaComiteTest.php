@@ -99,57 +99,56 @@ class ActaComiteTest extends TestCase
         $this->postJson('/api/actas-comite/generar', [], ['X-Active-Role' => 'coordinador_comercial'])
             ->assertStatus(422)
             ->assertJsonFragment([
-                'message' => 'No hay créditos listos para el Comité todavía. Tener el Análisis Financiero confirmado no es suficiente: '
-                    . 'también hace falta cargar la Presentación para el Comité y que Gerencia la apruebe.',
-            ])
-            ->assertJsonPath('casi_listos', []);
+                'message' => 'No hay créditos con Análisis Financiero confirmado listos para el Comité todavía.',
+            ]);
     }
 
     /**
-     * SCRUM-183 (2026-08-05): el mensaje de "no hay créditos" ahora lista
-     * los créditos con Análisis Financiero confirmado que quedaron a
-     * mitad de camino (falta Presentación Comité y/o aprobación de
-     * Gerencia), en vez de dejar la impresión de que nada avanzó.
+     * SCRUM-183 (2026-08-05, decisión de Luis tras hablar con Lorena): se
+     * eliminó el paso de Presentación para el Comité + aprobación de
+     * Gerencia — la presentación ahora se adjunta directo sobre la
+     * solicitud dentro del Acta, no antes de llegar a comite_evaluacion.
      */
-    public function test_generar_falla_con_casi_listos_lista_lo_que_falta(): void
+    public function test_subir_presentacion_adjunta_pdf_a_la_solicitud(): void
     {
-        $solicitud = SolicitudCredito::create([
-            'cliente_id' => $this->clienteNatural->id,
-            'usuario_registra_id' => $this->admin->id,
-            'tipo_credito_id' => $this->tipoOrdinario->id,
-            'monto_solicitado' => 30000000,
-            'plazo_meses' => 12,
-            'amortizacion_id' => $this->amortizacionMensual->id,
-            'destino_recurso' => 'Capital de trabajo',
-            'garantia' => 'Pagaré',
-            'fuente_pago' => 'Ingresos operacionales',
-            'correo_notificacion' => 'acta.cliente@test.com',
-            'asunto_notificacion' => 'Documentación',
-            'mensaje_notificacion' => 'Adjunta los archivos.',
-        ]);
-        $credito = CreditoOrdinario::create([
-            'numero_solicitud' => 'CO-TEST-CASILISTO',
-            'cliente_id' => $this->clienteNatural->id,
-            'solicitud_credito_id' => $solicitud->id,
-            'monto' => 30000000,
-            'plazo_meses' => 12,
-            'estado' => 'pendiente_analisis_financiero',
-            'documentos' => [],
-        ]);
-        \App\Models\AnalisisFinanciero::create([
-            'credito_ordinario_id' => $credito->id,
-            'estado' => 'confirmado',
-        ]);
+        $credito = $this->crearCreditoEnComiteEvaluacion();
 
         Passport::actingAs($this->coordinador);
         $response = $this->postJson('/api/actas-comite/generar', [], ['X-Active-Role' => 'coordinador_comercial'])
-            ->assertStatus(422);
+            ->assertStatus(201);
+        $acta = \App\Models\ActaComite::find($response->json('id'));
+        $solicitud = $acta->solicitudes()->first();
+        $this->assertNull($solicitud->presentacion_comite);
 
-        $casiListos = $response->json('casi_listos');
-        $this->assertCount(1, $casiListos);
-        $this->assertSame('CO-TEST-CASILISTO', $casiListos[0]['numero_solicitud']);
-        $this->assertContains('Cargar la Presentación para el Comité de Crédito', $casiListos[0]['falta']);
-        $this->assertContains('Aprobación de Gerencia sobre la presentación', $casiListos[0]['falta']);
+        $archivo = \Illuminate\Http\UploadedFile::fake()->create('presentacion.pdf', 500, 'application/pdf');
+        $response = $this->postJson(
+            "/api/actas-comite/{$acta->id}/solicitudes/{$solicitud->id}/presentacion",
+            ['archivo' => $archivo],
+            ['X-Active-Role' => 'coordinador_comercial']
+        );
+
+        $response->assertStatus(200);
+        $this->assertNotNull($response->json('presentacion_comite'));
+        $solicitud->refresh();
+        $this->assertNotNull($solicitud->presentacion_comite);
+    }
+
+    public function test_subir_presentacion_rechaza_archivo_no_pdf(): void
+    {
+        $credito = $this->crearCreditoEnComiteEvaluacion();
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson('/api/actas-comite/generar', [], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(201);
+        $acta = \App\Models\ActaComite::find($response->json('id'));
+        $solicitud = $acta->solicitudes()->first();
+
+        $archivo = \Illuminate\Http\UploadedFile::fake()->create('presentacion.docx', 500, 'application/msword');
+        $this->postJson(
+            "/api/actas-comite/{$acta->id}/solicitudes/{$solicitud->id}/presentacion",
+            ['archivo' => $archivo],
+            ['X-Active-Role' => 'coordinador_comercial']
+        )->assertStatus(422)->assertJsonValidationErrors(['archivo']);
     }
 
     public function test_generar_crea_acta_con_creditos_elegibles(): void
