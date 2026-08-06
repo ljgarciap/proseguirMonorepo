@@ -140,6 +140,18 @@ export const routes: Routes = [
         data: { roles: ['ingeniero', 'coordinador_comercial', 'superadmin'] }
     },
     {
+        path: 'actas-comite',
+        loadComponent: () => import('./components/actas-comite/actas-comite-bandeja.component').then(m => m.ActasComiteBandejaComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['coordinador_comercial', 'superadmin'] }
+    },
+    {
+        path: 'actas-comite/:actaId',
+        loadComponent: () => import('./components/actas-comite/actas-comite-detalle.component').then(m => m.ActasComiteDetalleComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['coordinador_comercial', 'superadmin'] }
+    },
+    {
         path: 'analisis-financiero',
         loadComponent: () => import('./components/analisis-financiero/analisis-financiero-bandeja.component').then(m => m.AnalisisFinancieroBandejaComponent),
         canActivate: [roleGuard],
@@ -158,10 +170,27 @@ export const routes: Routes = [
         data: { roles: ['oficial_cumplimiento', 'superadmin'] }
     },
     {
+        // SCRUM-184: Coordinador Comercial puede ver el detalle SARLAFT
+        // (link "Ver" desde Crédito Ordinario), igual que ya puede ver el
+        // Informe Técnico — la edición sigue restringida a Oficial de
+        // Cumplimiento vía `puedeEditar` dentro del propio componente, no
+        // por este guard.
         path: 'listas-sarlaft/:creditoId',
         loadComponent: () => import('./components/listas-sarlaft/listas-sarlaft-detalle.component').then(m => m.ListasSarlaftDetalleComponent),
         canActivate: [roleGuard],
-        data: { roles: ['oficial_cumplimiento', 'superadmin'] }
+        data: { roles: ['oficial_cumplimiento', 'coordinador_comercial', 'superadmin'] }
+    },
+    {
+        path: 'gestion-creditos',
+        loadComponent: () => import('./components/gestion-creditos/gestion-creditos-bandeja.component').then(m => m.GestionCreditosBandejaComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['coordinador_comercial', 'superadmin'] }
+    },
+    {
+        path: 'gestion-creditos/:creditoId',
+        loadComponent: () => import('./components/gestion-creditos/gestion-creditos-detalle.component').then(m => m.GestionCreditosDetalleComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['coordinador_comercial', 'superadmin'] }
     },
     {
         path: 'db-cleaner',

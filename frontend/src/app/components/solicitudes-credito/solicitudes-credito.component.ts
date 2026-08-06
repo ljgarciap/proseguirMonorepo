@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
 import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 import { ClienteAutocompleteComponent } from '../shared/cliente-autocomplete/cliente-autocomplete.component';
+import { AuthService } from '../../services/auth.service';
 import Swal from 'sweetalert2';
 
 @Component({
@@ -44,6 +45,24 @@ export class SolicitudesCreditoComponent implements OnInit {
   selectedVisitId: number | null = null;
   selectedPresetId: number | null = null;
   selectedPresetDocs: any[] = [];
+
+  // SCRUM-159: edición de "Condiciones Financieras del Crédito" de una
+  // solicitud ya registrada (por Coordinador Comercial / superadmin).
+  // No nulo cuando el formulario está en modo edición en vez de creación.
+  editingSolicitudId: number | null = null;
+
+  // SCRUM-159 (hallazgo Senior Reviewer): true cuando la solicitud en
+  // edición ya tiene un CreditoOrdinario asociado (workflow BPMN en curso).
+  // El backend es la fuente de verdad del bloqueo (422 en el PUT) — esto
+  // solo evita que el usuario intente un cambio que sabemos que va a fallar.
+  editingTieneCreditoOrdinario = false;
+
+  // SCRUM-173: cuerpo del mensaje sin los datos de acceso al portal. Se
+  // guarda aparte para poder reconstruir el mensaje completo cuando el
+  // cliente se selecciona/cambia después de generar el template inicial
+  // (registro manual: al momento de mostrar el template todavía no hay
+  // cliente elegido, por lo que numero_documento/correo aún no existen).
+  mensajeBaseNotificacion = '';
 
   // Form Fields
   form: any = {
@@ -96,7 +115,18 @@ export class SolicitudesCreditoComponent implements OnInit {
     mensaje_notificacion: ''
   };
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private authService: AuthService) {}
+
+  // SCRUM-159: Coordinador Comercial y superadmin pueden editar
+  // "Condiciones Financieras del Crédito" de una solicitud ya registrada.
+  canEditCondicionesFinancieras(): boolean {
+    const role = this.authService.getActiveRole();
+    return role === 'coordinador_comercial' || role === 'superadmin';
+  }
+
+  get isEditingSolicitud(): boolean {
+    return this.editingSolicitudId !== null;
+  }
 
   ngOnInit() {
     this.loadPendingVisits();
@@ -241,12 +271,29 @@ export class SolicitudesCreditoComponent implements OnInit {
     // Generate subject and message template
     const tcName = visit.tipo_credito?.nombre || 'Crédito Ordinario';
     this.form.asunto_notificacion = `Solicitud de documentos para solicitud de ${tcName.toLowerCase()}`;
-    this.form.mensaje_notificacion = `Estimado cliente, nos complace informarle que hemos registrado su solicitud de crédito de acuerdo con nuestra última reunión. Para proceder con el estudio, requerimos que adjunte los soportes correspondientes en su portal de cliente.`;
+    this.mensajeBaseNotificacion = `Estimado cliente, nos complace informarle que hemos registrado su solicitud de crédito de acuerdo con nuestra última reunión. Para proceder con el estudio, requerimos que adjunte los soportes correspondientes en su portal de cliente.`;
+    this.form.mensaje_notificacion = this.construirMensajeConAcceso(this.mensajeBaseNotificacion);
 
     // Attempt to auto-select a preset matching the credit type name
     this.autoSelectPreset(tcName);
 
     this.activeTab = 'registrar';
+  }
+
+  // SCRUM-173: agrega al mensaje base la URL del sistema, el usuario y la
+  // clave del cliente, para que pueda ingresar directamente a la plataforma.
+  // Usuario/clave replican exactamente la lógica de aprovisionamiento de
+  // ClienteController::syncUserAccess (backend): usuario = correo de
+  // notificación (o "<documento>@noreply.proseguir.local" si no tiene
+  // correo), clave = número de documento sin guiones.
+  private construirMensajeConAcceso(mensajeBase: string): string {
+    const numeroDocumento = (this.form.numero_documento || '').toString().replace(/-/g, '');
+    if (!numeroDocumento) return mensajeBase;
+
+    const usuario = this.form.correo_notificacion || `${numeroDocumento}@noreply.proseguir.local`;
+    const urlSistema = environment.apiUrl.replace('/api', '');
+
+    return `${mensajeBase}\n\nPuede ingresar a la plataforma en ${urlSistema} con el usuario ${usuario} y la contraseña ${numeroDocumento}.`;
   }
 
   autoSelectPreset(creditTypeName: string) {
@@ -265,13 +312,90 @@ export class SolicitudesCreditoComponent implements OnInit {
     }
   }
 
+  // SCRUM-159: preload a registered solicitud into the form to edit its
+  // "Condiciones Financieras del Crédito". Reuses the isFromVisit lock for
+  // the rest of the sections (cliente, representante legal, proyecto,
+  // notificación) — solo los 7 campos financieros quedan habilitados,
+  // condicionado además a canEditCondicionesFinancieras().
+  onEditSolicitud(req: any) {
+    this.resetForm();
+    this.isFromVisit = true;
+    this.editingSolicitudId = req.id;
+    this.editingTieneCreditoOrdinario = !!req.credito_ordinario_exists;
+    this.selectedVisitId = req.visita_id || null;
+    this.selectedPresetId = req.document_preset_id || null;
+
+    const cliente = req.cliente;
+    if (cliente) {
+      this.form.cliente_id = cliente.id;
+      this.form.tipo_persona_id = cliente.tipo_persona_id || '';
+      this.form.tipo_documento_id = cliente.tipo_documento_id || '';
+      this.form.numero_documento = cliente.numero_documento || '';
+
+      this.form.nombres = cliente.nombres || '';
+      this.form.primer_apellido = cliente.primer_apellido || '';
+      this.form.segundo_apellido = cliente.segundo_apellido || '';
+      this.form.correo_electronico = cliente.correo_electronico || '';
+      this.form.telefono = cliente.telefono || '';
+      this.form.direccion = cliente.direccion || '';
+      this.form.pais = cliente.pais || 'Colombia';
+      this.form.departamento_id = cliente.departamento_id || '';
+      this.form.ciudad_id = cliente.ciudad_id || '';
+      if (this.form.departamento_id) {
+        this.onDepartamentoChange(true);
+      }
+
+      this.form.nombre_razon_social = cliente.nombre_razon_social || '';
+      this.form.tipo_empresa = cliente.tipo_empresa || '';
+      this.form.actividad_economica = cliente.actividad_economica || '';
+      this.form.correo_electronico_empresarial = cliente.correo_electronico_empresarial || '';
+
+      this.form.rep_tipo_documento_id = cliente.rep_tipo_documento_id || '';
+      this.form.rep_numero_documento = cliente.rep_numero_documento || '';
+      this.form.rep_nombres = cliente.rep_nombres || '';
+      this.form.rep_primer_apellido = cliente.rep_primer_apellido || '';
+      this.form.rep_segundo_apellido = cliente.rep_segundo_apellido || '';
+      this.form.rep_cargo = cliente.rep_cargo || '';
+      this.form.rep_correo_electronico = cliente.rep_correo_electronico || '';
+      this.form.rep_telefono = cliente.rep_telefono || '';
+    }
+
+    // Condiciones Financieras del Crédito — única sección realmente editable
+    this.form.tipo_credito_id = req.tipo_credito_id || '';
+    this.form.monto_solicitado = req.monto_solicitado || null;
+    this.form.plazo_meses = req.plazo_meses || null;
+    this.form.amortizacion_id = req.amortizacion_id || '';
+    this.form.destino_recurso = req.destino_recurso || '';
+    this.form.garantia = req.garantia || '';
+    this.form.fuente_pago = req.fuente_pago || '';
+
+    // Información del Proyecto — solo lectura en modo edición (SCRUM-159 no
+    // incluye este bloque en el alcance)
+    this.form.proyecto = req.proyecto || '';
+    this.form.proyecto_direccion = req.proyecto_direccion || '';
+    this.form.proyecto_departamento_id = req.proyecto_departamento_id || '';
+    this.form.proyecto_ciudad_id = req.proyecto_ciudad_id || '';
+    if (this.form.proyecto_departamento_id) {
+      this.onDepartamentoProyectoChange(true);
+    }
+
+    // Notificación — se precarga solo para no romper isFormValid(); esta
+    // sección se oculta en modo edición y no se reenvía al backend.
+    this.form.correo_notificacion = req.correo_notificacion || '';
+    this.form.asunto_notificacion = req.asunto_notificacion || '';
+    this.form.mensaje_notificacion = req.mensaje_notificacion || '';
+
+    this.activeTab = 'registrar';
+  }
+
   // Handle manual creation
   onNewManualRequest() {
     this.resetForm();
     this.isFromVisit = false;
     this.selectedVisitId = null;
     this.form.asunto_notificacion = 'Solicitud de documentos para solicitud de crédito';
-    this.form.mensaje_notificacion = 'Estimado cliente, hemos iniciado el registro de su solicitud de crédito. Para continuar con el proceso, solicitamos cargue los documentos requeridos.';
+    this.mensajeBaseNotificacion = 'Estimado cliente, hemos iniciado el registro de su solicitud de crédito. Para continuar con el proceso, solicitamos cargue los documentos requeridos.';
+    this.form.mensaje_notificacion = this.mensajeBaseNotificacion;
     this.activeTab = 'registrar';
   }
 
@@ -313,12 +437,23 @@ export class SolicitudesCreditoComponent implements OnInit {
 
     const isJuridica = this.isPersonaJuridica();
     this.form.correo_notificacion = isJuridica ? selected.correo_electronico_empresarial : selected.correo_electronico;
+
+    // SCRUM-173: al elegir cliente en el registro manual recién se conocen
+    // numero_documento/correo, así que es acá donde el mensaje default
+    // (generado antes, sin esos datos) debe completarse con el acceso.
+    if (this.mensajeBaseNotificacion) {
+      this.form.mensaje_notificacion = this.construirMensajeConAcceso(this.mensajeBaseNotificacion);
+    }
   }
 
   // When type of persona changes manually
   onTipoPersonaChange() {
     const isJuridica = this.isPersonaJuridica();
     this.form.correo_notificacion = isJuridica ? this.form.correo_electronico_empresarial : this.form.correo_electronico;
+
+    if (this.mensajeBaseNotificacion) {
+      this.form.mensaje_notificacion = this.construirMensajeConAcceso(this.mensajeBaseNotificacion);
+    }
   }
 
   // Check if JURIDICA selected — uses tipoPersonas list by tipo_persona_id,
@@ -388,6 +523,11 @@ export class SolicitudesCreditoComponent implements OnInit {
       return;
     }
 
+    if (this.isEditingSolicitud) {
+      this.submitCondicionesFinancierasUpdate();
+      return;
+    }
+
     const clientName = this.isPersonaJuridica() ? this.form.nombre_razon_social : `${this.form.nombres} ${this.form.primer_apellido}`;
     const clientDoc = this.form.numero_documento;
 
@@ -421,9 +561,50 @@ export class SolicitudesCreditoComponent implements OnInit {
     });
   }
 
+  // SCRUM-159: guarda solo los 7 campos de "Condiciones Financieras del
+  // Crédito" de una solicitud ya registrada — no reenvía notificación ni
+  // toca las demás secciones.
+  submitCondicionesFinancierasUpdate() {
+    const payload = {
+      tipo_credito_id: this.form.tipo_credito_id,
+      monto_solicitado: this.form.monto_solicitado,
+      plazo_meses: this.form.plazo_meses,
+      amortizacion_id: this.form.amortizacion_id,
+      destino_recurso: this.form.destino_recurso,
+      garantia: this.form.garantia,
+      fuente_pago: this.form.fuente_pago
+    };
+
+    Swal.fire({
+      title: '¿Guardar cambios en Condiciones Financieras?',
+      text: '¿Está seguro de que desea actualizar las condiciones financieras de esta solicitud de crédito?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#1d4ed8'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.http.put(`${environment.apiUrl}/solicitudes-credito/${this.editingSolicitudId}`, payload).subscribe({
+          next: () => {
+            Swal.fire('Actualización Exitosa', 'Las condiciones financieras de la solicitud fueron actualizadas.', 'success');
+            this.resetForm();
+            this.switchTab('pendientes');
+          },
+          error: (err) => {
+            Swal.fire('Error', err.error?.message || 'Ocurrió un error al actualizar la solicitud.', 'error');
+          }
+        });
+      }
+    });
+  }
+
   resetForm() {
     this.isFromVisit = false;
     this.selectedVisitId = null;
+    this.editingSolicitudId = null;
+    this.editingTieneCreditoOrdinario = false;
+    this.mensajeBaseNotificacion = '';
     this.selectedPresetId = null;
     this.selectedPresetDocs = [];
     this.ciudadesDelDepartamento = [];

@@ -6,6 +6,7 @@ use App\Models\SolicitudCredito;
 use App\Models\Visita;
 use App\Models\Cliente;
 use App\Models\User;
+use App\Models\CreditoOrdinario;
 use App\Models\DocumentPreset;
 use App\Models\DocumentRequest;
 use App\Models\DocumentRequestItem;
@@ -39,7 +40,12 @@ class SolicitudCreditoController extends Controller
      */
     public function index(Request $request)
     {
-        $query = SolicitudCredito::with(['visita', 'cliente.tipoPersona', 'usuarioRegistra', 'tipoCredito', 'amortizacion', 'preset']);
+        // withExists('creditoOrdinario') agrega el flag boolean
+        // credito_ordinario_exists (subquery liviana) para que el frontend
+        // pueda deshabilitar tipo_credito_id en el formulario de edición sin
+        // una llamada extra (SCRUM-159, hallazgo Senior Reviewer).
+        $query = SolicitudCredito::with(['visita', 'cliente.tipoPersona', 'usuarioRegistra', 'tipoCredito', 'amortizacion', 'preset'])
+            ->withExists('creditoOrdinario');
 
         return response()->json($query->orderBy('created_at', 'desc')->get());
     }
@@ -51,7 +57,10 @@ class SolicitudCreditoController extends Controller
     {
         $rules = [
             'visita_id' => 'nullable|exists:visitas,id',
-            'cliente_id' => 'required|exists:clientes,id',
+            // SCRUM-185: 'nullable' — un cliente completamente nuevo no trae
+            // cliente_id todavía (ver bloque de abajo, que valida en su lugar
+            // los campos de identidad necesarios para crearlo).
+            'cliente_id' => 'nullable|exists:clientes,id',
             'tipo_credito_id' => 'required|exists:tipo_creditos,id',
             'monto_solicitado' => 'required|numeric|min:0.01',
             'proyecto' => 'nullable|string',
@@ -66,8 +75,29 @@ class SolicitudCreditoController extends Controller
             'document_preset_id' => 'nullable|exists:document_presets,id',
         ];
 
-        // Conditional client info validations based on person type
-        $cliente = Cliente::findOrFail($request->cliente_id);
+        // SCRUM-185: 'cliente_id' viene vacío cuando se registra un cliente
+        // completamente nuevo (campo "Asociar Cliente Existente" sin usar) —
+        // el frontend permite enviar el formulario así (isFormValid() solo
+        // exige numero_documento como alternativa). Antes esto hacía
+        // Cliente::findOrFail(null), un ModelNotFoundException que Laravel
+        // renderiza como 404 opaco, sin crear nada. Se arma la instancia en
+        // memoria con los campos de identidad (el frontend siempre los
+        // manda) para poder resolver tipoPersona/validar más abajo, igual
+        // que con un cliente existente; el resto de campos del bloque de
+        // guardado más abajo la completa y persiste.
+        if ($request->filled('cliente_id')) {
+            $cliente = Cliente::findOrFail($request->cliente_id);
+        } else {
+            $rules['tipo_persona_id'] = 'required|exists:tipo_personas,id';
+            $rules['tipo_documento_id'] = 'required|exists:document_types,id';
+            $rules['numero_documento'] = 'required|string|unique:clientes,numero_documento';
+            $cliente = new Cliente([
+                'tipo_persona_id' => $request->tipo_persona_id,
+                'tipo_documento_id' => $request->tipo_documento_id,
+                'numero_documento' => $request->numero_documento,
+                'activo' => true,
+            ]);
+        }
         $tipoPersona = $cliente->tipoPersona;
         $codigoPersona = $tipoPersona ? strtoupper($tipoPersona->codigo) : 'NATURAL';
 
@@ -133,9 +163,14 @@ class SolicitudCreditoController extends Controller
         $validated = $request->validate($rules);
 
         return DB::transaction(function () use ($request, $cliente, $codigoPersona, $validated) {
-            // 1. Update Cliente information with the validated client details
+            // 1. Update Cliente information with the validated client details.
+            // SCRUM-185: fill()->save() en vez de update() — update() no hace
+            // nada (retorna false sin persistir) si $cliente todavía no existe
+            // en BD, que es exactamente el caso de un cliente nuevo armado
+            // arriba. fill()->save() hace INSERT o UPDATE según corresponda,
+            // igual en ambos casos.
             if ($codigoPersona === 'NATURAL') {
-                $cliente->update([
+                $cliente->fill([
                     'nombres' => $validated['nombres'],
                     'primer_apellido' => $validated['primer_apellido'],
                     'segundo_apellido' => $validated['segundo_apellido'] ?? null,
@@ -145,9 +180,9 @@ class SolicitudCreditoController extends Controller
                     'pais' => $validated['pais'],
                     'departamento_id' => $validated['departamento_id'],
                     'ciudad_id' => $validated['ciudad_id'],
-                ]);
+                ])->save();
             } else {
-                $cliente->update([
+                $cliente->fill([
                     'nombre_razon_social' => $validated['nombre_razon_social'],
                     'tipo_empresa' => $validated['tipo_empresa'],
                     'actividad_economica' => $validated['actividad_economica'],
@@ -165,7 +200,7 @@ class SolicitudCreditoController extends Controller
                     'rep_cargo' => $validated['rep_cargo'],
                     'rep_correo_electronico' => $validated['rep_correo_electronico'],
                     'rep_telefono' => $validated['rep_telefono'],
-                ]);
+                ])->save();
             }
 
             // 2. Ensure User exists and sync their details
@@ -290,5 +325,51 @@ class SolicitudCreditoController extends Controller
 
             return response()->json($solicitud->load(['visita', 'cliente', 'usuarioRegistra', 'tipoCredito', 'amortizacion']), 201);
         });
+    }
+
+    /**
+     * SCRUM-159: permite al Coordinador Comercial (y superadmin) editar la
+     * sección "Condiciones Financieras del Crédito" de una solicitud ya
+     * registrada por el Gerente desde el registro de visita. Alcance
+     * acotado a propósito a los 7 campos de esa sección — no toca cliente,
+     * representante legal, información del proyecto ni notificación.
+     *
+     * Decisión de negocio de Luis: editable en cualquier estado abierto de
+     * la solicitud (sin restricción por estado del workflow) y sin control
+     * de concurrencia adicional.
+     */
+    public function update(Request $request, SolicitudCredito $solicitudCredito)
+    {
+        $validated = $request->validate([
+            'tipo_credito_id' => 'required|exists:tipo_creditos,id',
+            'monto_solicitado' => 'required|numeric|min:0.01',
+            'plazo_meses' => 'required|integer|min:1',
+            'amortizacion_id' => 'required|exists:amortizaciones,id',
+            'destino_recurso' => 'required|string',
+            'garantia' => 'nullable|string',
+            'fuente_pago' => 'required|string',
+        ]);
+
+        // SCRUM-159 (hallazgo Senior Reviewer): tipo_credito_id no se puede
+        // cambiar si ya existe un CreditoOrdinario (workflow BPMN) asociado
+        // a esta solicitud — InformeTecnicoController::index() filtra la
+        // bandeja con un join EN VIVO contra el tipo de crédito actual, así
+        // que cambiarlo con el flujo ya en curso desincroniza el expediente
+        // de esa bandeja. El resto de los campos siguen editables siempre.
+        if ((int) $validated['tipo_credito_id'] !== (int) $solicitudCredito->tipo_credito_id) {
+            $tieneCreditoOrdinario = CreditoOrdinario::where('solicitud_credito_id', $solicitudCredito->id)->exists();
+
+            if ($tieneCreditoOrdinario) {
+                return response()->json([
+                    'message' => 'No se puede cambiar el tipo de crédito: ya existe un flujo de Crédito Ordinario en curso para esta solicitud.',
+                ], 422);
+            }
+        }
+
+        $solicitudCredito->update($validated);
+
+        return response()->json(
+            $solicitudCredito->load(['visita', 'cliente', 'usuarioRegistra', 'tipoCredito', 'amortizacion'])
+        );
     }
 }

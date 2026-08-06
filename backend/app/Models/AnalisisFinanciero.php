@@ -24,6 +24,7 @@ class AnalisisFinanciero extends Model
         'cartera',
         'observaciones',
         'soporte_complementario',
+        'archivos_adjuntos',
         'diligenciado_por_id',
         'diligenciado_por_at',
     ];
@@ -37,6 +38,7 @@ class AnalisisFinanciero extends Model
             'utilidad_neta' => 'array',
             'ori' => 'array',
             'cartera' => 'array',
+            'archivos_adjuntos' => 'array',
             'diligenciado_por_at' => 'datetime',
         ];
     }

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -30,8 +30,11 @@ export class CreditoOrdinarioComponent implements OnInit {
     // Cumplimiento) — este paso del stepper solo queda como referencia visual
     // de progreso, sin panel de acción propio en esta pantalla.
     { key: 'sarlaft_control_interno', label: 'Listas Restrictivas / SARLAFT', role: 'oficial_cumplimiento', roleLabel: 'Oficial de Cumplimiento', desc: 'Validar Listas Restrictivas y emitir concepto SARLAFT (gestionado desde el módulo Listas Restrictivas y SARLAFT).' },
-    { key: 'pendiente_analisis_financiero', label: 'Análisis Financiero', role: 'coordinador_comercial', roleLabel: 'Coordinador Comercial', desc: 'Realizar el análisis financiero y preparar la presentación del cliente para el Comité.' },
-    { key: 'aprobacion_presentacion', label: 'Aprobación Pres.', role: 'gerente', roleLabel: 'Gerencia', desc: 'Revisar y aprobar la presentación del cliente elaborada para el Comité de Créditos.' },
+    // SCRUM-183: se retiró el paso "Aprobación Pres." (Gerencia) — confirmar
+    // el Análisis Financiero ya pasa directo a Comité de Crédito. La
+    // presentación para el Comité se adjunta después, en Actas Comité de
+    // Crédito (una por solicitud dentro del acta).
+    { key: 'pendiente_analisis_financiero', label: 'Análisis Financiero', role: 'coordinador_comercial', roleLabel: 'Coordinador Comercial', desc: 'Realizar el análisis financiero del cliente.' },
     { key: 'comite_evaluacion', label: 'Comité de Crédito', role: 'comite_credito', roleLabel: 'Comité de Crédito', desc: 'Evaluar el perfil de crédito y firmar el Acta oficial de decisión del Comité.' },
     { key: 'formalizacion_garantias', label: 'Garantías', role: 'operativo', roleLabel: 'Dirección Administrativa', desc: 'Revisar y registrar las garantías firmadas por el cliente.' },
     { key: 'aprobacion_registro_cyf', label: 'Registro CYF', role: 'gerente', roleLabel: 'Gerencia', desc: 'Aprobar el registro de la operación en la plataforma core CYF.' },
@@ -54,6 +57,26 @@ export class CreditoOrdinarioComponent implements OnInit {
     });
 
     this.loadCreditos();
+  }
+
+  // SCRUM-176: volver a esta pantalla con atrás/adelante del navegador (bfcache) o
+  // cambiando de pestaña y regresando no dispara ngOnInit ni ninguna petición nueva —
+  // 'selectedCredito' (y su historial_estados) queda congelado con lo último que se
+  // cargó, aunque el backend ya tenga las transiciones de SARLAFT/Análisis
+  // Financiero hechas en otro módulo. Reproduce el síntoma reportado: BD completa,
+  // pantalla mostrando solo el primer evento.
+  @HostListener('window:pageshow', ['$event'])
+  onPageShow(event: PageTransitionEvent): void {
+    if (event.persisted) {
+      this.loadCreditos();
+    }
+  }
+
+  @HostListener('document:visibilitychange')
+  onVisibilityChange(): void {
+    if (document.visibilityState === 'visible') {
+      this.loadCreditos();
+    }
   }
 
   loadCreditos() {
@@ -198,6 +221,18 @@ export class CreditoOrdinarioComponent implements OnInit {
     if (this.selectedCredito?.informe_tecnico?.estado === 'registrado') return 'Completado';
     const estadosEnProceso = ['validacion_documental_constructor', 'completar_solicitud_constructor', 'informe_tecnico_ingeniero', 'informe_tecnico_coordinador', 'informe_tecnico_finalizado'];
     if (this.selectedCredito?.informe_tecnico || estadosEnProceso.includes(this.selectedCredito?.estado)) return 'En Proceso';
+    return 'Pendiente';
+  }
+
+  // SCRUM-164: la "Síntesis SARLAFT" de la Etapa de Análisis SARLAFT y
+  // Financiero se quedaba en "Pendiente" para siempre porque chequeaba
+  // documentos.sarlft_sintesis, un campo legacy que el módulo dedicado
+  // (ListasRestrictivasSarlaftController, SCRUM-128) nunca llena — el
+  // resultado real vive en la columna sarlaft_concepto del crédito.
+  get sarlaftEstadoLabel(): string {
+    const concepto = this.selectedCredito?.sarlaft_concepto;
+    if (concepto === 'favorable') return 'Favorable';
+    if (concepto === 'desfavorable') return 'Desfavorable';
     return 'Pendiente';
   }
 

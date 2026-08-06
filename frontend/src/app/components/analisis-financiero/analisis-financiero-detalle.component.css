@@ -80,6 +80,20 @@
 
 .field-note .material-symbols-outlined { font-size: 18px; }
 
+/* SCRUM-162 — botón de eliminar fila custom, inline junto al label */
+.btn-remove-fila {
+  border: none;
+  background: transparent;
+  color: #b91c1c;
+  cursor: pointer;
+  font-size: 0.75rem;
+  margin-left: 6px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.btn-remove-fila:hover { background: #fee2e2; }
+
 .pro-input {
   padding: 10px 14px;
   border: 1px solid #cbd5e1;
@@ -415,4 +429,35 @@
 .badge-ok {
   background: #dcfce7;
   color: #15803d;
+}
+
+/* SCRUM-175 — tabla de archivos adjuntos */
+.modern-table.minimal {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.modern-table.minimal th {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.modern-table.minimal td {
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.btn-upload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
 }

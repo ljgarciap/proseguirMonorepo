@@ -16,6 +16,7 @@ use App\Models\DocumentRequirement;
 use App\Models\SolicitudCredito;
 use App\Models\DocumentRequest;
 use App\Models\DocumentRequestItem;
+use App\Models\CreditoOrdinario;
 use App\Mail\SolicitudCreditoMail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -247,6 +248,115 @@ class SolicitudCreditoTest extends TestCase
             return $mail->hasTo('juan_modificado@test.com') && 
                    $mail->solicitud->monto_solicitado == 20000000.00;
         });
+    }
+
+    /**
+     * SCRUM-185: 'cliente_id' vacío (cliente completamente nuevo, sin usar
+     * "Asociar Cliente Existente") no debe tirar 404 — antes
+     * Cliente::findOrFail(null) reventaba con ModelNotFoundException antes
+     * de llegar a cualquier validación, sin crear nada. Este camino nunca
+     * tuvo cobertura (todos los demás tests usan un cliente ya sembrado).
+     */
+    public function test_can_register_credit_request_for_brand_new_client(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $payload = [
+            // Sin cliente_id — simula dejar "Asociar Cliente Existente" vacío.
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => '99988877',
+
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 15000000.00,
+            'plazo_meses' => 24,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'garantia' => 'Firma personal',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'cliente.nuevo@test.com',
+            'asunto_notificacion' => 'Documentación para Crédito',
+            'mensaje_notificacion' => 'Por favor adjunta los archivos.',
+            'document_preset_id' => $this->preset->id,
+
+            'nombres' => 'Carlos',
+            'primer_apellido' => 'Nuevo',
+            'segundo_apellido' => 'Cliente',
+            'correo_electronico' => 'cliente.nuevo@test.com',
+            'telefono' => '3111234567',
+            'direccion' => 'Calle Nueva 45',
+            'pais' => 'Colombia',
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id
+        ];
+
+        $response = $this->postJson('/api/solicitudes-credito', $payload);
+
+        $response->assertStatus(201);
+
+        // Se creó el Cliente nuevo, con nombre/identificacion derivados por
+        // el hook Cliente::boot()::saving().
+        $this->assertDatabaseHas('clientes', [
+            'numero_documento' => '99988877',
+            'identificacion' => '99988877',
+            'nombre' => 'Carlos Nuevo Cliente',
+            'nombres' => 'Carlos',
+            'correo_electronico' => 'cliente.nuevo@test.com',
+        ]);
+
+        $cliente = Cliente::where('numero_documento', '99988877')->first();
+        $this->assertNotNull($cliente);
+
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'cliente_id' => $cliente->id,
+            'monto_solicitado' => 15000000.00,
+        ]);
+
+        // Assert User got provisioned for the brand-new client
+        $this->assertDatabaseHas('users', [
+            'numero_documento' => '99988877',
+            'email' => 'cliente.nuevo@test.com',
+        ]);
+    }
+
+    /**
+     * SCRUM-185: si 'cliente_id' viene vacío pero el 'numero_documento' ya
+     * pertenece a otro cliente, debe rechazarse con un 422 de validación
+     * explícito — no crear un duplicado ni reventar con un error de BD.
+     */
+    public function test_register_credit_request_rejects_duplicate_numero_documento_for_new_client(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $payload = [
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => $this->clientNatural->numero_documento, // ya existe
+
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 15000000.00,
+            'plazo_meses' => 24,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'duplicado@test.com',
+            'asunto_notificacion' => 'Documentación para Crédito',
+            'mensaje_notificacion' => 'Por favor adjunta los archivos.',
+
+            'nombres' => 'Duplicado',
+            'primer_apellido' => 'Cliente',
+            'correo_electronico' => 'duplicado@test.com',
+            'telefono' => '3111234567',
+            'direccion' => 'Calle Nueva 45',
+            'pais' => 'Colombia',
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id
+        ];
+
+        $response = $this->postJson('/api/solicitudes-credito', $payload);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['numero_documento']);
     }
 
     /**
@@ -505,5 +615,331 @@ class SolicitudCreditoTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['proyecto_ciudad_id']);
+    }
+
+    /**
+     * SCRUM-159: el Coordinador Comercial puede editar "Condiciones
+     * Financieras del Crédito" de una solicitud ya registrada.
+     */
+    public function test_coordinador_comercial_can_update_condiciones_financieras(): void
+    {
+        $coordinador = User::create([
+            'name' => 'Coordinador Comercial',
+            'email' => 'coordinador.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'coord999',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['coordinador_comercial']
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clientNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'garantia' => 'Firma personal',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        Passport::actingAs($coordinador);
+
+        $payload = [
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 35000000.00,
+            'plazo_meses' => 24,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Compra de maquinaria',
+            'garantia' => 'Hipoteca',
+            'fuente_pago' => 'Ventas del negocio',
+        ];
+
+        $response = $this->putJson("/api/solicitudes-credito/{$solicitud->id}", $payload);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'id' => $solicitud->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 35000000.00,
+            'plazo_meses' => 24,
+            'destino_recurso' => 'Compra de maquinaria',
+            'garantia' => 'Hipoteca',
+            'fuente_pago' => 'Ventas del negocio',
+        ]);
+
+        // No debe tocar campos fuera de alcance (cliente, notificación, etc.)
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'id' => $solicitud->id,
+            'cliente_id' => $this->clientNatural->id,
+            'correo_notificacion' => 'juan@test.com',
+        ]);
+    }
+
+    /**
+     * SCRUM-159: roles fuera de Coordinador Comercial / superadmin no pueden
+     * editar Condiciones Financieras vía este endpoint.
+     */
+    public function test_update_condiciones_financieras_rejects_unauthorized_role(): void
+    {
+        $gerente = User::create([
+            'name' => 'Gerente',
+            'email' => 'gerente.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'ger999',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['gerente']
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clientNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        Passport::actingAs($gerente);
+
+        $response = $this->putJson("/api/solicitudes-credito/{$solicitud->id}", [
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 99999999.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+        ]);
+
+        $response->assertStatus(403);
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'id' => $solicitud->id,
+            'monto_solicitado' => 20000000.00,
+        ]);
+    }
+
+    /**
+     * SCRUM-159: la validación reutiliza las mismas reglas de store() para
+     * los campos de Condiciones Financieras.
+     */
+    public function test_update_condiciones_financieras_validates_required_fields(): void
+    {
+        $coordinador = User::create([
+            'name' => 'Coordinador Comercial',
+            'email' => 'coordinador2.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'coord998',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['coordinador_comercial']
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clientNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        Passport::actingAs($coordinador);
+
+        $response = $this->putJson("/api/solicitudes-credito/{$solicitud->id}", [
+            'monto_solicitado' => -5,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors([
+            'tipo_credito_id',
+            'monto_solicitado',
+            'plazo_meses',
+            'amortizacion_id',
+            'destino_recurso',
+            'fuente_pago',
+        ]);
+    }
+
+    /**
+     * SCRUM-159 (hallazgo Senior Reviewer): si todavía no existe ningún
+     * CreditoOrdinario (el workflow BPMN aún no arrancó) el Coordinador
+     * puede seguir cambiando tipo_credito_id libremente, para corregir un
+     * error de carga del Gerente antes de que el flujo arranque.
+     */
+    public function test_update_permite_cambiar_tipo_credito_si_no_existe_credito_ordinario(): void
+    {
+        $coordinador = User::create([
+            'name' => 'Coordinador Comercial',
+            'email' => 'coordinador3.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'coord997',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['coordinador_comercial']
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clientNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        // Sin CreditoOrdinario asociado: el workflow BPMN nunca arrancó.
+        Passport::actingAs($coordinador);
+
+        $response = $this->putJson("/api/solicitudes-credito/{$solicitud->id}", [
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'id' => $solicitud->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+        ]);
+    }
+
+    /**
+     * SCRUM-159 (hallazgo Senior Reviewer): si ya existe un CreditoOrdinario
+     * asociado (el workflow BPMN ya arrancó), cambiar tipo_credito_id se
+     * rechaza con 422 y el valor no se modifica en BD — evita que el
+     * expediente desaparezca o quede mal ubicado en la bandeja de Informe
+     * Técnico, que filtra con un join en vivo contra el tipo de crédito
+     * actual (InformeTecnicoController::index()).
+     */
+    public function test_update_bloquea_cambio_de_tipo_credito_si_existe_credito_ordinario(): void
+    {
+        $coordinador = User::create([
+            'name' => 'Coordinador Comercial',
+            'email' => 'coordinador4.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'coord996',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['coordinador_comercial']
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clientNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        CreditoOrdinario::create([
+            'numero_solicitud' => 'CO-TEST-' . $solicitud->id,
+            'solicitud_credito_id' => $solicitud->id,
+            'monto' => 20000000.00,
+            'plazo_meses' => 12,
+            'estado' => 'revision_documental',
+        ]);
+
+        Passport::actingAs($coordinador);
+
+        $response = $this->putJson("/api/solicitudes-credito/{$solicitud->id}", [
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonFragment([
+            'message' => 'No se puede cambiar el tipo de crédito: ya existe un flujo de Crédito Ordinario en curso para esta solicitud.',
+        ]);
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'id' => $solicitud->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+        ]);
+    }
+
+    /**
+     * SCRUM-159 (hallazgo Senior Reviewer): con CreditoOrdinario ya
+     * asociado, el bloqueo es SOLO sobre tipo_credito_id — el resto de los
+     * 6 campos de Condiciones Financieras siguen editables sin
+     * restricción, igual que antes del fix.
+     */
+    public function test_update_permite_otros_campos_si_existe_credito_ordinario_pero_tipo_no_cambia(): void
+    {
+        $coordinador = User::create([
+            'name' => 'Coordinador Comercial',
+            'email' => 'coordinador5.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'coord995',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['coordinador_comercial']
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clientNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        CreditoOrdinario::create([
+            'numero_solicitud' => 'CO-TEST-' . $solicitud->id,
+            'solicitud_credito_id' => $solicitud->id,
+            'monto' => 20000000.00,
+            'plazo_meses' => 12,
+            'estado' => 'revision_documental',
+        ]);
+
+        Passport::actingAs($coordinador);
+
+        $response = $this->putJson("/api/solicitudes-credito/{$solicitud->id}", [
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 45000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'id' => $solicitud->id,
+            'tipo_credito_id' => $this->tipoConstructor->id,
+            'monto_solicitado' => 45000000.00,
+        ]);
     }
 }

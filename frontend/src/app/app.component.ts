@@ -7,6 +7,20 @@ import { AuthService } from './services/auth.service';
 import { environment } from '../environments/environment';
 import { interval, Subscription } from 'rxjs';
 
+interface NavItem {
+  label: string;
+  route: string;
+  icon: string;
+  roles: string[];
+  badge?: () => number;
+}
+
+interface NavSection {
+  title: string;
+  roles: string[];
+  items: NavItem[];
+}
+
 @Component({
     selector: 'app-root',
     standalone: true,
@@ -24,140 +38,21 @@ import { interval, Subscription } from 'rxjs';
         </div>
 
         <nav class="sidebar-nav">
-          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])">
-            <label>Operaciones</label>
-            <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])" routerLink="/dashboard" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">dashboard</span> Dashboard
-            </a>
-            <a *ngIf="authService.isAuthorized(['operativo'])" routerLink="/sheets" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">database</span> Base de Datos
-            </a>
-            <a *ngIf="authService.isAuthorized(['operativo'])" routerLink="/upload" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">upload_file</span> Subir Operación
-            </a>
-            <a *ngIf="authService.isAuthorized(['operativo', 'gerente'])" routerLink="/validation" routerLinkActive="active" class="nav-link">
-              <div class="nav-link-content">
-                <span class="material-symbols-outlined">rule</span>
-                <span>Validación</span>
-                <span class="nav-badge" *ngIf="getValidationBadge() > 0">{{ getValidationBadge() }}</span>
-              </div>
-            </a>
-            <a *ngIf="authService.isAuthorized(['operativo', 'contable', 'gerente', 'superadmin'])" routerLink="/internal-docs" routerLinkActive="active" class="nav-link">
-              <div class="nav-link-content">
-                <span class="material-symbols-outlined">mail</span>
-                <span>Bandeja Interna</span>
-                <span class="nav-badge" *ngIf="getInternalDocsBadge() > 0">{{ getInternalDocsBadge() }}</span>
-              </div>
-            </a>
-            <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])" routerLink="/mandatos" routerLinkActive="active" class="nav-link">
-              <div class="nav-link-content">
-                <span class="material-symbols-outlined">contract</span>
-                <span>Revisión Mandatos</span>
-                <span class="nav-badge" *ngIf="getMandatosBadge() > 0">{{ getMandatosBadge() }}</span>
-              </div>
-            </a>
-          </div>
-
-          <!-- SCRUM-153: sección propia de Crédito, orden alfabético -->
-          <div class="nav-section" *ngIf="authService.isAuthorized(['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin', 'ingeniero'])">
-            <label>Crédito</label>
-            <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'superadmin'])" routerLink="/analisis-financiero" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">finance</span> Análisis Financiero
-            </a>
-            <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'])" routerLink="/creditos" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">payments</span> Crédito Ordinario
-            </a>
-            <a *ngIf="authService.isAuthorized(['ingeniero', 'coordinador_comercial', 'superadmin'])" routerLink="/informes-tecnicos" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">engineering</span> Informe Técnico
-            </a>
-            <a *ngIf="authService.isAuthorized(['oficial_cumplimiento', 'superadmin'])" routerLink="/listas-sarlaft" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">gavel</span> Listas Restrictivas y SARLAFT
-            </a>
-            <a *ngIf="authService.isAuthorized(['coordinador_comercial', 'gerente', 'superadmin', 'operativo'])" routerLink="/solicitudes-credito" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">assignment_turned_in</span> Registro Solicitud Crédito
-            </a>
-          </div>
-
-          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin', 'coordinador_comercial'])">
-            <label>Administración</label>
-            <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])" routerLink="/conciliacion-susuerte" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">fact_check</span> Conciliación Susuerte
-            </a>
-            <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'superadmin', 'coordinador_comercial'])" routerLink="/clientes" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">group</span> Registro de Clientes
-            </a>
-            <a *ngIf="authService.isAuthorized(['gerente', 'operativo', 'superadmin'])" routerLink="/visitas" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">chat_bubble</span> Registro de Visita a Cliente
-            </a>
-          </div>
-
-          <div class="nav-section" *ngIf="authService.isAuthorized(['gerente', 'operativo', 'contable', 'superadmin'])">
-            <label>Sistema</label>
-            <a routerLink="/logs" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">shield_person</span> Auditoría
-            </a>
-          </div>
-
-          <div class="nav-section" *ngIf="authService.isAuthorized(['operativo', 'superadmin'])">
-            <label>Configuración Documentos</label>
-            <a routerLink="/document-requests" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">checklist</span> Solicitudes Documentos
-            </a>
-            <a routerLink="/document-config" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">settings_applications</span> Config Requisitos
-            </a>
-          </div>
-
-          <div class="nav-section" *ngIf="authService.getActiveRole() === 'superadmin'">
-            <label>Notificaciones</label>
-            <a routerLink="/destinatarios" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">mail_lock</span> Destinatarios
-            </a>
-            <a routerLink="/notificaciones" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">notifications_active</span> Notificaciones
-            </a>
-            <a routerLink="/asignaciones" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">assignment_ind</span> Asignaciones
-            </a>
-          </div>
-
-          <div class="nav-section" *ngIf="authService.getActiveRole() === 'superadmin'">
-            <label>Planificación</label>
-            <a routerLink="/roadmap" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">route</span> Roadmap del Sistema
-            </a>
-          </div>
-
-          <div class="nav-section" *ngIf="authService.getActiveRole() === 'superadmin'">
-            <label>Configuración</label>
-            <a routerLink="/users" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">group</span> Gestión Usuarios
-            </a>
-            <a routerLink="/parameters" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">settings_applications</span> Parámetros
-            </a>
-            <a routerLink="/db-cleaner" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">restart_alt</span> Limpieza BD
-            </a>
-            <a routerLink="/configuraciones" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">key</span> Configuraciones
-            </a>
-            <a routerLink="/document-areas" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">account_tree</span> Áreas de Aprobación
-            </a>
-          </div>
-
-          <div class="nav-section" *ngIf="authService.isAuthorized(['cliente'])">
-            <label>Portal Cliente</label>
-            <a routerLink="/client-upload" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">folder_shared</span> Mis Cargas
-            </a>
-            <a routerLink="/mandatos" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">description</span> Diligenciar Mandato
-            </a>
-            <a routerLink="/creditos" routerLinkActive="active" class="nav-link">
-              <span class="material-symbols-outlined">payments</span> Mis Créditos
-            </a>
+          <!-- SCRUM-160: bloques e ítems ordenados alfabéticamente, colapsables -->
+          <div class="nav-section" *ngFor="let section of visibleSections()">
+            <label (click)="toggleSection(section.title)">
+              <span>{{ section.title }}</span>
+              <span class="material-symbols-outlined nav-section-toggle" [class.collapsed]="isSectionCollapsed(section.title)">expand_more</span>
+            </label>
+            <ng-container *ngIf="!isSectionCollapsed(section.title)">
+              <a *ngFor="let item of visibleItems(section)" [routerLink]="item.route" routerLinkActive="active" class="nav-link">
+                <div class="nav-link-content">
+                  <span class="material-symbols-outlined">{{ item.icon }}</span>
+                  <span>{{ item.label }}</span>
+                  <span class="nav-badge" *ngIf="item.badge && item.badge()! > 0">{{ item.badge!() }}</span>
+                </div>
+              </a>
+            </ng-container>
           </div>
 
         </nav>
@@ -179,7 +74,7 @@ import { interval, Subscription } from 'rxjs';
         <div class="pending-alert-bar" [ngClass]="{'critical': isExpiring()}" *ngIf="(getValidationBadge() > 0 || getInternalDocsBadge() > 0) && !router.url.includes('/validation') && !router.url.includes('/internal-docs')">
            <div class="alert-content">
               <span class="material-symbols-outlined pulse">{{ isExpiring() ? 'timer' : 'warning' }}</span>
-              
+
               <!-- Message for Client Uploads -->
               <p *ngIf="getValidationBadge() > 0">
                 Tienes <strong>{{ getValidationBadge() }}</strong> documentos de clientes pendientes.
@@ -187,14 +82,14 @@ import { interval, Subscription } from 'rxjs';
 
               <!-- Message for Internal Docs (Contable / Gerente) -->
               <p *ngIf="getInternalDocsBadge() > 0">
-                Tienes <strong>{{ getInternalDocsBadge() }}</strong> documentos internos pendientes. 
+                Tienes <strong>{{ getInternalDocsBadge() }}</strong> documentos internos pendientes.
                 <span *ngIf="isExpiring()" style="color: #fee2e2; margin-left: 4px;">(¡Atención: Algunos están a punto de vencer!)</span>
               </p>
            </div>
-           
-           <button *ngIf="authService.isAuthorized(['operativo', 'gerente']) && (pendingCounts.operativo > 0 || pendingCounts.gerente > 0)" 
+
+           <button *ngIf="authService.isAuthorized(['operativo', 'gerente']) && (pendingCounts.operativo > 0 || pendingCounts.gerente > 0)"
                    class="btn-alert-action" routerLink="/validation">Validar Clientes</button>
-           
+
            <button *ngIf="(authService.getActiveRole() === 'contable' && pendingCounts.contable > 0) || (authService.getActiveRole() === 'gerente' && pendingCounts.internal_gerente > 0)"
                    class="btn-alert-action" routerLink="/internal-docs" style="margin-left: 10px;">Ver Bandeja Interna</button>
         </div>
@@ -216,7 +111,7 @@ import { interval, Subscription } from 'rxjs';
                  </div>
                 <span class="material-symbols-outlined expand-icon">expand_more</span>
               </div>
-              
+
               <!-- Dropdown Menu -->
               <div class="user-dropdown" *ngIf="showUserMenu">
                 <a routerLink="/profile" class="dropdown-item" (click)="showUserMenu = false">
@@ -247,8 +142,12 @@ import { interval, Subscription } from 'rxjs';
       .sidebar { width: 260px; background: #FFFFFF; border-right: 1px solid #E2E8F0; display: flex; flex-direction: column; z-index: 100; }
       .sidebar-header { padding: 2rem 1.5rem; display: flex; justify-content: center; border-bottom: 1px solid #F7FAFC; .app-logo { max-width: 180px; height: auto; } }
       .sidebar-nav { flex-grow: 1; padding: 1.5rem 1rem; overflow-y: auto; }
-      .nav-section { margin-bottom: 2rem; label { display: block; font-size: 0.65rem; font-weight: 800; color: #A0AEC0; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.75rem; padding-left: 0.75rem; } }
-      
+      .nav-section {
+        margin-bottom: 2rem;
+        label { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; font-size: 0.65rem; font-weight: 800; color: #A0AEC0; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.75rem; padding-left: 0.75rem; padding-right: 0.75rem; }
+        .nav-section-toggle { font-size: 16px; transition: transform 0.2s ease; transform: rotate(180deg); &.collapsed { transform: rotate(0deg); } }
+      }
+
       .nav-link {
         display: flex; align-items: center; gap: 12px; padding: 0.75rem 1rem; color: #4A5568; text-decoration: none; font-size: 0.9rem; font-weight: 500; border-radius: 10px; transition: all 0.2s; margin-bottom: 4px;
         &:hover { background: #F7FAFC; color: var(--primary); }
@@ -260,19 +159,19 @@ import { interval, Subscription } from 'rxjs';
       .nav-badge { position: absolute; right: 0; background: var(--danger); color: white; font-size: 0.65rem; font-weight: 800; padding: 2px 6px; border-radius: 6px; min-width: 18px; text-align: center; box-shadow: 0 2px 4px rgba(229, 62, 62, 0.3); }
 
       /* Pending Alert Bar */
-      .pending-alert-bar { 
+      .pending-alert-bar {
         background: #fffbeb; /* Soft amber background */
         color: #b45309; /* Dark amber text for high contrast */
         border-bottom: 1px solid #fde68a;
-        padding: 12px 2rem; 
-        display: flex; 
-        justify-content: space-between; 
-        align-items: center; 
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+        padding: 12px 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
         transition: all 0.3s ease;
         &.critical { background: #dc2626; color: white; border-bottom-color: #b91c1c; }
-        .alert-content { display: flex; align-items: center; gap: 12px; p { margin: 0; font-size: 0.95rem; font-weight: 500; } } 
-        .btn-alert-action { background: #f59e0b; border: none; color: white; padding: 6px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: background 0.2s; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2); &:hover { background: #d97706; } } 
+        .alert-content { display: flex; align-items: center; gap: 12px; p { margin: 0; font-size: 0.95rem; font-weight: 500; } }
+        .btn-alert-action { background: #f59e0b; border: none; color: white; padding: 6px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; transition: background 0.2s; box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2); &:hover { background: #d97706; } }
         &.critical .btn-alert-action { background: white; color: #dc2626; box-shadow: 0 2px 4px rgba(0,0,0,0.1); &:hover { background: #fef2f2; } }
       }
 
@@ -283,7 +182,7 @@ import { interval, Subscription } from 'rxjs';
 
       .main-wrapper { flex-grow: 1; display: flex; flex-direction: column; background: #F4F7FE; overflow: hidden; }
       .top-bar { height: 70px; background: white; border-bottom: 1px solid #E2E8F0; padding: 0 2rem; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; h3 { margin: 0; font-size: 1.1rem; color: #1A202C; } }
-      
+
       .user-profile-wrapper { position: relative; cursor: pointer; }
       .user-profile { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-radius: 12px; transition: background 0.2s; &:hover { background: #F8FAFC; } .expand-icon { font-size: 20px; color: var(--text-muted); } }
       .user-dropdown { position: absolute; top: calc(100% + 8px); right: 0; width: 200px; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid var(--border-color); padding: 8px; z-index: 1000; animation: fadeIn 0.2s ease-out; .dropdown-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; color: var(--text-main); text-decoration: none; font-size: 0.9rem; font-weight: 500; border-radius: 8px; transition: all 0.2s; cursor: pointer; .material-symbols-outlined { font-size: 18px; color: var(--text-muted); } &:hover { background: #F4F7FE; color: var(--primary); .material-symbols-outlined { color: var(--primary); } } &.logout { color: var(--danger); &:hover { background: #FFF5F5; } .material-symbols-outlined { color: var(--danger); } } } .dropdown-divider { height: 1px; background: var(--border-color); margin: 6px 0; } }
@@ -297,7 +196,7 @@ import { interval, Subscription } from 'rxjs';
 
       .burger-menu-btn { display: none; background: none; border: none; cursor: pointer; color: #4A5568; outline: none; padding: 4px; display: none; align-items: center; justify-content: center; .material-symbols-outlined { font-size: 28px; } }
       .sidebar-backdrop { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 99; animation: fadeIn 0.2s ease-out; }
-      
+
       @media (max-width: 768px) {
         .sidebar { position: fixed; top: 0; left: -260px; height: 100vh; transition: left 0.3s ease; z-index: 100; }
         .sidebar.open { left: 0; }
@@ -311,32 +210,164 @@ import { interval, Subscription } from 'rxjs';
 export class AppComponent implements OnInit, OnDestroy {
   showUserMenu = false;
   isSidebarOpen = false;
-  pendingCounts: { 
-    operativo: number, 
-    gerente: number, 
-    contable: number, 
-    internal_gerente: number, 
+  pendingCounts: {
+    operativo: number,
+    gerente: number,
+    contable: number,
+    internal_gerente: number,
     internal_operativo?: number,
-    expiring_contable?: number, 
-    expiring_gerente?: number, 
+    expiring_contable?: number,
+    expiring_gerente?: number,
     expiring_operativo?: number,
     pending_mandates?: number,
-    total: number 
-  } = { 
-    operativo: 0, 
-    gerente: 0, 
-    contable: 0, 
-    internal_gerente: 0, 
+    total: number
+  } = {
+    operativo: 0,
+    gerente: 0,
+    contable: 0,
+    internal_gerente: 0,
     internal_operativo: 0,
-    expiring_contable: 0, 
-    expiring_gerente: 0, 
+    expiring_contable: 0,
+    expiring_gerente: 0,
     expiring_operativo: 0,
     pending_mandates: 0,
-    total: 0 
+    total: 0
   };
   private pollingSub!: Subscription;
 
+  // SCRUM-160: fuente de datos del menú lateral. El orden de declaración acá NO importa —
+  // navSections se construye ya ordenado alfabéticamente (bloques por title, ítems por label)
+  // en buildSortedNavSections(). Los arrays `roles` reproducen exactamente los *ngIf que había
+  // antes por sección/ítem (ver commits previos) para no alterar la superficie de permisos.
+  private readonly rawNavSections: NavSection[] = [
+    {
+      title: 'Operaciones',
+      roles: ['gerente', 'operativo', 'contable', 'superadmin'],
+      items: [
+        { label: 'Dashboard', route: '/dashboard', icon: 'dashboard', roles: ['gerente', 'operativo', 'contable', 'superadmin'] },
+        { label: 'Base de Datos', route: '/sheets', icon: 'database', roles: ['operativo'] },
+        { label: 'Subir Operación', route: '/upload', icon: 'upload_file', roles: ['operativo'] },
+        { label: 'Validación', route: '/validation', icon: 'rule', roles: ['operativo', 'gerente'], badge: () => this.getValidationBadge() },
+        { label: 'Bandeja Interna', route: '/internal-docs', icon: 'mail', roles: ['operativo', 'contable', 'gerente', 'superadmin'], badge: () => this.getInternalDocsBadge() },
+        { label: 'Revisión Mandatos', route: '/mandatos', icon: 'contract', roles: ['gerente', 'operativo', 'contable', 'superadmin'], badge: () => this.getMandatosBadge() },
+      ],
+    },
+    {
+      // SCRUM-153: sección propia de Crédito, ya alfabetizada internamente — se preserva.
+      title: 'Crédito',
+      roles: ['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin', 'ingeniero'],
+      items: [
+        { label: 'Actas Comité de Crédito', route: '/actas-comite', icon: 'history_edu', roles: ['coordinador_comercial', 'superadmin'] },
+        { label: 'Análisis Financiero', route: '/analisis-financiero', icon: 'finance', roles: ['coordinador_comercial', 'superadmin'] },
+        { label: 'Crédito Ordinario', route: '/creditos', icon: 'payments', roles: ['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'] },
+        { label: 'Gestión de Créditos', route: '/gestion-creditos', icon: 'task_alt', roles: ['coordinador_comercial', 'superadmin'] },
+        { label: 'Informe Técnico', route: '/informes-tecnicos', icon: 'engineering', roles: ['ingeniero', 'coordinador_comercial', 'superadmin'] },
+        { label: 'Listas Restrictivas y SARLAFT', route: '/listas-sarlaft', icon: 'gavel', roles: ['oficial_cumplimiento', 'superadmin'] },
+        { label: 'Registro Solicitud Crédito', route: '/solicitudes-credito', icon: 'assignment_turned_in', roles: ['coordinador_comercial', 'gerente', 'superadmin', 'operativo'] },
+      ],
+    },
+    {
+      title: 'Administración',
+      roles: ['gerente', 'operativo', 'contable', 'superadmin', 'coordinador_comercial'],
+      items: [
+        { label: 'Conciliación Susuerte', route: '/conciliacion-susuerte', icon: 'fact_check', roles: ['gerente', 'operativo', 'contable', 'superadmin'] },
+        { label: 'Registro de Clientes', route: '/clientes', icon: 'group', roles: ['gerente', 'operativo', 'superadmin', 'coordinador_comercial'] },
+        { label: 'Registro de Visita a Cliente', route: '/visitas', icon: 'chat_bubble', roles: ['gerente', 'operativo', 'superadmin'] },
+      ],
+    },
+    {
+      title: 'Sistema',
+      roles: ['gerente', 'operativo', 'contable', 'superadmin'],
+      items: [
+        // Auditoría no tenía *ngIf propio: hereda el permiso del bloque.
+        { label: 'Auditoría', route: '/logs', icon: 'shield_person', roles: ['gerente', 'operativo', 'contable', 'superadmin'] },
+      ],
+    },
+    {
+      title: 'Configuración Documentos',
+      roles: ['operativo', 'superadmin'],
+      items: [
+        // Ítems sin *ngIf propio: heredan el permiso del bloque.
+        { label: 'Solicitudes Documentos', route: '/document-requests', icon: 'checklist', roles: ['operativo', 'superadmin'] },
+        { label: 'Config Requisitos', route: '/document-config', icon: 'settings_applications', roles: ['operativo', 'superadmin'] },
+      ],
+    },
+    {
+      // El bloque original usaba getActiveRole() === 'superadmin'. isAuthorized(['superadmin'])
+      // es equivalente: true solo cuando el rol activo es superadmin (ver AuthService.isAuthorized).
+      title: 'Notificaciones',
+      roles: ['superadmin'],
+      items: [
+        { label: 'Destinatarios', route: '/destinatarios', icon: 'mail_lock', roles: ['superadmin'] },
+        { label: 'Notificaciones', route: '/notificaciones', icon: 'notifications_active', roles: ['superadmin'] },
+        { label: 'Asignaciones', route: '/asignaciones', icon: 'assignment_ind', roles: ['superadmin'] },
+      ],
+    },
+    {
+      title: 'Planificación',
+      roles: ['superadmin'],
+      items: [
+        { label: 'Roadmap del Sistema', route: '/roadmap', icon: 'route', roles: ['superadmin'] },
+      ],
+    },
+    {
+      title: 'Configuración',
+      roles: ['superadmin'],
+      items: [
+        { label: 'Gestión Usuarios', route: '/users', icon: 'group', roles: ['superadmin'] },
+        { label: 'Parámetros', route: '/parameters', icon: 'settings_applications', roles: ['superadmin'] },
+        { label: 'Limpieza BD', route: '/db-cleaner', icon: 'restart_alt', roles: ['superadmin'] },
+        { label: 'Configuraciones', route: '/configuraciones', icon: 'key', roles: ['superadmin'] },
+        { label: 'Áreas de Aprobación', route: '/document-areas', icon: 'account_tree', roles: ['superadmin'] },
+      ],
+    },
+    {
+      title: 'Portal Cliente',
+      roles: ['cliente'],
+      items: [
+        { label: 'Mis Cargas', route: '/client-upload', icon: 'folder_shared', roles: ['cliente'] },
+        { label: 'Diligenciar Mandato', route: '/mandatos', icon: 'description', roles: ['cliente'] },
+        { label: 'Mis Créditos', route: '/creditos', icon: 'payments', roles: ['cliente'] },
+      ],
+    },
+  ];
+
+  navSections: NavSection[] = this.buildSortedNavSections();
+
+  // SCRUM-160: estado en memoria de bloques colapsados — no persiste entre sesiones a propósito
+  // (siempre arranca expandido, igual que isSidebarOpen no persiste).
+  private collapsedSections = new Set<string>();
+
   constructor(public authService: AuthService, public router: Router, private http: HttpClient) {}
+
+  private buildSortedNavSections(): NavSection[] {
+    return [...this.rawNavSections]
+      .map(section => ({
+        ...section,
+        items: [...section.items].sort((a, b) => a.label.localeCompare(b.label, 'es')),
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title, 'es'));
+  }
+
+  visibleSections(): NavSection[] {
+    return this.navSections.filter(section => this.authService.isAuthorized(section.roles));
+  }
+
+  visibleItems(section: NavSection): NavItem[] {
+    return section.items.filter(item => this.authService.isAuthorized(item.roles));
+  }
+
+  isSectionCollapsed(title: string): boolean {
+    return this.collapsedSections.has(title);
+  }
+
+  toggleSection(title: string): void {
+    if (this.collapsedSections.has(title)) {
+      this.collapsedSections.delete(title);
+    } else {
+      this.collapsedSections.add(title);
+    }
+  }
 
   toggleSidebar() {
     this.isSidebarOpen = !this.isSidebarOpen;

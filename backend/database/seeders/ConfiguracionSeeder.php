@@ -83,6 +83,34 @@ class ConfiguracionSeeder extends Seeder
                 'grupo'       => 'analisis_financiero',
                 'es_secreto'  => false,
             ],
+            // Duración de sesión (SCRUM-161)
+            [
+                'clave'       => 'SESSION_DURATION_OPTIONS',
+                'valor'       => json_encode([
+                    ['value' => 30, 'label' => '30 minutos'],
+                    ['value' => 60, 'label' => '1 hora'],
+                    ['value' => 240, 'label' => '4 horas'],
+                    ['value' => 480, 'label' => '8 horas'],
+                    ['value' => 1440, 'label' => '24 horas'],
+                ]),
+                'descripcion' => 'Lista cerrada de duraciones de sesión (minutos) que el usuario puede elegir desde /perfil. JSON de objetos {value,label}.',
+                'grupo'       => 'sesion',
+                'es_secreto'  => false,
+            ],
+            [
+                'clave'       => 'SESSION_DURATION_DEFAULT',
+                'valor'       => '480',
+                'descripcion' => 'Duración de sesión (minutos) asignada por defecto a un usuario que no eligió ninguna preferencia todavía.',
+                'grupo'       => 'sesion',
+                'es_secreto'  => false,
+            ],
+            [
+                'clave'       => 'SESSION_DURATION_MAX',
+                'valor'       => '1440',
+                'descripcion' => 'Techo absoluto (minutos) para la duración de sesión: ninguna opción de SESSION_DURATION_OPTIONS puede aplicarse por encima de este valor, aunque exista en la lista.',
+                'grupo'       => 'sesion',
+                'es_secreto'  => false,
+            ],
         ];
 
         foreach ($configs as $config) {

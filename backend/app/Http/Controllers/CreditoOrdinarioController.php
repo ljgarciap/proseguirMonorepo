@@ -22,7 +22,7 @@ class CreditoOrdinarioController extends Controller
         $user = Auth::user();
         $activeRole = $this->resolveActiveRole($request);
         
-        $query = CreditoOrdinario::with(['cliente', 'informeTecnico', 'solicitudCredito.tipoCredito', 'solicitudCredito.documentRequest.items.requirement']);
+        $query = CreditoOrdinario::with(['cliente', 'informeTecnico', 'analisisFinanciero', 'solicitudCredito.tipoCredito', 'solicitudCredito.documentRequest.items.requirement']);
 
         // Si el rol es cliente, solo puede ver sus propias solicitudes
         if ($activeRole === 'cliente') {
@@ -73,7 +73,7 @@ class CreditoOrdinarioController extends Controller
      */
     public function show($id)
     {
-        $credito = CreditoOrdinario::with(['cliente', 'informeTecnico', 'solicitudCredito.tipoCredito', 'solicitudCredito.documentRequest.items.requirement'])->findOrFail($id);
+        $credito = CreditoOrdinario::with(['cliente', 'informeTecnico', 'analisisFinanciero', 'solicitudCredito.tipoCredito', 'solicitudCredito.documentRequest.items.requirement'])->findOrFail($id);
         return response()->json($credito);
     }
 
@@ -94,6 +94,40 @@ class CreditoOrdinarioController extends Controller
         }
 
         return ['formulario_solicitud', 'documentos_identidad', 'estados_financieros', 'certificados_laborales'];
+    }
+
+    /**
+     * Determina si un documento de Etapa 1 (clave 'req_item_{id}' del preset,
+     * o clave fija legacy) ya está satisfecho. SCRUM-176: hay dos caminos de
+     * carga válidos que antes no se hablaban entre sí —
+     * a) directo en credito.documentos, vía el widget "Subir" dentro de
+     *    Crédito Ordinario / Mis Créditos (este mismo transition()), o
+     * b) el portal "Mis Cargas" (ClientUploadController), que es el nav más
+     *    visible del cliente y el que nombra el documento exacto requerido,
+     *    pero solo deja rastro en DocumentRequestItem.estado — nunca en
+     *    documentos_raw. Antes solo se miraba (a), así que una carga hecha
+     *    por (b) nunca destrababa la etapa: el crédito quedaba atascado en
+     *    'Faltan documentos obligatorios' para siempre, sin ningún error
+     *    visible ni para el cliente (ve "Carga Exitosa") ni para el
+     *    Coordinador. No se exige que el item llegue a 'aprobado' (eso
+     *    requeriría el circuito completo de validar+aprobar de Operativo,
+     *    ajeno a esta pantalla) — basta con que el cliente ya haya subido
+     *    algo ('subido' en adelante, distinto de 'pendiente'/'rechazado').
+     */
+    private function etapa1KeySatisfecha(string $key, array $documentos, CreditoOrdinario $credito): bool
+    {
+        $valor = $documentos[$key] ?? null;
+        if (is_array($valor) ? count($valor) > 0 : !empty($valor)) {
+            return true;
+        }
+
+        if (str_starts_with($key, 'req_item_')) {
+            $itemId = (int) substr($key, strlen('req_item_'));
+            $item = $credito->solicitudCredito?->documentRequest?->items?->firstWhere('id', $itemId);
+            return $item && !in_array($item->estado, ['pendiente', 'rechazado'], true);
+        }
+
+        return false;
     }
 
     /**
@@ -122,15 +156,34 @@ class CreditoOrdinarioController extends Controller
         // Bypassear validaciones estrictas de rol si es superadmin (para facilitar pruebas)
         $isAuthorized = ($activeRole === 'superadmin');
 
+        // SCRUM-178: 'comite_evaluacion' ya no se transiciona manualmente
+        // desde acá — la única salida de ese estado es registrar el Acta de
+        // Comité (ActaComiteController::registrar()), que decide
+        // aprobado/rechazado/pendiente por solicitud. Cortamos temprano con
+        // un mensaje explícito en vez de dejar caer en el mapa de roles
+        // genérico de abajo (que, sin una entrada para este estado, dejaría
+        // pasar a cualquier rol).
+        if ($estadoActual === 'comite_evaluacion' && !$isAuthorized) {
+            return response()->json([
+                'message' => 'Esta transición ahora se ejecuta desde Actas de Comité al registrar el acta.',
+            ], 422);
+        }
+
         // Mapa de roles autorizados por estado para transiciones
         $rolesAutorizados = [
             'validacion_documental_constructor' => ['coordinador_comercial', 'cliente'],
             'completar_solicitud_constructor' => ['cliente'],
             'revision_documental' => ['coordinador_comercial', 'cliente'],
             'completar_solicitud' => ['cliente'],
+            // SCRUM-183: 'aprobacion_presentacion' se retiró — Análisis
+            // Financiero confirmado pasa directo a comite_evaluacion (ver
+            // AnalisisFinancieroController::confirmar()). El único rol que
+            // sigue teniendo algo que hacer en 'pendiente_analisis_financiero'
+            // vía este endpoint es 'rechazar' (genérico, caso else de abajo).
             'pendiente_analisis_financiero' => ['coordinador_comercial'],
-            'aprobacion_presentacion' => ['gerente'],
-            'comite_evaluacion' => ['comite_credito'],
+            // 'comite_evaluacion' ya NO tiene rol autorizado acá: SCRUM-178
+            // retiró el botón manual de aprobar/rechazar — la única salida
+            // de ese estado es ActaComiteController::registrar().
             'formalizacion_garantias' => ['coordinador_comercial', 'cliente', 'operativo'],
             'aprobacion_registro_cyf' => ['coordinador_comercial', 'gerente'],
             'desembolso_ingreso' => ['operativo'],
@@ -225,10 +278,14 @@ class CreditoOrdinarioController extends Controller
 
         // 2. Lógica de Máquina de Estados BPMN
         if ($accion === 'rechazar') {
-            if ($estadoActual === 'aprobacion_presentacion') {
-                $estadoNuevo = 'pendiente_analisis_financiero';
-                $comentario = 'Presentación rechazada por Gerencia. Retorna a análisis financiero. ' . $comentario;
-            } elseif ($estadoActual === 'comite_evaluacion') {
+            // SCRUM-183: el caso 'aprobacion_presentacion' se retiró junto
+            // con el estado — ya no existe ese paso.
+            if ($estadoActual === 'comite_evaluacion') {
+                // SCRUM-178: solo alcanzable por superadmin (el guard de más
+                // arriba bloquea a comite_credito). Se conserva como vía de
+                // escape manual; el camino normal es Actas de Comité, que
+                // además setea resultado_origen/gestión — este atajo no lo
+                // hace.
                 $estadoNuevo = 'rechazado';
                 $comentario = 'Crédito rechazado formalmente por el Comité de Crédito. ' . $comentario;
             } elseif ($estadoActual === 'formalizacion_garantias') {
@@ -255,9 +312,11 @@ class CreditoOrdinarioController extends Controller
             }
         } elseif ($accion === 'devolver') {
             if ($estadoActual === 'comite_evaluacion') {
-                // Returns to Gerente Presentation approval (Revision e Aprobacion de Presentacion)
-                $estadoNuevo = 'aprobacion_presentacion';
-                $comentario = 'Crédito devuelto por el Comité para corrección de la presentación. ' . $comentario;
+                // SCRUM-178: solo alcanzable por superadmin, ver nota en la rama 'rechazar'.
+                // SCRUM-183: ya no existe 'aprobacion_presentacion' — vuelve
+                // directo a análisis financiero para corrección.
+                $estadoNuevo = 'pendiente_analisis_financiero';
+                $comentario = 'Crédito devuelto por el Comité para corrección del análisis financiero. ' . $comentario;
             } elseif ($estadoActual === 'formalizacion_garantias') {
                 $estadoNuevo = 'formalizacion_garantias';
                 $documentos['garantias_firmadas'] = null;
@@ -293,10 +352,9 @@ class CreditoOrdinarioController extends Controller
                     // pasa directo a Informe Técnico (no a SARLAFT, que en
                     // Constructor corre después del Informe Técnico).
                     if ($accion === 'aprobar') {
-                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(function ($key) use ($documentos) {
-                            $valor = $documentos[$key] ?? null;
-                            return is_array($valor) ? count($valor) > 0 : !empty($valor);
-                        });
+                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(
+                            fn ($key) => $this->etapa1KeySatisfecha($key, $documentos, $credito)
+                        );
 
                         if ($hasEtapa1) {
                             $estadoNuevo = 'informe_tecnico_ingeniero';
@@ -312,10 +370,9 @@ class CreditoOrdinarioController extends Controller
                     // etapa: solo el Coordinador Comercial, con 'aprobar' explícito,
                     // decide que el expediente inicial está completo.
                     if ($accion === 'aprobar') {
-                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(function ($key) use ($documentos) {
-                            $valor = $documentos[$key] ?? null;
-                            return is_array($valor) ? count($valor) > 0 : !empty($valor);
-                        });
+                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(
+                            fn ($key) => $this->etapa1KeySatisfecha($key, $documentos, $credito)
+                        );
 
                         if ($hasEtapa1) {
                             $estadoNuevo = 'sarlaft_control_interno';
@@ -340,32 +397,16 @@ class CreditoOrdinarioController extends Controller
                     }
                     break;
 
-                case 'pendiente_analisis_financiero':
-                    // El Oficial de Cumplimiento ya emitió concepto favorable (módulo Listas
-                    // Restrictivas y SARLAFT, SCRUM-128). SCRUM-155 reemplazó el upload manual
-                    // de "Análisis Financiero" por el módulo interactivo dedicado — la
-                    // condición ya no depende de $documentos['analisis_financiero'], sino de
-                    // que AnalisisFinanciero quede confirmado allá. "Presentación Comité" sigue
-                    // siendo upload manual (elaborar esa presentación está fuera de alcance).
-                    $analisisConfirmado = $credito->analisisFinanciero?->estado === 'confirmado';
-                    $hasFinancial = $analisisConfirmado && !empty($documentos['presentacion_comite']);
-
-                    if ($hasFinancial) {
-                        $estadoNuevo = 'aprobacion_presentacion';
-                        $comentario = 'Análisis financiero confirmado y presentación cargada por Comercial. Pasa a aprobación de presentación por Gerencia.';
-                    } else {
-                        $comentario = 'Archivo cargado en análisis financiero. Aún faltan documentos complementarios para transicionar de etapa.';
-                    }
-                    break;
-
-                case 'aprobacion_presentacion':
-                    if ($accion === 'aprobar') {
-                        $estadoNuevo = 'comite_evaluacion';
-                        $comentario = 'Presentación aprobada por Gerencia. Pasa a evaluación del Comité de Crédito.';
-                    }
-                    break;
+                // SCRUM-183: los casos 'pendiente_analisis_financiero' y
+                // 'aprobacion_presentacion' se retiraron de acá — confirmar
+                // el Análisis Financiero (módulo dedicado, SCRUM-155) ya
+                // transiciona directo a 'comite_evaluacion' por sí solo, ver
+                // AnalisisFinancieroController::confirmar(). Ya no hay
+                // ninguna acción manual de 'aprobar'/'subir_archivo' que
+                // hacer en ese tramo desde acá.
 
                 case 'comite_evaluacion':
+                    // SCRUM-178: solo alcanzable por superadmin, ver nota en la rama 'rechazar'.
                     if ($accion === 'aprobar' && !empty($documentos['acta_comite_firmada'])) {
                         $estadoNuevo = 'formalizacion_garantias';
                         $comentario = 'Crédito aprobado por el Comité y Acta firmada cargada. Pasa a formalización de garantías.';

@@ -10,6 +10,8 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::get('/me', [AuthController::class, 'me'])->middleware('auth:api');
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:api');
 Route::post('/change-password', [AuthController::class, 'changePassword'])->middleware('auth:api');
+Route::patch('/profile', [AuthController::class, 'updateProfile'])->middleware('auth:api');
+Route::get('/profile/session-duration-options', [AuthController::class, 'sessionDurationOptions'])->middleware('auth:api');
 
 Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class, 'stats'])->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
 
@@ -202,6 +204,25 @@ Route::prefix('analisis-financiero')->middleware('auth:api')->group(function () 
     Route::put('/{creditoId}/borrador', [\App\Http\Controllers\AnalisisFinancieroController::class, 'guardarBorrador']);
     Route::post('/{creditoId}/confirmar', [\App\Http\Controllers\AnalisisFinancieroController::class, 'confirmar']);
     Route::get('/{creditoId}/descargar', [\App\Http\Controllers\AnalisisFinancieroController::class, 'descargar']);
+    Route::post('/{creditoId}/adjuntos', [\App\Http\Controllers\AnalisisFinancieroController::class, 'subirAdjunto']);
+    Route::delete('/{creditoId}/adjuntos/{index}', [\App\Http\Controllers\AnalisisFinancieroController::class, 'eliminarAdjunto']);
+});
+
+// Actas del Comité de Crédito (SCRUM-169)
+Route::prefix('actas-comite')->middleware('auth:api')->group(function () {
+    Route::get('/', [\App\Http\Controllers\ActaComiteController::class, 'index']);
+    Route::post('/generar', [\App\Http\Controllers\ActaComiteController::class, 'generar']);
+    Route::get('/{acta}', [\App\Http\Controllers\ActaComiteController::class, 'show']);
+    Route::put('/{acta}', [\App\Http\Controllers\ActaComiteController::class, 'actualizar']);
+    Route::post('/{acta}/aprobar-orden-dia', [\App\Http\Controllers\ActaComiteController::class, 'aprobarOrdenDia']);
+    Route::post('/{acta}/solicitudes', [\App\Http\Controllers\ActaComiteController::class, 'agregarSolicitud']);
+    Route::put('/{acta}/solicitudes/{solicitud}', [\App\Http\Controllers\ActaComiteController::class, 'actualizarSolicitud']);
+    Route::delete('/{acta}/solicitudes/{solicitud}', [\App\Http\Controllers\ActaComiteController::class, 'eliminarSolicitud']);
+    Route::post('/{acta}/solicitudes/{solicitud}/presentacion', [\App\Http\Controllers\ActaComiteController::class, 'subirPresentacion']);
+    Route::post('/{acta}/imagenes', [\App\Http\Controllers\ActaComiteController::class, 'subirImagen']);
+    Route::get('/{acta}/previsualizar', [\App\Http\Controllers\ActaComiteController::class, 'previsualizar']);
+    Route::get('/{acta}/descargar', [\App\Http\Controllers\ActaComiteController::class, 'descargar']);
+    Route::post('/{acta}/registrar', [\App\Http\Controllers\ActaComiteController::class, 'registrar']);
 });
 
 // Listas Restrictivas y SARLAFT (SCRUM-128)
@@ -212,6 +233,14 @@ Route::prefix('listas-sarlaft')->middleware('auth:api')->group(function () {
     Route::post('/{creditoId}/finalizar', [\App\Http\Controllers\ListasRestrictivasSarlaftController::class, 'finalizar']);
 });
 
+// Gestión de Créditos (SCRUM-178)
+Route::prefix('gestion-creditos')->middleware(['auth:api', 'checkrole:superadmin,coordinador_comercial'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\GestionCreditoController::class, 'index']);
+    Route::get('/tarjetas', [\App\Http\Controllers\GestionCreditoController::class, 'tarjetas']);
+    Route::get('/{creditoId}', [\App\Http\Controllers\GestionCreditoController::class, 'show']);
+    Route::post('/{creditoId}/notificar', [\App\Http\Controllers\GestionCreditoController::class, 'notificar']);
+});
+
 // Registro de Solicitudes de Crédito
 Route::prefix('solicitudes-credito')->middleware('auth:api')->group(function () {
     Route::get('/pendientes', [\App\Http\Controllers\SolicitudCreditoController::class, 'indexPending'])
@@ -220,6 +249,10 @@ Route::prefix('solicitudes-credito')->middleware('auth:api')->group(function () 
         ->middleware('checkrole:superadmin,gerente,coordinador_comercial,operativo');
     Route::post('/', [\App\Http\Controllers\SolicitudCreditoController::class, 'store'])
         ->middleware('checkrole:superadmin,gerente,coordinador_comercial,operativo');
+    // SCRUM-159: edición de "Condiciones Financieras del Crédito" restringida a
+    // Coordinador Comercial (superadmin siempre pasa por CheckUserRole::handle).
+    Route::put('/{solicitudCredito}', [\App\Http\Controllers\SolicitudCreditoController::class, 'update'])
+        ->middleware('checkrole:coordinador_comercial');
 });
 
 // Parámetros Genéricos (Superadmin)

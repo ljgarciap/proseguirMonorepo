@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesActiveRole;
-use App\Mail\SarlaftDesfavorableClienteMail;
 use App\Mail\SarlaftDesfavorableCoordinadorMail;
 use App\Models\CreditoOrdinario;
 use App\Models\User;
@@ -53,7 +52,9 @@ class ListasRestrictivasSarlaftController extends Controller
 
     /**
      * Detalle solo lectura: datos completos del cliente (natural o jurídica)
-     * y del crédito solicitado. Solo Oficial de Cumplimiento/superadmin.
+     * y del crédito solicitado. Oficial de Cumplimiento/superadmin pueden
+     * editar; Coordinador Comercial puede consultarlo (SCRUM-184) pero
+     * queda en solo lectura por autorizarAccion().
      */
     public function show(Request $request, $creditoId)
     {
@@ -136,6 +137,10 @@ class ListasRestrictivasSarlaftController extends Controller
 
         $estadoAnterior = $credito->estado;
         $estadoNuevo = $concepto === 'favorable' ? 'pendiente_analisis_financiero' : 'rechazado';
+
+        if ($concepto === 'desfavorable') {
+            $credito->resultado_origen = 'sarlaft';
+        }
 
         $historial = $credito->historial_estados ?? [];
         $historial[] = [
@@ -234,7 +239,10 @@ class ListasRestrictivasSarlaftController extends Controller
 
     private function autorizarVisualizacion(string $activeRole): void
     {
-        if ($activeRole === 'superadmin' || $activeRole === 'oficial_cumplimiento') {
+        // SCRUM-184: Coordinador Comercial puede consultar el detalle
+        // (solo lectura — autorizarAccion() abajo sigue exigiendo
+        // Oficial de Cumplimiento para guardar/finalizar).
+        if (in_array($activeRole, ['superadmin', 'oficial_cumplimiento', 'coordinador_comercial'], true)) {
             return;
         }
 
@@ -258,13 +266,16 @@ class ListasRestrictivasSarlaftController extends Controller
         }
     }
 
+    /**
+     * SCRUM-178: el correo al cliente ya NO se envía automáticamente acá —
+     * pasa a depender de que el Coordinador Comercial lo gestione desde la
+     * bandeja Gestión de Créditos (redacta asunto/mensaje y dispara el
+     * envío manualmente). Este método solo avisa internamente a los
+     * Coordinadores que hay un nuevo resultado desfavorable por gestionar.
+     */
     private function notificarDesfavorable(CreditoOrdinario $credito): void
     {
         $credito->loadMissing('cliente');
-
-        if ($credito->cliente && $credito->cliente->email) {
-            Mail::to($credito->cliente->email)->send(new SarlaftDesfavorableClienteMail($credito));
-        }
 
         $coordinadores = User::whereJsonContains('roles', 'coordinador_comercial')->pluck('email')->filter()->all();
         if (!empty($coordinadores)) {

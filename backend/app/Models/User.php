@@ -24,7 +24,8 @@ class User extends Authenticatable
         'password',
         'numero_documento',
         'tipo_documento_id',
-        'roles'
+        'roles',
+        'session_duration_minutes',
     ];
 
     /**
@@ -48,6 +49,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'roles' => 'array',
+            'session_duration_minutes' => 'integer',
         ];
     }
 

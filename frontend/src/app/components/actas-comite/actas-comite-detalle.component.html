@@ -1,0 +1,301 @@
+<div class="view-container" *ngIf="!loading && acta">
+  <header class="view-header">
+    <div class="title-area">
+      <h1>Acta Comité de Crédito N.° {{ acta.numero }}</h1>
+      <p>
+        <span class="status-pill" [ngClass]="{ 'warning': acta.estado !== 'aprobada', 'success': acta.estado === 'aprobada' }">
+          {{ acta.estado === 'aprobada' ? 'Aprobada' : (acta.estado === 'borrador' ? 'Borrador' : 'Pendiente') }}
+        </span>
+        <span class="text-muted" *ngIf="guardando"> · Guardando...</span>
+      </p>
+    </div>
+    <a class="btn-pro secondary" routerLink="/actas-comite">
+      <span class="material-symbols-outlined">arrow_back</span>
+      Volver a la bandeja
+    </a>
+  </header>
+
+  <div class="draft-banner" *ngIf="soloLectura">
+    Esta acta ya fue registrada y no puede modificarse. Solo puede consultarse y descargarse.
+  </div>
+
+  <nav class="tabs-nav">
+    <button class="tab-btn" [class.active]="activeTab === 'orden_dia'" (click)="cambiarTab('orden_dia')">1. Orden del día</button>
+    <button class="tab-btn" [class.active]="activeTab === 'desarrollo'" (click)="cambiarTab('desarrollo')">2. Desarrollo</button>
+    <button class="tab-btn" [class.active]="activeTab === 'decision'" (click)="cambiarTab('decision')">3. Decisión</button>
+    <button class="tab-btn" [class.active]="activeTab === 'resumen'" (click)="cambiarTab('resumen')">4. Resumen</button>
+    <button class="tab-btn" [class.active]="activeTab === 'observaciones'" (click)="cambiarTab('observaciones')">5. Observaciones</button>
+    <button class="tab-btn" [class.active]="activeTab === 'firmantes'" (click)="cambiarTab('firmantes')">6. Firmantes</button>
+  </nav>
+
+  <div class="content-card">
+
+    <!-- 1. Orden del día -->
+    <section *ngIf="activeTab === 'orden_dia'">
+      <h3 class="card-title">Información de la reunión</h3>
+      <div class="form-grid">
+        <div class="form-field">
+          <label>Fecha *</label>
+          <input class="pro-input" type="date" [(ngModel)]="fechaReunion" (change)="onFieldChangeInmediato()" [disabled]="soloLectura">
+        </div>
+        <div class="form-field">
+          <label>Hora de inicio *</label>
+          <input class="pro-input" type="time" [(ngModel)]="horaInicio" (change)="onFieldChangeInmediato()" [disabled]="soloLectura">
+        </div>
+      </div>
+
+      <div class="form-field mt-3">
+        <label>Lugar *</label>
+        <quill-editor [(ngModel)]="lugar" [modules]="quillModules('lugar')" [readOnly]="soloLectura"
+                      (onEditorCreated)="onEditorCreated('lugar', $event)" (onContentChanged)="onFieldChange()"></quill-editor>
+      </div>
+
+      <div class="form-field mt-3">
+        <label>Asistentes * (mínimo 1)</label>
+        <div class="chip-list">
+          <span class="chip" *ngFor="let a of asistentes; let i = index">
+            {{ a.nombre }}
+            <button *ngIf="!soloLectura" class="chip-remove" (click)="eliminarAsistente(i)">×</button>
+          </span>
+        </div>
+        <div class="inline-add" *ngIf="!soloLectura">
+          <input class="pro-input" type="text" [(ngModel)]="nuevoAsistente" placeholder="Nombre del asistente" (keyup.enter)="agregarAsistente()">
+          <button class="btn-pro sm primary" (click)="agregarAsistente()">Agregar</button>
+        </div>
+      </div>
+
+      <h3 class="card-title mt-4">Orden del día {{ ordenDiaAprobado ? '(aprobado)' : '' }}</h3>
+      <div class="orden-dia-item" *ngFor="let item of ordenDia; let i = index">
+        <div class="orden-dia-item-header">
+          <span class="orden-dia-num">{{ i + 1 }}.</span>
+          <quill-editor class="flex-1" [(ngModel)]="item.texto" [modules]="quillModules('orden_dia_' + item.id)" [readOnly]="soloLectura"
+                        (onEditorCreated)="onEditorCreated('orden_dia_' + item.id, $event)" (onContentChanged)="onFieldChange()"></quill-editor>
+          <button *ngIf="!soloLectura" class="btn-pro sm secondary" (click)="eliminarItemOrdenDia(i)">Eliminar</button>
+        </div>
+      </div>
+      <div class="inline-add" *ngIf="!soloLectura">
+        <input class="pro-input" type="text" [(ngModel)]="nuevoItemOrdenDia" placeholder="Nuevo ítem del orden del día" (keyup.enter)="agregarItemOrdenDia()">
+        <button class="btn-pro sm primary" (click)="agregarItemOrdenDia()">Agregar ítem</button>
+      </div>
+
+      <button class="btn-pro primary mt-3" [disabled]="ordenDiaAprobado || soloLectura" (click)="aprobarOrdenDia()">
+        <span class="material-symbols-outlined">how_to_vote</span>
+        {{ ordenDiaAprobado ? 'Orden del día aprobado' : 'Aprobar orden del día por unanimidad' }}
+      </button>
+    </section>
+
+    <!-- 2. Desarrollo -->
+    <section *ngIf="activeTab === 'desarrollo'">
+      <h3 class="card-title">Desarrollo</h3>
+      <div class="orden-dia-item" *ngFor="let item of ordenDia">
+        <h4>{{ item.texto }}</h4>
+        <quill-editor [(ngModel)]="desarrollo[item.id]" [modules]="quillModules('desarrollo_' + item.id)" [readOnly]="soloLectura"
+                      (onEditorCreated)="onEditorCreated('desarrollo_' + item.id, $event)" (onContentChanged)="onFieldChange()"></quill-editor>
+      </div>
+
+      <h3 class="card-title mt-4">Presentación de solicitudes</h3>
+      <div class="table-container">
+        <table class="modern-table">
+          <thead>
+            <tr><th>Cliente</th><th>Solicitud</th><th>Monto</th><th>Origen</th><th class="text-right">Acción</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let s of acta.solicitudes">
+              <td>{{ s.cliente_nombre }}</td>
+              <td>{{ s.tipo_solicitud }}</td>
+              <td>${{ (s.monto || 0) | number:'1.0-0':'es-CO' }}</td>
+              <td>{{ s.origen === 'sistema' ? 'Análisis financiero' : 'Adicionada manualmente' }}</td>
+              <td class="text-right">
+                <button *ngIf="s.origen === 'manual' && !soloLectura" class="btn-pro sm secondary" (click)="eliminarSolicitud(s)">Eliminar</button>
+              </td>
+            </tr>
+            <tr *ngIf="!acta.solicitudes?.length"><td colspan="5" class="text-center text-muted py-4">No hay solicitudes presentadas.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="inline-add-solicitud" *ngIf="!soloLectura">
+        <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitud.cliente_nombre" placeholder="Cliente">
+        <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitud.tipo_solicitud" placeholder="Tipo de solicitud">
+        <input class="pro-input" type="number" [(ngModel)]="nuevaSolicitud.monto" placeholder="Monto">
+        <button class="btn-pro sm primary" (click)="agregarSolicitudManual()">Agregar solicitud manual</button>
+      </div>
+    </section>
+
+    <!-- 3. Decisión y detalle de solicitudes -->
+    <section *ngIf="activeTab === 'decision'">
+      <h3 class="card-title">Decisión y detalle de solicitudes</h3>
+      <div class="solicitud-detalle-card" *ngFor="let s of acta.solicitudes">
+        <h4>{{ s.cliente_nombre }} <span class="text-muted">({{ s.origen === 'sistema' ? 'Análisis financiero' : 'Manual' }})</span></h4>
+        <div class="form-grid">
+          <div class="form-field" *ngIf="s.origen === 'manual'">
+            <label>Cliente</label>
+            <input class="pro-input" type="text" [(ngModel)]="s.cliente_nombre" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+          </div>
+          <div class="form-field">
+            <label>Solicitud</label>
+            <input class="pro-input" type="text" [(ngModel)]="s.tipo_solicitud" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+          </div>
+          <div class="form-field">
+            <label>Monto</label>
+            <input class="pro-input" type="number" [(ngModel)]="s.monto" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+          </div>
+          <div class="form-field">
+            <label>Amortización</label>
+            <input class="pro-input" type="text" [(ngModel)]="s.amortizacion" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+          </div>
+          <div class="form-field">
+            <label>Plazo (meses)</label>
+            <input class="pro-input" type="number" [(ngModel)]="s.plazo_meses" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+          </div>
+          <div class="form-field">
+            <label>Tasa de interés (%)</label>
+            <input class="pro-input" type="number" step="0.01" [(ngModel)]="s.tasa_interes" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+          </div>
+          <div class="form-field">
+            <label>% Financiación</label>
+            <input class="pro-input" type="number" step="0.01" [(ngModel)]="s.porcentaje_financiacion" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+          </div>
+          <div class="form-field">
+            <label>Garantías</label>
+            <input class="pro-input" type="text" [(ngModel)]="s.garantias" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+          </div>
+          <div class="form-field">
+            <label>Fuente de pago</label>
+            <input class="pro-input" type="text" [(ngModel)]="s.fuente_pago" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+          </div>
+          <div class="form-field">
+            <label>Estado *</label>
+            <select class="pro-input" [(ngModel)]="s.estado_decision" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+              <option [ngValue]="null">Seleccione...</option>
+              <option value="aprobado">APROBADO</option>
+              <option value="rechazado">RECHAZADO</option>
+              <option value="pendiente">PENDIENTE</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label>Vigencia de aprobación</label>
+            <input class="pro-input" type="text" [(ngModel)]="s.vigencia_aprobacion" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+          </div>
+          <!-- SCRUM-183: la Presentación para el Comité se adjunta acá, no
+               antes de llegar a Comité de Crédito. -->
+          <div class="form-field">
+            <label>Presentación para el Comité</label>
+            <input type="file" [id]="'file-presentacion-' + s.id" accept=".pdf" hidden
+                   (change)="subirPresentacion(s, $event)" [disabled]="soloLectura">
+            <label [for]="'file-presentacion-' + s.id" class="btn-pro secondary sm btn-upload" *ngIf="!soloLectura">
+              <span class="material-symbols-outlined">upload</span>
+              {{ s.presentacion_comite ? 'Reemplazar' : 'Cargar PDF' }}
+            </label>
+            <a *ngIf="s.presentacion_comite" [href]="s.presentacion_comite" target="_blank" class="btn-view-doc">
+              <span class="material-symbols-outlined">open_in_new</span> Ver
+            </a>
+          </div>
+        </div>
+        <div class="form-field mt-2">
+          <label>Observaciones</label>
+          <textarea class="pro-input" rows="2" [(ngModel)]="s.observaciones" (change)="guardarSolicitud(s)" [disabled]="soloLectura"></textarea>
+        </div>
+      </div>
+      <p class="text-muted" *ngIf="!acta.solicitudes?.length">No hay solicitudes registradas.</p>
+    </section>
+
+    <!-- 4. Resumen de aprobaciones -->
+    <section *ngIf="activeTab === 'resumen'">
+      <h3 class="card-title">Resumen de aprobaciones</h3>
+      <p>Se dan por APROBADAS, NEGADAS O APLAZADAS las siguientes operaciones, de la siguiente manera:</p>
+      <div class="table-container">
+        <table class="modern-table">
+          <thead><tr><th>Cliente</th><th>Concepto</th><th>Decisión</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let s of acta.solicitudes">
+              <td>{{ s.cliente_nombre }}</td>
+              <td>
+                <span class="status-pill" [ngClass]="{
+                  'success': s.estado_decision === 'aprobado',
+                  'danger': s.estado_decision === 'rechazado',
+                  'warning': !s.estado_decision || s.estado_decision === 'pendiente'
+                }">{{ (s.estado_decision || 'pendiente') | uppercase }}</span>
+              </td>
+              <td>
+                <input class="pro-input" type="number" [(ngModel)]="s.monto_decision" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+              </td>
+            </tr>
+            <tr *ngIf="!acta.solicitudes?.length"><td colspan="3" class="text-center text-muted py-4">No hay solicitudes registradas.</td></tr>
+          </tbody>
+          <tfoot>
+            <tr class="total-row"><td>Total Aprobado</td><td colspan="2">${{ totalPorEstado('aprobado') | number:'1.0-0':'es-CO' }}</td></tr>
+            <tr class="total-row"><td>Total Rechazado</td><td colspan="2">${{ totalPorEstado('rechazado') | number:'1.0-0':'es-CO' }}</td></tr>
+            <tr class="total-row"><td>Total Pendiente</td><td colspan="2">${{ totalPorEstado('pendiente') | number:'1.0-0':'es-CO' }}</td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <!-- 5. Observaciones generales -->
+    <section *ngIf="activeTab === 'observaciones'">
+      <h3 class="card-title">Observaciones generales</h3>
+      <quill-editor [(ngModel)]="observacionesGenerales" [modules]="quillModules('observaciones')" [readOnly]="soloLectura"
+                    (onEditorCreated)="onEditorCreated('observaciones', $event)" (onContentChanged)="onFieldChange()"></quill-editor>
+
+      <div class="form-field mt-3">
+        <label>Termina la reunión a las... *</label>
+        <input class="pro-input" type="time" [(ngModel)]="horaFinalizacion" (change)="onFieldChangeInmediato()" [disabled]="soloLectura">
+      </div>
+    </section>
+
+    <!-- 6. Firmantes -->
+    <section *ngIf="activeTab === 'firmantes'">
+      <h3 class="card-title">Firmantes</h3>
+      <p class="card-subtitle">Candidatos (asistentes registrados):</p>
+      <div class="chip-list">
+        <button class="chip chip-action" *ngFor="let a of asistentes" [disabled]="soloLectura" (click)="agregarFirmanteDesdeAsistentes(a.nombre)">
+          + {{ a.nombre }}
+        </button>
+      </div>
+
+      <h4 class="mt-3">Firmantes del acta * (mínimo 1)</h4>
+      <div class="table-container">
+        <table class="modern-table">
+          <thead><tr><th>Nombre</th><th>Rol en la reunión</th><th class="text-right">Acción</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let f of firmantes; let i = index">
+              <td>{{ f.nombre }}</td>
+              <td>
+                <select class="pro-input" [(ngModel)]="f.rol" (change)="onFieldChangeInmediato()" [disabled]="soloLectura">
+                  <option value="Presidente">Presidente</option>
+                  <option value="Secretario(a)">Secretario(a)</option>
+                  <option value="Miembro del Comité">Miembro del Comité</option>
+                </select>
+              </td>
+              <td class="text-right">
+                <button *ngIf="!soloLectura" class="btn-pro sm secondary" (click)="eliminarFirmante(i)">Eliminar</button>
+              </td>
+            </tr>
+            <tr *ngIf="!firmantes.length"><td colspan="3" class="text-center text-muted py-4">Sin firmantes agregados.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="actions-footer mt-4">
+        <a class="btn-pro secondary" [href]="urlPrevisualizar()" target="_blank" rel="noopener">
+          <span class="material-symbols-outlined">visibility</span>
+          Previsualizar acta
+        </a>
+        <button class="btn-pro secondary" (click)="descargar()">
+          <span class="material-symbols-outlined">download</span>
+          Descargar PDF
+        </button>
+        <button class="btn-pro primary" *ngIf="!soloLectura" [disabled]="registrando" (click)="registrar()">
+          <span class="material-symbols-outlined">lock</span>
+          {{ registrando ? 'Registrando...' : 'Registrar acta' }}
+        </button>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<div class="view-container" *ngIf="loading">
+  <p class="text-center py-4">Cargando acta...</p>
+</div>

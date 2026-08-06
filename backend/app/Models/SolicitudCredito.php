@@ -82,6 +82,16 @@ class SolicitudCredito extends Model
         return $this->hasOne(DocumentRequest::class, 'solicitud_credito_id');
     }
 
+    /**
+     * Expediente de Crédito Ordinario (workflow BPMN) originado a partir de
+     * esta solicitud, si ya arrancó (SCRUM-120). Nullable: puede no existir
+     * todavía si el flujo aún no fue iniciado.
+     */
+    public function creditoOrdinario()
+    {
+        return $this->hasOne(CreditoOrdinario::class, 'solicitud_credito_id');
+    }
+
     public function proyectoDepartamento()
     {
         return $this->belongsTo(Departamento::class, 'proyecto_departamento_id');

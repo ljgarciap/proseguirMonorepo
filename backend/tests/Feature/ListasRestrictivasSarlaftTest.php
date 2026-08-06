@@ -215,8 +215,12 @@ class ListasRestrictivasSarlaftTest extends TestCase
         Mail::assertNotSent(SarlaftDesfavorableCoordinadorMail::class);
     }
 
-    public function test_finalizar_desfavorable_transiciona_a_rechazado_y_envia_dos_correos(): void
+    public function test_finalizar_desfavorable_transiciona_a_rechazado_y_avisa_internamente_sin_notificar_al_cliente(): void
     {
+        // SCRUM-178: el correo al cliente ya no se dispara automáticamente
+        // acá — pasa a depender de que el Coordinador Comercial lo gestione
+        // desde la bandeja Gestión de Créditos. Solo se mantiene el aviso
+        // interno a Coordinadores.
         $credito = $this->crearCreditoEnSarlaftControlInterno();
 
         Passport::actingAs($this->cumplimiento);
@@ -232,11 +236,11 @@ class ListasRestrictivasSarlaftTest extends TestCase
             'id' => $credito->id,
             'estado' => 'rechazado',
             'sarlaft_concepto' => 'desfavorable',
+            'resultado_origen' => 'sarlaft',
+            'solicitud_gestionada' => false,
         ]);
 
-        Mail::assertSent(SarlaftDesfavorableClienteMail::class, function ($mail) use ($credito) {
-            return $mail->hasTo('sarlaft.cliente@test.com') && $mail->credito->id === $credito->id;
-        });
+        Mail::assertNotSent(SarlaftDesfavorableClienteMail::class);
 
         Mail::assertSent(SarlaftDesfavorableCoordinadorMail::class, function ($mail) use ($credito) {
             return $mail->hasTo('coordinador.sarlaft@test.com') && $mail->credito->id === $credito->id;
@@ -296,13 +300,19 @@ class ListasRestrictivasSarlaftTest extends TestCase
             ->assertJsonFragment(['message' => 'El archivo debe estar en formato PDF.']);
     }
 
-    public function test_rol_fuera_de_alcance_recibe_403(): void
+    /**
+     * SCRUM-184 (2026-08-05): Coordinador Comercial ahora puede consultar
+     * el detalle SARLAFT (link "Ver" desde Crédito Ordinario, igual que ya
+     * podía ver el Informe Técnico) — pero sigue sin poder editar/finalizar,
+     * eso continúa exclusivo de Oficial de Cumplimiento.
+     */
+    public function test_coordinador_puede_ver_pero_no_editar(): void
     {
         $credito = $this->crearCreditoEnSarlaftControlInterno();
 
         Passport::actingAs($this->coordinador);
         $this->getJson("/api/listas-sarlaft/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial'])
-            ->assertStatus(403);
+            ->assertStatus(200);
 
         $this->putJson("/api/listas-sarlaft/{$credito->id}/borrador", [
             'sarlaft_concepto' => 'favorable',
@@ -314,6 +324,27 @@ class ListasRestrictivasSarlaftTest extends TestCase
             'sarlaft_observaciones' => 'x',
             'archivo' => $this->pdf(),
         ], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(403);
+    }
+
+    public function test_rol_fuera_de_alcance_recibe_403(): void
+    {
+        $credito = $this->crearCreditoEnSarlaftControlInterno();
+
+        Passport::actingAs($this->gerente);
+        $this->getJson("/api/listas-sarlaft/{$credito->id}", ['X-Active-Role' => 'gerente'])
+            ->assertStatus(403);
+
+        $this->putJson("/api/listas-sarlaft/{$credito->id}/borrador", [
+            'sarlaft_concepto' => 'favorable',
+        ], ['X-Active-Role' => 'gerente'])
+            ->assertStatus(403);
+
+        $this->postJson("/api/listas-sarlaft/{$credito->id}/finalizar", [
+            'sarlaft_concepto' => 'favorable',
+            'sarlaft_observaciones' => 'x',
+            'archivo' => $this->pdf(),
+        ], ['X-Active-Role' => 'gerente'])
             ->assertStatus(403);
     }
 

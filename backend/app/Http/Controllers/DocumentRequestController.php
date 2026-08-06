@@ -79,18 +79,42 @@ class DocumentRequestController extends Controller
         return response()->json($documentRequest->load('items.requirement'), 201);
     }
 
+    /**
+     * SCRUM-176: cada SolicitudCredito tiene su propio DocumentRequest
+     * (SCRUM-152), así que un cliente puede tener varios "pendiente"
+     * simultáneos — uno por solicitud, sin que las anteriores se cierren
+     * automáticamente. Antes se tomaba el primero sin ORDER BY (equivalente
+     * al más viejo/estancado): si el cliente tenía una solicitud anterior
+     * sin cerrar, sus cargas nuevas quedaban atadas a ese DocumentRequest
+     * viejo y el crédito realmente activo nunca veía su Etapa 1 satisfecha
+     * — bloqueado para siempre en 'validacion_documental_constructor' /
+     * 'revision_documental' sin ningún error visible ni para el cliente
+     * (ve "Carga Exitosa") ni para el Coordinador (solo ve "Faltan
+     * documentos obligatorios" repetido). Esto también explica por qué la
+     * trazabilidad de esos créditos nunca avanzaba más allá de la carga
+     * documental del cliente: el resto del BPMN jamás se alcanzaba.
+     * Se prioriza el DocumentRequest cuyo CreditoOrdinario está realmente
+     * esperando al cliente ahora mismo; si ninguno calza (p.ej. todavía en
+     * revisión inicial), se usa el más reciente en vez del más viejo.
+     */
     public function activeRequest(Request $request)
     {
         $user = $request->user();
-        
-        $active = DocumentRequest::where('cliente_id', $user->id)
-            ->where('estado', 'pendiente')
-            ->with(['items.requirement', 'items.upload'])
-            ->first();
 
-        if (!$active) {
+        $pendientes = DocumentRequest::where('cliente_id', $user->id)
+            ->where('estado', 'pendiente')
+            ->with(['items.requirement', 'items.upload', 'solicitudCredito.creditoOrdinario'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        if ($pendientes->isEmpty()) {
             return response()->json(null);
         }
+
+        $estadosEsperandoCliente = ['completar_solicitud', 'completar_solicitud_constructor'];
+        $active = $pendientes->first(function (DocumentRequest $dr) use ($estadosEsperandoCliente) {
+            return in_array($dr->solicitudCredito?->creditoOrdinario?->estado, $estadosEsperandoCliente, true);
+        }) ?? $pendientes->first();
 
         return response()->json($active);
     }
