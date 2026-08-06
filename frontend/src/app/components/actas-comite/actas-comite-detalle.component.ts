@@ -250,6 +250,30 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
     });
   }
 
+  // SCRUM-183: la Presentación para el Comité se adjunta acá, por
+  // solicitud — ya no bloquea ninguna transición del crédito (antes había
+  // que cargarla para pasar de Análisis Financiero a Comité, ese paso se
+  // retiró del BPMN).
+  subirPresentacion(solicitud: any, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('archivo', file);
+    this.http.post<any>(
+      `${environment.apiUrl}/actas-comite/${this.actaId}/solicitudes/${solicitud.id}/presentacion`,
+      formData,
+      this.headers()
+    ).subscribe({
+      next: (resp) => {
+        solicitud.presentacion_comite = resp.presentacion_comite;
+      },
+      error: (err) => Swal.fire('Error', err?.error?.message || 'El archivo debe ser un PDF de hasta 20 MB.', 'error')
+    });
+    input.value = '';
+  }
+
   // --- Firmantes ---
   agregarFirmanteDesdeAsistentes(nombre: string): void {
     if (this.firmantes.some(f => f.nombre === nombre)) return;

@@ -175,8 +175,12 @@ class CreditoOrdinarioController extends Controller
             'completar_solicitud_constructor' => ['cliente'],
             'revision_documental' => ['coordinador_comercial', 'cliente'],
             'completar_solicitud' => ['cliente'],
+            // SCRUM-183: 'aprobacion_presentacion' se retiró — Análisis
+            // Financiero confirmado pasa directo a comite_evaluacion (ver
+            // AnalisisFinancieroController::confirmar()). El único rol que
+            // sigue teniendo algo que hacer en 'pendiente_analisis_financiero'
+            // vía este endpoint es 'rechazar' (genérico, caso else de abajo).
             'pendiente_analisis_financiero' => ['coordinador_comercial'],
-            'aprobacion_presentacion' => ['gerente'],
             // 'comite_evaluacion' ya NO tiene rol autorizado acá: SCRUM-178
             // retiró el botón manual de aprobar/rechazar — la única salida
             // de ese estado es ActaComiteController::registrar().
@@ -274,10 +278,9 @@ class CreditoOrdinarioController extends Controller
 
         // 2. Lógica de Máquina de Estados BPMN
         if ($accion === 'rechazar') {
-            if ($estadoActual === 'aprobacion_presentacion') {
-                $estadoNuevo = 'pendiente_analisis_financiero';
-                $comentario = 'Presentación rechazada por Gerencia. Retorna a análisis financiero. ' . $comentario;
-            } elseif ($estadoActual === 'comite_evaluacion') {
+            // SCRUM-183: el caso 'aprobacion_presentacion' se retiró junto
+            // con el estado — ya no existe ese paso.
+            if ($estadoActual === 'comite_evaluacion') {
                 // SCRUM-178: solo alcanzable por superadmin (el guard de más
                 // arriba bloquea a comite_credito). Se conserva como vía de
                 // escape manual; el camino normal es Actas de Comité, que
@@ -310,9 +313,10 @@ class CreditoOrdinarioController extends Controller
         } elseif ($accion === 'devolver') {
             if ($estadoActual === 'comite_evaluacion') {
                 // SCRUM-178: solo alcanzable por superadmin, ver nota en la rama 'rechazar'.
-                // Returns to Gerente Presentation approval (Revision e Aprobacion de Presentacion)
-                $estadoNuevo = 'aprobacion_presentacion';
-                $comentario = 'Crédito devuelto por el Comité para corrección de la presentación. ' . $comentario;
+                // SCRUM-183: ya no existe 'aprobacion_presentacion' — vuelve
+                // directo a análisis financiero para corrección.
+                $estadoNuevo = 'pendiente_analisis_financiero';
+                $comentario = 'Crédito devuelto por el Comité para corrección del análisis financiero. ' . $comentario;
             } elseif ($estadoActual === 'formalizacion_garantias') {
                 $estadoNuevo = 'formalizacion_garantias';
                 $documentos['garantias_firmadas'] = null;
@@ -393,30 +397,13 @@ class CreditoOrdinarioController extends Controller
                     }
                     break;
 
-                case 'pendiente_analisis_financiero':
-                    // El Oficial de Cumplimiento ya emitió concepto favorable (módulo Listas
-                    // Restrictivas y SARLAFT, SCRUM-128). SCRUM-155 reemplazó el upload manual
-                    // de "Análisis Financiero" por el módulo interactivo dedicado — la
-                    // condición ya no depende de $documentos['analisis_financiero'], sino de
-                    // que AnalisisFinanciero quede confirmado allá. "Presentación Comité" sigue
-                    // siendo upload manual (elaborar esa presentación está fuera de alcance).
-                    $analisisConfirmado = $credito->analisisFinanciero?->estado === 'confirmado';
-                    $hasFinancial = $analisisConfirmado && !empty($documentos['presentacion_comite']);
-
-                    if ($hasFinancial) {
-                        $estadoNuevo = 'aprobacion_presentacion';
-                        $comentario = 'Análisis financiero confirmado y presentación cargada por Comercial. Pasa a aprobación de presentación por Gerencia.';
-                    } else {
-                        $comentario = 'Archivo cargado en análisis financiero. Aún faltan documentos complementarios para transicionar de etapa.';
-                    }
-                    break;
-
-                case 'aprobacion_presentacion':
-                    if ($accion === 'aprobar') {
-                        $estadoNuevo = 'comite_evaluacion';
-                        $comentario = 'Presentación aprobada por Gerencia. Pasa a evaluación del Comité de Crédito.';
-                    }
-                    break;
+                // SCRUM-183: los casos 'pendiente_analisis_financiero' y
+                // 'aprobacion_presentacion' se retiraron de acá — confirmar
+                // el Análisis Financiero (módulo dedicado, SCRUM-155) ya
+                // transiciona directo a 'comite_evaluacion' por sí solo, ver
+                // AnalisisFinancieroController::confirmar(). Ya no hay
+                // ninguna acción manual de 'aprobar'/'subir_archivo' que
+                // hacer en ese tramo desde acá.
 
                 case 'comite_evaluacion':
                     // SCRUM-178: solo alcanzable por superadmin, ver nota en la rama 'rechazar'.

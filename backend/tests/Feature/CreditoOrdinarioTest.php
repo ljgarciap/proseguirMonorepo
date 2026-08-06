@@ -186,63 +186,39 @@ class CreditoOrdinarioTest extends TestCase
         // upload manual de 'analisis_financiero'; se crea directamente en estado
         // confirmado porque este test cubre las transiciones BPMN, no las reglas
         // de validación del módulo, que tienen su propia suite en
-        // AnalisisFinancieroTest).
+        // AnalisisFinancieroTest). SCRUM-183: confirmar el Análisis Financiero ya
+        // no depende de ninguna Presentación para el Comité — transiciona directo
+        // a comite_evaluacion (ver AnalisisFinancieroControllerTest, que sí pasa
+        // por el endpoint real de confirmar()).
         \App\Models\AnalisisFinanciero::create([
             'credito_ordinario_id' => $creditoId,
             'estado' => 'confirmado',
             'anio_inicial' => 2024,
             'cantidad_anios' => 2,
         ]);
+        $credito->estado = 'comite_evaluacion';
+        $credito->save();
 
-        Passport::actingAs($this->coordinador);
-
-        // Last doc triggers auto-transition to aprobacion_presentacion
-        $this->subirArchivo($creditoId, 'presentacion_comite', 'coordinador_comercial', 'presentacion.pdf')
-            ->assertStatus(200)
-            ->assertJsonPath('estado', 'aprobacion_presentacion');
-
-        // 4. Gerente rejects (returns to analisis) then re-approves
-        Passport::actingAs($this->gerente);
-        $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion'     => 'rechazar',
-            'comentario' => 'Revisar datos financieros'
-        ], ['X-Active-Role' => 'gerente'])
-            ->assertStatus(200)
-            ->assertJsonPath('estado', 'pendiente_analisis_financiero');
-
-        Passport::actingAs($this->coordinador);
-        $this->subirArchivo($creditoId, 'presentacion_comite', 'coordinador_comercial', 'presentacion_v2.pdf')
-            ->assertStatus(200)
-            ->assertJsonPath('estado', 'aprobacion_presentacion');
-
-        Passport::actingAs($this->gerente);
-        $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion'     => 'aprobar',
-            'comentario' => 'Presentación lista.'
-        ], ['X-Active-Role' => 'gerente'])
-            ->assertStatus(200)
-            ->assertJsonPath('estado', 'comite_evaluacion');
-
-        // 5. Comité devuelve a Gerente, luego re-aprueba. SCRUM-178 retiró
-        // el botón manual de comite_credito en 'comite_evaluacion' — la
-        // única salida normal de ese estado ahora es Actas de Comité (ver
-        // ActaComiteTest). Acá se ejercita el atajo de superadmin que se
-        // mantiene como vía de escape (documentado en
-        // CreditoOrdinarioController::transition()).
+        // 4. SCRUM-178 retiró el botón manual de comite_credito en
+        // 'comite_evaluacion' — la única salida normal de ese estado ahora es
+        // Actas de Comité (ver ActaComiteTest). Acá se ejercita el atajo de
+        // superadmin que se mantiene como vía de escape (documentado en
+        // CreditoOrdinarioController::transition()): SCRUM-183 retiró también
+        // 'aprobacion_presentacion' — 'devolver' ahora vuelve directo a
+        // 'pendiente_analisis_financiero'.
         Passport::actingAs($this->admin);
         $this->postJson("/api/creditos/{$creditoId}/transition", [
             'accion'     => 'devolver',
             'comentario' => 'El monto es muy alto, ajustar propuesta'
         ], ['X-Active-Role' => 'superadmin'])
             ->assertStatus(200)
-            ->assertJsonPath('estado', 'aprobacion_presentacion');
+            ->assertJsonPath('estado', 'pendiente_analisis_financiero');
 
-        Passport::actingAs($this->gerente);
-        $this->postJson("/api/creditos/{$creditoId}/transition", [
-            'accion' => 'aprobar'
-        ], ['X-Active-Role' => 'gerente'])
-            ->assertStatus(200)
-            ->assertJsonPath('estado', 'comite_evaluacion');
+        // Vuelve a comite_evaluacion (simulando una nueva confirmación del
+        // Análisis Financiero, mismo atajo que el paso 3).
+        $credito->refresh();
+        $credito->estado = 'comite_evaluacion';
+        $credito->save();
 
         // El rol comite_credito ya no puede transicionar directamente.
         Passport::actingAs($this->comite);

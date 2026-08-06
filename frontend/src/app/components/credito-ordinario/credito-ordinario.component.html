@@ -255,64 +255,34 @@
             <!-- Stage 3: pendiente_analisis_financiero (Coordinador Comercial) -->
             <!-- SCRUM-128: el concepto SARLAFT/Listas Restrictivas ya se resolvió
                  en la bandeja dedicada (Oficial de Cumplimiento) antes de llegar
-                 acá — este estado solo cubre el análisis financiero comercial. -->
+                 acá — este estado solo cubre el análisis financiero comercial.
+                 SCRUM-183: confirmar el Análisis Financiero (módulo dedicado)
+                 transiciona directo a Comité de Crédito — no hace falta ningún
+                 botón ni carga acá, es automático al confirmar allá. La
+                 Presentación para el Comité se adjunta después, en Actas
+                 Comité de Crédito. -->
             <div *ngIf="selectedCredito.estado === 'pendiente_analisis_financiero'">
-              <p class="action-instructions">Completa el Análisis Financiero (módulo dedicado) y carga la Presentación del Comité para continuar:</p>
+              <p class="action-instructions">Completa el Análisis Financiero en su módulo dedicado — al confirmarlo, el crédito pasa automáticamente a Comité de Crédito:</p>
 
               <div class="parallel-actions-grid">
-                <!-- Coordinador Comercial Area -->
                 <div class="role-action-box" [class.active]="activeRole === 'coordinador_comercial' || activeRole === 'superadmin'">
                   <h5>📈 Coordinador Comercial</h5>
-                  <p>Debe confirmar el Análisis Financiero (módulo "Análisis Financiero") y cargar la Presentación del Comité.</p>
+                  <p>Debe confirmar el Análisis Financiero (módulo "Análisis Financiero").</p>
 
                   <div class="upload-controls">
                     <div class="upload-item">
-                      <label>1. Análisis Financiero</label>
+                      <label>Análisis Financiero</label>
                       <span class="file-status" *ngIf="selectedCredito.analisis_financiero?.estado === 'confirmado'; else analisisPendienteTpl">✅ Confirmado</span>
                       <ng-template #analisisPendienteTpl>
                         <span class="file-status">⏳ Pendiente — se diligencia en el módulo Análisis Financiero</span>
                       </ng-template>
                     </div>
-
-                    <div class="upload-item">
-                      <label>2. Presentación del Cliente para Comité (PDF)</label>
-                      <input type="file" id="file-presentacion" (change)="onFileUpload($event, 'presentacion_comite')"
-                             [disabled]="!(activeRole === 'coordinador_comercial' || activeRole === 'superadmin')" accept=".pdf" class="file-input-hide">
-                      <label for="file-presentacion" class="btn-pro secondary sm btn-upload">
-                        <span class="material-symbols-outlined">upload</span>
-                        {{ selectedCredito.documentos?.presentacion_comite ? 'Reemplazar Presentación' : 'Cargar Presentación' }}
-                      </label>
-                      <span class="file-status" *ngIf="selectedCredito.documentos?.presentacion_comite">✅ Cargado</span>
-                    </div>
                   </div>
                 </div>
               </div>
-
-              <div class="transition-trigger-box" *ngIf="selectedCredito.analisis_financiero?.estado === 'confirmado' && selectedCredito.documentos?.presentacion_comite">
-                <div class="info-alert">
-                  <span class="material-symbols-outlined">info</span>
-                  <p>Análisis financiero confirmado y presentación cargada con éxito. Procede a confirmar el paso a Gerencia.</p>
-                </div>
-                <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Análisis financiero completado con éxito.')">
-                  Enviar a Aprobación de Gerencia
-                </button>
-              </div>
             </div>
 
-            <!-- Stage 4: aprobacion_presentacion (Gerente) -->
-            <div *ngIf="selectedCredito.estado === 'aprobacion_presentacion'" class="action-buttons-layout">
-              <p class="action-instructions">Como <strong>Gerencia</strong>, debes revisar la presentación comercial y el análisis financiero consolidado del cliente.</p>
-              <div class="flex-actions">
-                <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Presentación del cliente aprobada para el Comité de Créditos.')">
-                  <span class="material-symbols-outlined">check_circle</span> Aprobar Presentación
-                </button>
-                <button class="btn-pro danger" (click)="executeTransition('rechazar', 'Presentación rechazada. Se devuelve a corrección comercial.')">
-                  <span class="material-symbols-outlined">assignment_return</span> Rechazar y Devolver
-                </button>
-              </div>
-            </div>
-
-            <!-- Stage 5: comite_evaluacion (Comité de Crédito) -->
+            <!-- Stage 4: comite_evaluacion (Comité de Crédito) -->
             <div *ngIf="selectedCredito.estado === 'comite_evaluacion'">
               <p class="action-instructions">Como <strong>Comité de Crédito</strong>, deben realizar la evaluación del crédito y cargar el **Acta Oficial del Comité firmada** antes de dar el veredicto final.</p>
               
@@ -632,30 +602,9 @@
                   </a>
                 </div>
               </div>
-
-              <!-- Presentación del Comité -->
-              <div class="doc-box-new">
-                <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.presentacion_comite">slideshow</span>
-                  <div class="doc-title-desc">
-                    <h5>Presentación para Comité de Crédito</h5>
-                    <p>Ficha y propuesta de otorgamiento de crédito. Responsable: Coordinador Comercial.</p>
-                  </div>
-                </div>
-                <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.presentacion_comite">Cargado</span>
-                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.presentacion_comite">Pendiente</span>
-
-                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'pendiente_analisis_financiero' && (activeRole === 'coordinador_comercial' || activeRole === 'superadmin')">
-                    <input type="file" id="inline-file-presentacion" (change)="onFileUpload($event, 'presentacion_comite')" accept=".pdf" hidden>
-                    <label for="inline-file-presentacion" class="btn-inline-upload">Subir</label>
-                  </div>
-
-                  <a *ngIf="selectedCredito.documentos?.presentacion_comite" [href]="selectedCredito.documentos.presentacion_comite" target="_blank" class="btn-view-doc">
-                    <span class="material-symbols-outlined">open_in_new</span> Ver
-                  </a>
-                </div>
-              </div>
+              <!-- SCRUM-183: "Presentación para el Comité" se retiró de acá —
+                   ya no bloquea ninguna transición del crédito. Se adjunta
+                   ahora en Actas Comité de Crédito, por solicitud. -->
             </div>
           </div>
 

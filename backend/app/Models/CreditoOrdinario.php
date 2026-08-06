@@ -209,7 +209,9 @@ class CreditoOrdinario extends Model
             'sarlft_datacredito'           => null,
             'sintesis_oficial_cumplimiento' => null,
             'analisis_financiero'          => null,
-            'presentacion_comite'          => null,
+            // SCRUM-183: 'presentacion_comite' se retiró de acá — ya no
+            // bloquea la transición a comite_evaluacion, se adjunta como
+            // ActaComiteSolicitud::presentacion_comite en su lugar.
             'acta_comite_firmada'          => null,
             'pagare_borrador'              => null,
             'carta_instrucciones_borrador' => null,

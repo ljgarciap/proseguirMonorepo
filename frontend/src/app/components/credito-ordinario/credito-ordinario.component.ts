@@ -30,8 +30,11 @@ export class CreditoOrdinarioComponent implements OnInit {
     // Cumplimiento) — este paso del stepper solo queda como referencia visual
     // de progreso, sin panel de acción propio en esta pantalla.
     { key: 'sarlaft_control_interno', label: 'Listas Restrictivas / SARLAFT', role: 'oficial_cumplimiento', roleLabel: 'Oficial de Cumplimiento', desc: 'Validar Listas Restrictivas y emitir concepto SARLAFT (gestionado desde el módulo Listas Restrictivas y SARLAFT).' },
-    { key: 'pendiente_analisis_financiero', label: 'Análisis Financiero', role: 'coordinador_comercial', roleLabel: 'Coordinador Comercial', desc: 'Realizar el análisis financiero y preparar la presentación del cliente para el Comité.' },
-    { key: 'aprobacion_presentacion', label: 'Aprobación Pres.', role: 'gerente', roleLabel: 'Gerencia', desc: 'Revisar y aprobar la presentación del cliente elaborada para el Comité de Créditos.' },
+    // SCRUM-183: se retiró el paso "Aprobación Pres." (Gerencia) — confirmar
+    // el Análisis Financiero ya pasa directo a Comité de Crédito. La
+    // presentación para el Comité se adjunta después, en Actas Comité de
+    // Crédito (una por solicitud dentro del acta).
+    { key: 'pendiente_analisis_financiero', label: 'Análisis Financiero', role: 'coordinador_comercial', roleLabel: 'Coordinador Comercial', desc: 'Realizar el análisis financiero del cliente.' },
     { key: 'comite_evaluacion', label: 'Comité de Crédito', role: 'comite_credito', roleLabel: 'Comité de Crédito', desc: 'Evaluar el perfil de crédito y firmar el Acta oficial de decisión del Comité.' },
     { key: 'formalizacion_garantias', label: 'Garantías', role: 'operativo', roleLabel: 'Dirección Administrativa', desc: 'Revisar y registrar las garantías firmadas por el cliente.' },
     { key: 'aprobacion_registro_cyf', label: 'Registro CYF', role: 'gerente', roleLabel: 'Gerencia', desc: 'Aprobar el registro de la operación en la plataforma core CYF.' },

@@ -27,6 +27,17 @@ use Illuminate\Support\Facades\Storage;
  * docs/specs/scrum-169-actas-comite-credito.md). El botón manual
  * aprobar/rechazar de CreditoOrdinarioController para 'comite_evaluacion'
  * quedó retirado — la única salida de ese estado es esta.
+ *
+ * SCRUM-183 (2026-08-05, decisión de Luis tras hablar con Lorena): se
+ * eliminó el paso "Presentación para el Comité" + aprobación de Gerencia
+ * (estado 'aprobacion_presentacion') — no aportaba valor real al flujo y
+ * dejaba créditos con Análisis Financiero confirmado bloqueados
+ * indefinidamente si nadie cargaba esa presentación. Ahora un crédito pasa
+ * directo de 'pendiente_analisis_financiero' a 'comite_evaluacion' al
+ * confirmar el Análisis Financiero (ver AnalisisFinancieroController::
+ * confirmar()). La presentación se adjunta después, por solicitud, acá
+ * mismo (ver subirPresentacion()) — el Coordinador Comercial la sube
+ * cuando arma el Acta, no antes.
  */
 class ActaComiteController extends Controller
 {
@@ -86,9 +97,7 @@ class ActaComiteController extends Controller
 
         if ($creditosElegibles->isEmpty()) {
             return response()->json([
-                'message' => 'No hay créditos listos para el Comité todavía. Tener el Análisis Financiero confirmado no es suficiente: '
-                    . 'también hace falta cargar la Presentación para el Comité y que Gerencia la apruebe.',
-                'casi_listos' => $this->creditosCasiListos(),
+                'message' => 'No hay créditos con Análisis Financiero confirmado listos para el Comité todavía.',
             ], 422);
         }
 
@@ -316,6 +325,43 @@ class ActaComiteController extends Controller
         return response()->json(['url' => CreditoOrdinario::resolveStorageUrl($path)]);
     }
 
+    /**
+     * SCRUM-183: la Presentación para el Comité de Crédito ya no bloquea la
+     * transición a comite_evaluacion (ver AnalisisFinancieroController::
+     * confirmar() y CreditoOrdinarioController::transition()) — se adjunta
+     * acá, directo sobre la solicitud dentro del Acta, una por solicitud
+     * (cada crédito puede traer la suya propia).
+     */
+    public function subirPresentacion(Request $request, ActaComite $acta, ActaComiteSolicitud $solicitud)
+    {
+        if ($solicitud->acta_comite_id !== $acta->id) {
+            abort(404);
+        }
+
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarRol($activeRole);
+        $this->rechazarSiAprobada($acta);
+
+        $request->validate([
+            'archivo' => 'required|file|mimes:pdf|max:20480',
+        ], [
+            'archivo.required' => 'Debe seleccionar un archivo PDF.',
+            'archivo.mimes' => 'El archivo debe ser un PDF.',
+            'archivo.max' => 'El archivo no debe superar 20 MB.',
+        ]);
+
+        $path = $request->file('archivo')->storeAs(
+            "actas-comite/{$acta->id}/presentaciones",
+            $request->file('archivo')->getClientOriginalName(),
+            'public'
+        );
+
+        $solicitud->presentacion_comite = $path;
+        $solicitud->save();
+
+        return response()->json($solicitud->fresh());
+    }
+
     public function previsualizar(Request $request, ActaComite $acta)
     {
         $activeRole = $this->resolveActiveRole($request);
@@ -441,45 +487,6 @@ class ActaComiteController extends Controller
         }
     }
 
-    /**
-     * SCRUM-183 (2026-08-05, comentario de Juan): el mensaje de "no hay
-     * créditos" no distinguía entre "nadie ha hecho nada" y "hay créditos
-     * con Análisis Financiero confirmado que quedaron a mitad de camino"
-     * — Análisis Financiero confirmado solo habilita
-     * 'pendiente_analisis_financiero'; para llegar a 'comite_evaluacion'
-     * (el único estado elegible) todavía faltan la Presentación para el
-     * Comité (upload manual, ver CreditoOrdinarioController case
-     * 'pendiente_analisis_financiero') y la aprobación de Gerencia sobre
-     * esa presentación (estado 'aprobacion_presentacion'). Esta lista
-     * resuelve, para cada crédito "casi listo", exactamente cuál de los
-     * dos pasos falta, para que el mensaje deje de ser un callejón sin
-     * salida.
-     */
-    private function creditosCasiListos()
-    {
-        return CreditoOrdinario::whereIn('estado', ['pendiente_analisis_financiero', 'aprobacion_presentacion'])
-            ->whereHas('analisisFinanciero', fn ($q) => $q->where('estado', 'confirmado'))
-            ->with(['solicitudCredito.cliente'])
-            ->get()
-            ->map(function (CreditoOrdinario $credito) {
-                $faltantes = [];
-                if (empty($credito->documentos['presentacion_comite'] ?? null)) {
-                    $faltantes[] = 'Cargar la Presentación para el Comité de Crédito';
-                }
-                if ($credito->estado !== 'aprobacion_presentacion') {
-                    $faltantes[] = 'Aprobación de Gerencia sobre la presentación';
-                }
-
-                return [
-                    'numero_solicitud' => $credito->numero_solicitud,
-                    'cliente' => $credito->solicitudCredito?->cliente?->nombre
-                        ?? $credito->solicitudCredito?->cliente?->nombre_razon_social,
-                    'estado' => $credito->estado,
-                    'falta' => $faltantes,
-                ];
-            })
-            ->values();
-    }
 
     private function ordenDiaInicial(?ActaComite $ultimaAprobada): array
     {

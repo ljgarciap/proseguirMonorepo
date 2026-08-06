@@ -191,14 +191,12 @@ class AnalisisFinancieroController extends Controller
         $analisis->diligenciado_por_at = now();
         $analisis->save();
 
-        $tienePresentacionComite = !empty($credito->documentos['presentacion_comite'] ?? null);
-        if ($tienePresentacionComite) {
-            $this->transicionarCredito($credito, 'aprobacion_presentacion', $user->name, $activeRole,
-                'Análisis financiero confirmado y presentación cargada. Pasa a aprobación de presentación por Gerencia.');
-        } else {
-            $this->transicionarCredito($credito, $credito->estado, $user->name, $activeRole,
-                'Análisis financiero confirmado. Falta cargar la presentación para el Comité de Crédito antes de continuar.');
-        }
+        // SCRUM-183: ya no depende de si se cargó la Presentación para el
+        // Comité (ese paso + la aprobación de Gerencia se eliminaron del
+        // BPMN) — confirmar el Análisis Financiero es, por sí solo,
+        // suficiente para pasar a evaluación del Comité.
+        $this->transicionarCredito($credito, 'comite_evaluacion', $user->name, $activeRole,
+            'Análisis financiero confirmado. Pasa a evaluación del Comité de Crédito.');
 
         return response()->json([
             'analisis' => $analisis->fresh(),

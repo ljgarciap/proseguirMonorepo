@@ -177,6 +177,20 @@
             <label>Vigencia de aprobación</label>
             <input class="pro-input" type="text" [(ngModel)]="s.vigencia_aprobacion" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
           </div>
+          <!-- SCRUM-183: la Presentación para el Comité se adjunta acá, no
+               antes de llegar a Comité de Crédito. -->
+          <div class="form-field">
+            <label>Presentación para el Comité</label>
+            <input type="file" [id]="'file-presentacion-' + s.id" accept=".pdf" hidden
+                   (change)="subirPresentacion(s, $event)" [disabled]="soloLectura">
+            <label [for]="'file-presentacion-' + s.id" class="btn-pro secondary sm btn-upload" *ngIf="!soloLectura">
+              <span class="material-symbols-outlined">upload</span>
+              {{ s.presentacion_comite ? 'Reemplazar' : 'Cargar PDF' }}
+            </label>
+            <a *ngIf="s.presentacion_comite" [href]="s.presentacion_comite" target="_blank" class="btn-view-doc">
+              <span class="material-symbols-outlined">open_in_new</span> Ver
+            </a>
+          </div>
         </div>
         <div class="form-field mt-2">
           <label>Observaciones</label>
