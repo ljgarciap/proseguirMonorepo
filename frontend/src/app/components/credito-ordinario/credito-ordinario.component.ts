@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, HostListener, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -54,6 +54,26 @@ export class CreditoOrdinarioComponent implements OnInit {
     });
 
     this.loadCreditos();
+  }
+
+  // SCRUM-176: volver a esta pantalla con atrás/adelante del navegador (bfcache) o
+  // cambiando de pestaña y regresando no dispara ngOnInit ni ninguna petición nueva —
+  // 'selectedCredito' (y su historial_estados) queda congelado con lo último que se
+  // cargó, aunque el backend ya tenga las transiciones de SARLAFT/Análisis
+  // Financiero hechas en otro módulo. Reproduce el síntoma reportado: BD completa,
+  // pantalla mostrando solo el primer evento.
+  @HostListener('window:pageshow', ['$event'])
+  onPageShow(event: PageTransitionEvent): void {
+    if (event.persisted) {
+      this.loadCreditos();
+    }
+  }
+
+  @HostListener('document:visibilitychange')
+  onVisibilityChange(): void {
+    if (document.visibilityState === 'visible') {
+      this.loadCreditos();
+    }
   }
 
   loadCreditos() {

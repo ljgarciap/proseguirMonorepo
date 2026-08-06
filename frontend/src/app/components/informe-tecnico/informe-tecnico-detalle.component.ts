@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
@@ -158,6 +158,29 @@ export class InformeTecnicoDetalleComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.autoguardadoSub?.unsubscribe();
+  }
+
+  // SCRUM-176: si el usuario vuelve a esta pantalla con el botón atrás/adelante del
+  // navegador (bfcache) o simplemente cambia de pestaña y regresa, Angular no vuelve
+  // a correr ngOnInit ni dispara ninguna petición nueva — 'credito' (y su
+  // historial_estados) se queda congelado con lo que se cargó la primera vez, sin
+  // importar qué tan desactualizado esté. Esto reproduce exactamente el síntoma
+  // reportado: el dato en backend estaba completo (verificado por tinker), pero la
+  // pantalla seguía mostrando solo el primer evento. Recargar en ambos casos cubre
+  // el escenario real de un Coordinador/Ingeniero que resuelve SARLAFT o Análisis
+  // Financiero en otro módulo/pestaña y vuelve acá sin refrescar manualmente.
+  @HostListener('window:pageshow', ['$event'])
+  onPageShow(event: PageTransitionEvent): void {
+    if (event.persisted && this.creditoId) {
+      this.cargar();
+    }
+  }
+
+  @HostListener('document:visibilitychange')
+  onVisibilityChange(): void {
+    if (document.visibilityState === 'visible' && this.creditoId) {
+      this.cargar();
+    }
   }
 
   // Enganchado a (input) en el contenedor de cada sección editable: dispara
