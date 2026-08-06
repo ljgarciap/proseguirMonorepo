@@ -251,6 +251,115 @@ class SolicitudCreditoTest extends TestCase
     }
 
     /**
+     * SCRUM-185: 'cliente_id' vacío (cliente completamente nuevo, sin usar
+     * "Asociar Cliente Existente") no debe tirar 404 — antes
+     * Cliente::findOrFail(null) reventaba con ModelNotFoundException antes
+     * de llegar a cualquier validación, sin crear nada. Este camino nunca
+     * tuvo cobertura (todos los demás tests usan un cliente ya sembrado).
+     */
+    public function test_can_register_credit_request_for_brand_new_client(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $payload = [
+            // Sin cliente_id — simula dejar "Asociar Cliente Existente" vacío.
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => '99988877',
+
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 15000000.00,
+            'plazo_meses' => 24,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'garantia' => 'Firma personal',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'cliente.nuevo@test.com',
+            'asunto_notificacion' => 'Documentación para Crédito',
+            'mensaje_notificacion' => 'Por favor adjunta los archivos.',
+            'document_preset_id' => $this->preset->id,
+
+            'nombres' => 'Carlos',
+            'primer_apellido' => 'Nuevo',
+            'segundo_apellido' => 'Cliente',
+            'correo_electronico' => 'cliente.nuevo@test.com',
+            'telefono' => '3111234567',
+            'direccion' => 'Calle Nueva 45',
+            'pais' => 'Colombia',
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id
+        ];
+
+        $response = $this->postJson('/api/solicitudes-credito', $payload);
+
+        $response->assertStatus(201);
+
+        // Se creó el Cliente nuevo, con nombre/identificacion derivados por
+        // el hook Cliente::boot()::saving().
+        $this->assertDatabaseHas('clientes', [
+            'numero_documento' => '99988877',
+            'identificacion' => '99988877',
+            'nombre' => 'Carlos Nuevo Cliente',
+            'nombres' => 'Carlos',
+            'correo_electronico' => 'cliente.nuevo@test.com',
+        ]);
+
+        $cliente = Cliente::where('numero_documento', '99988877')->first();
+        $this->assertNotNull($cliente);
+
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'cliente_id' => $cliente->id,
+            'monto_solicitado' => 15000000.00,
+        ]);
+
+        // Assert User got provisioned for the brand-new client
+        $this->assertDatabaseHas('users', [
+            'numero_documento' => '99988877',
+            'email' => 'cliente.nuevo@test.com',
+        ]);
+    }
+
+    /**
+     * SCRUM-185: si 'cliente_id' viene vacío pero el 'numero_documento' ya
+     * pertenece a otro cliente, debe rechazarse con un 422 de validación
+     * explícito — no crear un duplicado ni reventar con un error de BD.
+     */
+    public function test_register_credit_request_rejects_duplicate_numero_documento_for_new_client(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $payload = [
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => $this->clientNatural->numero_documento, // ya existe
+
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 15000000.00,
+            'plazo_meses' => 24,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'duplicado@test.com',
+            'asunto_notificacion' => 'Documentación para Crédito',
+            'mensaje_notificacion' => 'Por favor adjunta los archivos.',
+
+            'nombres' => 'Duplicado',
+            'primer_apellido' => 'Cliente',
+            'correo_electronico' => 'duplicado@test.com',
+            'telefono' => '3111234567',
+            'direccion' => 'Calle Nueva 45',
+            'pais' => 'Colombia',
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id
+        ];
+
+        $response = $this->postJson('/api/solicitudes-credito', $payload);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['numero_documento']);
+    }
+
+    /**
      * SCRUM-152: cada SolicitudCredito debe tener su propio DocumentRequest,
      * con exactamente los documentos de SU preset — antes, si el cliente ya
      * tenía un DocumentRequest "pendiente" de una solicitud anterior (muy
