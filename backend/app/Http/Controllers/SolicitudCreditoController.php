@@ -57,7 +57,10 @@ class SolicitudCreditoController extends Controller
     {
         $rules = [
             'visita_id' => 'nullable|exists:visitas,id',
-            'cliente_id' => 'required|exists:clientes,id',
+            // SCRUM-185: 'nullable' — un cliente completamente nuevo no trae
+            // cliente_id todavía (ver bloque de abajo, que valida en su lugar
+            // los campos de identidad necesarios para crearlo).
+            'cliente_id' => 'nullable|exists:clientes,id',
             'tipo_credito_id' => 'required|exists:tipo_creditos,id',
             'monto_solicitado' => 'required|numeric|min:0.01',
             'proyecto' => 'nullable|string',
@@ -72,8 +75,29 @@ class SolicitudCreditoController extends Controller
             'document_preset_id' => 'nullable|exists:document_presets,id',
         ];
 
-        // Conditional client info validations based on person type
-        $cliente = Cliente::findOrFail($request->cliente_id);
+        // SCRUM-185: 'cliente_id' viene vacío cuando se registra un cliente
+        // completamente nuevo (campo "Asociar Cliente Existente" sin usar) —
+        // el frontend permite enviar el formulario así (isFormValid() solo
+        // exige numero_documento como alternativa). Antes esto hacía
+        // Cliente::findOrFail(null), un ModelNotFoundException que Laravel
+        // renderiza como 404 opaco, sin crear nada. Se arma la instancia en
+        // memoria con los campos de identidad (el frontend siempre los
+        // manda) para poder resolver tipoPersona/validar más abajo, igual
+        // que con un cliente existente; el resto de campos del bloque de
+        // guardado más abajo la completa y persiste.
+        if ($request->filled('cliente_id')) {
+            $cliente = Cliente::findOrFail($request->cliente_id);
+        } else {
+            $rules['tipo_persona_id'] = 'required|exists:tipo_personas,id';
+            $rules['tipo_documento_id'] = 'required|exists:document_types,id';
+            $rules['numero_documento'] = 'required|string|unique:clientes,numero_documento';
+            $cliente = new Cliente([
+                'tipo_persona_id' => $request->tipo_persona_id,
+                'tipo_documento_id' => $request->tipo_documento_id,
+                'numero_documento' => $request->numero_documento,
+                'activo' => true,
+            ]);
+        }
         $tipoPersona = $cliente->tipoPersona;
         $codigoPersona = $tipoPersona ? strtoupper($tipoPersona->codigo) : 'NATURAL';
 
@@ -139,9 +163,14 @@ class SolicitudCreditoController extends Controller
         $validated = $request->validate($rules);
 
         return DB::transaction(function () use ($request, $cliente, $codigoPersona, $validated) {
-            // 1. Update Cliente information with the validated client details
+            // 1. Update Cliente information with the validated client details.
+            // SCRUM-185: fill()->save() en vez de update() — update() no hace
+            // nada (retorna false sin persistir) si $cliente todavía no existe
+            // en BD, que es exactamente el caso de un cliente nuevo armado
+            // arriba. fill()->save() hace INSERT o UPDATE según corresponda,
+            // igual en ambos casos.
             if ($codigoPersona === 'NATURAL') {
-                $cliente->update([
+                $cliente->fill([
                     'nombres' => $validated['nombres'],
                     'primer_apellido' => $validated['primer_apellido'],
                     'segundo_apellido' => $validated['segundo_apellido'] ?? null,
@@ -151,9 +180,9 @@ class SolicitudCreditoController extends Controller
                     'pais' => $validated['pais'],
                     'departamento_id' => $validated['departamento_id'],
                     'ciudad_id' => $validated['ciudad_id'],
-                ]);
+                ])->save();
             } else {
-                $cliente->update([
+                $cliente->fill([
                     'nombre_razon_social' => $validated['nombre_razon_social'],
                     'tipo_empresa' => $validated['tipo_empresa'],
                     'actividad_economica' => $validated['actividad_economica'],
@@ -171,7 +200,7 @@ class SolicitudCreditoController extends Controller
                     'rep_cargo' => $validated['rep_cargo'],
                     'rep_correo_electronico' => $validated['rep_correo_electronico'],
                     'rep_telefono' => $validated['rep_telefono'],
-                ]);
+                ])->save();
             }
 
             // 2. Ensure User exists and sync their details
