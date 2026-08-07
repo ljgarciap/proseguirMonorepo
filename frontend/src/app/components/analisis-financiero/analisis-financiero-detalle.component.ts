@@ -79,7 +79,41 @@ const CARTERA_CONCEPTOS: FilaConcepto[] = [
   { label: 'Provisión de cartera', clave: 'provision' },
 ];
 
+// SCRUM-187 (segunda entrega): Estado de Resultados (antes "Utilidad Neta")
+// es una cascada de 6 buckets con rol de signo fijo (ver
+// AnalisisFinancieroCalculoService::calcularUtilidadNeta) — cada uno admite
+// Agregar fila/ocultar/reordenar igual que el resto de secciones, sin tocar
+// la fórmula de la cascada en sí.
+const INGRESOS_ORDINARIOS_CONCEPTOS: FilaConcepto[] = [
+  { label: 'Ingresos ordinarios', clave: 'ingresos_ordinarios' },
+];
+const COSTO_VENTAS_CONCEPTOS: FilaConcepto[] = [
+  { label: 'Costo de ventas', clave: 'costo_ventas' },
+];
+const GASTOS_OPERACIONALES_CONCEPTOS: FilaConcepto[] = [
+  { label: 'Gastos de administración', clave: 'gastos_administracion' },
+  { label: 'Gastos de ventas y distribución', clave: 'gastos_ventas_distribucion' },
+];
+const OTROS_INGRESOS_CONCEPTOS: FilaConcepto[] = [
+  { label: 'Ingreso financiero', clave: 'ingreso_financiero' },
+  { label: 'Otros ingresos', clave: 'otros_ingresos' },
+  { label: 'Ingresos método de participación', clave: 'ingresos_metodo_participacion' },
+];
+const OTROS_GASTOS_CONCEPTOS: FilaConcepto[] = [
+  { label: 'Gasto financiero', clave: 'gasto_financiero' },
+  { label: 'Intereses', clave: 'intereses' },
+  { label: 'Otros gastos', clave: 'otros_gastos' },
+];
+const IMPUESTOS_CONCEPTOS: FilaConcepto[] = [
+  { label: 'Impuesto a las ganancias', clave: 'impuesto_ganancias' },
+  { label: 'Impuesto de renta', clave: 'impuesto_renta' },
+];
+
 type Tab = 'activo' | 'pasivo' | 'patrimonio' | 'utilidad_neta' | 'ori' | 'cartera' | 'resumen';
+
+interface FilaRenderizable extends FilaConcepto {
+  esCustom: boolean;
+}
 
 /**
  * SCRUM-162 — grupos que soportan filas custom ad-hoc (los mismos que ya
@@ -94,6 +128,22 @@ const GRUPOS_POR_TAB: Record<string, string[]> = {
   pasivo: ['pasivo_corriente', 'pasivo_no_corriente'],
   patrimonio: ['patrimonio'],
   cartera: ['cartera'],
+  utilidad_neta: ['ingresos_ordinarios', 'costo_ventas', 'gastos_operacionales', 'otros_ingresos', 'otros_gastos', 'impuestos'],
+};
+
+const CONCEPTOS_FIJOS_POR_GRUPO: Record<string, FilaConcepto[]> = {
+  activo_corriente: ACTIVO_CORRIENTE,
+  activo_no_corriente: ACTIVO_NO_CORRIENTE,
+  pasivo_corriente: PASIVO_CORRIENTE,
+  pasivo_no_corriente: PASIVO_NO_CORRIENTE,
+  patrimonio: PATRIMONIO_CONCEPTOS,
+  cartera: CARTERA_CONCEPTOS,
+  ingresos_ordinarios: INGRESOS_ORDINARIOS_CONCEPTOS,
+  costo_ventas: COSTO_VENTAS_CONCEPTOS,
+  gastos_operacionales: GASTOS_OPERACIONALES_CONCEPTOS,
+  otros_ingresos: OTROS_INGRESOS_CONCEPTOS,
+  otros_gastos: OTROS_GASTOS_CONCEPTOS,
+  impuestos: IMPUESTOS_CONCEPTOS,
 };
 
 @Component({
@@ -128,6 +178,8 @@ export class AnalisisFinancieroDetalleComponent implements OnInit, OnDestroy {
     activo_corriente: [], activo_no_corriente: [],
     pasivo_corriente: [], pasivo_no_corriente: [],
     patrimonio: [], cartera: [],
+    ingresos_ordinarios: [], costo_ventas: [], gastos_operacionales: [],
+    otros_ingresos: [], otros_gastos: [], impuestos: [],
   };
 
   observaciones = '';
@@ -285,6 +337,103 @@ export class AnalisisFinancieroDetalleComponent implements OnInit, OnDestroy {
       }
     }
     this.inputs[tab]['_custom'] = lista;
+  }
+
+  // SCRUM-187 (segunda entrega) — "eliminar cualquier ítem, no solo los
+  // agregados con Agregar fila": un concepto FIJO no se borra del catálogo
+  // (`CONCEPTOS_FIJOS_POR_GRUPO`, compartido por todos los créditos), se
+  // oculta solo en ESTE análisis vía `inputs[tab]._ocultos` (lista plana de
+  // claves, decisión de Luis: por análisis, no catálogo global). Una fila
+  // custom se sigue eliminando de verdad (ver `eliminarFila`).
+  ocultarFila(tab: string, clave: string): void {
+    if (!this.puedeEditar) return;
+    const ocultos: string[] = this.inputs[tab]['_ocultos'] || [];
+    if (!ocultos.includes(clave)) {
+      this.inputs[tab]['_ocultos'] = [...ocultos, clave];
+      this.onCampoCambiado();
+    }
+  }
+
+  restaurarFila(tab: string, clave: string): void {
+    if (!this.puedeEditar) return;
+    const ocultos: string[] = this.inputs[tab]['_ocultos'] || [];
+    this.inputs[tab]['_ocultos'] = ocultos.filter(c => c !== clave);
+    this.onCampoCambiado();
+  }
+
+  // Conceptos (fijos de cualquier grupo de la pestaña + custom) ocultos en
+  // ESTE análisis — para el link "Mostrar ocultos" de cada pestaña.
+  filasOcultas(tab: string): FilaConcepto[] {
+    const ocultos: string[] = this.inputs[tab]?.['_ocultos'] || [];
+    if (!ocultos.length) return [];
+    const grupos = GRUPOS_POR_TAB[tab] || [];
+    const todas: FilaConcepto[] = [];
+    for (const grupo of grupos) {
+      todas.push(...(CONCEPTOS_FIJOS_POR_GRUPO[grupo] || []));
+      todas.push(...(this.customFilas[grupo] || []));
+    }
+    return ocultos
+      .map(clave => todas.find(f => f.clave === clave))
+      .filter((f): f is FilaConcepto => !!f);
+  }
+
+  // SCRUM-187 (segunda entrega) — filas fijas + custom de un grupo, ya
+  // filtradas por `_ocultos` y en el orden persistido (`inputs[tab]._orden`,
+  // por grupo). Sin orden guardado (análisis previos a esta feature, o
+  // grupo recién creado) cae al orden natural: fijas primero, custom al
+  // final — el mismo comportamiento de siempre.
+  filasOrdenadas(grupo: string, tab: string): FilaRenderizable[] {
+    const fijas: FilaRenderizable[] = (CONCEPTOS_FIJOS_POR_GRUPO[grupo] || []).map(f => ({ ...f, esCustom: false }));
+    const custom: FilaRenderizable[] = (this.customFilas[grupo] || []).map(f => ({ ...f, esCustom: true }));
+    const ocultos: string[] = this.inputs[tab]?.['_ocultos'] || [];
+    const todas = [...fijas, ...custom].filter(f => !ocultos.includes(f.clave));
+
+    const orden: string[] | undefined = this.inputs[tab]?.['_orden']?.[grupo];
+    if (!Array.isArray(orden) || orden.length === 0) return todas;
+
+    const porClave = new Map(todas.map(f => [f.clave, f]));
+    const resultado: FilaRenderizable[] = [];
+    for (const clave of orden) {
+      const f = porClave.get(clave);
+      if (f) {
+        resultado.push(f);
+        porClave.delete(clave);
+      }
+    }
+    // Fila nueva (agregada después de guardar el orden) o legacy sin orden: al final.
+    for (const f of todas) {
+      if (porClave.has(f.clave)) resultado.push(f);
+    }
+    return resultado;
+  }
+
+  // `filasOrdenadas` construye objetos nuevos en cada llamada (spread de
+  // FilaConcepto) — sin trackBy, Angular ve identidades distintas en cada
+  // ciclo de detección de cambios y destruye/recrea el DOM de la fila
+  // completa (perdiendo el foco del input en cada tecla, y con potencial de
+  // colgar la pestaña en tablas grandes). trackBy por clave lo evita.
+  trackByClave(_index: number, fila: FilaConcepto): string {
+    return fila.clave;
+  }
+
+  puedeMoverFila(grupo: string, tab: string, clave: string, direccion: -1 | 1): boolean {
+    const lista = this.filasOrdenadas(grupo, tab);
+    const idx = lista.findIndex(f => f.clave === clave);
+    const nuevoIdx = idx + direccion;
+    return idx >= 0 && nuevoIdx >= 0 && nuevoIdx < lista.length;
+  }
+
+  moverFila(grupo: string, tab: string, clave: string, direccion: -1 | 1): void {
+    if (!this.puedeEditar) return;
+    const claves = this.filasOrdenadas(grupo, tab).map(f => f.clave);
+    const idx = claves.indexOf(clave);
+    const nuevoIdx = idx + direccion;
+    if (idx < 0 || nuevoIdx < 0 || nuevoIdx >= claves.length) return;
+
+    [claves[idx], claves[nuevoIdx]] = [claves[nuevoIdx], claves[idx]];
+    if (!this.inputs[tab]['_orden']) this.inputs[tab]['_orden'] = {};
+    this.inputs[tab]['_orden'][grupo] = claves;
+    this.onCampoCambiado();
   }
 
   get anios(): number[] {

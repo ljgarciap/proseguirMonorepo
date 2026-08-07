@@ -52,6 +52,19 @@ class AnalisisFinancieroCalculoService
         'cartera_corriente', 'vencida_0_60', 'vencida_mas_60', 'dificil_cobro', 'provision',
     ];
 
+    // SCRUM-187 (segunda entrega): Estado de Resultados (antes "Utilidad
+    // Neta") es una cascada con roles de signo fijos por concepto — no un
+    // solo grupo sumado como Activo/Pasivo. Cada bucket agrupa los
+    // conceptos que comparten el mismo rol en la cascada, para poder
+    // extenderlos con filas custom (conceptosConCustom) igual que el resto
+    // de secciones, sin alterar la fórmula contable en sí.
+    private const UTILIDAD_INGRESOS_ORDINARIOS = ['ingresos_ordinarios'];
+    private const UTILIDAD_COSTO_VENTAS = ['costo_ventas'];
+    private const UTILIDAD_GASTOS_OPERACIONALES = ['gastos_administracion', 'gastos_ventas_distribucion'];
+    private const UTILIDAD_OTROS_INGRESOS = ['ingreso_financiero', 'otros_ingresos', 'ingresos_metodo_participacion'];
+    private const UTILIDAD_OTROS_GASTOS = ['gasto_financiero', 'intereses', 'otros_gastos'];
+    private const UTILIDAD_IMPUESTOS = ['impuesto_ganancias', 'impuesto_renta'];
+
     /**
      * Activo Corriente + No Corriente (celdas de la plantilla SUMATEC).
      * Análisis estructural base = Total Activo del mismo año.
@@ -138,37 +151,33 @@ class AnalisisFinancieroCalculoService
     }
 
     /**
-     * Estado de resultados (Utilidad Neta) — cascada, no suma de grupo.
+     * Estado de resultados (antes "Utilidad Neta") — cascada de 6 buckets
+     * con rol de signo fijo, no un solo grupo sumado. Cada bucket admite
+     * filas custom (Agregar fila) y ocultar sus conceptos fijos igual que
+     * Activo/Pasivo/Patrimonio/Cartera (SCRUM-187, segunda entrega) — la
+     * fórmula de la cascada en sí (bruta/operacional/antes de
+     * impuestos/neta) no cambia, solo qué conceptos alimentan cada bucket.
      * Análisis estructural base = Ingresos Ordinarios del mismo año.
      */
     public function calcularUtilidadNeta(array $inputs, array $anios): array
     {
-        $valores = [];
+        $ingresos = $this->sumarGrupo($inputs, $this->conceptosConCustom($inputs, self::UTILIDAD_INGRESOS_ORDINARIOS, 'ingresos_ordinarios'), $anios);
+        $costoVentas = $this->sumarGrupo($inputs, $this->conceptosConCustom($inputs, self::UTILIDAD_COSTO_VENTAS, 'costo_ventas'), $anios);
+        $gastosOperacionales = $this->sumarGrupo($inputs, $this->conceptosConCustom($inputs, self::UTILIDAD_GASTOS_OPERACIONALES, 'gastos_operacionales'), $anios);
+        $otrosIngresos = $this->sumarGrupo($inputs, $this->conceptosConCustom($inputs, self::UTILIDAD_OTROS_INGRESOS, 'otros_ingresos'), $anios);
+        $otrosGastos = $this->sumarGrupo($inputs, $this->conceptosConCustom($inputs, self::UTILIDAD_OTROS_GASTOS, 'otros_gastos'), $anios);
+        $impuestos = $this->sumarGrupo($inputs, $this->conceptosConCustom($inputs, self::UTILIDAD_IMPUESTOS, 'impuestos'), $anios);
+
         $utilidadBruta = [];
         $utilidadOperacional = [];
         $gananciaAntesImpuestos = [];
         $utilidadNeta = [];
 
-        $conceptos = [
-            'ingresos_ordinarios', 'costo_ventas', 'gastos_administracion', 'gastos_ventas_distribucion',
-            'ingreso_financiero', 'otros_ingresos', 'ingresos_metodo_participacion',
-            'gasto_financiero', 'intereses', 'otros_gastos', 'impuesto_ganancias', 'impuesto_renta',
-        ];
-
         foreach ($anios as $anio) {
-            $v = [];
-            foreach ($conceptos as $concepto) {
-                $v[$concepto] = $this->num($inputs[$concepto][$anio] ?? null);
-            }
-            foreach ($conceptos as $concepto) {
-                $valores[$concepto][$anio] = $v[$concepto];
-            }
-
-            $bruta = $v['ingresos_ordinarios'] - $v['costo_ventas'];
-            $operacional = $bruta - $v['gastos_administracion'] - $v['gastos_ventas_distribucion'];
-            $antesImpuestos = $operacional + $v['ingreso_financiero'] + $v['otros_ingresos'] + $v['ingresos_metodo_participacion']
-                - $v['gasto_financiero'] - $v['intereses'] - $v['otros_gastos'];
-            $neta = $antesImpuestos - $v['impuesto_ganancias'] - $v['impuesto_renta'];
+            $bruta = $ingresos['subtotal'][$anio] - $costoVentas['subtotal'][$anio];
+            $operacional = $bruta - $gastosOperacionales['subtotal'][$anio];
+            $antesImpuestos = $operacional + $otrosIngresos['subtotal'][$anio] - $otrosGastos['subtotal'][$anio];
+            $neta = $antesImpuestos - $impuestos['subtotal'][$anio];
 
             $utilidadBruta[$anio] = $this->round($bruta);
             $utilidadOperacional[$anio] = $this->round($operacional);
@@ -176,7 +185,12 @@ class AnalisisFinancieroCalculoService
             $utilidadNeta[$anio] = $this->round($neta);
         }
 
-        $ingresosOrdinarios = $valores['ingresos_ordinarios'];
+        $valores = array_merge(
+            $ingresos['valores'], $costoVentas['valores'], $gastosOperacionales['valores'],
+            $otrosIngresos['valores'], $otrosGastos['valores'], $impuestos['valores']
+        );
+
+        $ingresosOrdinarios = $ingresos['subtotal'];
         $baseEstructural = array_merge($valores, [
             'utilidad_bruta' => $utilidadBruta,
             'utilidad_operacional' => $utilidadOperacional,
@@ -286,21 +300,33 @@ class AnalisisFinancieroCalculoService
      *
      * Las filas custom son ad-hoc por informe (no un catálogo reutilizable):
      * viajan en la propia sección (`activo`, `pasivo`, `patrimonio`,
-     * `cartera`) bajo la clave reservada `_custom`, como una lista de
-     * `{grupo, clave, label}`. El VALOR de cada fila custom vive en el
-     * mismo nivel que cualquier concepto fijo (`$inputs[$clave][$anio]`) —
-     * así `sumarGrupo()` no necesita saber que una clave es custom, solo
-     * necesita la lista completa de claves a sumar.
+     * `cartera`, `utilidad_neta`) bajo la clave reservada `_custom`, como
+     * una lista de `{grupo, clave, label}`. El VALOR de cada fila custom
+     * vive en el mismo nivel que cualquier concepto fijo
+     * (`$inputs[$clave][$anio]`) — así `sumarGrupo()` no necesita saber que
+     * una clave es custom, solo necesita la lista completa de claves a sumar.
      *
      * Una clave custom nunca puede pisar una clave fija del grupo (se
      * ignora silenciosamente si coincide) y las claves duplicadas se
      * deduplican.
+     *
+     * SCRUM-187 (segunda entrega) — "eliminar cualquier ítem, no solo los
+     * agregados con Agregar fila": los conceptos fijos que el usuario
+     * decidió ocultar en ESTE análisis viajan en `_ocultos` (lista plana de
+     * claves, reservada igual que `_custom`), sin tocar el catálogo fijo
+     * global (decisión de Luis: ocultar por análisis, no por catálogo). Una
+     * clave oculta se excluye tanto si es fija como si es custom.
      */
     private function conceptosConCustom(array $inputs, array $conceptosFijos, string $grupo): array
     {
+        $ocultos = $inputs['_ocultos'] ?? [];
+        $ocultos = is_array($ocultos) ? array_values(array_filter($ocultos, 'is_string')) : [];
+
+        $conceptosFijosVisibles = array_values(array_diff($conceptosFijos, $ocultos));
+
         $custom = $inputs['_custom'] ?? [];
         if (!is_array($custom)) {
-            return $conceptosFijos;
+            return $conceptosFijosVisibles;
         }
 
         $customClaves = [];
@@ -312,13 +338,13 @@ class AnalisisFinancieroCalculoService
                 continue;
             }
             $clave = $fila['clave'] ?? null;
-            if (!is_string($clave) || $clave === '' || in_array($clave, $conceptosFijos, true)) {
+            if (!is_string($clave) || $clave === '' || in_array($clave, $conceptosFijos, true) || in_array($clave, $ocultos, true)) {
                 continue;
             }
             $customClaves[] = $clave;
         }
 
-        return array_merge($conceptosFijos, array_values(array_unique($customClaves)));
+        return array_merge($conceptosFijosVisibles, array_values(array_unique($customClaves)));
     }
 
     /**

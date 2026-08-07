@@ -73,7 +73,7 @@
     <button class="tab-btn" [class.active]="activeTab === 'activo'" (click)="cambiarTab('activo')">ACTIVO</button>
     <button class="tab-btn" [class.active]="activeTab === 'pasivo'" (click)="cambiarTab('pasivo')">PASIVO</button>
     <button class="tab-btn" [class.active]="activeTab === 'patrimonio'" (click)="cambiarTab('patrimonio')">PATRIMONIO</button>
-    <button class="tab-btn" [class.active]="activeTab === 'utilidad_neta'" (click)="cambiarTab('utilidad_neta')">UTILIDAD NETA</button>
+    <button class="tab-btn" [class.active]="activeTab === 'utilidad_neta'" (click)="cambiarTab('utilidad_neta')">ESTADO DE RESULTADOS</button>
     <button class="tab-btn" [class.active]="activeTab === 'ori'" (click)="cambiarTab('ori')">ORI</button>
     <button class="tab-btn" [class.active]="activeTab === 'cartera'" (click)="cambiarTab('cartera')">CARTERA</button>
     <button class="tab-btn" [class.active]="activeTab === 'resumen'" (click)="cambiarTab('resumen')">RESUMEN</button>
@@ -96,21 +96,15 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let fila of activoCorriente">
-            <td>{{ fila.label }}</td>
-            <ng-container *ngFor="let anio of anios; let i = index">
-              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                     [ngModel]="campoInput('activo', fila.clave, anio)"
-                     (ngModelChange)="setCampoInput('activo', fila.clave, anio, $event)"
-                     [disabled]="!puedeEditar"></td>
-              <td class="pct-cell">{{ fmtPct(estructural('activo', fila.clave, anio)) }}</td>
-              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('activo', fila.clave, anio)) }}</td>
-            </ng-container>
-          </tr>
-          <tr *ngFor="let fila of customFilas['activo_corriente']">
+          <tr *ngFor="let fila of filasOrdenadas('activo_corriente','activo'); trackBy: trackByClave">
             <td>{{ fila.label }}
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('activo_corriente','activo',fila.clave,-1)"
+                      (click)="moverFila('activo_corriente','activo',fila.clave,-1)" title="Subir">↑</button>
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('activo_corriente','activo',fila.clave,1)"
+                      (click)="moverFila('activo_corriente','activo',fila.clave,1)" title="Bajar">↓</button>
               <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
-                      (click)="eliminarFila('activo_corriente','activo',fila.clave)" title="Eliminar fila">✕</button>
+                      (click)="fila.esCustom ? eliminarFila('activo_corriente','activo',fila.clave) : ocultarFila('activo',fila.clave)"
+                      [title]="fila.esCustom ? 'Eliminar fila' : 'Ocultar fila'">✕</button>
             </td>
             <ng-container *ngFor="let anio of anios; let i = index">
               <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
@@ -143,21 +137,15 @@
 
       <table class="items-table mt-2">
         <tbody>
-          <tr *ngFor="let fila of activoNoCorriente">
-            <td>{{ fila.label }}</td>
-            <ng-container *ngFor="let anio of anios; let i = index">
-              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                     [ngModel]="campoInput('activo', fila.clave, anio)"
-                     (ngModelChange)="setCampoInput('activo', fila.clave, anio, $event)"
-                     [disabled]="!puedeEditar"></td>
-              <td class="pct-cell">{{ fmtPct(estructural('activo', fila.clave, anio)) }}</td>
-              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('activo', fila.clave, anio)) }}</td>
-            </ng-container>
-          </tr>
-          <tr *ngFor="let fila of customFilas['activo_no_corriente']">
+          <tr *ngFor="let fila of filasOrdenadas('activo_no_corriente','activo'); trackBy: trackByClave">
             <td>{{ fila.label }}
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('activo_no_corriente','activo',fila.clave,-1)"
+                      (click)="moverFila('activo_no_corriente','activo',fila.clave,-1)" title="Subir">↑</button>
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('activo_no_corriente','activo',fila.clave,1)"
+                      (click)="moverFila('activo_no_corriente','activo',fila.clave,1)" title="Bajar">↓</button>
               <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
-                      (click)="eliminarFila('activo_no_corriente','activo',fila.clave)" title="Eliminar fila">✕</button>
+                      (click)="fila.esCustom ? eliminarFila('activo_no_corriente','activo',fila.clave) : ocultarFila('activo',fila.clave)"
+                      [title]="fila.esCustom ? 'Eliminar fila' : 'Ocultar fila'">✕</button>
             </td>
             <ng-container *ngFor="let anio of anios; let i = index">
               <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
@@ -193,6 +181,11 @@
           </tr>
         </tfoot>
       </table>
+
+      <p class="field-note ocultos-hint" *ngIf="filasOcultas('activo').length">
+        <span class="material-symbols-outlined">visibility_off</span>
+        Ocultos: <a href="javascript:void(0)" *ngFor="let f of filasOcultas('activo')" (click)="restaurarFila('activo', f.clave)">{{ f.label }} (restaurar)</a>
+      </p>
     </div>
 
     <!-- ================= PASIVO ================= -->
@@ -210,21 +203,15 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let fila of pasivoCorriente">
-            <td>{{ fila.label }}</td>
-            <ng-container *ngFor="let anio of anios; let i = index">
-              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                     [ngModel]="campoInput('pasivo', fila.clave, anio)"
-                     (ngModelChange)="setCampoInput('pasivo', fila.clave, anio, $event)"
-                     [disabled]="!puedeEditar"></td>
-              <td class="pct-cell">{{ fmtPct(estructural('pasivo', fila.clave, anio)) }}</td>
-              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('pasivo', fila.clave, anio)) }}</td>
-            </ng-container>
-          </tr>
-          <tr *ngFor="let fila of customFilas['pasivo_corriente']">
+          <tr *ngFor="let fila of filasOrdenadas('pasivo_corriente','pasivo'); trackBy: trackByClave">
             <td>{{ fila.label }}
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('pasivo_corriente','pasivo',fila.clave,-1)"
+                      (click)="moverFila('pasivo_corriente','pasivo',fila.clave,-1)" title="Subir">↑</button>
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('pasivo_corriente','pasivo',fila.clave,1)"
+                      (click)="moverFila('pasivo_corriente','pasivo',fila.clave,1)" title="Bajar">↓</button>
               <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
-                      (click)="eliminarFila('pasivo_corriente','pasivo',fila.clave)" title="Eliminar fila">✕</button>
+                      (click)="fila.esCustom ? eliminarFila('pasivo_corriente','pasivo',fila.clave) : ocultarFila('pasivo',fila.clave)"
+                      [title]="fila.esCustom ? 'Eliminar fila' : 'Ocultar fila'">✕</button>
             </td>
             <ng-container *ngFor="let anio of anios; let i = index">
               <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
@@ -257,21 +244,15 @@
 
       <table class="items-table mt-2">
         <tbody>
-          <tr *ngFor="let fila of pasivoNoCorriente">
-            <td>{{ fila.label }}</td>
-            <ng-container *ngFor="let anio of anios; let i = index">
-              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                     [ngModel]="campoInput('pasivo', fila.clave, anio)"
-                     (ngModelChange)="setCampoInput('pasivo', fila.clave, anio, $event)"
-                     [disabled]="!puedeEditar"></td>
-              <td class="pct-cell">{{ fmtPct(estructural('pasivo', fila.clave, anio)) }}</td>
-              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('pasivo', fila.clave, anio)) }}</td>
-            </ng-container>
-          </tr>
-          <tr *ngFor="let fila of customFilas['pasivo_no_corriente']">
+          <tr *ngFor="let fila of filasOrdenadas('pasivo_no_corriente','pasivo'); trackBy: trackByClave">
             <td>{{ fila.label }}
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('pasivo_no_corriente','pasivo',fila.clave,-1)"
+                      (click)="moverFila('pasivo_no_corriente','pasivo',fila.clave,-1)" title="Subir">↑</button>
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('pasivo_no_corriente','pasivo',fila.clave,1)"
+                      (click)="moverFila('pasivo_no_corriente','pasivo',fila.clave,1)" title="Bajar">↓</button>
               <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
-                      (click)="eliminarFila('pasivo_no_corriente','pasivo',fila.clave)" title="Eliminar fila">✕</button>
+                      (click)="fila.esCustom ? eliminarFila('pasivo_no_corriente','pasivo',fila.clave) : ocultarFila('pasivo',fila.clave)"
+                      [title]="fila.esCustom ? 'Eliminar fila' : 'Ocultar fila'">✕</button>
             </td>
             <ng-container *ngFor="let anio of anios; let i = index">
               <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
@@ -307,6 +288,11 @@
           </tr>
         </tfoot>
       </table>
+
+      <p class="field-note ocultos-hint" *ngIf="filasOcultas('pasivo').length">
+        <span class="material-symbols-outlined">visibility_off</span>
+        Ocultos: <a href="javascript:void(0)" *ngFor="let f of filasOcultas('pasivo')" (click)="restaurarFila('pasivo', f.clave)">{{ f.label }} (restaurar)</a>
+      </p>
     </div>
 
     <!-- ================= PATRIMONIO ================= -->
@@ -328,21 +314,15 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let fila of patrimonioConceptos">
-            <td>{{ fila.label }}</td>
-            <ng-container *ngFor="let anio of anios; let i = index">
-              <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                     [ngModel]="campoInput('patrimonio', fila.clave, anio)"
-                     (ngModelChange)="setCampoInput('patrimonio', fila.clave, anio, $event)"
-                     [disabled]="!puedeEditar"></td>
-              <td class="pct-cell">{{ fmtPct(estructural('patrimonio', fila.clave, anio)) }}</td>
-              <td *ngIf="i > 0" class="pct-cell">{{ fmtPct(variacion('patrimonio', fila.clave, anio)) }}</td>
-            </ng-container>
-          </tr>
-          <tr *ngFor="let fila of customFilas['patrimonio']">
+          <tr *ngFor="let fila of filasOrdenadas('patrimonio','patrimonio'); trackBy: trackByClave">
             <td>{{ fila.label }}
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('patrimonio','patrimonio',fila.clave,-1)"
+                      (click)="moverFila('patrimonio','patrimonio',fila.clave,-1)" title="Subir">↑</button>
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('patrimonio','patrimonio',fila.clave,1)"
+                      (click)="moverFila('patrimonio','patrimonio',fila.clave,1)" title="Bajar">↓</button>
               <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
-                      (click)="eliminarFila('patrimonio','patrimonio',fila.clave)" title="Eliminar fila">✕</button>
+                      (click)="fila.esCustom ? eliminarFila('patrimonio','patrimonio',fila.clave) : ocultarFila('patrimonio',fila.clave)"
+                      [title]="fila.esCustom ? 'Eliminar fila' : 'Ocultar fila'">✕</button>
             </td>
             <ng-container *ngFor="let anio of anios; let i = index">
               <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator
@@ -370,99 +350,158 @@
           </tr>
         </tfoot>
       </table>
+
+      <p class="field-note ocultos-hint" *ngIf="filasOcultas('patrimonio').length">
+        <span class="material-symbols-outlined">visibility_off</span>
+        Ocultos: <a href="javascript:void(0)" *ngFor="let f of filasOcultas('patrimonio')" (click)="restaurarFila('patrimonio', f.clave)">{{ f.label }} (restaurar)</a>
+      </p>
     </div>
 
-    <!-- ================= UTILIDAD NETA ================= -->
+    <!-- ================= ESTADO DE RESULTADOS ================= -->
     <div *ngIf="activeTab === 'utilidad_neta'">
-      <h3 class="card-title">UTILIDAD NETA</h3>
+      <h3 class="card-title">ESTADO DE RESULTADOS</h3>
       <table class="items-table">
         <thead>
           <tr><th>Concepto</th><th *ngFor="let anio of anios">{{ anio }}</th></tr>
         </thead>
         <tbody>
-          <tr>
-            <td>Ingresos ordinarios</td>
+          <tr *ngFor="let fila of filasOrdenadas('ingresos_ordinarios','utilidad_neta'); trackBy: trackByClave">
+            <td>{{ fila.label }}
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('ingresos_ordinarios','utilidad_neta',fila.clave,-1)"
+                      (click)="moverFila('ingresos_ordinarios','utilidad_neta',fila.clave,-1)" title="Subir">↑</button>
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('ingresos_ordinarios','utilidad_neta',fila.clave,1)"
+                      (click)="moverFila('ingresos_ordinarios','utilidad_neta',fila.clave,1)" title="Bajar">↓</button>
+              <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
+                      (click)="fila.esCustom ? eliminarFila('ingresos_ordinarios','utilidad_neta',fila.clave) : ocultarFila('utilidad_neta',fila.clave)"
+                      [title]="fila.esCustom ? 'Eliminar fila' : 'Ocultar fila'">✕</button>
+            </td>
             <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                [ngModel]="campoInput('utilidad_neta', 'ingresos_ordinarios', anio)"
-                (ngModelChange)="setCampoInput('utilidad_neta', 'ingresos_ordinarios', anio, $event)" [disabled]="!puedeEditar"></td>
+                [ngModel]="campoInput('utilidad_neta', fila.clave, anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', fila.clave, anio, $event)" [disabled]="!puedeEditar"></td>
           </tr>
-          <tr>
-            <td>Costo de ventas</td>
+          <tr *ngIf="puedeEditar">
+            <td [attr.colspan]="1 + anios.length">
+              <button type="button" class="btn-pro secondary sm" (click)="agregarFila('ingresos_ordinarios','utilidad_neta')">
+                <span class="material-symbols-outlined">add</span> Agregar fila (Ingresos ordinarios)
+              </button>
+            </td>
+          </tr>
+          <tr *ngFor="let fila of filasOrdenadas('costo_ventas','utilidad_neta'); trackBy: trackByClave">
+            <td>{{ fila.label }}
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('costo_ventas','utilidad_neta',fila.clave,-1)"
+                      (click)="moverFila('costo_ventas','utilidad_neta',fila.clave,-1)" title="Subir">↑</button>
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('costo_ventas','utilidad_neta',fila.clave,1)"
+                      (click)="moverFila('costo_ventas','utilidad_neta',fila.clave,1)" title="Bajar">↓</button>
+              <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
+                      (click)="fila.esCustom ? eliminarFila('costo_ventas','utilidad_neta',fila.clave) : ocultarFila('utilidad_neta',fila.clave)"
+                      [title]="fila.esCustom ? 'Eliminar fila' : 'Ocultar fila'">✕</button>
+            </td>
             <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                [ngModel]="campoInput('utilidad_neta', 'costo_ventas', anio)"
-                (ngModelChange)="setCampoInput('utilidad_neta', 'costo_ventas', anio, $event)" [disabled]="!puedeEditar"></td>
+                [ngModel]="campoInput('utilidad_neta', fila.clave, anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', fila.clave, anio, $event)" [disabled]="!puedeEditar"></td>
+          </tr>
+          <tr *ngIf="puedeEditar">
+            <td [attr.colspan]="1 + anios.length">
+              <button type="button" class="btn-pro secondary sm" (click)="agregarFila('costo_ventas','utilidad_neta')">
+                <span class="material-symbols-outlined">add</span> Agregar fila (Costo de ventas)
+              </button>
+            </td>
           </tr>
           <tr class="total-row">
             <td>UTILIDAD BRUTA</td>
             <td *ngFor="let anio of anios">$ {{ valorCalculado('utilidadNeta', 'utilidad_bruta', anio) | number:'1.0-0':'es-CO' }}</td>
           </tr>
-          <tr>
-            <td>Gastos de administración</td>
+          <tr *ngFor="let fila of filasOrdenadas('gastos_operacionales','utilidad_neta'); trackBy: trackByClave">
+            <td>{{ fila.label }}
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('gastos_operacionales','utilidad_neta',fila.clave,-1)"
+                      (click)="moverFila('gastos_operacionales','utilidad_neta',fila.clave,-1)" title="Subir">↑</button>
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('gastos_operacionales','utilidad_neta',fila.clave,1)"
+                      (click)="moverFila('gastos_operacionales','utilidad_neta',fila.clave,1)" title="Bajar">↓</button>
+              <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
+                      (click)="fila.esCustom ? eliminarFila('gastos_operacionales','utilidad_neta',fila.clave) : ocultarFila('utilidad_neta',fila.clave)"
+                      [title]="fila.esCustom ? 'Eliminar fila' : 'Ocultar fila'">✕</button>
+            </td>
             <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                [ngModel]="campoInput('utilidad_neta', 'gastos_administracion', anio)"
-                (ngModelChange)="setCampoInput('utilidad_neta', 'gastos_administracion', anio, $event)" [disabled]="!puedeEditar"></td>
+                [ngModel]="campoInput('utilidad_neta', fila.clave, anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', fila.clave, anio, $event)" [disabled]="!puedeEditar"></td>
           </tr>
-          <tr>
-            <td>Gastos de ventas y distribución</td>
-            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                [ngModel]="campoInput('utilidad_neta', 'gastos_ventas_distribucion', anio)"
-                (ngModelChange)="setCampoInput('utilidad_neta', 'gastos_ventas_distribucion', anio, $event)" [disabled]="!puedeEditar"></td>
+          <tr *ngIf="puedeEditar">
+            <td [attr.colspan]="1 + anios.length">
+              <button type="button" class="btn-pro secondary sm" (click)="agregarFila('gastos_operacionales','utilidad_neta')">
+                <span class="material-symbols-outlined">add</span> Agregar fila (Gastos operacionales)
+              </button>
+            </td>
           </tr>
           <tr class="total-row">
             <td>UTILIDAD OPERACIONAL</td>
             <td *ngFor="let anio of anios">$ {{ valorCalculado('utilidadNeta', 'utilidad_operacional', anio) | number:'1.0-0':'es-CO' }}</td>
           </tr>
-          <tr>
-            <td>Ingreso financiero</td>
+          <tr *ngFor="let fila of filasOrdenadas('otros_ingresos','utilidad_neta'); trackBy: trackByClave">
+            <td>{{ fila.label }}
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('otros_ingresos','utilidad_neta',fila.clave,-1)"
+                      (click)="moverFila('otros_ingresos','utilidad_neta',fila.clave,-1)" title="Subir">↑</button>
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('otros_ingresos','utilidad_neta',fila.clave,1)"
+                      (click)="moverFila('otros_ingresos','utilidad_neta',fila.clave,1)" title="Bajar">↓</button>
+              <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
+                      (click)="fila.esCustom ? eliminarFila('otros_ingresos','utilidad_neta',fila.clave) : ocultarFila('utilidad_neta',fila.clave)"
+                      [title]="fila.esCustom ? 'Eliminar fila' : 'Ocultar fila'">✕</button>
+            </td>
             <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                [ngModel]="campoInput('utilidad_neta', 'ingreso_financiero', anio)"
-                (ngModelChange)="setCampoInput('utilidad_neta', 'ingreso_financiero', anio, $event)" [disabled]="!puedeEditar"></td>
+                [ngModel]="campoInput('utilidad_neta', fila.clave, anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', fila.clave, anio, $event)" [disabled]="!puedeEditar"></td>
           </tr>
-          <tr>
-            <td>Otros ingresos</td>
-            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                [ngModel]="campoInput('utilidad_neta', 'otros_ingresos', anio)"
-                (ngModelChange)="setCampoInput('utilidad_neta', 'otros_ingresos', anio, $event)" [disabled]="!puedeEditar"></td>
+          <tr *ngIf="puedeEditar">
+            <td [attr.colspan]="1 + anios.length">
+              <button type="button" class="btn-pro secondary sm" (click)="agregarFila('otros_ingresos','utilidad_neta')">
+                <span class="material-symbols-outlined">add</span> Agregar fila (Otros ingresos)
+              </button>
+            </td>
           </tr>
-          <tr>
-            <td>Ingresos método de participación</td>
+          <tr *ngFor="let fila of filasOrdenadas('otros_gastos','utilidad_neta'); trackBy: trackByClave">
+            <td>{{ fila.label }}
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('otros_gastos','utilidad_neta',fila.clave,-1)"
+                      (click)="moverFila('otros_gastos','utilidad_neta',fila.clave,-1)" title="Subir">↑</button>
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('otros_gastos','utilidad_neta',fila.clave,1)"
+                      (click)="moverFila('otros_gastos','utilidad_neta',fila.clave,1)" title="Bajar">↓</button>
+              <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
+                      (click)="fila.esCustom ? eliminarFila('otros_gastos','utilidad_neta',fila.clave) : ocultarFila('utilidad_neta',fila.clave)"
+                      [title]="fila.esCustom ? 'Eliminar fila' : 'Ocultar fila'">✕</button>
+            </td>
             <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                [ngModel]="campoInput('utilidad_neta', 'ingresos_metodo_participacion', anio)"
-                (ngModelChange)="setCampoInput('utilidad_neta', 'ingresos_metodo_participacion', anio, $event)" [disabled]="!puedeEditar"></td>
+                [ngModel]="campoInput('utilidad_neta', fila.clave, anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', fila.clave, anio, $event)" [disabled]="!puedeEditar"></td>
           </tr>
-          <tr>
-            <td>Gasto financiero</td>
-            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                [ngModel]="campoInput('utilidad_neta', 'gasto_financiero', anio)"
-                (ngModelChange)="setCampoInput('utilidad_neta', 'gasto_financiero', anio, $event)" [disabled]="!puedeEditar"></td>
-          </tr>
-          <tr>
-            <td>Intereses</td>
-            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                [ngModel]="campoInput('utilidad_neta', 'intereses', anio)"
-                (ngModelChange)="setCampoInput('utilidad_neta', 'intereses', anio, $event)" [disabled]="!puedeEditar"></td>
-          </tr>
-          <tr>
-            <td>Otros gastos</td>
-            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                [ngModel]="campoInput('utilidad_neta', 'otros_gastos', anio)"
-                (ngModelChange)="setCampoInput('utilidad_neta', 'otros_gastos', anio, $event)" [disabled]="!puedeEditar"></td>
+          <tr *ngIf="puedeEditar">
+            <td [attr.colspan]="1 + anios.length">
+              <button type="button" class="btn-pro secondary sm" (click)="agregarFila('otros_gastos','utilidad_neta')">
+                <span class="material-symbols-outlined">add</span> Agregar fila (Otros gastos)
+              </button>
+            </td>
           </tr>
           <tr class="total-row">
             <td>GANANCIA ANTES DE IMPUESTOS</td>
             <td *ngFor="let anio of anios">$ {{ valorCalculado('utilidadNeta', 'ganancia_antes_impuestos', anio) | number:'1.0-0':'es-CO' }}</td>
           </tr>
-          <tr>
-            <td>Impuesto a las ganancias</td>
+          <tr *ngFor="let fila of filasOrdenadas('impuestos','utilidad_neta'); trackBy: trackByClave">
+            <td>{{ fila.label }}
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('impuestos','utilidad_neta',fila.clave,-1)"
+                      (click)="moverFila('impuestos','utilidad_neta',fila.clave,-1)" title="Subir">↑</button>
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('impuestos','utilidad_neta',fila.clave,1)"
+                      (click)="moverFila('impuestos','utilidad_neta',fila.clave,1)" title="Bajar">↓</button>
+              <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
+                      (click)="fila.esCustom ? eliminarFila('impuestos','utilidad_neta',fila.clave) : ocultarFila('utilidad_neta',fila.clave)"
+                      [title]="fila.esCustom ? 'Eliminar fila' : 'Ocultar fila'">✕</button>
+            </td>
             <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                [ngModel]="campoInput('utilidad_neta', 'impuesto_ganancias', anio)"
-                (ngModelChange)="setCampoInput('utilidad_neta', 'impuesto_ganancias', anio, $event)" [disabled]="!puedeEditar"></td>
+                [ngModel]="campoInput('utilidad_neta', fila.clave, anio)"
+                (ngModelChange)="setCampoInput('utilidad_neta', fila.clave, anio, $event)" [disabled]="!puedeEditar"></td>
           </tr>
-          <tr>
-            <td>Impuesto de renta</td>
-            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                [ngModel]="campoInput('utilidad_neta', 'impuesto_renta', anio)"
-                (ngModelChange)="setCampoInput('utilidad_neta', 'impuesto_renta', anio, $event)" [disabled]="!puedeEditar"></td>
+          <tr *ngIf="puedeEditar">
+            <td [attr.colspan]="1 + anios.length">
+              <button type="button" class="btn-pro secondary sm" (click)="agregarFila('impuestos','utilidad_neta')">
+                <span class="material-symbols-outlined">add</span> Agregar fila (Impuestos)
+              </button>
+            </td>
           </tr>
         </tbody>
         <tfoot>
@@ -472,6 +511,11 @@
           </tr>
         </tfoot>
       </table>
+
+      <p class="field-note ocultos-hint" *ngIf="filasOcultas('utilidad_neta').length">
+        <span class="material-symbols-outlined">visibility_off</span>
+        Ocultos: <a href="javascript:void(0)" *ngFor="let f of filasOcultas('utilidad_neta')" (click)="restaurarFila('utilidad_neta', f.clave)">{{ f.label }} (restaurar)</a>
+      </p>
     </div>
 
     <!-- ================= ORI ================= -->
@@ -516,16 +560,15 @@
           <tr><th>Concepto</th><th *ngFor="let anio of anios">{{ anio }}</th></tr>
         </thead>
         <tbody>
-          <tr *ngFor="let fila of carteraConceptos">
-            <td>{{ fila.label }}</td>
-            <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
-                [ngModel]="campoInput('cartera', fila.clave, anio)"
-                (ngModelChange)="setCampoInput('cartera', fila.clave, anio, $event)" [disabled]="!puedeEditar"></td>
-          </tr>
-          <tr *ngFor="let fila of customFilas['cartera']">
+          <tr *ngFor="let fila of filasOrdenadas('cartera','cartera'); trackBy: trackByClave">
             <td>{{ fila.label }}
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('cartera','cartera',fila.clave,-1)"
+                      (click)="moverFila('cartera','cartera',fila.clave,-1)" title="Subir">↑</button>
+              <button type="button" class="btn-row-move" *ngIf="puedeEditar && puedeMoverFila('cartera','cartera',fila.clave,1)"
+                      (click)="moverFila('cartera','cartera',fila.clave,1)" title="Bajar">↓</button>
               <button type="button" class="btn-remove-fila" *ngIf="puedeEditar"
-                      (click)="eliminarFila('cartera','cartera',fila.clave)" title="Eliminar fila">✕</button>
+                      (click)="fila.esCustom ? eliminarFila('cartera','cartera',fila.clave) : ocultarFila('cartera',fila.clave)"
+                      [title]="fila.esCustom ? 'Eliminar fila' : 'Ocultar fila'">✕</button>
             </td>
             <td *ngFor="let anio of anios"><input class="pro-input" type="text" inputmode="decimal" milesSeparator
                 [ngModel]="campoInput('cartera', fila.clave, anio)"
@@ -546,6 +589,11 @@
           </tr>
         </tfoot>
       </table>
+
+      <p class="field-note ocultos-hint" *ngIf="filasOcultas('cartera').length">
+        <span class="material-symbols-outlined">visibility_off</span>
+        Ocultos: <a href="javascript:void(0)" *ngFor="let f of filasOcultas('cartera')" (click)="restaurarFila('cartera', f.clave)">{{ f.label }} (restaurar)</a>
+      </p>
 
       <div class="charts-grid mt-4">
         <div class="chart-box doughnut" *ngFor="let anio of anios">
