@@ -2,7 +2,7 @@ import { Component, HostListener, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
 import Swal from 'sweetalert2';
@@ -19,6 +19,12 @@ export class CreditoOrdinarioComponent implements OnInit {
   selectedCredito: any = null;
   activeRole: string = 'cliente';
   searchTerm: string = '';
+  // SCRUM-176: id de crédito tomado de la URL (/creditos/:creditoId). Fuente de
+  // verdad de "qué crédito estoy viendo" — reemplaza el fallback anterior de
+  // asumir el primero de la lista, que en la práctica era el crédito más
+  // recién creado por cualquiera en el sistema, no el que el usuario venía
+  // revisando.
+  routeCreditoId: number | null = null;
 
   // BPMN Stepper definition
   bpmnSteps = [
@@ -43,11 +49,16 @@ export class CreditoOrdinarioComponent implements OnInit {
     { key: 'ejecucion_transferencia', label: 'Transferencia', role: 'tesoreria', roleLabel: 'Tesorería', desc: 'Ejecutar la transferencia bancaria y enviar el comprobante de pago al cliente.' }
   ];
 
-  constructor(private http: HttpClient, public authService: AuthService) {}
+  constructor(
+    private http: HttpClient,
+    public authService: AuthService,
+    private route: ActivatedRoute,
+    private router: Router
+  ) {}
 
   ngOnInit() {
     this.activeRole = this.authService.getActiveRole() || 'cliente';
-    
+
     // Subscribe to active role changes to dynamically update dashboard view
     this.authService.activeRole$.subscribe(role => {
       if (role) {
@@ -56,7 +67,14 @@ export class CreditoOrdinarioComponent implements OnInit {
       }
     });
 
-    this.loadCreditos();
+    // SCRUM-176: reactivo al param de ruta (no solo lectura inicial) para que
+    // navegar entre créditos, o volver a /creditos sin id, siempre dispare una
+    // recarga que resuelva correctamente cuál debe quedar seleccionado.
+    this.route.paramMap.subscribe(params => {
+      const idParam = params.get('creditoId');
+      this.routeCreditoId = idParam ? Number(idParam) : null;
+      this.loadCreditos();
+    });
   }
 
   // SCRUM-176: volver a esta pantalla con atrás/adelante del navegador (bfcache) o
@@ -85,13 +103,22 @@ export class CreditoOrdinarioComponent implements OnInit {
     }).subscribe({
       next: (data) => {
         this.creditos = data;
-        if (this.selectedCredito) {
-          // Keep current selected credit updated
-          const updated = data.find(c => c.id === this.selectedCredito.id);
-          this.selectedCredito = updated || data[0] || null;
-        } else if (data.length > 0) {
-          this.selectedCredito = data[0];
+        if (this.routeCreditoId) {
+          // La URL indica explícitamente qué crédito mostrar — nunca se
+          // adivina. Si no aparece en la lista (rol sin acceso, id inválido),
+          // queda sin selección en vez de mostrar uno distinto en silencio.
+          this.selectedCredito = data.find(c => c.id === this.routeCreditoId) || null;
+        } else if (this.selectedCredito) {
+          // Sin id en la URL pero ya había una selección en memoria (cambio de
+          // rol, refresco por pageshow/visibilitychange): mantenerla actualizada.
+          this.selectedCredito = data.find(c => c.id === this.selectedCredito.id) || null;
         }
+        // SCRUM-176: sin id en la URL y sin selección previa, NO se cae a
+        // data[0] (el crédito más recién creado por cualquiera en el
+        // sistema) — eso era la causa raíz real de la trazabilidad
+        // "estancada": mostraba en silencio un crédito distinto al que el
+        // usuario venía revisando. Se deja sin seleccionar hasta que el
+        // usuario elija uno de la lista.
       },
       error: () => {
         Swal.fire('Error', 'No se pudieron cargar las solicitudes de crédito.', 'error');
@@ -101,6 +128,7 @@ export class CreditoOrdinarioComponent implements OnInit {
 
   selectCredito(credito: any) {
     this.selectedCredito = credito;
+    this.router.navigate(['/creditos', credito.id]);
   }
 
   // SCRUM-143: filtro client-side por cliente o número de documento —
