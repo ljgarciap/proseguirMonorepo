@@ -61,13 +61,12 @@ test.describe('Historial de Auditoría no queda congelado tras acción cruzada (
     });
 
     await loginAs(page, '1234', '1234', 'coordinador_comercial');
-    await page.goto('/creditos', { waitUntil: 'networkidle' });
+    // SCRUM-176: entra directo con el id en la URL — con el fix, ya no hace
+    // falta (ni es fiable) intentar seleccionar el crédito de prueba
+    // haciendo click por texto en el sidebar, cuyo campo visible es el
+    // cliente/número de solicitud, no el "usuario" del historial.
+    await page.goto(`/creditos/${creditoId}`, { waitUntil: 'networkidle' });
     await expect(page.locator('h1', { hasText: 'Crédito Ordinario' })).toBeVisible({ timeout: 10000 });
-
-    // Selecciona explícitamente el crédito de prueba (no asume que sea el
-    // primero de la lista, por si hay otros creados en paralelo).
-    await page.locator(`text=E2E SCRUM-176`).first().click().catch(() => {});
-    await page.waitForTimeout(500);
 
     const countBefore = await page.locator('.timeline-item').count();
     expect(countBefore).toBeGreaterThan(0);
@@ -99,5 +98,91 @@ test.describe('Historial de Auditoría no queda congelado tras acción cruzada (
       .poll(() => page.locator('.timeline-item').count(), { timeout: 5000 })
       .toBe(countBefore + 1);
     await expect(page.locator('.timeline-item').last()).toContainText('SARLAFT favorable');
+  });
+});
+
+/**
+ * SCRUM-176 (re-investigación 2026-08-07) — el bfcache fix de arriba no era
+ * suficiente: SARLAFT/Análisis Financiero/Informe Técnico son rutas Angular
+ * separadas, así que volver a "Mis Créditos" ya destruye y recrea el
+ * componente (dispara ngOnInit solo, sin necesitar el listener). La causa
+ * raíz real era que `credito-ordinario.component.ts` no tenía ninguna
+ * identidad de "qué crédito estoy viendo" — sin id en la URL, `loadCreditos()`
+ * caía en `data[0]`, el crédito más recién creado por cualquiera en el
+ * sistema. En un entorno con más de un crédito de prueba, esto mostraba en
+ * silencio la trazabilidad de un crédito distinto al que el usuario venía
+ * revisando — reproduce exactamente "se ve estancada en el mismo punto" en
+ * cada repro nueva de Juan (CO-2026-SSYZ15, CO-2026-XFMB41), porque cada vez
+ * había un crédito más nuevo de por medio.
+ */
+test.describe('Selección de crédito no cae al más reciente por error al volver de otra ruta (SCRUM-176)', () => {
+  let creditoViejoId: number;
+  let creditoNuevoId: number;
+  let numeroSolicitudViejo: string;
+
+  test.beforeAll(() => {
+    const crear = (marca: string) => {
+      const out = tinker(`
+        $c = \\App\\Models\\CreditoOrdinario::iniciar(
+          clienteId: 1, monto: 5000000, plazoMeses: 12,
+          usuario: '${marca}', rol: 'coordinador_comercial',
+          comentario: '${marca}'
+        );
+        $h = $c->historial_estados ?? [];
+        $h[] = ['fecha'=>now()->toIso8601String(),'usuario'=>'E2E','rol'=>'oficial_cumplimiento','estado_anterior'=>$c->estado,'estado_nuevo'=>'pendiente_analisis_financiero','comentario'=>'${marca}: paso SARLAFT'];
+        $c->estado = 'pendiente_analisis_financiero';
+        $c->historial_estados = $h;
+        $c->save();
+        echo 'ID:'.$c->id.':NUM:'.$c->numero_solicitud;
+      `);
+      const match = out.match(/ID:(\d+):NUM:(\S+)/);
+      if (!match) throw new Error('No se pudo crear el crédito de prueba vía tinker: ' + out);
+      return { id: Number(match[1]), numeroSolicitud: match[2] };
+    };
+
+    // El "viejo" se crea primero (es el que el usuario está revisando); el
+    // "nuevo" se crea después, simulando otro crédito de prueba que aparece
+    // en el sistema mientras tanto (el escenario real reportado por Juan).
+    const viejo = crear('E2E SCRUM-176 VIEJO');
+    creditoViejoId = viejo.id;
+    numeroSolicitudViejo = viejo.numeroSolicitud;
+    creditoNuevoId = crear('E2E SCRUM-176 NUEVO').id;
+  });
+
+  test.afterAll(() => {
+    tinker(`\\App\\Models\\CreditoOrdinario::find(${creditoViejoId})?->delete(); \\App\\Models\\CreditoOrdinario::find(${creditoNuevoId})?->delete(); echo 'ok';`);
+  });
+
+  test('volver a /creditos sin id no muestra en silencio el crédito más reciente', async ({ page }) => {
+    await loginAs(page, '1234', '1234', 'coordinador_comercial');
+
+    // El usuario abre el crédito viejo (2 pasos de historial: iniciar + SARLAFT).
+    await page.goto(`/creditos/${creditoViejoId}`, { waitUntil: 'networkidle' });
+    await expect(page.locator('.timeline-item')).toHaveCount(2, { timeout: 10000 });
+
+    // Navega a otra ruta (SARLAFT, ruta Angular separada) y vuelve a la
+    // pantalla genérica de "Mis Créditos" sin id — como haría el sidebar.
+    await page.goto(`/listas-sarlaft/${creditoViejoId}`, { waitUntil: 'networkidle' });
+    await page.goto('/creditos', { waitUntil: 'networkidle' });
+
+    // No debe adivinar ningún crédito (ni el viejo ni el nuevo): pide elegir.
+    await expect(page.locator('h3', { hasText: 'Selecciona una solicitud' })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.timeline-item')).toHaveCount(0);
+
+    // Al elegir explícitamente el crédito viejo (por su número de solicitud,
+    // el único campo del sidebar que lo identifica de forma única), muestra
+    // SU historial (no el del nuevo) y la URL queda con su id.
+    await page.locator('.credit-item-card', { hasText: numeroSolicitudViejo }).first().click();
+    await expect(page).toHaveURL(new RegExp(`/creditos/${creditoViejoId}$`));
+    await expect(page.locator('.timeline-item')).toHaveCount(2, { timeout: 10000 });
+    await expect(page.locator('.timeline-item').last()).toContainText('VIEJO');
+  });
+
+  test('entrar directo a /creditos/:id muestra ese crédito aunque exista uno más reciente', async ({ page }) => {
+    await loginAs(page, '1234', '1234', 'coordinador_comercial');
+    await page.goto(`/creditos/${creditoViejoId}`, { waitUntil: 'networkidle' });
+
+    await expect(page.locator('.timeline-item')).toHaveCount(2, { timeout: 10000 });
+    await expect(page.locator('.timeline-item').last()).toContainText('VIEJO');
   });
 });

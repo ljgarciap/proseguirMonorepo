@@ -122,6 +122,15 @@ export const routes: Routes = [
         data: { roles: ['cliente', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'] }
     },
     {
+        // SCRUM-176: id de crédito explícito en la URL — fuente de verdad de
+        // qué crédito muestra la trazabilidad, en vez del fallback anterior
+        // al primero de la lista (ver credito-ordinario.component.ts).
+        path: 'creditos/:creditoId',
+        loadComponent: () => import('./components/credito-ordinario/credito-ordinario.component').then(m => m.CreditoOrdinarioComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['cliente', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'] }
+    },
+    {
         path: 'solicitudes-credito',
         loadComponent: () => import('./components/solicitudes-credito/solicitudes-credito.component').then(m => m.SolicitudesCreditoComponent),
         canActivate: [roleGuard],

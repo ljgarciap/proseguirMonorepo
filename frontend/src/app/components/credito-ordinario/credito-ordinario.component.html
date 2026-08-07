@@ -59,6 +59,14 @@
       </div>
     </aside>
 
+    <!-- SCRUM-176: sin crédito seleccionado (recién llegado a /creditos sin id
+         en la URL) ya no se adivina uno — se pide elegir explícitamente. -->
+    <div class="empty-state-card card" *ngIf="!selectedCredito">
+      <span class="material-symbols-outlined icon">touch_app</span>
+      <h3>Selecciona una solicitud</h3>
+      <p>Elegí una solicitud de la lista para ver su detalle y trazabilidad.</p>
+    </div>
+
     <!-- Main Detail Panel -->
     <main class="detail-panel" *ngIf="selectedCredito">
       <!-- Credit Summary Banner -->
