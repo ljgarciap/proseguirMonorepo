@@ -94,6 +94,35 @@
 
 .btn-remove-fila:hover { background: #fee2e2; }
 
+/* SCRUM-187 (segunda entrega) — mover fila (reordenar) y ocultar/restaurar
+   cualquier concepto (fijo o custom), mismo estilo inline que eliminar. */
+.btn-row-move {
+  border: none;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  font-size: 0.75rem;
+  margin-left: 4px;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.btn-row-move:hover { background: #e2e8f0; }
+
+.ocultos-hint {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  flex-wrap: wrap;
+}
+
+.ocultos-hint a {
+  color: #1d4ed8;
+  cursor: pointer;
+  margin-right: 10px;
+  text-decoration: underline;
+}
+
 .pro-input {
   padding: 10px 14px;
   border: 1px solid #cbd5e1;

@@ -391,4 +391,95 @@ class AnalisisFinancieroCalculoServiceTest extends TestCase
         $sinCustom = $this->service->calcularActivo($this->inputsActivo(), [2024, 2025]);
         $this->assertEqualsWithDelta($sinCustom['total_activo_no_corriente'][2024], $resultado['total_activo_no_corriente'][2024], 0.01);
     }
+
+    // ---------------------------------------------------------------
+    // SCRUM-187 (segunda entrega) — ocultar cualquier concepto fijo
+    // (no solo eliminar filas custom) y Estado de Resultados con los
+    // mismos buckets extensibles que Activo/Pasivo/Patrimonio/Cartera.
+    // ---------------------------------------------------------------
+
+    public function test_ocultar_concepto_fijo_lo_excluye_del_total_y_de_valores(): void
+    {
+        $inputs = $this->inputsActivo();
+        $inputs['_ocultos'] = ['caja_bancos'];
+
+        $sinOcultar = $this->service->calcularActivo($this->inputsActivo(), [2024, 2025]);
+        $conOculto = $this->service->calcularActivo($inputs, [2024, 2025]);
+
+        // caja_bancos = 323 en 2024 (ver inputsActivo) — se resta del total.
+        $this->assertEqualsWithDelta($sinOcultar['total_activo'][2024] - 323, $conOculto['total_activo'][2024], 0.01);
+        $this->assertArrayNotHasKey('caja_bancos', $conOculto['valores']);
+    }
+
+    public function test_ocultos_ausente_no_cambia_ningun_total_existente(): void
+    {
+        // Regresión: análisis ya persistidos antes de SCRUM-187 no tienen
+        // `_ocultos` en su JSON — debe comportarse exactamente igual que hoy.
+        $resultado = $this->service->calcularActivo($this->inputsActivo(), [2024, 2025]);
+
+        $this->assertEqualsWithDelta(220103, $resultado['total_activo'][2024], 0.01);
+    }
+
+    public function test_ocultar_una_fila_custom_tambien_la_excluye(): void
+    {
+        $inputs = $this->inputsActivo();
+        $inputs['_custom'] = [
+            ['grupo' => 'activo_corriente', 'clave' => 'custom_activo_c_1', 'label' => 'Anticipo especial'],
+        ];
+        $inputs['custom_activo_c_1'] = [2024 => 1000, 2025 => 2000];
+        $inputs['_ocultos'] = ['custom_activo_c_1'];
+
+        $resultado = $this->service->calcularActivo($inputs, [2024, 2025]);
+        $sinCustomNiOcultos = $this->service->calcularActivo($this->inputsActivo(), [2024, 2025]);
+
+        $this->assertEqualsWithDelta($sinCustomNiOcultos['total_activo'][2024], $resultado['total_activo'][2024], 0.01);
+        $this->assertArrayNotHasKey('custom_activo_c_1', $resultado['valores']);
+    }
+
+    public function test_utilidad_neta_con_fila_custom_en_bucket_correcto_afecta_la_cascada(): void
+    {
+        $inputs = $this->inputsUtilidadNeta();
+        $inputs['_custom'] = [
+            ['grupo' => 'gastos_operacionales', 'clave' => 'custom_gasto_extra', 'label' => 'Gasto operacional extra'],
+        ];
+        $inputs['custom_gasto_extra'] = [2024 => 1000, 2025 => 0];
+
+        $sinCustom = $this->service->calcularUtilidadNeta($this->inputsUtilidadNeta(), [2024, 2025]);
+        $conCustom = $this->service->calcularUtilidadNeta($inputs, [2024, 2025]);
+
+        // Un gasto operacional extra de 1000 en 2024 resta 1000 desde
+        // utilidad_operacional en adelante (bruta no se ve afectada, es
+        // anterior en la cascada al bucket de gastos operacionales).
+        $this->assertEqualsWithDelta($sinCustom['utilidad_bruta'][2024], $conCustom['utilidad_bruta'][2024], 0.01);
+        $this->assertEqualsWithDelta($sinCustom['utilidad_operacional'][2024] - 1000, $conCustom['utilidad_operacional'][2024], 0.01);
+        $this->assertEqualsWithDelta($sinCustom['utilidad_neta'][2024] - 1000, $conCustom['utilidad_neta'][2024], 0.01);
+        // 2025 no tiene el gasto extra (0) — no cambia.
+        $this->assertEqualsWithDelta($sinCustom['utilidad_neta'][2025], $conCustom['utilidad_neta'][2025], 0.01);
+    }
+
+    public function test_utilidad_neta_ocultar_concepto_fijo_lo_saca_de_la_cascada(): void
+    {
+        $inputs = $this->inputsUtilidadNeta();
+        $inputs['_ocultos'] = ['impuesto_renta'];
+
+        $sinOcultar = $this->service->calcularUtilidadNeta($this->inputsUtilidadNeta(), [2024, 2025]);
+        $conOculto = $this->service->calcularUtilidadNeta($inputs, [2024, 2025]);
+
+        // impuesto_renta 2024 = -467 (ver inputsUtilidadNeta) — al ocultarlo
+        // deja de restarse (era una resta de un valor negativo, es decir
+        // sumaba): utilidad_neta baja en 467.
+        $this->assertEqualsWithDelta($sinOcultar['utilidad_neta'][2024] - 467, $conOculto['utilidad_neta'][2024], 0.01);
+        $this->assertArrayNotHasKey('impuesto_renta', $conOculto['valores']);
+    }
+
+    public function test_utilidad_neta_sin_ocultos_ni_custom_calcula_igual_que_antes(): void
+    {
+        // Regresión: el refactor a buckets (SCRUM-187) no debe cambiar el
+        // resultado del caso base ya cubierto por test_utilidad_neta_cascada_completa.
+        $resultado = $this->service->calcularUtilidadNeta($this->inputsUtilidadNeta(), [2024, 2025]);
+
+        $this->assertEqualsWithDelta(90802, $resultado['utilidad_bruta'][2024], 0.01);
+        $this->assertEqualsWithDelta(3241, $resultado['utilidad_neta'][2024], 0.01);
+        $this->assertEqualsWithDelta(2405, $resultado['utilidad_neta'][2025], 0.01);
+    }
 }

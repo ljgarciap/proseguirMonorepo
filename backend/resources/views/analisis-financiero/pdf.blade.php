@@ -134,7 +134,7 @@
 </table>
 
 @php $un = $calculado['utilidad_neta']; @endphp
-<h2>UTILIDAD NETA</h2>
+<h2>ESTADO DE RESULTADOS</h2>
 <table>
     <thead><tr><th>Concepto</th>@foreach ($anios as $anio)<th>{{ $anio }}</th>@endforeach</tr></thead>
     <tbody>

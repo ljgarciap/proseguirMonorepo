@@ -131,7 +131,7 @@ class AnalisisFinancieroExport implements FromArray, WithStyles, WithTitle, Shou
         $add([]);
 
         $un = $this->calculado['utilidad_neta'];
-        $addBold(['UTILIDAD NETA']);
+        $addBold(['ESTADO DE RESULTADOS']);
         $add($this->encabezado($anios));
         $add(['Ingresos ordinarios', ...$this->valoresPorAnio($un['valores']['ingresos_ordinarios'], $anios)]);
         $add(['Costo de ventas', ...$this->valoresPorAnio($un['valores']['costo_ventas'], $anios)]);
