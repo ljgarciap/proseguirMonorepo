@@ -34,8 +34,11 @@ class InformeTecnicoCalculoServiceTest extends TestCase
         $this->assertEqualsWithDelta(0.0, $resultado['porcentajes']['casas'], 0.000001);
     }
 
-    public function test_costos_no_suma_honorarios_ni_financieros(): void
+    public function test_costos_suma_honorarios_y_financieros_al_total(): void
     {
+        // SCRUM-186 (segunda entrega): el negocio pidió explícitamente que
+        // Honorarios y Financieros sumen al Total de Costos (antes excluidos
+        // a propósito, replicando el Excel de referencia original).
         $totalVentas = 32841282386;
 
         $resultado = $this->service->calcularCostos([
@@ -48,11 +51,9 @@ class InformeTecnicoCalculoServiceTest extends TestCase
             'financieros' => 1596600000,
         ], $totalVentas);
 
-        // E15 = E16+E17+E18+E19+E22 = 27,643,780,361 (excluye Honorarios E20 y Financieros E23)
-        $this->assertEqualsWithDelta(27643780361, $resultado['total_costos'], 0.01);
-        // F15 = E15/E7
-        $this->assertEqualsWithDelta(0.8417387614798, $resultado['porcentaje_costos'], 0.0000001);
-        // Los inputs se capturan aunque no se sumen
+        // 27,643,780,361 (suma sin Honorarios/Financieros) + 2,495,448,000 + 1,596,600,000 = 31,735,828,361
+        $this->assertEqualsWithDelta(31735828361, $resultado['total_costos'], 0.01);
+        $this->assertEqualsWithDelta(0.9663394988049783, $resultado['porcentaje_costos'], 0.0000001);
         $this->assertEquals(2495448000, $resultado['honorarios']);
         $this->assertEquals(1596600000, $resultado['financieros']);
     }
@@ -65,14 +66,17 @@ class InformeTecnicoCalculoServiceTest extends TestCase
             'lote' => 5315952140,
             'costos_directos' => 1410320211,
             'costos_indirectos' => 1660000000,
+            'cuotas_iniciales_fiducia' => 500000000,
             'recursos_propios' => 2416500000,
             'cuotas_iniciales_ya_pagadas' => 3561000000,
         ], $totalVentas);
 
-        // E25 = E26+E27+E28 = 8,386,272,351
-        $this->assertEqualsWithDelta(8386272351, $resultado['total_invertido'], 0.01);
-        // F25 = E25/E7
-        $this->assertEqualsWithDelta(0.25535763958398, $resultado['porcentaje_invertido'], 0.0000001);
+        // SCRUM-186 (segunda entrega): "Cuotas Iniciales en Fiducia" ahora
+        // suma al Total Invertido junto con Lote/Costos Directos/Indirectos.
+        // 8,386,272,351 + 500,000,000 = 8,886,272,351
+        $this->assertEqualsWithDelta(8886272351, $resultado['total_invertido'], 0.01);
+        $this->assertEqualsWithDelta(0.27058238002265567, $resultado['porcentaje_invertido'], 0.0000001);
+        $this->assertEquals(500000000, $resultado['cuotas_iniciales_fiducia']);
         // E34 = SUM(E32:E33) = 5,977,500,000
         $this->assertEqualsWithDelta(5977500000, $resultado['total_fuentes'], 0.01);
     }
@@ -145,11 +149,16 @@ class InformeTecnicoCalculoServiceTest extends TestCase
         $this->assertEqualsWithDelta(4966123294.2, $resultado['saldo_no_financiado'], 0.01);
     }
 
-    public function test_coberturas_usa_apartamentos_no_total_ventas_en_garantia(): void
+    public function test_coberturas_usa_total_ventas_en_garantia(): void
     {
+        // SCRUM-186 (segunda entrega): el denominador de Cobertura de
+        // Garantía pasa de "Apartamentos" a total_ventas (todas las
+        // unidades vendidas). En este fixture ambos valores coinciden
+        // (100% vendido en apartamentos), así que el resultado numérico no
+        // cambia respecto al comportamiento anterior.
         $creditoSolicitado = [
             'credito_solicitado' => 8000000000,
-            'aptos_vendidos' => 32841282386, // = Apartamentos (E9) en este ejemplo
+            'aptos_vendidos' => 32841282386,
             'saldo_recaudar_contraentrega_vendidos' => 22988897670.2,
         ];
         $analisisFinanciacion = [
@@ -157,7 +166,7 @@ class InformeTecnicoCalculoServiceTest extends TestCase
             'saldo_no_financiado' => 4966123294.2,
         ];
         $saldosPorRecaudar = ['saldo_recaudar_contraentrega_por_vender' => 0];
-        $ventasTotalesProyecto = ['apartamentos' => 32841282386];
+        $ventasTotalesProyecto = ['total_ventas' => 32841282386];
 
         $resultado = $this->service->calcularCoberturas($creditoSolicitado, $analisisFinanciacion, $saldosPorRecaudar, $ventasTotalesProyecto);
 
@@ -169,32 +178,49 @@ class InformeTecnicoCalculoServiceTest extends TestCase
         $this->assertEqualsWithDelta(0.56401674757149, $resultado['mejor_escenario']['cobertura'], 0.0000001);
         $this->assertEquals('verde', $resultado['mejor_escenario']['semaforo']);
 
-        // G77 = F77/F78 = E36/E9 (Apartamentos, no total de ventas)
+        // G77 = F77/F78 = E36/total_ventas
         $this->assertEqualsWithDelta(0.24359584701876, $resultado['cobertura_garantia']['cobertura'], 0.0000001);
         $this->assertEquals('verde', $resultado['cobertura_garantia']['semaforo']);
     }
 
-    public function test_coberturas_garantia_usa_apartamentos_de_ventas_no_aptos_vendidos_del_coordinador(): void
+    public function test_coberturas_garantia_usa_total_ventas_no_aptos_vendidos_del_coordinador(): void
     {
-        // Caso donde Apartamentos (E9, Ingeniero) y Aptos. Vendidos (E38,
+        // Caso donde total_ventas (Ingeniero) y Aptos. Vendidos (E38,
         // Coordinador) son DISTINTOS — no se vendió el 100% del proyecto.
-        // El fixture real (Entre Verde) los tenía iguales por casualidad,
-        // lo que ocultó un bug donde calcularCoberturas() leía por error
-        // aptos_vendidos en vez de apartamentos para este cálculo.
         $creditoSolicitado = [
             'credito_solicitado' => 8000000000,
-            'aptos_vendidos' => 20000000000, // distinto de apartamentos a propósito
+            'aptos_vendidos' => 20000000000, // distinto de total_ventas a propósito
             'saldo_recaudar_contraentrega_vendidos' => 1,
         ];
         $analisisFinanciacion = ['saldo_x_financiar' => 0, 'saldo_no_financiado' => 0];
         $saldosPorRecaudar = ['saldo_recaudar_contraentrega_por_vender' => 0];
-        $ventasTotalesProyecto = ['apartamentos' => 40000000000];
+        $ventasTotalesProyecto = ['total_ventas' => 40000000000];
 
         $resultado = $this->service->calcularCoberturas($creditoSolicitado, $analisisFinanciacion, $saldosPorRecaudar, $ventasTotalesProyecto);
 
-        // G77 = E36/E9 = 8,000,000,000 / 40,000,000,000 = 0.2 (usando apartamentos, no aptos_vendidos)
+        // G77 = E36/total_ventas = 8,000,000,000 / 40,000,000,000 = 0.2 (no aptos_vendidos)
         $this->assertEqualsWithDelta(0.2, $resultado['cobertura_garantia']['cobertura'], 0.0000001);
         $this->assertEquals(40000000000, $resultado['cobertura_garantia']['denominador']);
+    }
+
+    public function test_coberturas_garantia_usa_total_ventas_no_solo_apartamentos(): void
+    {
+        // SCRUM-186 (segunda entrega): antes daba 0 en proyectos que no
+        // venden literalmente "apartamentos" (casas, lotes, locales). Este
+        // caso simula un proyecto que solo vende casas.
+        $creditoSolicitado = [
+            'credito_solicitado' => 8000000000,
+            'aptos_vendidos' => 40000000000,
+            'saldo_recaudar_contraentrega_vendidos' => 1,
+        ];
+        $analisisFinanciacion = ['saldo_x_financiar' => 0, 'saldo_no_financiado' => 0];
+        $saldosPorRecaudar = ['saldo_recaudar_contraentrega_por_vender' => 0];
+        // apartamentos = 0 (no vende apartamentos), pero total_ventas > 0
+        $ventasTotalesProyecto = ['apartamentos' => 0, 'casas' => 40000000000, 'total_ventas' => 40000000000];
+
+        $resultado = $this->service->calcularCoberturas($creditoSolicitado, $analisisFinanciacion, $saldosPorRecaudar, $ventasTotalesProyecto);
+
+        $this->assertEqualsWithDelta(0.2, $resultado['cobertura_garantia']['cobertura'], 0.0000001);
     }
 
     public function test_division_por_cero_no_produce_nan_ni_infinito(): void
@@ -245,7 +271,7 @@ class InformeTecnicoCalculoServiceTest extends TestCase
         $this->assertSame([], $resultado['custom']);
     }
 
-    public function test_costos_suma_filas_custom_al_total_pero_honorarios_financieros_siguen_sin_sumar(): void
+    public function test_costos_suma_filas_custom_y_honorarios_financieros_al_total(): void
     {
         $totalVentas = 10000;
 
@@ -259,12 +285,12 @@ class InformeTecnicoCalculoServiceTest extends TestCase
             ],
         ], $totalVentas);
 
-        // 1000 + 500 + 250 (custom) = 1750 — honorarios/financieros siguen excluidos.
-        $this->assertEqualsWithDelta(1750, $resultado['total_costos'], 0.01);
+        // 1000 + 500 + 999 (honorarios) + 888 (financieros) + 250 (custom) = 3637
+        $this->assertEqualsWithDelta(3637, $resultado['total_costos'], 0.01);
         $this->assertCount(1, $resultado['custom']);
     }
 
-    public function test_costos_sin_custom_calcula_igual_que_antes(): void
+    public function test_costos_sin_custom_incluye_honorarios_y_financieros(): void
     {
         $resultado = $this->service->calcularCostos([
             'lote' => 5315952140,
@@ -276,7 +302,7 @@ class InformeTecnicoCalculoServiceTest extends TestCase
             'financieros' => 1596600000,
         ], 32841282386);
 
-        $this->assertEqualsWithDelta(27643780361, $resultado['total_costos'], 0.01);
+        $this->assertEqualsWithDelta(31735828361, $resultado['total_costos'], 0.01);
         $this->assertSame([], $resultado['custom']);
     }
 

@@ -14,11 +14,13 @@ namespace App\Services;
  * este servicio siempre recalcula los totales/porcentajes antes de
  * persistir — nunca se confía en un total calculado por el cliente.
  *
- * Dos particularidades del Excel real se replican tal cual (confirmado
- * con Luis, no son bugs a "arreglar"):
- *  - calcularCostos(): el total NO suma Honorarios ni Financieros.
- *  - calcularCoberturas(): "Cobertura de Garantía" usa Apartamentos
- *    (no el total de ventas) como denominador de referencia.
+ * SCRUM-186 (segunda entrega, 2026-08-06): dos particularidades del Excel
+ * original que antes se replicaban tal cual quedaron reemplazadas por
+ * requerimiento explícito del negocio:
+ *  - calcularCostos(): Honorarios y Financieros ahora SÍ suman al total.
+ *  - calcularCoberturas(): "Cobertura de Garantía" usa el total de TODAS
+ *    las unidades vendidas (no solo Apartamentos) como denominador —
+ *    Apartamentos daba 0 en proyectos que venden casas/lotes/locales.
  */
 class InformeTecnicoCalculoService
 {
@@ -73,15 +75,15 @@ class InformeTecnicoCalculoService
     }
 
     /**
-     * Sección Ingeniero — Costos (celdas E15:H23). E15 = E16+E17+E18+E19+E22,
-     * es decir NO suma Honorarios (E20) ni Financieros (E23) pese al título
-     * "Costos (Incluido Costo Financiero)" — así está en el documento de
-     * control interno vigente, confirmado con Luis.
+     * Sección Ingeniero — Costos (celdas E15:H23).
      *
-     * SCRUM-162: las filas custom ad-hoc siempre suman al total — se
-     * agregan al mismo bucket que Lote/Directos/Directos Urbanismo/
-     * Indirectos/Incremento en costos, nunca al de Honorarios/Financieros
-     * (esos dos siguen siendo la excepción fija documentada arriba).
+     * SCRUM-186 (segunda entrega): Honorarios (E20) y Financieros (E23)
+     * ahora suman al total de Costos — el Excel de referencia original los
+     * excluía (E15 = E16+E17+E18+E19+E22), pero el negocio pidió
+     * explícitamente incluirlos en la segunda entrega del proceso.
+     *
+     * SCRUM-162: las filas custom ad-hoc siempre suman al total, igual que
+     * Lote/Directos/Directos Urbanismo/Indirectos/Incremento en costos.
      */
     public function calcularCostos(array $inputs, float $totalVentas): array
     {
@@ -95,7 +97,7 @@ class InformeTecnicoCalculoService
         $custom = $this->filasCustom($inputs);
         $totalCustom = array_sum(array_column($custom, 'valor'));
 
-        $totalCostos = $lote + $directos + $directosUrbanismo + $indirectos + $incrementoCostos + $totalCustom;
+        $totalCostos = $lote + $directos + $directosUrbanismo + $indirectos + $honorarios + $incrementoCostos + $financieros + $totalCustom;
 
         return [
             'lote' => $lote,
@@ -108,28 +110,32 @@ class InformeTecnicoCalculoService
             'custom' => $custom,
             'total_costos' => $this->round($totalCostos),
             'porcentaje_costos' => $this->porcentaje($totalCostos, $totalVentas),
-            'nota' => 'Honorarios y Financieros no se incluyen en el total de Costos (regla del documento de control CR-RO-09A).',
         ];
     }
 
     /**
      * Sección Ingeniero — Invertido (celdas E25:E34).
+     *
+     * SCRUM-186 (segunda entrega): agrega "Cuotas Iniciales en Fiducia"
+     * debajo de Costos Indirectos, sumando también al Total Invertido.
      */
     public function calcularInvertido(array $inputs, float $totalVentas): array
     {
         $lote = $this->num($inputs, 'lote');
         $costosDirectos = $this->num($inputs, 'costos_directos');
         $costosIndirectos = $this->num($inputs, 'costos_indirectos');
+        $cuotasInicialesFiducia = $this->num($inputs, 'cuotas_iniciales_fiducia');
         $recursosPropios = $this->num($inputs, 'recursos_propios');
         $cuotasInicialesYaPagadas = $this->num($inputs, 'cuotas_iniciales_ya_pagadas');
 
-        $totalInvertido = $lote + $costosDirectos + $costosIndirectos;
+        $totalInvertido = $lote + $costosDirectos + $costosIndirectos + $cuotasInicialesFiducia;
         $totalFuentes = $recursosPropios + $cuotasInicialesYaPagadas;
 
         return [
             'lote' => $lote,
             'costos_directos' => $costosDirectos,
             'costos_indirectos' => $costosIndirectos,
+            'cuotas_iniciales_fiducia' => $cuotasInicialesFiducia,
             'total_invertido' => $this->round($totalInvertido),
             'porcentaje_invertido' => $this->porcentaje($totalInvertido, $totalVentas),
             'recursos_propios' => $recursosPropios,
@@ -260,12 +266,14 @@ class InformeTecnicoCalculoService
         $saldoNoFinanciado = $analisisFinanciacion['saldo_no_financiado'] ?? 0;
         $saldoContraentregaVendidos = $creditoSolicitado['saldo_recaudar_contraentrega_vendidos'] ?? 0;
         $saldoContraentregaPorVender = $saldosPorRecaudar['saldo_recaudar_contraentrega_por_vender'] ?? 0;
-        // "Valor Total en Ventas" en Cobertura de Garantía = Apartamentos (E9,
-        // línea de Ventas Totales Proyecto del Ingeniero), NO "Aptos. Vendidos"
-        // (E38, Crédito Solicitado del Coordinador) — son campos distintos que
-        // solo coinciden cuando se vendió el 100% del proyecto, como en el
-        // fixture de referencia. Ese solape ocultaba este bug en el test.
-        $apartamentos = $ventasTotalesProyecto['apartamentos'] ?? 0;
+        // SCRUM-186 (segunda entrega): el denominador de "Cobertura de
+        // Garantía" pasa a ser el total de TODAS las unidades vendidas
+        // (total_ventas: apartamentos + casas + parqueaderos + demás
+        // conceptos fijos + filas custom). Antes usaba solo "Apartamentos"
+        // (E9), que daba 0 — y por lo tanto una cobertura siempre en 0% —
+        // en cualquier proyecto que no vendiera literalmente apartamentos
+        // (casas, lotes, locales), aunque el proyecto sí tuviera ventas.
+        $totalUnidadesVendidas = $ventasTotalesProyecto['total_ventas'] ?? 0;
 
         $peorNumerador = $credito + $saldoXFinanciar;
         $peorDenominador = $saldoContraentregaVendidos;
@@ -275,7 +283,7 @@ class InformeTecnicoCalculoService
         $mejorDenominador = $saldoContraentregaVendidos + $saldoContraentregaPorVender;
         $mejorCobertura = $this->porcentaje($mejorNumerador, $mejorDenominador);
 
-        $garantiaCobertura = $this->porcentaje($credito, $apartamentos);
+        $garantiaCobertura = $this->porcentaje($credito, $totalUnidadesVendidas);
 
         return [
             'peor_escenario' => [
@@ -294,7 +302,7 @@ class InformeTecnicoCalculoService
             ],
             'cobertura_garantia' => [
                 'numerador' => $this->round($credito),
-                'denominador' => $this->round($apartamentos),
+                'denominador' => $this->round($totalUnidadesVendidas),
                 'cobertura' => $garantiaCobertura,
                 'umbral_maximo' => 0.6,
                 'semaforo' => $garantiaCobertura > 0.6 ? 'rojo' : 'verde',
