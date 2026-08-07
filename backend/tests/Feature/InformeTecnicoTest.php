@@ -550,7 +550,8 @@ class InformeTecnicoTest extends TestCase
 
         $response->assertStatus(200);
         $this->assertEqualsWithDelta(32841282386, $response->json('ventas_totales_proyecto.total_ventas'), 0.01);
-        $this->assertEqualsWithDelta(27643780361, $response->json('costos.total_costos'), 0.01);
+        // SCRUM-186 (segunda entrega): 27,643,780,361 + Honorarios (2,495,448,000) + Financieros (1,596,600,000)
+        $this->assertEqualsWithDelta(31735828361, $response->json('costos.total_costos'), 0.01);
         $this->assertEqualsWithDelta(8386272351, $response->json('invertido.total_invertido'), 0.01);
 
         Passport::actingAs($this->coordinador);
@@ -573,9 +574,12 @@ class InformeTecnicoTest extends TestCase
         $this->assertEqualsWithDelta(6291384715.8, $response->json('credito_solicitado.cuotas_iniciales_pendientes'), 0.01);
         // E48 = E40+E41+E42
         $this->assertEqualsWithDelta(29280282386, $response->json('saldos_por_recaudar_contraentrega.total_pendiente_por_recaudar'), 0.01);
-        // E57 Saldo X Financiar
-        $this->assertEqualsWithDelta(4966123294.2, $response->json('analisis_financiacion.saldo_x_financiar'), 0.01);
-        // G77 = E36/E9 (Apartamentos, no total de ventas)
+        // E57 Saldo X Financiar — sube frente al valor original del Excel
+        // (4,966,123,294.2) porque costo_obra ahora incluye Honorarios y
+        // Financieros (SCRUM-186, segunda entrega): 31,735,828,361 -
+        // 8,386,272,351 - 8,000,000,000 - 6,291,384,715.8 = 9,058,171,294.2
+        $this->assertEqualsWithDelta(9058171294.2, $response->json('analisis_financiacion.saldo_x_financiar'), 0.01);
+        // G77 = E36/total_ventas (coincide con Apartamentos en este fixture: 100% vendido)
         $this->assertEqualsWithDelta(0.24359584701876, $response->json('coberturas.cobertura_garantia.cobertura'), 0.0000001);
         $this->assertEquals('registrado', $response->json('estado'));
     }

@@ -58,10 +58,6 @@ const COSTOS_CONCEPTOS: FilaConcepto[] = [
   { label: 'Financieros', clave: 'financieros' },
 ];
 
-// Los únicos dos campos fijos de Costos que NO suman al total (regla del
-// documento de control CR-RO-09A, ver InformeTecnicoCalculoService::calcularCostos()).
-const COSTOS_CLAVES_NO_SUMAN = ['honorarios', 'financieros'];
-
 type VentasInput = Record<string, number | null>;
 type CostosInput = Record<string, number | null>;
 
@@ -69,6 +65,7 @@ interface InvertidoInput {
   lote: number | null;
   costos_directos: number | null;
   costos_indirectos: number | null;
+  cuotas_iniciales_fiducia: number | null;
   recursos_propios: number | null;
   cuotas_iniciales_ya_pagadas: number | null;
 }
@@ -101,7 +98,6 @@ export class InformeTecnicoDetalleComponent implements OnInit, OnDestroy {
   // SCRUM-120 Fase 2 / SCRUM-162: config de filas fijas expuesta al template.
   readonly ventasConceptos = VENTAS_CONCEPTOS;
   readonly costosConceptos = COSTOS_CONCEPTOS;
-  readonly costosClavesNoSuman = COSTOS_CLAVES_NO_SUMAN;
 
   // Inputs editables — hidratados desde `informe` al cargar/guardar.
   ventasInput: VentasInput = {
@@ -119,7 +115,7 @@ export class InformeTecnicoDetalleComponent implements OnInit, OnDestroy {
   costosCustomFilas: FilaConcepto[] = [];
 
   invertidoInput: InvertidoInput = {
-    lote: null, costos_directos: null, costos_indirectos: null,
+    lote: null, costos_directos: null, costos_indirectos: null, cuotas_iniciales_fiducia: null,
     recursos_propios: null, cuotas_iniciales_ya_pagadas: null
   };
   observacionesIngeniero = '';
@@ -240,6 +236,7 @@ export class InformeTecnicoDetalleComponent implements OnInit, OnDestroy {
     const i = this.informe.invertido || {};
     this.invertidoInput = {
       lote: i.lote ?? null, costos_directos: i.costos_directos ?? null, costos_indirectos: i.costos_indirectos ?? null,
+      cuotas_iniciales_fiducia: i.cuotas_iniciales_fiducia ?? null,
       recursos_propios: i.recursos_propios ?? null, cuotas_iniciales_ya_pagadas: i.cuotas_iniciales_ya_pagadas ?? null
     };
 

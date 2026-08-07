@@ -60,7 +60,6 @@
 </table>
 
 <h3>② Costos (incluido Costo Financiero)</h3>
-<div class="note">{{ $c['nota'] ?? 'Honorarios y Financieros no se incluyen en el total de Costos (regla del documento de control CR-RO-09A).' }}</div>
 <table>
     <thead><tr><th>Campo</th><th>Valor</th><th></th></tr></thead>
     <tbody>
@@ -68,9 +67,9 @@
         <tr><td>Directos</td><td>{{ number_format($c['directos'] ?? 0, 0) }}</td><td></td></tr>
         <tr><td>Directos Urbanismo</td><td>{{ number_format($c['directos_urbanismo'] ?? 0, 0) }}</td><td></td></tr>
         <tr><td>Indirectos</td><td>{{ number_format($c['indirectos'] ?? 0, 0) }}</td><td></td></tr>
-        <tr><td>Honorarios (no suma al total)</td><td>{{ number_format($c['honorarios'] ?? 0, 0) }}</td><td></td></tr>
+        <tr><td>Honorarios</td><td>{{ number_format($c['honorarios'] ?? 0, 0) }}</td><td></td></tr>
         <tr><td>Incremento en costos</td><td>{{ number_format($c['incremento_costos'] ?? 0, 0) }}</td><td></td></tr>
-        <tr><td>Financieros (no suma al total)</td><td>{{ number_format($c['financieros'] ?? 0, 0) }}</td><td></td></tr>
+        <tr><td>Financieros</td><td>{{ number_format($c['financieros'] ?? 0, 0) }}</td><td></td></tr>
         <tr class="total-row"><td>Total Costos</td><td>{{ number_format($c['total_costos'] ?? 0, 0) }}</td><td>{{ number_format(($c['porcentaje_costos'] ?? 0) * 100, 2) }}%</td></tr>
     </tbody>
 </table>
@@ -82,6 +81,7 @@
         <tr><td>Lote</td><td>{{ number_format($i['lote'] ?? 0, 0) }}</td><td></td></tr>
         <tr><td>Costos Directos</td><td>{{ number_format($i['costos_directos'] ?? 0, 0) }}</td><td></td></tr>
         <tr><td>Costos Indirectos</td><td>{{ number_format($i['costos_indirectos'] ?? 0, 0) }}</td><td></td></tr>
+        <tr><td>Cuotas Iniciales en Fiducia</td><td>{{ number_format($i['cuotas_iniciales_fiducia'] ?? 0, 0) }}</td><td></td></tr>
         <tr class="total-row"><td>Total Invertido</td><td>{{ number_format($i['total_invertido'] ?? 0, 0) }}</td><td>{{ number_format(($i['porcentaje_invertido'] ?? 0) * 100, 2) }}%</td></tr>
         <tr><td>Recursos propios</td><td>{{ number_format($i['recursos_propios'] ?? 0, 0) }}</td><td></td></tr>
         <tr><td>Cuotas Iniciales Ya Pagadas</td><td>{{ number_format($i['cuotas_iniciales_ya_pagadas'] ?? 0, 0) }}</td><td></td></tr>
@@ -139,7 +139,7 @@
 </table>
 
 <h3>Coberturas</h3>
-<div class="note">Cobertura de Garantía usa Apartamentos como referencia de ventas (no el Total de Ventas del proyecto) — documento de control CR-RO-09A.</div>
+<div class="note">Cobertura de Garantía usa el Total de Ventas del proyecto (todas las unidades vendidas) como referencia.</div>
 <div class="coverage-box {{ $cob['peor_escenario']['semaforo'] ?? '' }}">
     <strong>A) Peor Escenario</strong><br>
     {{ number_format(($cob['peor_escenario']['cobertura'] ?? 0) * 100, 2) }}%

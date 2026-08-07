@@ -79,11 +79,10 @@ class InformeTecnicoExport implements FromArray, WithStyles, WithTitle, ShouldAu
         $add(['Directos', $c['directos'] ?? 0]);
         $add(['Directos Urbanismo', $c['directos_urbanismo'] ?? 0]);
         $add(['Indirectos', $c['indirectos'] ?? 0]);
-        $add(['Honorarios (no suma al total)', $c['honorarios'] ?? 0]);
+        $add(['Honorarios', $c['honorarios'] ?? 0]);
         $add(['Incremento en costos', $c['incremento_costos'] ?? 0]);
-        $add(['Financieros (no suma al total)', $c['financieros'] ?? 0]);
+        $add(['Financieros', $c['financieros'] ?? 0]);
         $addBold(['Total Costos', $c['total_costos'] ?? 0, $this->pct($c['porcentaje_costos'] ?? 0)]);
-        $add(['Nota', $c['nota'] ?? 'Honorarios y Financieros no se incluyen en el total de Costos (regla del documento de control CR-RO-09A).']);
         $add([]);
 
         $i = $this->informe->invertido ?? [];
@@ -91,6 +90,7 @@ class InformeTecnicoExport implements FromArray, WithStyles, WithTitle, ShouldAu
         $add(['Lote', $i['lote'] ?? 0]);
         $add(['Costos Directos', $i['costos_directos'] ?? 0]);
         $add(['Costos Indirectos', $i['costos_indirectos'] ?? 0]);
+        $add(['Cuotas Iniciales en Fiducia', $i['cuotas_iniciales_fiducia'] ?? 0]);
         $addBold(['Total Invertido', $i['total_invertido'] ?? 0, $this->pct($i['porcentaje_invertido'] ?? 0)]);
         $add(['Recursos propios', $i['recursos_propios'] ?? 0]);
         $add(['Cuotas Iniciales Ya Pagadas', $i['cuotas_iniciales_ya_pagadas'] ?? 0]);
@@ -139,7 +139,7 @@ class InformeTecnicoExport implements FromArray, WithStyles, WithTitle, ShouldAu
         $add(['Coberturas', 'Cobertura', 'Umbral Máximo', 'Semáforo']);
         $add(['A) Peor Escenario (no vende más)', $this->pct($cob['peor_escenario']['cobertura'] ?? 0), $this->pct($cob['peor_escenario']['umbral_maximo'] ?? 0), $cob['peor_escenario']['semaforo'] ?? '—']);
         $add(['B) Mejor Escenario (vende todo)', $this->pct($cob['mejor_escenario']['cobertura'] ?? 0), $this->pct($cob['mejor_escenario']['umbral_maximo'] ?? 0), $cob['mejor_escenario']['semaforo'] ?? '—']);
-        $add(['C) Cobertura de Garantía (usa Apartamentos, no Total Ventas)', $this->pct($cob['cobertura_garantia']['cobertura'] ?? 0), $this->pct($cob['cobertura_garantia']['umbral_maximo'] ?? 0), $cob['cobertura_garantia']['semaforo'] ?? '—']);
+        $add(['C) Cobertura de Garantía (usa Total Ventas)', $this->pct($cob['cobertura_garantia']['cobertura'] ?? 0), $this->pct($cob['cobertura_garantia']['umbral_maximo'] ?? 0), $cob['cobertura_garantia']['semaforo'] ?? '—']);
         $add([]);
 
         $add(['Observaciones del Coordinador Comercial', $this->informe->observaciones_coordinador ?? '—']);

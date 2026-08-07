@@ -81,17 +81,13 @@
 
     <!-- Costos -->
     <h4 class="section-subtitle mt-4">② Costos (incluido Costo Financiero)</h4>
-    <p class="field-note">
-      <span class="material-symbols-outlined">info</span>
-      {{ informe?.costos?.nota || 'Honorarios y Financieros no se incluyen en el total de Costos (regla del documento de control CR-RO-09A).' }}
-    </p>
     <table class="items-table">
       <thead>
         <tr><th>Campo</th><th>Valor</th><th></th></tr>
       </thead>
       <tbody>
         <tr *ngFor="let fila of costosConceptos">
-          <td>{{ fila.label }} <span class="tag-nota" *ngIf="costosClavesNoSuman.includes(fila.clave)">no suma al total</span></td>
+          <td>{{ fila.label }}</td>
           <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="costosInput[fila.clave]" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
@@ -140,6 +136,11 @@
         <tr>
           <td>Costos Indirectos</td>
           <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="invertidoInput.costos_indirectos" [disabled]="!seccionIngenieroEditable"></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Cuotas Iniciales en Fiducia</td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="invertidoInput.cuotas_iniciales_fiducia" [disabled]="!seccionIngenieroEditable"></td>
           <td></td>
         </tr>
       </tbody>
@@ -218,7 +219,7 @@
         </tr>
         <tr>
           <td>Aptos. Vendidos</td>
-          <td><input class="pro-input" type="number" [(ngModel)]="creditoSolicitadoInput.aptos_vendidos" [disabled]="!seccionCoordinadorEditable"></td>
+          <td><input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="creditoSolicitadoInput.aptos_vendidos" [disabled]="!seccionCoordinadorEditable"></td>
           <td class="pct-cell">{{ (informe?.credito_solicitado?.porcentaje_aptos_vendidos_sobre_ventas || 0) | percent:'1.0-2' }}</td>
         </tr>
         <tr>
