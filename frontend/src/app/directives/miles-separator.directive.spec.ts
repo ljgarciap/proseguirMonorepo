@@ -50,9 +50,30 @@ describe('MilesSeparatorDirective', () => {
     expect(host.valor).toBe(1234567.89);
   });
 
-  it('soporta valores negativos', () => {
+  it('soporta valores negativos (valor pegado de una vez)', () => {
     escribir('-500000');
 
+    expect(inputEl.value).toBe('-500.000');
+    expect(host.valor).toBe(-500000);
+  });
+
+  it('soporta valores negativos tecleados dígito a dígito (SCRUM-187)', () => {
+    // Reproduce el tipeo real del usuario: cada pulsación dispara su propio
+    // evento 'input' sobre el valor acumulado hasta ese momento. El signo
+    // "-" llega solo, sin dígitos, antes que el resto del número.
+    escribir('-');
+    expect(inputEl.value).toBe('-');
+    expect(host.valor).toBeNull();
+
+    escribir('-5');
+    expect(inputEl.value).toBe('-5');
+    expect(host.valor).toBe(-5);
+
+    escribir('-50');
+    expect(inputEl.value).toBe('-50');
+    expect(host.valor).toBe(-50);
+
+    escribir('-500000');
     expect(inputEl.value).toBe('-500.000');
     expect(host.valor).toBe(-500000);
   });

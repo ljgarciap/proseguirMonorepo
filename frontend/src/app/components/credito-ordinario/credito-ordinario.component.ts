@@ -131,15 +131,23 @@ export class CreditoOrdinarioComponent implements OnInit {
     this.router.navigate(['/creditos', credito.id]);
   }
 
-  // SCRUM-143: filtro client-side por cliente o número de documento —
-  // la lista ya llega completa del backend, no hace falta re-consultarlo.
+  // SCRUM-143: filtro client-side por cliente, documento o número de
+  // solicitud — la lista ya llega completa del backend, no hace falta
+  // re-consultarlo.
+  // SCRUM-176 (re-investigación 2026-08-10): faltaba `numero_solicitud`
+  // acá. Es el único identificador que QA usa en los reportes ("el crédito
+  // CO-2026-XXXXX"), y sin poder buscarlo tenía que ubicar la fila a ojo en
+  // una lista con muchas solicitudes del mismo cliente de prueba — terreno
+  // fértil para abrir por error un crédito viejo, ver su trazabilidad corta
+  // (genuina, no un bug) y reportarlo como recurrencia del mismo defecto.
   get filteredCreditos(): any[] {
     const term = this.searchTerm.trim().toLowerCase();
     if (!term) return this.creditos;
     return this.creditos.filter(item => {
       const nombre = (item.cliente?.name || '').toLowerCase();
       const documento = (item.cliente?.numero_documento || '').toLowerCase();
-      return nombre.includes(term) || documento.includes(term);
+      const numeroSolicitud = (item.numero_solicitud || '').toLowerCase();
+      return nombre.includes(term) || documento.includes(term) || numeroSolicitud.includes(term);
     });
   }
 
@@ -160,6 +168,22 @@ export class CreditoOrdinarioComponent implements OnInit {
 
   get displaySteps() {
     return this.isCreditoConstructor ? this.bpmnStepsConstructor : this.bpmnSteps;
+  }
+
+  // SCRUM-176 (UX, re-investigación 2026-08-10): la tarjeta de cada fila en
+  // el listado solo distinguía 3 estados genéricos (Completado / Rechazado
+  // / En Proceso) — con varias solicitudes del mismo cliente en distintas
+  // etapas reales del BPMN, todas se veían idénticas en la lista. Variante
+  // de `getStepClass`/`displaySteps` que no depende de `selectedCredito`,
+  // para poder etiquetar cada fila con su paso real sin tener el crédito
+  // abierto.
+  stepLabelFor(item: any): string {
+    if (item.estado === 'completado') return 'Completado';
+    if (item.estado === 'rechazado') return 'Rechazado';
+    const esConstructor = (item.solicitud_credito?.tipo_credito?.codigo || '').toUpperCase() === 'CONSTRUCTOR';
+    const pasos = esConstructor ? this.bpmnStepsConstructor : this.bpmnSteps;
+    const paso = pasos.find(s => s.key === item.estado || (s as any).altKeys?.includes(item.estado));
+    return paso?.label || 'En Proceso';
   }
 
   // Get index of a state in the BPMN workflow
