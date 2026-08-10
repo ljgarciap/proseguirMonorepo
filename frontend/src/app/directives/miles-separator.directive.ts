@@ -50,6 +50,20 @@ export class MilesSeparatorDirective implements ControlValueAccessor {
 
   @HostListener('input', ['$event.target.value'])
   onInput(valorCrudo: string): void {
+    // SCRUM-187: si el usuario recién tecleó el signo "-" (todavía sin
+    // dígitos), `parsear` no tiene nada que convertir y devuelve null — sin
+    // este caso especial, el bloque de abajo formatea null como '' y borra
+    // el "-" del input antes de que el usuario alcance a escribir el
+    // número, dejando la casilla en blanco en cada intento (imposible
+    // escribir un negativo dígito a dígito, aunque pegar "-500000" de una
+    // sola vez sí funcionaba). Se conserva el "-" en pantalla y se deja el
+    // valor del modelo en null hasta que haya al menos un dígito.
+    if (valorCrudo.trim() === '-') {
+      this.el.nativeElement.value = '-';
+      this.onChange(null);
+      return;
+    }
+
     const numero = this.parsear(valorCrudo);
     const formateado = numero === null ? '' : this.formatear(numero);
     this.el.nativeElement.value = formateado;

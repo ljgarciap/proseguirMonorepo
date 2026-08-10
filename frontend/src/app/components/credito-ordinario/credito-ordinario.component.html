@@ -29,7 +29,7 @@
         <h3>Solicitudes ({{ filteredCreditos.length }})</h3>
         <div class="search-group">
           <span class="material-symbols-outlined">search</span>
-          <input type="text" [(ngModel)]="searchTerm" placeholder="Buscar por cliente o documento..." class="pro-input" />
+          <input type="text" [(ngModel)]="searchTerm" placeholder="Buscar por cliente, documento o N° de solicitud..." class="pro-input" />
         </div>
       </div>
 
@@ -40,8 +40,8 @@
              (click)="selectCredito(item)">
           <div class="item-header">
             <span class="sol-num">{{ item.numero_solicitud }}</span>
-            <span class="status-badge" [ngClass]="item.estado">
-              {{ item.estado === 'completado' ? 'Completado' : item.estado === 'rechazado' ? 'Rechazado' : 'En Proceso' }}
+            <span class="status-badge" [ngClass]="item.estado" [title]="'Estado interno: ' + item.estado">
+              {{ stepLabelFor(item) }}
             </span>
           </div>
           <div class="item-body">
