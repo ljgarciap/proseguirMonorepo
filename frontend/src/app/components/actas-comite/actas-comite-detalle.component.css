@@ -154,10 +154,14 @@
 }
 
 .inline-add-solicitud {
+  /* SCRUM-189 (2026-08-12, punto 2): se agregó buscador de cliente +
+     identificación + dropdown de tipo — auto-fit en vez de columnas fijas
+     para que el bloque siga siendo legible con más campos. */
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr auto;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 8px;
   margin-top: 0.75rem;
+  align-items: end;
 }
 
 .orden-dia-item {

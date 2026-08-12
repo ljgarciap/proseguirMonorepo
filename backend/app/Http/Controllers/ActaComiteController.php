@@ -5,7 +5,12 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesActiveRole;
 use App\Models\ActaComite;
 use App\Models\ActaComiteSolicitud;
+use App\Models\Amortizacion;
+use App\Models\Cliente;
 use App\Models\CreditoOrdinario;
+use App\Models\SolicitudCredito;
+use App\Models\TipoCredito;
+use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -115,22 +120,7 @@ class ActaComiteController extends Controller
             ]);
 
             foreach ($creditosElegibles as $credito) {
-                $solicitud = $credito->solicitudCredito;
-                $cliente = $solicitud?->cliente;
-
-                ActaComiteSolicitud::create([
-                    'acta_comite_id' => $acta->id,
-                    'credito_ordinario_id' => $credito->id,
-                    'origen' => 'sistema',
-                    'cliente_nombre' => $cliente?->nombre,
-                    'cliente_identificacion' => $cliente?->numero_documento,
-                    'tipo_solicitud' => $solicitud?->tipoCredito?->nombre,
-                    'monto' => $credito->monto,
-                    'amortizacion' => $solicitud?->amortizacion?->nombre,
-                    'plazo_meses' => $credito->plazo_meses,
-                    'garantias' => $solicitud?->garantia,
-                    'fuente_pago' => $solicitud?->fuente_pago,
-                ]);
+                $this->crearSolicitudDesdeCredito($acta, $credito);
             }
 
             return $acta;
@@ -139,12 +129,65 @@ class ActaComiteController extends Controller
         return response()->json($acta->load('solicitudes'), 201);
     }
 
+    private function crearSolicitudDesdeCredito(ActaComite $acta, CreditoOrdinario $credito): ActaComiteSolicitud
+    {
+        $solicitud = $credito->solicitudCredito;
+        $cliente = $solicitud?->cliente;
+
+        return ActaComiteSolicitud::create([
+            'acta_comite_id' => $acta->id,
+            'credito_ordinario_id' => $credito->id,
+            'origen' => 'sistema',
+            'cliente_nombre' => $cliente?->nombre,
+            'cliente_identificacion' => $cliente?->numero_documento,
+            'tipo_solicitud' => $solicitud?->tipoCredito?->nombre,
+            'monto' => $credito->monto,
+            'amortizacion' => $solicitud?->amortizacion?->nombre,
+            'plazo_meses' => $credito->plazo_meses,
+            'garantias' => $solicitud?->garantia,
+            'fuente_pago' => $solicitud?->fuente_pago,
+        ]);
+    }
+
+    /**
+     * SCRUM-189 (2026-08-12, punto 1): el acta pendiente/borrador queda
+     * abierta potencialmente varios días mientras el Coordinador la
+     * elabora — cualquier CreditoOrdinario que llegue a comite_evaluacion
+     * en ese lapso quedaba huérfano, porque generar() solo toma el
+     * snapshot en el instante de creación y la regla de concurrencia
+     * (una sola acta pendiente/borrador a la vez) impide abrir una
+     * segunda para "recogerlo". Decisión de Luis (2026-08-12): sincronizar
+     * automáticamente en cada guardado, sin acción manual del Coordinador.
+     * Se llama desde show() (por si el usuario solo reabre la acta sin
+     * guardar nada) y desde actualizar() (autoguardado). No aplica a actas
+     * `aprobada` (rechazarSiAprobada ya las excluye de edición).
+     */
+    private function sincronizarSolicitudesElegibles(ActaComite $acta): void
+    {
+        if ($acta->estado === 'aprobada') {
+            return;
+        }
+
+        $idsYaIncluidos = $acta->solicitudes()->whereNotNull('credito_ordinario_id')->pluck('credito_ordinario_id');
+
+        $creditosNuevos = CreditoOrdinario::where('estado', 'comite_evaluacion')
+            ->whereNotIn('id', $idsYaIncluidos)
+            ->with(['solicitudCredito.cliente', 'solicitudCredito.tipoCredito', 'solicitudCredito.amortizacion'])
+            ->get();
+
+        foreach ($creditosNuevos as $credito) {
+            $this->crearSolicitudDesdeCredito($acta, $credito);
+        }
+    }
+
     public function show(Request $request, ActaComite $acta)
     {
         $activeRole = $this->resolveActiveRole($request);
         if (!in_array($activeRole, self::ROLES_AUTORIZADOS)) {
             return $this->forbidden('ver');
         }
+
+        $this->sincronizarSolicitudesElegibles($acta);
 
         return response()->json($acta->load('solicitudes', 'elaboradaPor', 'registradaPor'));
     }
@@ -170,6 +213,8 @@ class ActaComiteController extends Controller
         $acta->fill($datos);
         $acta->estado = $acta->estado === 'pendiente' ? 'borrador' : $acta->estado;
         $acta->save();
+
+        $this->sincronizarSolicitudesElegibles($acta);
 
         return response()->json($acta->fresh()->load('solicitudes'));
     }
@@ -207,6 +252,11 @@ class ActaComiteController extends Controller
 
         $validado = $request->validate([
             'cliente_nombre' => 'required|string|max:255',
+            // SCRUM-189 (2026-08-12, punto 2): opcional — el buscador de
+            // cliente del frontend lo autocompleta al seleccionar, pero
+            // sigue admitiendo texto libre sin identificación (spec
+            // original de SCRUM-169 admite ambos).
+            'cliente_identificacion' => 'nullable|string|max:255',
             'tipo_solicitud' => 'required|string|max:255',
             'monto' => 'required|numeric|min:0',
         ]);
@@ -412,6 +462,7 @@ class ActaComiteController extends Controller
             $acta->save();
 
             $this->sincronizarCreditosOrdinarios($acta);
+            $this->materializarSolicitudesManuales($acta, $user->id);
         });
 
         return response()->json([
@@ -487,6 +538,99 @@ class ActaComiteController extends Controller
         }
     }
 
+    /**
+     * SCRUM-190 (2026-08-12, punto 1, decisión de Luis): las solicitudes
+     * `manual` (créditos que no existían en el sistema, agregados a mano
+     * dentro del Acta) con decisión tomada se materializan acá como un
+     * CreditoOrdinario real — antes quedaban invisibles para siempre en
+     * Gestión de Créditos (sincronizarCreditosOrdinarios() las ignora a
+     * propósito, ver docblock arriba, porque no tienen credito_ordinario_id).
+     *
+     * A propósito NO se crea un Cliente nuevo desde el texto libre de la
+     * solicitud: camposFaltantesParaMaterializar() ya bloqueó el registro
+     * del acta si la identificación no matchea un Cliente existente — evita
+     * clientes fantasma con datos incompletos (sin correo, etc.).
+     *
+     * `CreditoOrdinario.cliente_id` (columna legacy, referencia `users` no
+     * `clientes` — ver CreditoOrdinario::cliente()) se deja en el usuario de
+     * portal del cliente SI existe uno con el mismo numero_documento; si no
+     * existe (el cliente nunca inició sesión, típico de un crédito que nace
+     * directo en el Acta), queda null — GestionCreditoController::
+     * crearSolicitudDocumentos() ya bloquea explícitamente el caso
+     * "requiere documentos" sin cuenta de portal en vez de fallar por FK.
+     */
+    private function materializarSolicitudesManuales(ActaComite $acta, int $userId): void
+    {
+        $mapaDecision = [
+            'aprobado'  => ['estado' => 'aprobada_garantias', 'origen' => 'comite_aprobado'],
+            'rechazado' => ['estado' => 'rechazado', 'origen' => 'comite_rechazado'],
+            'pendiente' => ['estado' => 'pendiente_comite', 'origen' => 'comite_pendiente'],
+        ];
+
+        $solicitudesManuales = $acta->solicitudes()
+            ->where('origen', 'manual')
+            ->whereNull('credito_ordinario_id')
+            ->get();
+
+        if ($solicitudesManuales->isEmpty()) {
+            return;
+        }
+
+        // Mismo PDF que sincronizarCreditosOrdinarios() — si el acta también
+        // tenía solicitudes de sistema, ya se generó y no se repite el trabajo.
+        $pdfPath = "actas-comite/{$acta->id}/acta-comite-{$acta->numero}-firmada.pdf";
+        if (!Storage::disk('public')->exists($pdfPath)) {
+            Storage::disk('public')->put($pdfPath, $this->generarPdf($acta)->output());
+        }
+
+        foreach ($solicitudesManuales as $solicitud) {
+            $mapeo = $mapaDecision[$solicitud->estado_decision] ?? null;
+            $cliente = Cliente::where('numero_documento', $solicitud->cliente_identificacion)->first();
+            $tipoCredito = TipoCredito::where('nombre', $solicitud->tipo_solicitud)->first();
+            $amortizacion = Amortizacion::where('nombre', $solicitud->amortizacion)->first();
+
+            // Defensivo: camposFaltantesParaMaterializar() ya bloqueó
+            // registrar() si alguno de estos no resuelve.
+            if (!$mapeo || !$cliente || !$tipoCredito || !$amortizacion) {
+                continue;
+            }
+
+            $usuarioPortal = User::where('numero_documento', $solicitud->cliente_identificacion)->first();
+
+            $solicitudCredito = SolicitudCredito::create([
+                'cliente_id' => $cliente->id,
+                'usuario_registra_id' => $userId,
+                'tipo_credito_id' => $tipoCredito->id,
+                'monto_solicitado' => $solicitud->monto,
+                'plazo_meses' => $solicitud->plazo_meses,
+                'amortizacion_id' => $amortizacion->id,
+                'destino_recurso' => "Aprobado por el Comité de Crédito (Acta N.° {$acta->numero}, solicitud adicionada manualmente).",
+                'garantia' => $solicitud->garantias,
+                'fuente_pago' => $solicitud->fuente_pago,
+                'correo_notificacion' => $cliente->correo_electronico,
+                'asunto_notificacion' => 'Registro de crédito aprobado por Comité',
+                'mensaje_notificacion' => "Su crédito fue evaluado por el Comité de Crédito y registrado en el Acta N.° {$acta->numero}.",
+            ]);
+
+            $credito = CreditoOrdinario::iniciar(
+                clienteId: $usuarioPortal?->id,
+                monto: (float) $solicitud->monto,
+                plazoMeses: (int) $solicitud->plazo_meses,
+                usuario: 'Acta de Comité N.° ' . $acta->numero,
+                rol: 'comite_credito',
+                comentario: 'Crédito creado a partir de una solicitud manual del Acta de Comité N.° ' . $acta->numero . ': ' . $solicitud->estado_decision . '.',
+                solicitudCreditoId: $solicitudCredito->id,
+                estadoInicial: $mapeo['estado'],
+                documentosIniciales: ['acta_comite_firmada' => $pdfPath],
+            );
+
+            $credito->resultado_origen = $mapeo['origen'];
+            $credito->save();
+
+            $solicitud->credito_ordinario_id = $credito->id;
+            $solicitud->save();
+        }
+    }
 
     private function ordenDiaInicial(?ActaComite $ultimaAprobada): array
     {
@@ -504,14 +648,63 @@ class ActaComiteController extends Controller
         }, array_keys(self::ORDEN_DIA_DEFAULT), self::ORDEN_DIA_DEFAULT);
     }
 
+    /**
+     * SCRUM-189 (2026-08-12, punto 6/7): DomPDF trae `enable_remote => false`
+     * por defecto (config/dompdf.php del paquete, nunca sobreescrito en el
+     * proyecto) — las imágenes insertadas en el editor rich text quedan
+     * embebidas como URL http(s) absoluta (ver ActaComite::resolveImagenesEnHtml
+     * / CreditoOrdinario::resolveStorageUrl) y DomPDF no puede traerlas por
+     * red, así que no se veían ni en Previsualizar ni en el PDF final. En vez
+     * de habilitar fetch remoto (superficie extra, depende de red), se
+     * resuelve el mismo archivo a su ruta LOCAL en el disco 'public' — mismo
+     * archivo, sin salir a red — solo para el HTML que se le pasa a DomPDF.
+     * No se toca el accessor del modelo: ese sigue devolviendo URL absoluta
+     * para el uso normal en Angular/ngx-quill.
+     */
     private function generarPdf(ActaComite $acta)
     {
+        $acta->load('solicitudes');
         $totales = $this->calcularTotales($acta);
 
+        $ordenDiaPdf = collect($acta->orden_dia ?? [])->map(function ($item) {
+            $item['texto'] = $this->resolverImagenesParaPdf($item['texto'] ?? '');
+            return $item;
+        })->all();
+
+        $desarrolloPdf = collect($acta->desarrollo ?? [])
+            ->map(fn ($html) => $this->resolverImagenesParaPdf($html))
+            ->all();
+
         return Pdf::loadView('actas-comite.pdf', [
-            'acta' => $acta->load('solicitudes'),
+            'acta' => $acta,
             'totales' => $totales,
+            'lugarPdf' => $this->resolverImagenesParaPdf($acta->lugar),
+            'ordenDiaPdf' => $ordenDiaPdf,
+            'desarrolloPdf' => $desarrolloPdf,
+            'observacionesPdf' => $this->resolverImagenesParaPdf($acta->observaciones_generales),
         ]);
+    }
+
+    private function resolverImagenesParaPdf(?string $html): ?string
+    {
+        if (!$html) {
+            return $html;
+        }
+
+        return preg_replace_callback('/(<img[^>]+src=")([^"]+)(")/i', function ($m) {
+            $marcador = '/storage/';
+            $pos = strpos($m[2], $marcador);
+            if ($pos === false) {
+                // No es una imagen de nuestro disco 'public' (URL externa u
+                // otra cosa) — se deja tal cual, DomPDF hará lo que pueda.
+                return $m[0];
+            }
+
+            $rutaRelativa = rawurldecode(substr($m[2], $pos + strlen($marcador)));
+            $rutaLocal = Storage::disk('public')->path($rutaRelativa);
+
+            return $m[1] . $rutaLocal . $m[3];
+        }, $html);
     }
 
     private function calcularTotales(ActaComite $acta): array
@@ -540,7 +733,51 @@ class ActaComiteController extends Controller
         foreach ($acta->solicitudes as $solicitud) {
             if (!$solicitud->estado_decision) {
                 $faltantes[] = "Decisión pendiente para {$solicitud->cliente_nombre}";
+                continue;
             }
+
+            if ($solicitud->origen === 'manual') {
+                $faltantes = array_merge($faltantes, $this->camposFaltantesParaMaterializar($solicitud));
+            }
+        }
+
+        return $faltantes;
+    }
+
+    /**
+     * SCRUM-190 (2026-08-12): las solicitudes manuales con decisión se
+     * materializan como CreditoOrdinario real al registrar (ver
+     * materializarSolicitudesManuales) — eso exige datos enlazables a
+     * catálogos/registros reales, no el texto libre que el formulario
+     * admitía hasta ahora. Bloquea el registro del acta con el mismo
+     * mecanismo VAL-09 de siempre en vez de fallar a mitad de la
+     * materialización.
+     */
+    private function camposFaltantesParaMaterializar(ActaComiteSolicitud $solicitud): array
+    {
+        $faltantes = [];
+        $prefijo = "Solicitud manual de {$solicitud->cliente_nombre}";
+
+        $clienteExiste = $solicitud->cliente_identificacion
+            && Cliente::where('numero_documento', $solicitud->cliente_identificacion)->exists();
+        if (!$clienteExiste) {
+            $faltantes[] = "{$prefijo}: identificación sin vincular a un cliente existente (use el buscador de cliente)";
+        }
+
+        if (!$solicitud->tipo_solicitud || !TipoCredito::where('nombre', $solicitud->tipo_solicitud)->exists()) {
+            $faltantes[] = "{$prefijo}: tipo de solicitud no reconocido (selecciónelo del listado)";
+        }
+
+        if (!$solicitud->amortizacion || !Amortizacion::where('nombre', $solicitud->amortizacion)->exists()) {
+            $faltantes[] = "{$prefijo}: amortización no reconocida (selecciónela del listado)";
+        }
+
+        if (!$solicitud->plazo_meses) {
+            $faltantes[] = "{$prefijo}: plazo (meses)";
+        }
+
+        if (!$solicitud->fuente_pago) {
+            $faltantes[] = "{$prefijo}: fuente de pago";
         }
 
         return $faltantes;

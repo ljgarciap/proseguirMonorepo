@@ -165,8 +165,16 @@ class CreditoOrdinario extends Model
         return $this->hasMany(ActaComiteSolicitud::class, 'credito_ordinario_id');
     }
 
+    /**
+     * `$clienteId` es nullable desde SCRUM-190 (2026-08-12): un crédito
+     * creado a partir de una solicitud manual del Acta de Comité puede no
+     * tener cuenta de portal asociada (el cliente nunca inició sesión, la
+     * solicitud nació directo en la reunión) — la columna ya era nullable
+     * en BD, esta firma solo lo reflejaba de menos. Ver
+     * ActaComiteController::materializarSolicitudesManuales().
+     */
     public static function iniciar(
-        int $clienteId,
+        ?int $clienteId,
         float $monto,
         int $plazoMeses,
         string $usuario,

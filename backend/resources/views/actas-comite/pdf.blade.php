@@ -42,7 +42,7 @@
             <td colspan="2"><strong>Lugar:</strong></td>
         </tr>
     </table>
-    <div class="rich-text">{!! $acta->lugar ?? '—' !!}</div>
+    <div class="rich-text">{!! $lugarPdf ?? '—' !!}</div>
 </div>
 
 <h2>Asistentes</h2>
@@ -56,16 +56,16 @@
 
 <h2>Orden del día {{ $acta->orden_dia_aprobado ? '(aprobado por unanimidad)' : '' }}</h2>
 <ol>
-    @foreach(($acta->orden_dia ?? []) as $item)
+    @foreach($ordenDiaPdf as $item)
         <li>{{ $item['texto'] ?? '' }}</li>
     @endforeach
 </ol>
 
 <h2>Desarrollo</h2>
-@foreach(($acta->orden_dia ?? []) as $item)
+@foreach($ordenDiaPdf as $item)
     <div class="orden-dia-item">
         <h3>{{ $item['texto'] ?? '' }}</h3>
-        <div class="rich-text">{!! ($acta->desarrollo[$item['id']] ?? null) ?: '—' !!}</div>
+        <div class="rich-text">{!! ($desarrolloPdf[$item['id']] ?? null) ?: '—' !!}</div>
     </div>
 @endforeach
 
@@ -136,7 +136,7 @@
 </table>
 
 <h2>Observaciones generales</h2>
-<div class="rich-text">{!! $acta->observaciones_generales ?? '—' !!}</div>
+<div class="rich-text">{!! $observacionesPdf ?? '—' !!}</div>
 <p>Termina la reunión a las {{ $acta->hora_finalizacion ?? '—' }}.</p>
 
 <h2>Firmantes</h2>

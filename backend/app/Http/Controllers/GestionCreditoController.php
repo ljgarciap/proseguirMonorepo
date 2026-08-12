@@ -207,6 +207,17 @@ class GestionCreditoController extends Controller
             if ($request->boolean('requiere_documentos') && !$request->filled('preset_id')) {
                 return response()->json(['message' => 'Seleccione la documentación requerida.'], 422);
             }
+            // SCRUM-190 (2026-08-12): créditos materializados desde una
+            // solicitud manual del Acta de Comité pueden no tener cuenta de
+            // portal asociada (cliente_id null — ver ActaComiteController::
+            // materializarSolicitudesManuales()). crearSolicitudDocumentos()
+            // exige un cliente_id real (FK NOT NULL contra users), así que
+            // se bloquea acá con un mensaje claro en vez de romper por FK.
+            if ($request->boolean('requiere_documentos') && !$credito->cliente_id) {
+                return response()->json([
+                    'message' => 'Este cliente no tiene una cuenta de portal para recibir la solicitud de documentación. Gestione sin requerir documentos o contacte al administrador.',
+                ], 422);
+            }
         }
 
         // VAL-06: síntesis SARLAFT debe existir antes de notificar.
@@ -277,11 +288,24 @@ class GestionCreditoController extends Controller
         ]);
     }
 
+    /**
+     * SCRUM-190 (2026-08-12): el filtro original miraba solo el `estado`
+     * ACTUAL del crédito, pero `notificar()` avanza `aprobada_garantias` →
+     * `formalizacion_garantias` al gestionar (línea ~234) — el crédito
+     * desaparecía de la bandeja justo al gestionarse, cuando debía seguir
+     * visible con "Gestionada: Sí" (`solicitud_gestionada`/`fecha_gestion`,
+     * ya soportado por el frontend). Los otros 3 orígenes no cambian de
+     * `estado` al notificar (ver comentario en notificar()), así que no
+     * tienen el mismo problema — solo se amplía la rama de comité aprobado.
+     */
     private function queryBase()
     {
         return CreditoOrdinario::with(self::RELACIONES_DETALLE)
             ->where(function ($q) {
-                $q->where('estado', 'aprobada_garantias')
+                $q->where(function ($qa) {
+                    $qa->where('resultado_origen', 'comite_aprobado')
+                        ->whereIn('estado', ['aprobada_garantias', 'formalizacion_garantias']);
+                })
                     ->orWhere('estado', 'pendiente_comite')
                     ->orWhere(function ($qr) {
                         $qr->where('estado', 'rechazado')->whereIn('resultado_origen', ['sarlaft', 'comite_rechazado']);

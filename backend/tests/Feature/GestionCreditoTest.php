@@ -486,5 +486,14 @@ class GestionCreditoTest extends TestCase
             'mensaje' => 'Debe formalizar las garantías.',
             'preset_id' => $this->preset->id,
         ], $headers)->assertStatus(200)->assertJsonPath('credito.estado', 'formalizacion_garantias');
+
+        // 4. SCRUM-190 (2026-08-12): el crédito NO debe desaparecer de la
+        // bandeja al gestionarse — debe seguir visible con
+        // solicitud_gestionada=true y su fecha_gestion.
+        $bandejaPostGestion = $this->getJson('/api/gestion-creditos', $headers);
+        $bandejaPostGestion->assertStatus(200)->assertJsonCount(1)
+            ->assertJsonPath('0.solicitud_gestionada', true)
+            ->assertJsonPath('0.estado', 'formalizacion_garantias');
+        $this->assertNotNull($bandejaPostGestion->json('0.fecha_gestion'));
     }
 }
