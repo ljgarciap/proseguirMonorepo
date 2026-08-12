@@ -123,13 +123,13 @@
           (clienteSeleccionado)="onClienteManualSeleccionado($event)"
           placeholder="Buscar cliente existente...">
         </app-cliente-autocomplete>
-        <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitud.cliente_nombre" placeholder="Cliente">
+        <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitud.cliente_nombre" placeholder="Cliente *">
         <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitud.cliente_identificacion" placeholder="N.° de identificación">
         <select class="pro-input" [(ngModel)]="nuevaSolicitud.tipo_solicitud">
-          <option value="">Tipo de solicitud...</option>
+          <option value="">Tipo de solicitud... *</option>
           <option *ngFor="let t of tiposCredito" [value]="t.nombre">{{ t.nombre }}</option>
         </select>
-        <input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="nuevaSolicitud.monto" placeholder="Monto">
+        <input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="nuevaSolicitud.monto" placeholder="Monto *">
         <button class="btn-pro sm primary" (click)="agregarSolicitudManual()">Agregar solicitud manual</button>
       </div>
     </section>
