@@ -290,8 +290,13 @@
               </div>
             </div>
 
-            <!-- Stage 4: comite_evaluacion (Comité de Crédito) -->
-            <div *ngIf="selectedCredito.estado === 'comite_evaluacion'">
+            <!-- Stage 4: comite_evaluacion (Comité de Crédito). SCRUM-191
+                 (2026-08-12, punto 2): el cliente no debe ver este panel —
+                 está dirigido al Comité ("deben realizar la evaluación...")
+                 y sus acciones ya las bloquea el backend para cualquier rol
+                 no-superadmin en este estado (ver CreditoOrdinarioController::
+                 transition()), pero igual no corresponde mostrárselo. -->
+            <div *ngIf="selectedCredito.estado === 'comite_evaluacion' && activeRole !== 'cliente'">
               <p class="action-instructions">Como <strong>Comité de Crédito</strong>, deben realizar la evaluación del crédito y cargar el **Acta Oficial del Comité firmada** antes de dar el veredicto final.</p>
               
               <div class="upload-controls" style="margin-bottom: 20px;">
@@ -637,7 +642,11 @@
                     <label for="inline-file-acta" class="btn-inline-upload">Subir</label>
                   </div>
 
-                  <a *ngIf="selectedCredito.documentos?.acta_comite_firmada" [href]="selectedCredito.documentos.acta_comite_firmada" target="_blank" class="btn-view-doc">
+                  <!-- SCRUM-191 (2026-08-12, punto 2): el cliente no puede ver
+                       el Acta de Comité — a diferencia de las demás filas de
+                       esta grilla (ej. Análisis Financiero, línea ~608), esta
+                       no tenía ningún gate de rol en el link "Ver". -->
+                  <a *ngIf="selectedCredito.documentos?.acta_comite_firmada && activeRole !== 'cliente'" [href]="selectedCredito.documentos.acta_comite_firmada" target="_blank" class="btn-view-doc">
                     <span class="material-symbols-outlined">open_in_new</span> Ver
                   </a>
                 </div>

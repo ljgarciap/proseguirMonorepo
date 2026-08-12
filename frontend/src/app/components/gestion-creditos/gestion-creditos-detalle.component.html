@@ -116,6 +116,57 @@
       </div>
     </div>
 
+    <!-- SCRUM-191 (2026-08-12, punto 1): documentos reenviados por el
+         cliente tras un resultado "Pendiente por Comité con documentos
+         requeridos" — el Coordinador Comercial los aprueba/rechaza acá
+         mismo, sin pasar por la bandeja genérica de Operativo/Gerente. -->
+    <div class="content-card mt-4" *ngIf="mostrarPanelDocumentos">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">folder_shared</span>
+        Documentos reenviados por el cliente
+      </h3>
+
+      <div class="alert-readonly success" *ngIf="creditoDisponibleParaComite">
+        <span class="material-symbols-outlined">check_circle</span>
+        Toda la documentación fue aprobada — este crédito ya volvió a estar disponible para el Comité de Crédito.
+      </div>
+
+      <p class="card-subtitle" *ngIf="cargandoDocumentos">Cargando documentos...</p>
+      <p class="card-subtitle" *ngIf="!cargandoDocumentos && !documentRequest">
+        El cliente todavía no ha cargado ningún documento de los solicitados.
+      </p>
+
+      <div class="table-container mt-4" *ngIf="documentRequest">
+        <table class="modern-table">
+          <thead><tr><th>Documento</th><th>Estado</th><th>Archivo</th><th class="text-right">Acción</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let item of documentRequest.items">
+              <td>{{ item.requirement?.nombre || '—' }}</td>
+              <td>
+                <span class="status-pill" [ngClass]="{
+                  'success': item.estado === 'aprobado',
+                  'danger': item.estado === 'rechazado',
+                  'warning': item.estado === 'pendiente' || item.estado === 'subido'
+                }">{{ (item.estado || 'pendiente') | uppercase }}</span>
+              </td>
+              <td>
+                <button *ngIf="item.upload" class="btn-pro sm secondary" (click)="verArchivo(item.upload.id, item.upload.original_name)">
+                  <span class="material-symbols-outlined">visibility</span> Ver
+                </button>
+                <span *ngIf="!item.upload" class="text-muted">Sin cargar</span>
+              </td>
+              <td class="text-right">
+                <ng-container *ngIf="item.upload && item.estado !== 'aprobado' && !creditoDisponibleParaComite">
+                  <button class="btn-pro sm primary" (click)="revisarItem(item, 'aprobar')">Aprobar</button>
+                  <button class="btn-pro sm secondary" (click)="revisarItem(item, 'rechazar')">Rechazar</button>
+                </ng-container>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Formulario de notificación -->
     <div class="content-card mt-4 result-panel">
       <h3 class="card-title">

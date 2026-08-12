@@ -36,6 +36,11 @@ export class GestionCreditosDetalleComponent implements OnInit {
   presetId: number | null = null;
   requiereDocumentos: boolean | null = null;
 
+  // SCRUM-191 (2026-08-12, punto 1): documentos que el cliente reenvió tras
+  // la notificación de "Pendiente por Comité con documentos requeridos".
+  documentRequest: any = null;
+  cargandoDocumentos = false;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -59,6 +64,9 @@ export class GestionCreditosDetalleComponent implements OnInit {
         this.credito = data;
         this.destino = this.correoCliente();
         this.loading = false;
+        if (this.mostrarPanelDocumentos) {
+          this.cargarDocumentosPendientes();
+        }
       },
       error: (err) => {
         this.loading = false;
@@ -143,6 +151,97 @@ export class GestionCreditosDetalleComponent implements OnInit {
 
   get requierePresetObligatorio(): boolean {
     return this.resultado === 'aprobada_garantias' || (this.resultado === 'pendiente_comite' && this.requiereDocumentos === true);
+  }
+
+  /** SCRUM-191 (2026-08-12, punto 1): el último "Registrar y enviar
+   * notificación" de este crédito pidió documentación — de ahí sale si
+   * corresponde mostrar el panel de revisión de lo que el cliente reenvíe. */
+  private get ultimaGestionRequirioDocumentos(): boolean {
+    const detalle: any[] = this.credito?.gestion_detalle || [];
+    if (!detalle.length) return false;
+    return detalle[detalle.length - 1]?.requiere_documentos === true;
+  }
+
+  get mostrarPanelDocumentos(): boolean {
+    return this.resultado === 'pendiente_comite'
+      && !!this.credito?.solicitud_gestionada
+      && this.ultimaGestionRequirioDocumentos;
+  }
+
+  /** El crédito ya volvió a comite_evaluacion (todo lo reenviado quedó
+   * aprobado) — deja de estar "gestionable" acá, vuelve a la cola del Acta. */
+  get creditoDisponibleParaComite(): boolean {
+    return this.credito?.estado === 'comite_evaluacion';
+  }
+
+  cargarDocumentosPendientes(): void {
+    this.cargandoDocumentos = true;
+    this.http.get<any>(`${environment.apiUrl}/gestion-creditos/${this.creditoId}/documentos`, {
+      headers: { 'X-Active-Role': this.activeRole }
+    }).subscribe({
+      next: (data) => { this.documentRequest = data; this.cargandoDocumentos = false; },
+      error: () => { this.cargandoDocumentos = false; }
+    });
+  }
+
+  /** Mismo patrón que ClientUploadComponent.viewFile(). */
+  verArchivo(uploadId: number, originalName: string): void {
+    this.http.get(`${environment.apiUrl}/uploads/${uploadId}/download`, {
+      headers: { 'X-Active-Role': this.activeRole },
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        if (blob.type === 'application/pdf' || blob.type.startsWith('image/')) {
+          window.open(url, '_blank');
+        } else {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = originalName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+      },
+      error: () => Swal.fire('Error', 'No se pudo abrir el documento.', 'error')
+    });
+  }
+
+  revisarItem(item: any, accion: 'aprobar' | 'rechazar'): void {
+    const tituloConfirm = accion === 'aprobar' ? '¿Aprobar este documento?' : '¿Rechazar este documento?';
+    Swal.fire({
+      title: tituloConfirm,
+      input: accion === 'rechazar' ? 'textarea' : undefined,
+      inputLabel: accion === 'rechazar' ? 'Motivo del rechazo (el cliente lo verá)' : undefined,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: accion === 'aprobar' ? 'Sí, aprobar' : 'Sí, rechazar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: accion === 'aprobar' ? '#1d4ed8' : '#dc2626',
+    }).then(result => {
+      if (!result.isConfirmed) return;
+
+      // result.value es el texto del textarea cuando accion='rechazar', pero
+      // para 'aprobar' (sin input) SweetAlert2 devuelve el booleano `true`
+      // — enviarlo tal cual rompe la validación "observaciones: string" del
+      // backend. Solo viaja como observaciones si es texto de verdad.
+      const observaciones = typeof result.value === 'string' ? result.value : null;
+
+      this.http.post<any>(
+        `${environment.apiUrl}/gestion-creditos/${this.creditoId}/documentos/${item.id}/revisar`,
+        { accion, observaciones },
+        { headers: { 'X-Active-Role': this.activeRole } }
+      ).subscribe({
+        next: (resp) => {
+          this.documentRequest = resp.document_request;
+          if (resp.credito_disponible_comite) {
+            this.credito.estado = 'comite_evaluacion';
+            Swal.fire('¡Listo!', 'Toda la documentación fue aprobada — el crédito volvió a estar disponible para el Comité de Crédito.', 'success');
+          }
+        },
+        error: (err) => Swal.fire('Error', err.error?.message || 'No se pudo procesar el documento.', 'error')
+      });
+    });
   }
 
   registrarYEnviar(): void {

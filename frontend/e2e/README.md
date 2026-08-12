@@ -93,3 +93,37 @@ El entorno dev puede tener otros `CreditoOrdinario` en `comite_evaluacion` ajeno
 (de otras sesiones de QA) — el spec no fija un número exacto de tarjetas en la pestaña Decisión,
 decide cualquiera que aparezca (auto-sync, SCRUM-189.1) como "Pendiente por Comité" para no
 bloquear el registro del acta.
+
+## SCRUM-191 — Gestión de Créditos: documentos + acceso al Acta (`scrum-191-gestion-creditos-documentos.spec.ts`)
+
+```bash
+docker cp e2e/fixtures/seed_scrum_191.php factoring_backend:/tmp/seed_scrum_191.php
+docker exec factoring_backend php artisan tinker --execute="require '/tmp/seed_scrum_191.php';"
+```
+
+Siembra 3 `CreditoOrdinario` (`GC191-PW-SIN-DOCS`, `GC191-PW-CON-DOCS`, `GC191-PW-ACTA`) en
+`pendiente_comite`/con Acta ya firmada, más el `Cliente` "Cliente Playwright 191" — vinculado al
+usuario de portal `cliente` ya sembrado por `UserSeeder` (doc `2345` / pass `2345`). El script es
+idempotente: resetea los 2 primeros créditos a `pendiente_comite` (y borra cualquier
+`DocumentRequest` previo del segundo) en cada corrida — correrlo antes de CADA ejecución del spec.
+
+3 tests independientes:
+1. Notificar `pendiente_comite` con "requiere documentos: No" → el crédito desaparece de la
+   bandeja (volvió solo a `comite_evaluacion`).
+2. Notificar con "requiere documentos: Sí" → login como cliente (`/client-upload`) → recarga el
+   documento del preset → login como coordinador → aprueba desde el panel "Documentos reenviados
+   por el cliente" → el crédito vuelve a `comite_evaluacion`.
+3. Login como cliente → `/creditos` → confirma que el link "Ver" del Acta de Comité Firmada y el
+   panel legacy dirigido al Comité no aparecen para ese rol.
+
+Encontró un bug real durante la validación (no del test): al aprobar un documento sin motivo de
+rechazo, SweetAlert2 devuelve el booleano `true` como `result.value` (no hay `input` configurado)
+— viajaba tal cual como `observaciones` y el backend lo rechazaba (`"must be a string"`). Fix en
+`gestion-creditos-detalle.component.ts::revisarItem()`.
+
+Limpieza tras validar (evita acumular ruido en Gestión de Créditos):
+
+```php
+// vía tinker, borra los 3 CreditoOrdinario/SolicitudCredito/DocumentRequest GC191-PW-* y el
+// ClientUpload de prueba (ver bloque de limpieza usado en la sesión 2026-08-12)
+```

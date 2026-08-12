@@ -243,9 +243,19 @@ class GestionCreditoController extends Controller
         $estadoAnterior = $credito->estado;
         if ($resultado === 'aprobada_garantias') {
             $credito->estado = 'formalizacion_garantias';
+        } elseif ($resultado === 'pendiente_comite' && !$request->boolean('requiere_documentos')) {
+            // SCRUM-191 (2026-08-12): si no se requiere documentación
+            // adicional, no hay nada que esperar del cliente — el crédito
+            // vuelve directo a la cola del Comité en vez de quedar
+            // estancado para siempre en pendiente_comite (antes no existía
+            // ninguna salida de este estado sin documentos).
+            $credito->estado = 'comite_evaluacion';
         }
-        // sarlaft_desfavorable, rechazada_comite y pendiente_comite
-        // conservan el mismo estado (§5.5): solo cambia la marca de gestión.
+        // sarlaft_desfavorable, rechazada_comite y pendiente_comite CON
+        // documentos requeridos conservan el mismo estado (§5.5): solo
+        // cambia la marca de gestión — la salida de pendiente_comite con
+        // documentos ocurre en revisarDocumento(), cuando el Coordinador
+        // aprueba todo lo reenviado por el cliente.
 
         $credito->solicitud_gestionada = true;
         $credito->fecha_gestion = now();
@@ -298,6 +308,122 @@ class GestionCreditoController extends Controller
      * `estado` al notificar (ver comentario en notificar()), así que no
      * tienen el mismo problema — solo se amplía la rama de comité aprobado.
      */
+    /**
+     * SCRUM-191 (2026-08-12, punto 1): documentos que el cliente reenvió
+     * tras la notificación de "Pendiente por Comité con documentos
+     * requeridos" — para que el Coordinador Comercial los revise sin salir
+     * de Gestión de Créditos. Se ubica el `DocumentRequest` más reciente
+     * por `solicitud_credito_id` (mismo criterio de correlación que usa
+     * `crearSolicitudDocumentos()` al crearlo).
+     */
+    public function documentosPendientes(Request $request, $creditoId)
+    {
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarRol($activeRole);
+
+        $credito = CreditoOrdinario::findOrFail($creditoId);
+
+        if (!$credito->solicitud_credito_id) {
+            return response()->json(null);
+        }
+
+        $documentRequest = DocumentRequest::where('solicitud_credito_id', $credito->solicitud_credito_id)
+            ->with(['items.requirement', 'items.upload'])
+            ->orderByDesc('created_at')
+            ->first();
+
+        return response()->json($documentRequest);
+    }
+
+    /**
+     * SCRUM-191 (2026-08-12, punto 1): aprobación/rechazo en un solo paso
+     * por el Coordinador Comercial — a propósito NO reutiliza el flujo
+     * genérico Operativo→Gerente de `ClientUploadController` (usado en el
+     * onboarding inicial, SCRUM-146/152): ese es un pipeline de 2 pasos con
+     * roles distintos, y acá el ticket pide explícitamente que sea el mismo
+     * Coordinador Comercial quien decide, dentro de la pantalla que ya es
+     * su dominio (Gestión de Créditos). Al aprobar el último ítem
+     * pendiente, el crédito vuelve solo a `comite_evaluacion` — la
+     * funcionalidad que el ticket marcó como inexistente.
+     */
+    public function revisarDocumento(Request $request, $creditoId, $itemId)
+    {
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarRol($activeRole);
+        $user = Auth::user();
+
+        $credito = CreditoOrdinario::findOrFail($creditoId);
+
+        $request->validate([
+            'accion' => 'required|in:aprobar,rechazar',
+            'observaciones' => 'nullable|string',
+        ]);
+
+        $item = DocumentRequestItem::with('request', 'upload')->findOrFail($itemId);
+        if (!$credito->solicitud_credito_id || $item->request?->solicitud_credito_id !== $credito->solicitud_credito_id) {
+            abort(404);
+        }
+
+        if (!$item->client_upload_id) {
+            return response()->json(['message' => 'El cliente todavía no ha cargado este documento.'], 422);
+        }
+
+        $accion = $request->input('accion');
+        $observaciones = $request->input('observaciones');
+        $nuevoEstado = $accion === 'aprobar' ? 'aprobado' : 'rechazado';
+
+        $item->upload->update([
+            'status' => $nuevoEstado,
+            'observations' => $observaciones ?: $item->upload->observations,
+            'approved_by' => $user->id,
+        ]);
+        $item->update(['estado' => $nuevoEstado, 'observaciones' => $observaciones]);
+
+        $documentRequest = $item->request;
+        $pendientes = $documentRequest->items()->where('estado', '!=', 'aprobado')->count();
+
+        if ($pendientes === 0) {
+            $documentRequest->update(['estado' => 'completado']);
+            $this->habilitarComiteSiAplica($credito, $documentRequest, $user);
+        } else {
+            $documentRequest->update(['estado' => 'pendiente']);
+        }
+
+        return response()->json([
+            'message' => $accion === 'aprobar' ? 'Documento aprobado.' : 'Documento rechazado — el cliente puede volver a cargarlo.',
+            'document_request' => $documentRequest->fresh(['items.requirement', 'items.upload']),
+            'credito_disponible_comite' => $credito->fresh()->estado === 'comite_evaluacion',
+        ]);
+    }
+
+    /**
+     * Todos los documentos reenviados quedaron aprobados: el crédito vuelve
+     * a `comite_evaluacion` (elegible de nuevo para Actas de Comité, ver
+     * ActaComiteController::sincronizarSolicitudesElegibles()). Defensivo:
+     * solo si sigue en `pendiente_comite` (si ya se movió por otro camino,
+     * no lo tocamos de nuevo).
+     */
+    private function habilitarComiteSiAplica(CreditoOrdinario $credito, DocumentRequest $documentRequest, $user): void
+    {
+        if ($credito->estado !== 'pendiente_comite') {
+            return;
+        }
+
+        $historial = $credito->historial_estados ?? [];
+        $historial[] = [
+            'fecha' => now()->toIso8601String(),
+            'usuario' => $user->name,
+            'rol' => 'coordinador_comercial',
+            'estado_anterior' => $credito->estado,
+            'estado_nuevo' => 'comite_evaluacion',
+            'comentario' => 'Documentación reenviada por el cliente aprobada en su totalidad. Vuelve a la cola del Comité de Crédito.',
+        ];
+
+        $credito->estado = 'comite_evaluacion';
+        $credito->historial_estados = $historial;
+        $credito->save();
+    }
+
     private function queryBase()
     {
         return CreditoOrdinario::with(self::RELACIONES_DETALLE)

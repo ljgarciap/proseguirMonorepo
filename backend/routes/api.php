@@ -105,8 +105,11 @@ Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class
             Route::get('/recent-ocr', [\App\Http\Controllers\ClientUploadController::class, 'recentOcr']);
             Route::post('/', [\App\Http\Controllers\ClientUploadController::class, 'store'])
                 ->middleware('checkrole:cliente,operativo');
+            // coordinador_comercial: SCRUM-191 — revisa desde Gestión de
+            // Créditos los documentos que el cliente reenvió tras un
+            // resultado "Pendiente por Comité".
             Route::get('/{id}/download', [\App\Http\Controllers\ClientUploadController::class, 'download'])
-                ->middleware('checkrole:cliente,operativo,gerente,superadmin');
+                ->middleware('checkrole:cliente,operativo,gerente,coordinador_comercial,superadmin');
             Route::post('/{id}/validate', [\App\Http\Controllers\ClientUploadController::class, 'validateUpload'])
                 ->middleware('checkrole:operativo');
             Route::post('/{id}/approve', [\App\Http\Controllers\ClientUploadController::class, 'approveUpload'])
@@ -239,6 +242,9 @@ Route::prefix('gestion-creditos')->middleware(['auth:api', 'checkrole:superadmin
     Route::get('/tarjetas', [\App\Http\Controllers\GestionCreditoController::class, 'tarjetas']);
     Route::get('/{creditoId}', [\App\Http\Controllers\GestionCreditoController::class, 'show']);
     Route::post('/{creditoId}/notificar', [\App\Http\Controllers\GestionCreditoController::class, 'notificar']);
+    // SCRUM-191: documentos reenviados por el cliente tras "Pendiente por Comité".
+    Route::get('/{creditoId}/documentos', [\App\Http\Controllers\GestionCreditoController::class, 'documentosPendientes']);
+    Route::post('/{creditoId}/documentos/{itemId}/revisar', [\App\Http\Controllers\GestionCreditoController::class, 'revisarDocumento']);
 });
 
 // Registro de Solicitudes de Crédito
