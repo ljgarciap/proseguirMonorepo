@@ -64,3 +64,32 @@ vez de duplicarlos — para resembrar desde cero hay que borrarlos primero (`Cre
 el registro deja de estar disponible para gestionar de nuevo (o sale de la bandeja, si pasó a
 `formalizacion_garantias`). Para volver a correr la suite completa desde cero hay que
 borrar y resembrar los `GC-PW-*` antes.
+
+## SCRUM-189/190 — Actas Comité de Crédito (`scrum-189-190-actas-gestion-creditos.spec.ts`)
+
+```bash
+docker cp e2e/fixtures/seed_actas_comite_190.php factoring_backend:/tmp/seed_actas_comite_190.php
+docker exec factoring_backend php artisan tinker --execute="require '/tmp/seed_actas_comite_190.php';"
+```
+
+Siembra un `CreditoOrdinario` (`AC-PW-1`) en `comite_evaluacion` y un `Cliente` ("Cliente
+Playwright Manual") para probar el buscador de la solicitud manual. El script también:
+- Limpia cualquier acta `pendiente`/`borrador` que haya quedado de una corrida anterior
+  interrumpida (bloquea "Generar acta pendiente" mientras exista una).
+- Resetea `AC-PW-1` a `comite_evaluacion` si una corrida previa ya lo decidió — correr el fixture
+  antes de CADA corrida del spec, no solo la primera vez.
+
+Cada corrida exitosa **registra una acta nueva** (consecutivo `numero`) y **materializa un
+`CreditoOrdinario` nuevo** para "Cliente Playwright Manual" (SCRUM-190.1, comportamiento
+correcto — no es un fixture que se reutiliza, cada acta es independiente). Limpiar después de
+validar si no se quiere acumular ruido en Gestión de Créditos:
+
+```php
+// vía tinker, borra los créditos/solicitudes/actas creados por corridas de validación
+// (ver el bloque de limpieza usado en la sesión 2026-08-12, no versionado como script separado)
+```
+
+El entorno dev puede tener otros `CreditoOrdinario` en `comite_evaluacion` ajenos a este fixture
+(de otras sesiones de QA) — el spec no fija un número exacto de tarjetas en la pestaña Decisión,
+decide cualquiera que aparezca (auto-sync, SCRUM-189.1) como "Pendiente por Comité" para no
+bloquear el registro del acta.

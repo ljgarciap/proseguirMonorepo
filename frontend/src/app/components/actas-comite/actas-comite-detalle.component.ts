@@ -8,6 +8,8 @@ import { Subject, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
+import { ClienteAutocompleteComponent } from '../shared/cliente-autocomplete/cliente-autocomplete.component';
+import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 import Swal from 'sweetalert2';
 
 type Tab = 'orden_dia' | 'desarrollo' | 'decision' | 'resumen' | 'observaciones' | 'firmantes';
@@ -34,7 +36,7 @@ interface OrdenDiaItem {
 @Component({
   selector: 'app-actas-comite-detalle',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, QuillModule],
+  imports: [CommonModule, FormsModule, RouterModule, QuillModule, ClienteAutocompleteComponent, MilesSeparatorDirective],
   templateUrl: './actas-comite-detalle.component.html',
   styleUrls: ['./actas-comite-detalle.component.css']
 })
@@ -60,7 +62,14 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
 
   nuevoAsistente = '';
   nuevoItemOrdenDia = '';
-  nuevaSolicitud = { cliente_nombre: '', tipo_solicitud: '', monto: null as number | null };
+  nuevaSolicitud = { cliente_nombre: '', cliente_identificacion: '', tipo_solicitud: '', monto: null as number | null };
+  // Throwaway: solo dispara (clienteSeleccionado), no se envía tal cual al
+  // backend — ActaComiteSolicitud guarda cliente_nombre/identificación como
+  // snapshot de texto, no un cliente_id (ver spec SCRUM-169, admite buscador
+  // o campo libre).
+  nuevaSolicitudClienteBusqueda: number | null = null;
+  tiposCredito: any[] = [];
+  amortizaciones: any[] = [];
 
   private modulesCache: Record<string, any> = {};
   private editorRefs: Record<string, any> = {};
@@ -79,6 +88,22 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
     this.activeRole = this.authService.getActiveRole() || '';
     this.saveSub = this.save$.pipe(debounceTime(800)).subscribe(() => this.guardar());
     this.cargar();
+    this.cargarCatalogos();
+  }
+
+  // SCRUM-189 (2026-08-12, punto 2/4): catálogos reales para reemplazar los
+  // campos de texto libre de "Agregar solicitud manual" y el dropdown de
+  // Amortización en Decisión — mismos endpoints que usa Solicitudes de
+  // Crédito (parameters/tipo_creditos, parameters/amortizaciones).
+  private cargarCatalogos(): void {
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_creditos`).subscribe({
+      next: data => this.tiposCredito = data,
+      error: () => {}
+    });
+    this.http.get<any[]>(`${environment.apiUrl}/parameters/amortizaciones`).subscribe({
+      next: data => this.amortizaciones = data,
+      error: () => {}
+    });
   }
 
   ngOnDestroy(): void {
@@ -117,6 +142,30 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
     this.desarrollo = Array.isArray(acta.desarrollo) ? {} : (acta.desarrollo || {});
     this.observacionesGenerales = acta.observaciones_generales || '';
     this.firmantes = Array.isArray(acta.firmantes) ? acta.firmantes : [];
+    (this.acta.solicitudes || []).forEach((s: any) => this.prellenarMontoDecision(s));
+  }
+
+  // SCRUM-189 (2026-08-12, punto 4): "Decisión" en Resumen no traía el
+  // monto del crédito — se prellena editable, nunca pisa un valor que el
+  // usuario ya haya guardado.
+  private prellenarMontoDecision(solicitud: any): void {
+    if (solicitud.monto_decision === null || solicitud.monto_decision === undefined) {
+      solicitud.monto_decision = solicitud.monto;
+    }
+  }
+
+  // SCRUM-189 (2026-08-12, punto 1): el autoguardado (PUT) ahora puede
+  // traer solicitudes nuevas incorporadas por sincronizarSolicitudesElegibles()
+  // en el backend — se agregan sin tocar las que el usuario ya tiene en
+  // pantalla (mismo criterio de "nunca reemplazar estado editable local").
+  private mezclarSolicitudesNuevas(solicitudesServidor: any[] | undefined): void {
+    if (!solicitudesServidor || !this.acta?.solicitudes) return;
+    const idsActuales = new Set(this.acta.solicitudes.map((s: any) => s.id));
+    const nuevas = solicitudesServidor.filter((s: any) => !idsActuales.has(s.id));
+    if (nuevas.length) {
+      nuevas.forEach((s: any) => this.prellenarMontoDecision(s));
+      this.acta.solicitudes.push(...nuevas);
+    }
   }
 
   get soloLectura(): boolean {
@@ -156,10 +205,13 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
       next: (resp) => {
         this.guardando = false;
         // Nunca reasignar this.lugar/asistentes/ordenDia/desarrollo/etc. acá —
-        // solo lo que el usuario no está editando en pantalla.
+        // solo lo que el usuario no está editando en pantalla. Las solicitudes
+        // son la excepción: solo se agregan las nuevas (auto-sync), nunca se
+        // pisan/reordenan las existentes.
         if (this.acta) {
           this.acta.estado = resp.estado;
           this.acta.updated_at = resp.updated_at;
+          this.mezclarSolicitudesNuevas(resp.solicitudes);
         }
       },
       error: (err) => {
@@ -211,6 +263,14 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
   }
 
   // --- Solicitudes ---
+  // SCRUM-189 (2026-08-12, punto 2): al elegir un cliente del buscador se
+  // autocompletan nombre/identificación — sigue siendo texto editable
+  // después (el spec original admite buscador O campo libre, no exclusivo).
+  onClienteManualSeleccionado(cliente: any): void {
+    this.nuevaSolicitud.cliente_nombre = cliente?.nombre || '';
+    this.nuevaSolicitud.cliente_identificacion = cliente?.numero_documento || '';
+  }
+
   agregarSolicitudManual(): void {
     if (!this.nuevaSolicitud.cliente_nombre || !this.nuevaSolicitud.tipo_solicitud || !this.nuevaSolicitud.monto) {
       Swal.fire('Datos incompletos', 'Complete los campos obligatorios de la solicitud adicionada.', 'warning');
@@ -218,8 +278,10 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
     }
     this.http.post<any>(`${environment.apiUrl}/actas-comite/${this.actaId}/solicitudes`, this.nuevaSolicitud, this.headers()).subscribe({
       next: (solicitud) => {
+        this.prellenarMontoDecision(solicitud);
         this.acta.solicitudes.push(solicitud);
-        this.nuevaSolicitud = { cliente_nombre: '', tipo_solicitud: '', monto: null };
+        this.nuevaSolicitud = { cliente_nombre: '', cliente_identificacion: '', tipo_solicitud: '', monto: null };
+        this.nuevaSolicitudClienteBusqueda = null;
       },
       error: (err) => Swal.fire('Error', err?.error?.message || 'No se pudo agregar la solicitud.', 'error')
     });
@@ -339,8 +401,26 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
   }
 
   // --- Previsualizar / descargar / registrar ---
-  urlPrevisualizar(): string {
-    return `${environment.apiUrl}/actas-comite/${this.actaId}/previsualizar?X-Active-Role=${this.activeRole}`;
+  // SCRUM-189 (2026-08-12, punto 5): antes era un <a href> directo a la API.
+  // Un <a> no pasa por el interceptor de auth (no hay Authorization en la
+  // request) y el X-Active-Role iba como query param — el backend solo lee
+  // headers — así que Auth::user() llegaba null y ResolvesActiveRole
+  // reventaba con 500 al leer $user->roles. Mismo patrón que descargar():
+  // pedir el PDF por HttpClient (con headers()) y abrirlo como blob.
+  previsualizar(): void {
+    const nuevaVentana = window.open('', '_blank');
+    this.http.get(`${environment.apiUrl}/actas-comite/${this.actaId}/previsualizar`, { ...this.headers(), responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        if (nuevaVentana) {
+          nuevaVentana.location.href = url;
+        }
+      },
+      error: () => {
+        nuevaVentana?.close();
+        Swal.fire('Error', 'No fue posible generar la previsualización. Intente nuevamente o contacte al administrador.', 'error');
+      }
+    });
   }
 
   descargar(): void {

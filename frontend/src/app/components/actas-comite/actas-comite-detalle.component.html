@@ -114,10 +114,22 @@
         </table>
       </div>
 
+      <!-- SCRUM-189 (2026-08-12, punto 2): buscador de cliente (autofill de
+           nombre/identificación, sigue admitiendo texto libre), dropdown de
+           tipo de solicitud (catálogo real) y monto con separador de miles. -->
       <div class="inline-add-solicitud" *ngIf="!soloLectura">
+        <app-cliente-autocomplete
+          [(ngModel)]="nuevaSolicitudClienteBusqueda"
+          (clienteSeleccionado)="onClienteManualSeleccionado($event)"
+          placeholder="Buscar cliente existente...">
+        </app-cliente-autocomplete>
         <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitud.cliente_nombre" placeholder="Cliente">
-        <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitud.tipo_solicitud" placeholder="Tipo de solicitud">
-        <input class="pro-input" type="number" [(ngModel)]="nuevaSolicitud.monto" placeholder="Monto">
+        <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitud.cliente_identificacion" placeholder="N.° de identificación">
+        <select class="pro-input" [(ngModel)]="nuevaSolicitud.tipo_solicitud">
+          <option value="">Tipo de solicitud...</option>
+          <option *ngFor="let t of tiposCredito" [value]="t.nombre">{{ t.nombre }}</option>
+        </select>
+        <input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="nuevaSolicitud.monto" placeholder="Monto">
         <button class="btn-pro sm primary" (click)="agregarSolicitudManual()">Agregar solicitud manual</button>
       </div>
     </section>
@@ -126,11 +138,22 @@
     <section *ngIf="activeTab === 'decision'">
       <h3 class="card-title">Decisión y detalle de solicitudes</h3>
       <div class="solicitud-detalle-card" *ngFor="let s of acta.solicitudes">
-        <h4>{{ s.cliente_nombre }} <span class="text-muted">({{ s.origen === 'sistema' ? 'Análisis financiero' : 'Manual' }})</span></h4>
+        <!-- SCRUM-189 (2026-08-12, punto 3): la identificación ahora se
+             muestra siempre junto al nombre (antes solo salía la razón
+             social), sin importar el origen de la solicitud. -->
+        <h4>
+          {{ s.cliente_nombre }}
+          <span *ngIf="s.cliente_identificacion" class="text-muted">— {{ s.cliente_identificacion }}</span>
+          <span class="text-muted">({{ s.origen === 'sistema' ? 'Análisis financiero' : 'Manual' }})</span>
+        </h4>
         <div class="form-grid">
           <div class="form-field" *ngIf="s.origen === 'manual'">
             <label>Cliente</label>
             <input class="pro-input" type="text" [(ngModel)]="s.cliente_nombre" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+          </div>
+          <div class="form-field" *ngIf="s.origen === 'manual'">
+            <label>N.° de identificación</label>
+            <input class="pro-input" type="text" [(ngModel)]="s.cliente_identificacion" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
           </div>
           <div class="form-field">
             <label>Solicitud</label>
@@ -138,11 +161,18 @@
           </div>
           <div class="form-field">
             <label>Monto</label>
-            <input class="pro-input" type="number" [(ngModel)]="s.monto" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+            <input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="s.monto" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
           </div>
+          <!-- SCRUM-189 (2026-08-12, comentario de Juan): también sin
+               dropdown para créditos manuales — ahora es catálogo real para
+               los dos orígenes, evita typos que bloquearían la
+               materialización a CreditoOrdinario (ver SCRUM-190.1). -->
           <div class="form-field">
             <label>Amortización</label>
-            <input class="pro-input" type="text" [(ngModel)]="s.amortizacion" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+            <select class="pro-input" [(ngModel)]="s.amortizacion" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+              <option value="">Seleccione...</option>
+              <option *ngFor="let a of amortizaciones" [value]="a.nombre">{{ a.nombre }}</option>
+            </select>
           </div>
           <div class="form-field">
             <label>Plazo (meses)</label>
@@ -218,7 +248,10 @@
                 }">{{ (s.estado_decision || 'pendiente') | uppercase }}</span>
               </td>
               <td>
-                <input class="pro-input" type="number" [(ngModel)]="s.monto_decision" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+                <!-- SCRUM-189 (2026-08-12, punto 4): se prellena con el monto
+                     del crédito al cargar (ver prellenarMontoDecision), sigue
+                     editable. -->
+                <input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="s.monto_decision" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
               </td>
             </tr>
             <tr *ngIf="!acta.solicitudes?.length"><td colspan="3" class="text-center text-muted py-4">No hay solicitudes registradas.</td></tr>
@@ -278,10 +311,10 @@
       </div>
 
       <div class="actions-footer mt-4">
-        <a class="btn-pro secondary" [href]="urlPrevisualizar()" target="_blank" rel="noopener">
+        <button class="btn-pro secondary" (click)="previsualizar()">
           <span class="material-symbols-outlined">visibility</span>
           Previsualizar acta
-        </a>
+        </button>
         <button class="btn-pro secondary" (click)="descargar()">
           <span class="material-symbols-outlined">download</span>
           Descargar PDF
