@@ -31,9 +31,27 @@ export class MilesSeparatorDirective implements ControlValueAccessor {
   writeValue(value: number | string | null): void {
     const numero = value === null || value === undefined || value === ''
       ? null
-      : (typeof value === 'string' ? this.parsear(value) : value);
+      : (typeof value === 'string'
+          ? (this.tipoValorMiles === 'string' ? this.parsear(value) : this.parsearNumeroPlano(value))
+          : value);
 
     this.el.nativeElement.value = numero === null ? '' : this.formatear(numero);
+  }
+
+  // SCRUM-192: writeValue() puede recibir un string de dos orígenes muy
+  // distintos: (a) texto ya formateado a la colombiana (puntos=miles,
+  // coma=decimal) cuando el campo destino en backend es varchar y viaja tal
+  // cual (tipoValorMiles='string', ver docstring de la clase) — ahí sí
+  // corresponde parsear(); o (b) un decimal de Laravel (cast 'decimal:2')
+  // que Eloquent serializa como string con punto decimal SIN agrupar miles,
+  // ej. "200000000.00". parsear() asume que todo punto es separador de
+  // miles y lo borra — sobre (b) eso fusiona la parte entera con los
+  // decimales ("200000000.00" -> "20000000000"), multiplicando el valor
+  // por 100. Los campos en modo 'number' (default) siempre esperan un
+  // decimal plano de este tipo, nunca texto formateado por el usuario.
+  private parsearNumeroPlano(valor: string): number | null {
+    const numero = Number(valor);
+    return isNaN(numero) ? null : numero;
   }
 
   registerOnChange(fn: (value: number | string | null) => void): void {

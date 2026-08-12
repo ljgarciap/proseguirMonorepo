@@ -102,6 +102,16 @@ describe('MilesSeparatorDirective', () => {
     expect(inputEl.value).toBe('2.500.000');
   });
 
+  it('writeValue con un decimal de Laravel (string con punto decimal, modo number) no lo multiplica x100 (SCRUM-192)', async () => {
+    host.valor = '200000000.00';
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(inputEl.value).toBe('200.000.000');
+    expect(host.valor).toBe('200000000.00');
+  });
+
   it('con tipoValorMiles=string expone el valor formateado como string (no number)', () => {
     host.tipo = 'string';
     fixture.detectChanges();

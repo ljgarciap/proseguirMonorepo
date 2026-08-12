@@ -271,9 +271,19 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
     this.nuevaSolicitud.cliente_identificacion = cliente?.numero_documento || '';
   }
 
+  // SCRUM-189 (2026-08-12, reincidencia comentario Juan): la validación en
+  // sí era correcta (bloqueaba con "Tipo de solicitud" sin seleccionar),
+  // pero el mensaje genérico no decía cuál campo faltaba y el select no
+  // tiene marca visual de obligatorio como el resto del formulario — el
+  // usuario no detectaba qué le faltaba diligenciar. Se listan los campos
+  // faltantes por nombre.
   agregarSolicitudManual(): void {
-    if (!this.nuevaSolicitud.cliente_nombre || !this.nuevaSolicitud.tipo_solicitud || !this.nuevaSolicitud.monto) {
-      Swal.fire('Datos incompletos', 'Complete los campos obligatorios de la solicitud adicionada.', 'warning');
+    const faltantes: string[] = [];
+    if (!this.nuevaSolicitud.cliente_nombre) faltantes.push('Cliente');
+    if (!this.nuevaSolicitud.tipo_solicitud) faltantes.push('Tipo de solicitud');
+    if (!this.nuevaSolicitud.monto) faltantes.push('Monto');
+    if (faltantes.length) {
+      Swal.fire('Datos incompletos', `Falta diligenciar: ${faltantes.join(', ')}.`, 'warning');
       return;
     }
     this.http.post<any>(`${environment.apiUrl}/actas-comite/${this.actaId}/solicitudes`, this.nuevaSolicitud, this.headers()).subscribe({
