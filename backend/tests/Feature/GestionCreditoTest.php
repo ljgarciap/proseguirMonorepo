@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Mail\GestionCreditoNotificacionMail;
 use App\Models\Amortizacion;
+use App\Models\ClientUpload;
 use App\Models\Cliente;
 use App\Models\CreditoOrdinario;
 use App\Models\DocumentPreset;
+use App\Models\DocumentRequest;
 use App\Models\DocumentRequirement;
 use App\Models\DocumentType;
 use App\Models\SolicitudCredito;
@@ -319,7 +321,12 @@ class GestionCreditoTest extends TestCase
         ]);
     }
 
-    public function test_notificar_pendiente_comite_sin_requerir_documentos_no_crea_document_request(): void
+    /**
+     * SCRUM-191 (2026-08-12, punto 1): sin documentos que esperar del
+     * cliente, el crédito no tiene por qué quedarse estancado en
+     * pendiente_comite — vuelve directo a la cola del Comité.
+     */
+    public function test_notificar_pendiente_comite_sin_requerir_documentos_vuelve_a_comite_evaluacion(): void
     {
         $credito = $this->crearCredito('pendiente_comite', 'comite_pendiente', '1');
 
@@ -331,9 +338,11 @@ class GestionCreditoTest extends TestCase
             'requiere_documentos' => false,
         ], ['X-Active-Role' => 'coordinador_comercial'])
             ->assertStatus(200)
-            ->assertJsonPath('credito.estado', 'pendiente_comite');
+            ->assertJsonPath('credito.estado', 'comite_evaluacion');
 
         $this->assertDatabaseCount('document_requests', 0);
+        $credito->refresh();
+        $this->assertTrue($credito->solicitud_gestionada);
     }
 
     // ---- Validaciones comunes ---------------------------------------------
@@ -495,5 +504,127 @@ class GestionCreditoTest extends TestCase
             ->assertJsonPath('0.solicitud_gestionada', true)
             ->assertJsonPath('0.estado', 'formalizacion_garantias');
         $this->assertNotNull($bandejaPostGestion->json('0.fecha_gestion'));
+    }
+
+    // ---- SCRUM-191 (2026-08-12, punto 1): documentos reenviados ----------
+
+    private function notificarPendienteComiteConDocumentos(CreditoOrdinario $credito, array $headers): void
+    {
+        $this->postJson("/api/gestion-creditos/{$credito->id}/notificar", [
+            'destino' => 'gestion.cliente@test.com',
+            'asunto' => 'Solicitud aplazada',
+            'mensaje' => 'El Comité aplazó su decisión, envíe la documentación solicitada.',
+            'requiere_documentos' => true,
+            'preset_id' => $this->preset->id,
+        ], $headers)->assertStatus(200);
+    }
+
+    public function test_documentos_pendientes_devuelve_el_document_request_del_credito(): void
+    {
+        $credito = $this->crearCredito('pendiente_comite', 'comite_pendiente', '1');
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+        Passport::actingAs($this->coordinador);
+
+        $this->notificarPendienteComiteConDocumentos($credito, $headers);
+
+        $response = $this->getJson("/api/gestion-creditos/{$credito->id}/documentos", $headers);
+        $response->assertStatus(200)
+            ->assertJsonPath('solicitud_credito_id', $credito->solicitud_credito_id)
+            ->assertJsonCount(1, 'items');
+    }
+
+    public function test_revisar_documento_aprueba_item_y_habilita_comite_al_completar_todos(): void
+    {
+        $credito = $this->crearCredito('pendiente_comite', 'comite_pendiente', '1');
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+        Passport::actingAs($this->coordinador);
+
+        $this->notificarPendienteComiteConDocumentos($credito, $headers);
+
+        $documentRequest = DocumentRequest::where('solicitud_credito_id', $credito->solicitud_credito_id)->first();
+        $item = $documentRequest->items()->first();
+
+        // El cliente carga el documento (simulado directo en BD, el upload
+        // en sí no es responsabilidad de este endpoint).
+        $upload = ClientUpload::create([
+            'user_id' => $credito->cliente_id,
+            'upload_role' => 'cliente',
+            'filename' => 'client_uploads/pagare.pdf',
+            'original_name' => 'pagare.pdf',
+            'status' => 'pendiente',
+        ]);
+        $item->update(['client_upload_id' => $upload->id, 'estado' => 'subido']);
+
+        $response = $this->postJson(
+            "/api/gestion-creditos/{$credito->id}/documentos/{$item->id}/revisar",
+            ['accion' => 'aprobar'],
+            $headers
+        );
+
+        $response->assertStatus(200)->assertJsonPath('credito_disponible_comite', true);
+
+        $item->refresh();
+        $this->assertSame('aprobado', $item->estado);
+        $upload->refresh();
+        $this->assertSame('aprobado', $upload->status);
+
+        $documentRequest->refresh();
+        $this->assertSame('completado', $documentRequest->estado);
+
+        $credito->refresh();
+        $this->assertSame('comite_evaluacion', $credito->estado);
+    }
+
+    public function test_revisar_documento_rechaza_item_credito_sigue_pendiente_comite(): void
+    {
+        $credito = $this->crearCredito('pendiente_comite', 'comite_pendiente', '1');
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+        Passport::actingAs($this->coordinador);
+
+        $this->notificarPendienteComiteConDocumentos($credito, $headers);
+
+        $documentRequest = DocumentRequest::where('solicitud_credito_id', $credito->solicitud_credito_id)->first();
+        $item = $documentRequest->items()->first();
+        $upload = ClientUpload::create([
+            'user_id' => $credito->cliente_id,
+            'upload_role' => 'cliente',
+            'filename' => 'client_uploads/pagare.pdf',
+            'original_name' => 'pagare.pdf',
+            'status' => 'pendiente',
+        ]);
+        $item->update(['client_upload_id' => $upload->id, 'estado' => 'subido']);
+
+        $response = $this->postJson(
+            "/api/gestion-creditos/{$credito->id}/documentos/{$item->id}/revisar",
+            ['accion' => 'rechazar', 'observaciones' => 'El documento no corresponde al pagaré solicitado.'],
+            $headers
+        );
+
+        $response->assertStatus(200)->assertJsonPath('credito_disponible_comite', false);
+
+        $item->refresh();
+        $this->assertSame('rechazado', $item->estado);
+        $this->assertSame('El documento no corresponde al pagaré solicitado.', $item->observaciones);
+
+        $credito->refresh();
+        $this->assertSame('pendiente_comite', $credito->estado);
+    }
+
+    public function test_revisar_documento_sin_cargar_archivo_falla(): void
+    {
+        $credito = $this->crearCredito('pendiente_comite', 'comite_pendiente', '1');
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+        Passport::actingAs($this->coordinador);
+
+        $this->notificarPendienteComiteConDocumentos($credito, $headers);
+
+        $documentRequest = DocumentRequest::where('solicitud_credito_id', $credito->solicitud_credito_id)->first();
+        $item = $documentRequest->items()->first();
+
+        $this->postJson(
+            "/api/gestion-creditos/{$credito->id}/documentos/{$item->id}/revisar",
+            ['accion' => 'aprobar'],
+            $headers
+        )->assertStatus(422);
     }
 }

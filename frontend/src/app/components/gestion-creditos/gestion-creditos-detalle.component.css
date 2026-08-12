@@ -42,6 +42,14 @@
   margin-bottom: 1rem;
 }
 
+/* SCRUM-191 (2026-08-12): variante para el aviso de "crédito ya disponible
+   para el Comité" tras aprobar toda la documentación reenviada. */
+.alert-readonly.success {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+
 .detail-grid {
   display: flex;
   flex-direction: column;
