@@ -366,8 +366,56 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
   }
 
   // --- Editor de texto enriquecido (ngx-quill) ---
+  // SCRUM-189 (2026-08-13, "las imágenes no se ven en el PDF" — 3ª vuelta):
+  // el fix anterior (resolverImagenesParaPdf en el backend) es correcto para
+  // imágenes subidas con el botón de la barra de herramientas (quedan en
+  // /storage/... y DomPDF las resuelve por ruta local). La causa raíz real
+  // de que Juan siguiera viendo el ícono de imagen rota, incluso con acta e
+  // imagen nuevas, es que Quill tiene DOS rutas más para insertar una imagen
+  // que nunca pasan por nuestro endpoint de subida:
+  //   1. Pegar (Ctrl+V) una imagen copiada de otra fuente (una página web,
+  //      otra app) cuyo portapapeles trae HTML con un <img src="https://...">
+  //      externo en vez de los bytes del archivo — Quill inserta ese <img>
+  //      TAL CUAL (ver quill/modules/clipboard.js, onCapturePaste: el
+  //      atajo a quill.uploader.upload() sólo dispara si el HTML pegado es
+  //      un <img> suelto Y además hay bytes de archivo en el portapapeles;
+  //      cualquier otro caso cae a onPaste() y preserva el src original).
+  //      Esa URL externa nunca contiene "/storage/", así que
+  //      resolverImagenesParaPdf() la deja intacta, y DomPDF (enable_remote
+  //      = false a propósito, ver ActaComiteController::resolverImagenesParaPdf)
+  //      no puede traerla — sale el ícono roto, en la previsualización y en
+  //      el PDF final, aunque en el navegador se vea bien (el navegador sí
+  //      puede cargar la URL externa directamente).
+  //   2. Pegar o soltar (drag&drop) un archivo de imagen real: el módulo
+  //      Uploader por defecto de Quill NO usa nuestro endpoint — lee el
+  //      archivo con FileReader y lo inserta como data:image/...;base64,...
+  //      (ver quill/modules/uploader.js, Uploader.DEFAULTS.handler). Esto sí
+  //      se ve bien en el PDF (DomPDF soporta data: URIs sin necesitar
+  //      enable_remote), pero es inconsistente con el resto de imágenes del
+  //      acta (nunca queda un archivo real en disco).
+  // Fix: el módulo 'uploader' de Quill se reconfigura para que CUALQUIER
+  // archivo con bytes reales (pegado o soltado) pase por el mismo endpoint
+  // de subida que ya usa el botón de la barra de herramientas — un solo
+  // camino, ya probado, que sí resuelve bien en el PDF. Y un matcher de
+  // clipboard bloquea explícitamente cualquier <img> pegado que NO sea de
+  // nuestro disco 'public' (no hay bytes que subir en ese caso — no hay
+  // forma segura de "arreglarlo" sin salir a red desde el backend, que es
+  // justo la superficie que resolverImagenesParaPdf evitó a propósito).
   onEditorCreated(key: string, editor: any): void {
     this.editorRefs[key] = editor;
+    editor.clipboard.addMatcher('IMG', (node: HTMLImageElement, delta: any) => {
+      const src = node.getAttribute('src') || '';
+      const esPropia = src.includes('/storage/') || src.startsWith('data:');
+      if (!esPropia) {
+        Swal.fire(
+          'Imagen no admitida',
+          'No se pueden pegar imágenes copiadas de otra fuente (una página web, otro documento). Usá el botón de imagen de la barra de herramientas para adjuntarla.',
+          'warning'
+        );
+        delta.ops = [];
+      }
+      return delta;
+    });
   }
 
   quillModules(key: string): any {
@@ -382,6 +430,12 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
           ],
           handlers: { image: () => this.insertarImagen(key) },
         },
+        uploader: {
+          mimetypes: ['image/png', 'image/jpeg', 'image/webp'],
+          handler: (range: any, files: File[]) => {
+            files.forEach((file) => this.subirImagenYEmbeder(file, key, range));
+          },
+        },
       };
     }
     return this.modulesCache[key];
@@ -394,20 +448,25 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
-      const formData = new FormData();
-      formData.append('imagen', file);
-      this.http.post<any>(`${environment.apiUrl}/actas-comite/${this.actaId}/imagenes`, formData, this.headers()).subscribe({
-        next: (resp) => {
-          const editor = this.editorRefs[key];
-          if (!editor) return;
-          const range = editor.getSelection(true) || { index: editor.getLength() };
-          editor.insertEmbed(range.index, 'image', resp.url, 'user');
-          editor.setSelection(range.index + 1, 0);
-        },
-        error: () => Swal.fire('Imagen no admitida', 'El archivo seleccionado no cumple el formato o tamaño permitido.', 'warning')
-      });
+      const editor = this.editorRefs[key];
+      const range = editor?.getSelection(true) || { index: editor?.getLength() ?? 0 };
+      this.subirImagenYEmbeder(file, key, range);
     };
     input.click();
+  }
+
+  private subirImagenYEmbeder(file: File, key: string, range: { index: number }): void {
+    const formData = new FormData();
+    formData.append('imagen', file);
+    this.http.post<any>(`${environment.apiUrl}/actas-comite/${this.actaId}/imagenes`, formData, this.headers()).subscribe({
+      next: (resp) => {
+        const editor = this.editorRefs[key];
+        if (!editor) return;
+        editor.insertEmbed(range.index, 'image', resp.url, 'user');
+        editor.setSelection(range.index + 1, 0);
+      },
+      error: () => Swal.fire('Imagen no admitida', 'El archivo seleccionado no cumple el formato o tamaño permitido.', 'warning')
+    });
   }
 
   // --- Previsualizar / descargar / registrar ---

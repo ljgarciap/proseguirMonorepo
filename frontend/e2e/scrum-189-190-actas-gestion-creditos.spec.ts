@@ -32,7 +32,10 @@ test('flujo completo Acta de Comité con solicitud manual, visible luego en Gest
   // --- Punto 2: buscador de cliente + dropdown de tipo + separador de miles ---
   await page.locator('.cliente-autocomplete input').fill('Cliente Playwright Manual');
   await page.getByText(/Cliente Playwright Manual.*900333444/).click();
-  await expect(page.locator('.inline-add-solicitud input[placeholder="Cliente"]')).toHaveValue('Cliente Playwright Manual');
+  // El placeholder ganó un "*" (campo obligatorio) en el fix del mismo
+  // SCRUM-189 sobre el mensaje de "Datos incompletos" (2026-08-13) — el
+  // locator exacto quedó desactualizado, no es un bug funcional.
+  await expect(page.locator('.inline-add-solicitud input[placeholder="Cliente *"]')).toHaveValue('Cliente Playwright Manual');
   await expect(page.locator('.inline-add-solicitud input[placeholder="N.° de identificación"]')).toHaveValue('900333444');
 
   const tipoSelect = page.locator('.inline-add-solicitud select');
