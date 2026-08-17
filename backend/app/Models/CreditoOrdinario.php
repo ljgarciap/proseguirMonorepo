@@ -29,6 +29,8 @@ class CreditoOrdinario extends Model
         'fecha_gestion',
         'resultado_origen',
         'gestion_detalle',
+        'fecha_registro_cyf',
+        'radicado_cyf',
     ];
 
     /**
@@ -49,6 +51,7 @@ class CreditoOrdinario extends Model
             'solicitud_gestionada' => 'boolean',
             'fecha_gestion' => 'datetime',
             'gestion_detalle' => 'array',
+            'fecha_registro_cyf' => 'date',
         ];
     }
 

@@ -23,7 +23,10 @@ import Swal from 'sweetalert2';
 })
 export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
   creditos: any[] = [];
-  tarjetas: any = { sarlaft_desfavorable: 0, aprobada_garantias: 0, rechazada_comite: 0, pendiente_comite: 0 };
+  tarjetas: any = {
+    sarlaft_desfavorable: 0, aprobada_garantias: 0, rechazada_comite: 0, pendiente_comite: 0,
+    pendiente_formalizacion_garantias: 0, pendiente_registro_cyf: 0
+  };
   loading = false;
   activeRole = '';
   private roleSub?: Subscription;
@@ -132,15 +135,24 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
       : 'No aplica';
   }
 
-  /** Etiqueta de Estado (§3.3, col. 9): combina estado + resultado_origen. */
+  /** Etiqueta de Estado (§3.3, col. 9): combina estado + resultado_origen.
+   * SCRUM-193/205: 'pendiente_formalizacion_garantias'/'pendiente_registro_cyf'
+   * no tienen resultado_origen propio (ver ESTADOS_SIMPLES en el backend) —
+   * se resuelven directo por `estado`. */
   estadoLabel(credito: any): string {
-    const mapa: Record<string, string> = {
+    const mapaEstado: Record<string, string> = {
+      pendiente_formalizacion_garantias: 'Pendiente Formalización de Garantías',
+      pendiente_registro_cyf: 'Pendiente Registro de Crédito en CYF',
+    };
+    if (mapaEstado[credito.estado]) return mapaEstado[credito.estado];
+
+    const mapaOrigen: Record<string, string> = {
       sarlaft: 'SARLAFT desfavorable',
       comite_aprobado: 'Aprobada para garantías',
       comite_rechazado: 'Rechazada por Comité',
       comite_pendiente: 'Pendiente por Comité',
     };
-    return mapa[credito.resultado_origen] || credito.estado;
+    return mapaOrigen[credito.resultado_origen] || credito.estado;
   }
 
   estadoPillClass(credito: any): any {
@@ -148,6 +160,8 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
       'danger': credito.resultado_origen === 'sarlaft' || credito.resultado_origen === 'comite_rechazado',
       'success': credito.resultado_origen === 'comite_aprobado',
       'warning': credito.resultado_origen === 'comite_pendiente',
+      'purple': credito.estado === 'pendiente_formalizacion_garantias',
+      'info': credito.estado === 'pendiente_registro_cyf',
     };
   }
 
@@ -162,5 +176,17 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
 
   accionIcono(credito: any): string {
     return this.puedeGestionar(credito) ? 'edit_note' : 'visibility';
+  }
+
+  /** SCRUM-193/205: los 2 estados nuevos tienen pantalla propia, distinta
+   * de la genérica /gestion-creditos/:id (4 resultados originales). */
+  rutaGestion(credito: any): any[] {
+    if (credito.estado === 'pendiente_formalizacion_garantias') {
+      return ['/gestion-creditos', credito.id, 'formalizacion-garantias'];
+    }
+    if (credito.estado === 'pendiente_registro_cyf') {
+      return ['/gestion-creditos', credito.id, 'registro-cyf'];
+    }
+    return ['/gestion-creditos', credito.id];
   }
 }

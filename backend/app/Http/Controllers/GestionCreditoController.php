@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesActiveRole;
+use App\Mail\FormalizacionGarantiasResultadoMail;
 use App\Mail\GestionCreditoNotificacionMail;
 use App\Models\CreditoOrdinario;
 use App\Models\DocumentPreset;
@@ -21,6 +22,16 @@ use Throwable;
  * notificación" es el único punto que marca Solicitud gestionada = Sí y
  * ejecuta la transición de estado correspondiente (ver
  * docs/architecture/scrum-178-gestion-creditos-diseno.md).
+ *
+ * SCRUM-193/205 (2026-08-17) agregan, después de 'aprobada_garantias', un
+ * tramo nuevo y separado del flujo legacy de Crédito Ordinario (rol
+ * Operativo en 'formalizacion_garantias', rol Gerente en
+ * 'aprobacion_registro_cyf' — ninguno de los dos se toca ni se retira):
+ * 'pendiente_formalizacion_garantias' (guardarFormalizacionGarantias(), el
+ * Coordinador Comercial valida cada garantía por ítem) →
+ * 'pendiente_registro_cyf' (registroCyf(), captura fecha + radicado) →
+ * de ahí SÍ entra al 'aprobacion_registro_cyf' legacy para que Gerencia
+ * apruebe con la pantalla ya existente.
  */
 class GestionCreditoController extends Controller
 {
@@ -46,6 +57,18 @@ class GestionCreditoController extends Controller
         'aprobada_garantias'   => ['estado' => 'aprobada_garantias', 'origen' => 'comite_aprobado'],
         'rechazada_comite'     => ['estado' => 'rechazado', 'origen' => 'comite_rechazado'],
         'pendiente_comite'     => ['estado' => 'pendiente_comite', 'origen' => 'comite_pendiente'],
+    ];
+
+    /**
+     * SCRUM-193/205 (2026-08-17): las 2 tarjetas nuevas (Formalización de
+     * Garantías, Registro de Crédito en CYF) no necesitan resultado_origen
+     * — a diferencia de RESULTADOS, cada `estado` acá es único y no se
+     * comparte con ningún otro resultado. Tienen sus propios endpoints
+     * (formalizacionGarantias()/registroCyf()), no pasan por notificar().
+     */
+    private const ESTADOS_SIMPLES = [
+        'pendiente_formalizacion_garantias' => 'pendiente_formalizacion_garantias',
+        'pendiente_registro_cyf'            => 'pendiente_registro_cyf',
     ];
 
     /**
@@ -85,6 +108,8 @@ class GestionCreditoController extends Controller
         if ($request->filled('estado') && $request->estado !== 'todos' && isset(self::RESULTADOS[$request->estado])) {
             $resultado = self::RESULTADOS[$request->estado];
             $query->where('estado', $resultado['estado'])->where('resultado_origen', $resultado['origen']);
+        } elseif ($request->filled('estado') && $request->estado !== 'todos' && isset(self::ESTADOS_SIMPLES[$request->estado])) {
+            $query->where('estado', self::ESTADOS_SIMPLES[$request->estado]);
         }
 
         if ($request->filled('gestionada') && $request->gestionada !== 'todos') {
@@ -136,6 +161,11 @@ class GestionCreditoController extends Controller
         foreach (self::RESULTADOS as $clave => $resultado) {
             $conteos[$clave] = CreditoOrdinario::where('estado', $resultado['estado'])
                 ->where('resultado_origen', $resultado['origen'])
+                ->where('solicitud_gestionada', false)
+                ->count();
+        }
+        foreach (self::ESTADOS_SIMPLES as $clave => $estado) {
+            $conteos[$clave] = CreditoOrdinario::where('estado', $estado)
                 ->where('solicitud_gestionada', false)
                 ->count();
         }
@@ -194,8 +224,19 @@ class GestionCreditoController extends Controller
         }
 
         // VAL-04: preset obligatorio para Aprobada para gestión de garantías.
-        if ($resultado === 'aprobada_garantias' && !$request->filled('preset_id')) {
-            return response()->json(['message' => 'Seleccione la documentación requerida.'], 422);
+        if ($resultado === 'aprobada_garantias') {
+            if (!$request->filled('preset_id')) {
+                return response()->json(['message' => 'Seleccione la documentación requerida.'], 422);
+            }
+            // SCRUM-193/205: mismo guard que SCRUM-190 para pendiente_comite
+            // (ver más abajo) — crearSolicitudDocumentos() exige cliente_id
+            // real (FK NOT NULL contra users), y créditos materializados
+            // desde una solicitud manual del Acta pueden no tenerlo.
+            if (!$credito->cliente_id) {
+                return response()->json([
+                    'message' => 'Este cliente no tiene una cuenta de portal para recibir la solicitud de documentación. Contacte al administrador.',
+                ], 422);
+            }
         }
 
         // VAL-05: Pendiente por Comité debe responder si requiere
@@ -241,9 +282,16 @@ class GestionCreditoController extends Controller
         }
 
         $estadoAnterior = $credito->estado;
-        if ($resultado === 'aprobada_garantias') {
-            $credito->estado = 'formalizacion_garantias';
-        } elseif ($resultado === 'pendiente_comite' && !$request->boolean('requiere_documentos')) {
+        // SCRUM-193/205 (2026-08-17): 'aprobada_garantias' YA NO transiciona
+        // a 'formalizacion_garantias' — ese estado es del flujo legacy
+        // (rol Operativo, pantalla de Crédito Ordinario), que se mantiene
+        // intacto y sin credits nuevos entrando por acá. El estado se queda
+        // en 'aprobada_garantias' mientras el cliente diligencia las
+        // garantías del preset (mismo patrón que 'pendiente_comite' más
+        // abajo); crearSolicitudDocumentos() habilita esa carga y
+        // ClientUploadController::syncRequestItem() avanza automáticamente
+        // a 'pendiente_formalizacion_garantias' cuando el cliente termina.
+        if ($resultado === 'pendiente_comite' && !$request->boolean('requiere_documentos')) {
             // SCRUM-191 (2026-08-12): si no se requiere documentación
             // adicional, no hay nada que esperar del cliente — el crédito
             // vuelve directo a la cola del Comité en vez de quedar
@@ -292,6 +340,12 @@ class GestionCreditoController extends Controller
             $this->crearSolicitudDocumentos($credito, (int) $request->input('preset_id'), $user->id);
         }
 
+        // SCRUM-193/205: Aprobada para Gestión de Garantías siempre requiere
+        // preset (VAL-04) — habilita la carga de garantías en Mis créditos.
+        if ($resultado === 'aprobada_garantias') {
+            $this->crearSolicitudDocumentos($credito, (int) $request->input('preset_id'), $user->id);
+        }
+
         return response()->json([
             'message' => 'La gestión fue registrada y la notificación enviada correctamente.',
             'credito' => $this->conFechaValidacion($credito->fresh(self::RELACIONES_DETALLE)),
@@ -299,14 +353,16 @@ class GestionCreditoController extends Controller
     }
 
     /**
-     * SCRUM-190 (2026-08-12): el filtro original miraba solo el `estado`
-     * ACTUAL del crédito, pero `notificar()` avanza `aprobada_garantias` →
-     * `formalizacion_garantias` al gestionar (línea ~234) — el crédito
-     * desaparecía de la bandeja justo al gestionarse, cuando debía seguir
-     * visible con "Gestionada: Sí" (`solicitud_gestionada`/`fecha_gestion`,
-     * ya soportado por el frontend). Los otros 3 orígenes no cambian de
-     * `estado` al notificar (ver comentario en notificar()), así que no
-     * tienen el mismo problema — solo se amplía la rama de comité aprobado.
+     * SCRUM-190 (2026-08-12): el filtro original de `queryBase()` miraba
+     * solo el `estado` ACTUAL del crédito, pero antes de SCRUM-193/205
+     * `notificar()` avanzaba `aprobada_garantias` → `formalizacion_garantias`
+     * al gestionar — el crédito desaparecía de la bandeja justo al
+     * gestionarse, cuando debía seguir visible con "Gestionada: Sí"
+     * (`solicitud_gestionada`/`fecha_gestion`, ya soportado por el
+     * frontend). Ese `orWhere` de `queryBase()` sigue existiendo por
+     * compatibilidad con créditos que ya quedaron en ese estado antes del
+     * cambio — ningún crédito nuevo vuelve a entrar por ahí (ver
+     * `notificar()`, rama `aprobada_garantias`).
      */
     /**
      * SCRUM-191 (2026-08-12, punto 1): documentos que el cliente reenvió
@@ -396,6 +452,247 @@ class GestionCreditoController extends Controller
     }
 
     /**
+     * SCRUM-205: detalle solo lectura para la pantalla de Formalización de
+     * Garantías — info del cliente/representante legal/crédito (ya viene en
+     * RELACIONES_DETALLE) + el DocumentRequest más reciente del preset de
+     * garantías (mismo criterio de correlación que documentosPendientes()).
+     */
+    public function formalizacionGarantias(Request $request, $creditoId)
+    {
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarRol($activeRole);
+
+        $credito = $this->queryBase()->findOrFail($creditoId);
+
+        $documentRequest = $credito->solicitud_credito_id
+            ? DocumentRequest::where('solicitud_credito_id', $credito->solicitud_credito_id)
+                ->with(['items.requirement', 'items.upload'])
+                ->orderByDesc('created_at')
+                ->first()
+            : null;
+
+        return response()->json([
+            'credito' => $this->conFechaValidacion($credito),
+            'document_request' => $documentRequest,
+        ]);
+    }
+
+    /**
+     * SCRUM-205: valida cada garantía del preset (aprobada/no aprobada +
+     * observaciones obligatorias si no aprobada) y decide el destino del
+     * crédito según el resultado consolidado (§9 del ticket):
+     * - alguna no aprobada → vuelve a 'aprobada_garantias' para que el
+     *   cliente corrija solo los ítems marcados 'rechazado' (mismo mecanismo
+     *   de reenvío por ítem que ya usa pendiente_comite/SCRUM-191).
+     * - todas aprobadas → pasa a 'pendiente_registro_cyf' (SCRUM-193).
+     * Estado de entrada obligatorio 'pendiente_formalizacion_garantias' —
+     * no reutiliza el 'formalizacion_garantias' legacy (rol Operativo, ver
+     * docblock de la clase) a propósito, para no pisarlo.
+     */
+    public function guardarFormalizacionGarantias(Request $request, $creditoId)
+    {
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarRol($activeRole);
+        $user = Auth::user();
+
+        $credito = CreditoOrdinario::with('cliente')->findOrFail($creditoId);
+
+        if ($credito->estado !== 'pendiente_formalizacion_garantias') {
+            return response()->json([
+                'message' => 'Esta solicitud no está pendiente de Formalización de Garantías.',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'items' => 'required|array|min:1',
+            'items.*.item_id' => 'required|integer|exists:document_request_items,id',
+            'items.*.validacion' => 'required|in:aprobada,no_aprobada',
+            'items.*.observaciones' => 'required_if:items.*.validacion,no_aprobada|nullable|string',
+        ], [
+            'items.required' => 'No hay garantías para validar.',
+            'items.*.validacion.required' => 'Toda garantía debe tener un resultado de validación.',
+            'items.*.observaciones.required_if' => 'Las garantías no aprobadas requieren observaciones.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        $documentRequest = DocumentRequest::where('solicitud_credito_id', $credito->solicitud_credito_id)
+            ->with('items.requirement')
+            ->orderByDesc('created_at')
+            ->first();
+
+        if (!$documentRequest) {
+            return response()->json(['message' => 'No se encontró la solicitud de garantías de este crédito.'], 422);
+        }
+
+        $itemsPorId = $documentRequest->items->keyBy('id');
+        $detalleCorreo = [];
+        $hayNoAprobada = false;
+
+        foreach ($request->input('items') as $entrada) {
+            $item = $itemsPorId->get($entrada['item_id']);
+            if (!$item) {
+                return response()->json(['message' => 'Una de las garantías no pertenece a esta solicitud.'], 422);
+            }
+
+            $aprobada = $entrada['validacion'] === 'aprobada';
+            $hayNoAprobada = $hayNoAprobada || !$aprobada;
+
+            $item->update([
+                'estado' => $aprobada ? 'aprobado' : 'rechazado',
+                'observaciones' => $entrada['observaciones'] ?? null,
+            ]);
+
+            $detalleCorreo[] = [
+                'garantia' => $item->requirement->nombre ?? 'Garantía',
+                'resultado' => $aprobada ? 'Aprobada' : 'No aprobada',
+                'observaciones' => $entrada['observaciones'] ?? null,
+            ];
+        }
+
+        $documentRequest->update(['estado' => $hayNoAprobada ? 'pendiente' : 'completado']);
+
+        $estadoAnterior = $credito->estado;
+        $credito->estado = $hayNoAprobada ? 'aprobada_garantias' : 'pendiente_registro_cyf';
+        $credito->solicitud_gestionada = false;
+        $credito->fecha_gestion = null;
+
+        $historial = $credito->historial_estados ?? [];
+        $historial[] = [
+            'fecha' => now()->toIso8601String(),
+            'usuario' => $user->name,
+            'rol' => $activeRole,
+            'estado_anterior' => $estadoAnterior,
+            'estado_nuevo' => $credito->estado,
+            'comentario' => $hayNoAprobada
+                ? 'Formalización de Garantías: una o más garantías no fueron aprobadas. Vuelve al cliente para ajustes.'
+                : 'Formalización de Garantías: todas las garantías fueron aprobadas. Pasa a Registro de Crédito en CYF.',
+        ];
+        $credito->historial_estados = $historial;
+        $credito->save();
+
+        $nombreCliente = $this->nombreClienteParaCorreo($credito);
+        $destino = $this->correoClienteParaNotificacion($credito);
+        if ($destino) {
+            try {
+                Mail::to($destino)->send(new FormalizacionGarantiasResultadoMail($credito, $nombreCliente, $detalleCorreo, $hayNoAprobada));
+            } catch (Throwable $e) {
+                // La validación ya quedó guardada — un fallo de envío no debe
+                // revertirla (a diferencia de notificar(), acá el correo es
+                // solo informativo, no la acción que dispara la transición).
+            }
+        }
+
+        return response()->json([
+            'message' => $hayNoAprobada
+                ? 'Validación registrada. La solicitud vuelve al cliente para ajustes.'
+                : 'Validación registrada. La solicitud pasa a Registro de Crédito en CYF.',
+            'credito' => $this->conFechaValidacion($credito->fresh(self::RELACIONES_DETALLE)),
+        ]);
+    }
+
+    /**
+     * SCRUM-193: captura fecha + radicado del registro del crédito en CYF.
+     * Estado de entrada obligatorio 'pendiente_registro_cyf' (viene de
+     * guardarFormalizacionGarantias()). Al guardar, el crédito pasa al
+     * estado legacy 'aprobacion_registro_cyf' para que la aprobación de
+     * Gerencia ya existente (pantalla de Crédito Ordinario) se mantenga
+     * intacta — se escribe `documentos_raw['registro_cyf']` con el radicado
+     * para satisfacer el gate de esa pantalla
+     * (`!empty($documentos['registro_cyf'])`, ver CreditoOrdinarioController)
+     * sin duplicar esa lógica acá.
+     */
+    public function registroCyf(Request $request, $creditoId)
+    {
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarRol($activeRole);
+        $user = Auth::user();
+
+        $credito = CreditoOrdinario::findOrFail($creditoId);
+
+        if ($credito->estado !== 'pendiente_registro_cyf') {
+            return response()->json([
+                'message' => 'Esta solicitud no está pendiente de Registro de Crédito en CYF.',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'fecha_registro_cyf' => 'required|date',
+            'radicado_cyf' => 'required|string',
+        ], [
+            'fecha_registro_cyf.required' => 'Ingrese la fecha del registro del crédito en CYF.',
+            'fecha_registro_cyf.date' => 'Ingrese una fecha válida.',
+            'radicado_cyf.required' => 'Ingrese el número de radicado en CYF.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        $radicado = trim((string) $request->input('radicado_cyf'));
+        if ($radicado === '') {
+            return response()->json(['message' => 'Ingrese el número de radicado en CYF.'], 422);
+        }
+
+        $documentos = $credito->documentos_raw ?? [];
+        $documentos['registro_cyf'] = $radicado;
+
+        $estadoAnterior = $credito->estado;
+        $historial = $credito->historial_estados ?? [];
+        $historial[] = [
+            'fecha' => now()->toIso8601String(),
+            'usuario' => $user->name,
+            'rol' => $activeRole,
+            'estado_anterior' => $estadoAnterior,
+            'estado_nuevo' => 'aprobacion_registro_cyf',
+            'comentario' => "Crédito registrado en CYF (radicado {$radicado}). Pasa a aprobación de Gerencia.",
+        ];
+
+        $credito->fecha_registro_cyf = $request->input('fecha_registro_cyf');
+        $credito->radicado_cyf = $radicado;
+        $credito->documentos = $documentos;
+        $credito->estado = 'aprobacion_registro_cyf';
+        $credito->solicitud_gestionada = true;
+        $credito->fecha_gestion = now();
+        $credito->historial_estados = $historial;
+        $credito->save();
+
+        return response()->json([
+            'message' => 'El crédito quedó registrado en CYF y disponible para la aprobación de Gerencia.',
+            'credito' => $this->conFechaValidacion($credito->fresh(self::RELACIONES_DETALLE)),
+        ]);
+    }
+
+    /** Mismo criterio de resolución que el frontend (correoCliente() en
+     * gestion-creditos-detalle.component.ts): correo de persona natural o
+     * jurídica, con fallback al email de la cuenta de portal si existe. */
+    private function correoClienteParaNotificacion(CreditoOrdinario $credito): ?string
+    {
+        $cliente = $credito->solicitudCredito?->cliente;
+
+        return $cliente?->correo_electronico
+            ?: $cliente?->correo_electronico_empresarial
+            ?: $credito->cliente?->email
+            ?: null;
+    }
+
+    private function nombreClienteParaCorreo(CreditoOrdinario $credito): string
+    {
+        $cliente = $credito->solicitudCredito?->cliente;
+        if (!$cliente) {
+            return 'cliente';
+        }
+
+        if ($cliente->nombre_razon_social) {
+            return $cliente->nombre_razon_social;
+        }
+
+        return trim(($cliente->nombres ?? '') . ' ' . ($cliente->primer_apellido ?? '')) ?: 'cliente';
+    }
+
+    /**
      * Todos los documentos reenviados quedaron aprobados: el crédito pasa a
      * `aprobada_garantias` y vuelve a aparecer pendiente de gestión en esa
      * bandeja (mismo patrón de reseteo de `solicitud_gestionada`/`fecha_gestion`
@@ -437,6 +734,10 @@ class GestionCreditoController extends Controller
                         ->whereIn('estado', ['aprobada_garantias', 'formalizacion_garantias']);
                 })
                     ->orWhere('estado', 'pendiente_comite')
+                    // SCRUM-193/205: estados propios del flujo nuevo de
+                    // Formalización de Garantías / Registro CYF — no llevan
+                    // resultado_origen (ver ESTADOS_SIMPLES).
+                    ->orWhereIn('estado', array_values(self::ESTADOS_SIMPLES))
                     ->orWhere(function ($qr) {
                         $qr->where('estado', 'rechazado')->whereIn('resultado_origen', ['sarlaft', 'comite_rechazado']);
                     });
@@ -486,7 +787,14 @@ class GestionCreditoController extends Controller
      */
     private function crearSolicitudDocumentos(CreditoOrdinario $credito, int $presetId, int $creadoPorId): void
     {
+        // SCRUM-193/205 (2026-08-17): acotado por solicitud_credito_id, no
+        // solo cliente_id — un cliente puede tener más de un crédito en
+        // trámite (ej. una re-solicitud de documentos de otro crédito
+        // todavía 'pendiente'); sin este filtro, esa request ajena hacía
+        // que este método no-opeara en silencio y el cliente nunca viera la
+        // solicitud de garantías de ESTE crédito.
         $existente = DocumentRequest::where('cliente_id', $credito->cliente_id)
+            ->where('solicitud_credito_id', $credito->solicitud_credito_id)
             ->where('estado', 'pendiente')
             ->first();
 

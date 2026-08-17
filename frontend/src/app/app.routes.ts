@@ -202,6 +202,20 @@ export const routes: Routes = [
         data: { roles: ['coordinador_comercial', 'superadmin'] }
     },
     {
+        // SCRUM-205
+        path: 'gestion-creditos/:creditoId/formalizacion-garantias',
+        loadComponent: () => import('./components/gestion-creditos/gestion-creditos-formalizacion-garantias.component').then(m => m.GestionCreditosFormalizacionGarantiasComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['coordinador_comercial', 'superadmin'] }
+    },
+    {
+        // SCRUM-193
+        path: 'gestion-creditos/:creditoId/registro-cyf',
+        loadComponent: () => import('./components/gestion-creditos/gestion-creditos-registro-cyf.component').then(m => m.GestionCreditosRegistroCyfComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['coordinador_comercial', 'superadmin'] }
+    },
+    {
         path: 'db-cleaner',
         loadComponent: () => import('./components/db-cleaner/db-cleaner.component').then(m => m.DbCleanerComponent),
         canActivate: [roleGuard],

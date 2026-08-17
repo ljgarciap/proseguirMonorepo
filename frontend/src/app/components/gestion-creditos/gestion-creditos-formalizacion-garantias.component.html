@@ -1,0 +1,149 @@
+<div class="view-container" *ngIf="!loading && credito">
+  <header class="view-header">
+    <div class="title-area">
+      <button class="btn-pro secondary sm back-btn" (click)="cancelar()">
+        <span class="material-symbols-outlined">arrow_back</span> Volver a la bandeja
+      </button>
+      <h1>Formalización de Garantías — {{ credito.numero_solicitud }}</h1>
+      <p>Revisión y aprobación de las garantías diligenciadas por el cliente.</p>
+    </div>
+    <div class="header-actions">
+      <span class="status-pill" [ngClass]="esJuridica ? 'purple' : 'info'">
+        {{ esJuridica ? 'Persona Jurídica' : 'Persona Natural' }}
+      </span>
+    </div>
+  </header>
+
+  <div class="alert-readonly" *ngIf="!puedeGestionar">
+    <span class="material-symbols-outlined">visibility</span>
+    Estás viendo esta solicitud en modo solo lectura.
+  </div>
+
+  <div class="detail-grid">
+    <!-- Información del cliente -->
+    <div class="content-card">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">badge</span>
+        Información del Cliente (no editable)
+      </h3>
+
+      <ng-container *ngIf="esNatural; else juridicaBlock">
+        <div class="form-grid mt-4">
+          <div class="form-group"><label>Tipo de Persona</label><p class="readonly-value">Persona Natural</p></div>
+          <div class="form-group"><label>Tipo de Documento</label><p class="readonly-value">{{ cliente?.document_type?.nombre || '—' }}</p></div>
+          <div class="form-group"><label>Número de Documento</label><p class="readonly-value">{{ cliente?.numero_documento || '—' }}</p></div>
+          <div class="form-group"><label>Nombres</label><p class="readonly-value">{{ cliente?.nombres || '—' }}</p></div>
+          <div class="form-group"><label>Primer Apellido</label><p class="readonly-value">{{ cliente?.primer_apellido || '—' }}</p></div>
+          <div class="form-group"><label>Segundo Apellido</label><p class="readonly-value">{{ cliente?.segundo_apellido || '—' }}</p></div>
+          <div class="form-group"><label>Correo Electrónico</label><p class="readonly-value">{{ cliente?.correo_electronico || '—' }}</p></div>
+          <div class="form-group"><label>Ocupación</label><p class="readonly-value">{{ cliente?.ocupacion || '—' }}</p></div>
+          <div class="form-group"><label>Teléfono</label><p class="readonly-value">{{ cliente?.telefono || '—' }}</p></div>
+          <div class="form-group"><label>Ciudad / Departamento</label><p class="readonly-value">{{ cliente?.ciudad || '—' }}, {{ cliente?.departamento || '—' }}</p></div>
+          <div class="form-group span-2"><label>Dirección</label><p class="readonly-value">{{ cliente?.direccion || '—' }}</p></div>
+        </div>
+      </ng-container>
+
+      <ng-template #juridicaBlock>
+        <div class="form-grid mt-4">
+          <div class="form-group"><label>Tipo de Persona</label><p class="readonly-value">Persona Jurídica</p></div>
+          <div class="form-group"><label>Tipo de Documento</label><p class="readonly-value">{{ cliente?.document_type?.nombre || '—' }}</p></div>
+          <div class="form-group"><label>Número de Documento</label><p class="readonly-value">{{ cliente?.numero_documento || '—' }}</p></div>
+          <div class="form-group span-2"><label>Nombre o Razón Social</label><p class="readonly-value">{{ cliente?.nombre_razon_social || cliente?.nombre || '—' }}</p></div>
+          <div class="form-group"><label>Tipo de Empresa</label><p class="readonly-value">{{ cliente?.tipo_empresa || '—' }}</p></div>
+          <div class="form-group"><label>Actividad Económica</label><p class="readonly-value">{{ cliente?.actividad_economica || '—' }}</p></div>
+          <div class="form-group"><label>Correo Electrónico</label><p class="readonly-value">{{ cliente?.correo_electronico_empresarial || '—' }}</p></div>
+          <div class="form-group"><label>Página Web</label><p class="readonly-value">{{ cliente?.pagina_web || '—' }}</p></div>
+          <div class="form-group"><label>Ciudad / Departamento</label><p class="readonly-value">{{ cliente?.ciudad || '—' }}, {{ cliente?.departamento || '—' }}</p></div>
+          <div class="form-group span-2"><label>Dirección</label><p class="readonly-value">{{ cliente?.direccion || '—' }}</p></div>
+        </div>
+
+        <h4 class="section-subtitle mt-4">Información del Representante Legal</h4>
+        <div class="form-grid">
+          <div class="form-group"><label>Tipo de Documento</label><p class="readonly-value">{{ cliente?.rep_document_type?.nombre || '—' }}</p></div>
+          <div class="form-group"><label>Número de Documento</label><p class="readonly-value">{{ cliente?.rep_numero_documento || '—' }}</p></div>
+          <div class="form-group"><label>Nombres</label><p class="readonly-value">{{ cliente?.rep_nombres || '—' }}</p></div>
+          <div class="form-group"><label>Primer Apellido</label><p class="readonly-value">{{ cliente?.rep_primer_apellido || '—' }}</p></div>
+          <div class="form-group"><label>Segundo Apellido</label><p class="readonly-value">{{ cliente?.rep_segundo_apellido || '—' }}</p></div>
+        </div>
+      </ng-template>
+    </div>
+
+    <!-- Crédito solicitado -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">request_quote</span>
+        Información del Crédito Solicitado (no editable)
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Fecha de Solicitud</label><p class="readonly-value">{{ credito.created_at | date:'dd/MM/yyyy' }}</p></div>
+        <div class="form-group"><label>Tipo de Crédito</label><p class="readonly-value">{{ solicitud?.tipo_credito?.nombre || '—' }}</p></div>
+        <div class="form-group"><label>Monto Solicitado</label><p class="readonly-value">$ {{ (solicitud?.monto_solicitado || credito.monto || 0) | number:'1.0-0':'es-CO' }}</p></div>
+        <div class="form-group"><label>Plazo</label><p class="readonly-value">{{ solicitud?.plazo_meses || credito.plazo_meses || '—' }} meses</p></div>
+        <div class="form-group"><label>Amortización</label><p class="readonly-value">{{ solicitud?.amortizacion?.nombre || '—' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Validación de garantías -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">fact_check</span>
+        Validación de Garantías
+      </h3>
+      <p class="card-subtitle" *ngIf="!items.length">El cliente todavía no ha diligenciado ninguna garantía.</p>
+
+      <div class="table-container mt-4" *ngIf="items.length">
+        <table class="modern-table">
+          <thead>
+            <tr>
+              <th>Garantía</th>
+              <th>Archivos Adjuntos del Cliente</th>
+              <th>Validación</th>
+              <th>Observaciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of items">
+              <td>{{ item.requirement?.nombre || '—' }}</td>
+              <td>
+                <button *ngIf="item.upload" class="btn-pro sm secondary" (click)="verArchivo(item.upload.id, item.upload.original_name)">
+                  <span class="material-symbols-outlined">visibility</span> {{ item.upload.original_name }}
+                </button>
+                <span *ngIf="!item.upload" class="text-muted">Sin cargar</span>
+              </td>
+              <td>
+                <select class="pro-input" [(ngModel)]="validaciones[item.id].validacion" [disabled]="!puedeGestionar">
+                  <option [ngValue]="null">Seleccione...</option>
+                  <option value="aprobada">Aprobada</option>
+                  <option value="no_aprobada">No aprobada</option>
+                </select>
+              </td>
+              <td>
+                <input class="pro-input" type="text" [(ngModel)]="validaciones[item.id].observaciones" [disabled]="!puedeGestionar"
+                       placeholder="Ingrese observaciones...">
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="alert-readonly mt-4">
+        <span class="material-symbols-outlined">info</span>
+        Si al menos una garantía no es aprobada, la solicitud vuelve a "Aprobado para Gestión de Garantías" para que el
+        cliente realice los ajustes. Si todas las garantías son aprobadas, la solicitud pasa a "Registro de Crédito en CYF".
+      </div>
+
+      <div class="form-footer mt-4" *ngIf="puedeGestionar">
+        <button class="btn-pro secondary" (click)="cancelar()">
+          <span class="material-symbols-outlined">close</span> Cancelar
+        </button>
+        <button class="btn-pro primary" [disabled]="guardando" (click)="guardarValidacion()">
+          <span class="material-symbols-outlined">save</span> Guardar validación
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="view-container" *ngIf="loading">
+  <p class="text-center py-4">Cargando solicitud...</p>
+</div>

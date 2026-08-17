@@ -246,6 +246,11 @@ Route::prefix('gestion-creditos')->middleware(['auth:api', 'checkrole:superadmin
     // SCRUM-191: documentos reenviados por el cliente tras "Pendiente por Comité".
     Route::get('/{creditoId}/documentos', [\App\Http\Controllers\GestionCreditoController::class, 'documentosPendientes']);
     Route::post('/{creditoId}/documentos/{itemId}/revisar', [\App\Http\Controllers\GestionCreditoController::class, 'revisarDocumento']);
+    // SCRUM-205: Formalización de Garantías (validación por ítem).
+    Route::get('/{creditoId}/formalizacion-garantias', [\App\Http\Controllers\GestionCreditoController::class, 'formalizacionGarantias']);
+    Route::post('/{creditoId}/formalizacion-garantias', [\App\Http\Controllers\GestionCreditoController::class, 'guardarFormalizacionGarantias']);
+    // SCRUM-193: Registro de Crédito en CYF (fecha + radicado).
+    Route::post('/{creditoId}/registro-cyf', [\App\Http\Controllers\GestionCreditoController::class, 'registroCyf']);
 });
 
 // Registro de Solicitudes de Crédito

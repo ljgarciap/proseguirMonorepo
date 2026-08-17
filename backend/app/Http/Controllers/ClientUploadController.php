@@ -79,6 +79,15 @@ class ClientUploadController extends Controller
                 'estado' => 'subido',
                 'observaciones' => null
             ]);
+
+            // SCRUM-193/205 (2026-08-17): a diferencia del pipeline de OCR
+            // (validateUpload()/approveUpload() → syncRequestItem()), los
+            // documentos dirigidos por document_request_item_id (SCRUM-146,
+            // usado acá para el preset de garantías) no pasan por ahí — acá
+            // es donde el cliente efectivamente "termina de subir" el ítem.
+            if ($item->request) {
+                $this->habilitarFormalizacionGarantiasSiAplica($item->request);
+            }
         }
 
         // Dispatch OCR processing job
@@ -361,8 +370,56 @@ class ClientUploadController extends Controller
                 } else {
                     $request->update(['estado' => 'pendiente']);
                 }
+
+                $this->habilitarFormalizacionGarantiasSiAplica($request);
             }
         }
+    }
+
+    /**
+     * SCRUM-193/205 (2026-08-17): cuando el cliente terminó de subir TODOS
+     * los ítems del preset de garantías (no hace falta que estén aprobados
+     * todavía, eso lo decide el Coordinador Comercial en Formalización de
+     * Garantías) el crédito pasa de 'aprobada_garantias' a
+     * 'pendiente_formalizacion_garantias' — a diferencia del chequeo de
+     * arriba (que exige 'aprobado' para dar la request por completada), acá
+     * alcanza con que ningún ítem siga 'pendiente' de carga. Guard
+     * defensivo por estado, mismo criterio que
+     * GestionCreditoController::habilitarGarantiasSiAplica(), para no
+     * interferir con otros flujos que comparten syncRequestItem() (SCRUM-146
+     * onboarding inicial, SCRUM-191 reenvío de pendiente_comite).
+     */
+    private function habilitarFormalizacionGarantiasSiAplica(\App\Models\DocumentRequest $request): void
+    {
+        if (!$request->solicitud_credito_id) {
+            return;
+        }
+
+        $credito = \App\Models\CreditoOrdinario::where('solicitud_credito_id', $request->solicitud_credito_id)->first();
+        if (!$credito || $credito->estado !== 'aprobada_garantias') {
+            return;
+        }
+
+        $itemsSinSubir = $request->items()->where('estado', 'pendiente')->count();
+        if ($itemsSinSubir > 0) {
+            return;
+        }
+
+        $historial = $credito->historial_estados ?? [];
+        $historial[] = [
+            'fecha' => now()->toIso8601String(),
+            'usuario' => 'Sistema',
+            'rol' => 'sistema',
+            'estado_anterior' => $credito->estado,
+            'estado_nuevo' => 'pendiente_formalizacion_garantias',
+            'comentario' => 'El cliente terminó de diligenciar las garantías solicitadas. Bandeja de Formalización de Garantías habilitada para el Coordinador Comercial.',
+        ];
+
+        $credito->estado = 'pendiente_formalizacion_garantias';
+        $credito->solicitud_gestionada = false;
+        $credito->fecha_gestion = null;
+        $credito->historial_estados = $historial;
+        $credito->save();
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\FormalizacionGarantiasResultadoMail;
 use App\Mail\GestionCreditoNotificacionMail;
 use App\Models\Amortizacion;
 use App\Models\ClientUpload;
@@ -9,6 +10,7 @@ use App\Models\Cliente;
 use App\Models\CreditoOrdinario;
 use App\Models\DocumentPreset;
 use App\Models\DocumentRequest;
+use App\Models\DocumentRequestItem;
 use App\Models\DocumentRequirement;
 use App\Models\DocumentType;
 use App\Models\SolicitudCredito;
@@ -16,7 +18,9 @@ use App\Models\TipoCredito;
 use App\Models\TipoPersona;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Passport\Passport;
 use Tests\TestCase;
 
@@ -43,6 +47,7 @@ class GestionCreditoTest extends TestCase
         parent::setUp();
 
         Mail::fake();
+        Storage::fake();
 
         $this->docCC = DocumentType::create(['nombre' => 'Cédula', 'codigo' => 'CC']);
         $tipoNatural = TipoPersona::firstOrCreate(['codigo' => 'NATURAL'], ['nombre' => 'Persona Natural']);
@@ -191,7 +196,13 @@ class GestionCreditoTest extends TestCase
         Mail::assertNotSent(GestionCreditoNotificacionMail::class);
     }
 
-    public function test_notificar_aprobada_garantias_transiciona_a_formalizacion_garantias(): void
+    /**
+     * SCRUM-193/205 (2026-08-17): ya no transiciona a 'formalizacion_garantias'
+     * (legacy, rol Operativo) — se queda en 'aprobada_garantias' mientras el
+     * cliente diligencia el preset, y crea el DocumentRequest que antes
+     * faltaba (ver docblock de notificar()).
+     */
+    public function test_notificar_aprobada_garantias_crea_document_request_y_mantiene_estado(): void
     {
         $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', '1');
 
@@ -203,14 +214,20 @@ class GestionCreditoTest extends TestCase
             'preset_id' => $this->preset->id,
         ], ['X-Active-Role' => 'coordinador_comercial']);
 
-        $response->assertStatus(200)->assertJsonPath('credito.estado', 'formalizacion_garantias');
+        $response->assertStatus(200)->assertJsonPath('credito.estado', 'aprobada_garantias');
 
         $this->assertDatabaseHas('credito_ordinarios', [
             'id' => $credito->id,
-            'estado' => 'formalizacion_garantias',
+            'estado' => 'aprobada_garantias',
             'solicitud_gestionada' => true,
         ]);
         $this->assertNotNull($credito->fresh()->fecha_gestion);
+
+        $this->assertDatabaseHas('document_requests', [
+            'cliente_id' => $this->clienteNatural->id,
+            'solicitud_credito_id' => $credito->solicitud_credito_id,
+            'estado' => 'pendiente',
+        ]);
 
         Mail::assertSent(GestionCreditoNotificacionMail::class, function ($mail) use ($credito) {
             return $mail->hasTo('gestion.cliente@test.com')
@@ -488,13 +505,15 @@ class GestionCreditoTest extends TestCase
         $bandeja->assertStatus(200)->assertJsonCount(1)
             ->assertJsonPath('0.fecha_validacion', '2026-08-04');
 
-        // 3. Coordinador gestiona: transiciona a formalizacion_garantias.
+        // 3. Coordinador gestiona: crea el DocumentRequest de garantías y se
+        // queda en 'aprobada_garantias' (SCRUM-193/205) mientras el cliente
+        // diligencia el preset.
         $this->postJson("/api/gestion-creditos/{$credito->id}/notificar", [
             'destino' => 'gestion.cliente@test.com',
             'asunto' => 'Aprobación de garantías',
             'mensaje' => 'Debe formalizar las garantías.',
             'preset_id' => $this->preset->id,
-        ], $headers)->assertStatus(200)->assertJsonPath('credito.estado', 'formalizacion_garantias');
+        ], $headers)->assertStatus(200)->assertJsonPath('credito.estado', 'aprobada_garantias');
 
         // 4. SCRUM-190 (2026-08-12): el crédito NO debe desaparecer de la
         // bandeja al gestionarse — debe seguir visible con
@@ -502,7 +521,7 @@ class GestionCreditoTest extends TestCase
         $bandejaPostGestion = $this->getJson('/api/gestion-creditos', $headers);
         $bandejaPostGestion->assertStatus(200)->assertJsonCount(1)
             ->assertJsonPath('0.solicitud_gestionada', true)
-            ->assertJsonPath('0.estado', 'formalizacion_garantias');
+            ->assertJsonPath('0.estado', 'aprobada_garantias');
         $this->assertNotNull($bandejaPostGestion->json('0.fecha_gestion'));
     }
 
@@ -634,5 +653,236 @@ class GestionCreditoTest extends TestCase
             ['accion' => 'aprobar'],
             $headers
         )->assertStatus(422);
+    }
+
+    // ---- SCRUM-193/205: Formalización de Garantías + Registro CYF --------
+
+    /**
+     * Crea un crédito 'aprobada_garantias' cuyo cliente_id apunta a un User
+     * de portal real (no al registro Cliente de crearCredito(), que no es
+     * autenticable) — necesario para simular la carga real del cliente vía
+     * POST /api/uploads.
+     */
+    private function crearCreditoConClientePortal(string $sufijo): array
+    {
+        $clienteUser = User::create([
+            'name' => 'Cliente Portal ' . $sufijo,
+            'email' => "cliente.portal.{$sufijo}@test.com",
+            'password' => bcrypt('password'),
+            'numero_documento' => 'cliente_portal_' . $sufijo,
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['cliente'],
+        ]);
+
+        $solicitud = $this->crearSolicitud($sufijo);
+        $credito = CreditoOrdinario::create([
+            'numero_solicitud' => 'CO-GC-FG-' . $sufijo,
+            'cliente_id' => $clienteUser->id,
+            'solicitud_credito_id' => $solicitud->id,
+            'monto' => 30000000,
+            'plazo_meses' => 12,
+            'estado' => 'aprobada_garantias',
+            'resultado_origen' => 'comite_aprobado',
+            'documentos' => [],
+        ]);
+
+        return [$credito, $clienteUser];
+    }
+
+    private function notificarAprobadaGarantias(CreditoOrdinario $credito, array $headers): void
+    {
+        $this->postJson("/api/gestion-creditos/{$credito->id}/notificar", [
+            'destino' => 'gestion.cliente@test.com',
+            'asunto' => 'Aprobación de garantías',
+            'mensaje' => 'Debe formalizar las garantías.',
+            'preset_id' => $this->preset->id,
+        ], $headers)->assertStatus(200);
+    }
+
+    public function test_cliente_completa_garantias_avanza_a_pendiente_formalizacion_garantias(): void
+    {
+        [$credito, $clienteUser] = $this->crearCreditoConClientePortal('1');
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+
+        Passport::actingAs($this->coordinador);
+        $this->notificarAprobadaGarantias($credito, $headers);
+
+        $item = DocumentRequestItem::whereHas('request', function ($q) use ($credito) {
+            $q->where('solicitud_credito_id', $credito->solicitud_credito_id);
+        })->firstOrFail();
+
+        Passport::actingAs($clienteUser);
+        $this->postJson('/api/uploads', [
+            'file' => UploadedFile::fake()->create('pagare.pdf', 100, 'application/pdf'),
+            'active_role' => 'cliente',
+            'document_request_item_id' => $item->id,
+        ])->assertStatus(200);
+
+        $credito->refresh();
+        $this->assertSame('pendiente_formalizacion_garantias', $credito->estado);
+        $this->assertFalse($credito->solicitud_gestionada);
+        $this->assertNull($credito->fecha_gestion);
+
+        $item->refresh();
+        $this->assertSame('subido', $item->estado);
+    }
+
+    /**
+     * Trae el crédito hasta 'pendiente_formalizacion_garantias' (mismo
+     * camino que el test de arriba) para los tests de guardarFormalizacionGarantias().
+     */
+    private function credioPendienteFormalizacion(string $sufijo): array
+    {
+        [$credito, $clienteUser] = $this->crearCreditoConClientePortal($sufijo);
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+
+        Passport::actingAs($this->coordinador);
+        $this->notificarAprobadaGarantias($credito, $headers);
+
+        $item = DocumentRequestItem::whereHas('request', function ($q) use ($credito) {
+            $q->where('solicitud_credito_id', $credito->solicitud_credito_id);
+        })->firstOrFail();
+
+        Passport::actingAs($clienteUser);
+        $this->postJson('/api/uploads', [
+            'file' => UploadedFile::fake()->create('pagare.pdf', 100, 'application/pdf'),
+            'active_role' => 'cliente',
+            'document_request_item_id' => $item->id,
+        ])->assertStatus(200);
+
+        $credito->refresh();
+
+        return [$credito, $item];
+    }
+
+    public function test_guardar_formalizacion_garantias_falla_si_no_esta_pendiente(): void
+    {
+        $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', 'fg-guard');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/formalizacion-garantias", [
+            'items' => [],
+        ], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(422)
+            ->assertJson(['message' => 'Esta solicitud no está pendiente de Formalización de Garantías.']);
+    }
+
+    public function test_guardar_formalizacion_garantias_no_aprobada_sin_observaciones_falla(): void
+    {
+        [$credito, $item] = $this->credioPendienteFormalizacion('2');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/formalizacion-garantias", [
+            'items' => [['item_id' => $item->id, 'validacion' => 'no_aprobada']],
+        ], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(422)
+            ->assertJson(['message' => 'Las garantías no aprobadas requieren observaciones.']);
+    }
+
+    public function test_guardar_formalizacion_garantias_con_ajuste_vuelve_a_aprobada_garantias(): void
+    {
+        [$credito, $item] = $this->credioPendienteFormalizacion('3');
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/formalizacion-garantias", [
+            'items' => [[
+                'item_id' => $item->id,
+                'validacion' => 'no_aprobada',
+                'observaciones' => 'Falta firma en el formulario.',
+            ]],
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200)->assertJsonPath('credito.estado', 'aprobada_garantias');
+
+        $credito->refresh();
+        $this->assertSame('aprobada_garantias', $credito->estado);
+        $this->assertFalse($credito->solicitud_gestionada);
+
+        $item->refresh();
+        $this->assertSame('rechazado', $item->estado);
+        $this->assertSame('Falta firma en el formulario.', $item->observaciones);
+
+        Mail::assertSent(FormalizacionGarantiasResultadoMail::class, function ($mail) {
+            return $mail->requiereAjustes === true && $mail->urlPortalCliente !== null;
+        });
+    }
+
+    public function test_guardar_formalizacion_garantias_todas_aprobadas_pasa_a_pendiente_registro_cyf(): void
+    {
+        [$credito, $item] = $this->credioPendienteFormalizacion('4');
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/formalizacion-garantias", [
+            'items' => [['item_id' => $item->id, 'validacion' => 'aprobada']],
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200)->assertJsonPath('credito.estado', 'pendiente_registro_cyf');
+
+        $credito->refresh();
+        $this->assertSame('pendiente_registro_cyf', $credito->estado);
+        $this->assertFalse($credito->solicitud_gestionada);
+
+        $item->refresh();
+        $this->assertSame('aprobado', $item->estado);
+
+        Mail::assertSent(FormalizacionGarantiasResultadoMail::class, function ($mail) {
+            return $mail->requiereAjustes === false && $mail->urlPortalCliente === null;
+        });
+    }
+
+    private function creditoPendienteRegistroCyf(string $sufijo): CreditoOrdinario
+    {
+        [$credito, $item] = $this->credioPendienteFormalizacion($sufijo);
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/formalizacion-garantias", [
+            'items' => [['item_id' => $item->id, 'validacion' => 'aprobada']],
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+
+        return $credito->fresh();
+    }
+
+    public function test_registro_cyf_falla_si_no_esta_pendiente(): void
+    {
+        $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', 'cyf-guard');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/registro-cyf", [
+            'fecha_registro_cyf' => '2026-08-17',
+            'radicado_cyf' => 'RAD-001',
+        ], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(422)
+            ->assertJson(['message' => 'Esta solicitud no está pendiente de Registro de Crédito en CYF.']);
+    }
+
+    public function test_registro_cyf_valida_campos_requeridos(): void
+    {
+        $credito = $this->creditoPendienteRegistroCyf('5');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/registro-cyf", [], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(422)
+            ->assertJson(['message' => 'Ingrese la fecha del registro del crédito en CYF.']);
+    }
+
+    public function test_registro_cyf_guarda_datos_y_pasa_a_aprobacion_registro_cyf(): void
+    {
+        $credito = $this->creditoPendienteRegistroCyf('6');
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/registro-cyf", [
+            'fecha_registro_cyf' => '2026-08-17',
+            'radicado_cyf' => 'RAD-2026-001',
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200)->assertJsonPath('credito.estado', 'aprobacion_registro_cyf');
+
+        $credito->refresh();
+        $this->assertSame('aprobacion_registro_cyf', $credito->estado);
+        $this->assertTrue($credito->solicitud_gestionada);
+        $this->assertSame('2026-08-17', $credito->fecha_registro_cyf->toDateString());
+        $this->assertSame('RAD-2026-001', $credito->radicado_cyf);
+        // Reutiliza el gate legacy de Gerencia (ver docblock de registroCyf()).
+        $this->assertSame('RAD-2026-001', $credito->documentos_raw['registro_cyf'] ?? null);
     }
 }

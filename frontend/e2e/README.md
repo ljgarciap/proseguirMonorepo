@@ -61,8 +61,8 @@ vez de duplicarlos — para resembrar desde cero hay que borrarlos primero (`Cre
 `SolicitudCredito` y cualquier `DocumentRequest` de prueba asociado).
 
 **La suite no es idempotente**: una vez un test "gestiona" una solicitud (envía la notificación),
-el registro deja de estar disponible para gestionar de nuevo (o sale de la bandeja, si pasó a
-`formalizacion_garantias`). Para volver a correr la suite completa desde cero hay que
+el registro deja de estar disponible para gestionar de nuevo (queda `solicitud_gestionada = true`,
+visible pero sin botón "Gestionar"). Para volver a correr la suite completa desde cero hay que
 borrar y resembrar los `GC-PW-*` antes.
 
 ## SCRUM-189/190 — Actas Comité de Crédito (`scrum-189-190-actas-gestion-creditos.spec.ts`)
@@ -127,3 +127,33 @@ Limpieza tras validar (evita acumular ruido en Gestión de Créditos):
 // vía tinker, borra los 3 CreditoOrdinario/SolicitudCredito/DocumentRequest GC191-PW-* y el
 // ClientUpload de prueba (ver bloque de limpieza usado en la sesión 2026-08-12)
 ```
+
+## SCRUM-193/205 — Formalización de Garantías + Registro de Crédito en CYF (`scrum-193-205-formalizacion-registro-cyf.spec.ts`)
+
+```bash
+docker cp e2e/fixtures/seed_scrum_193_205.php factoring_backend:/tmp/seed_scrum_193_205.php
+docker exec factoring_backend php artisan tinker --execute="require '/tmp/seed_scrum_193_205.php';"
+```
+
+Siembra 1 `CreditoOrdinario` (`GC193205-PW-1`) en `aprobada_garantias`/`comite_aprobado`, más el
+preset "Preset Playwright 193-205" (1 requisito, "Pagaré Playwright 193-205") — reusa el mismo
+usuario de portal `cliente` (doc `2345`/`2345`) y el registro `Cliente` que ya exista con esa
+identificación (puede mostrar "Cliente Playwright 191" si SCRUM-191 sembró primero — mismo
+`numero_documento`, no es un bug). El script es idempotente: resetea el crédito a
+`aprobada_garantias` (sin `DocumentRequest` previo) en cada corrida — correrlo antes de CADA
+ejecución del spec.
+
+1 test de principio a fin: Coordinador notifica con preset → cliente diligencia la garantía
+(`/client-upload`) → el crédito avanza SOLO (sin acción del Coordinador) a "Pendiente
+Formalización de Garantías" — hook nuevo en `ClientUploadController::store()`, ver docblock de
+`habilitarFormalizacionGarantiasSiAplica()` — → Coordinador aprueba la garantía en la pantalla
+nueva `/gestion-creditos/:id/formalizacion-garantias` → pasa a "Pendiente Registro de Crédito en
+CYF" → Coordinador registra fecha + radicado en `/gestion-creditos/:id/registro-cyf` → el crédito
+sale de Gestión de Créditos (queda en el estado legacy `aprobacion_registro_cyf`, disponible para
+Gerencia en la pantalla de Crédito Ordinario, sin tocar).
+
+Nota de accesibilidad encontrada armando el spec: los botones con ícono de Material Symbols
+(`<span class="material-symbols-outlined">save</span> Guardar`) exponen el nombre accesible como
+`"save Guardar"` (ícono + texto), igual que el "Ver"/`visibility Ver` ya documentado arriba —
+`getByRole('button', { name: /^Guardar$/ })` no matchea, hace falta `{ name: 'save Guardar' }` o un
+regex sin anclar (`/Guardar/`).

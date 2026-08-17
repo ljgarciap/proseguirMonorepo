@@ -35,6 +35,20 @@
         <p class="tile-label">Pendientes - Comité de Créditos</p>
       </div>
     </div>
+    <div class="tile-card clickable" (click)="filtrarPorTarjeta('pendiente_formalizacion_garantias')">
+      <span class="material-symbols-outlined tile-icon purple">fact_check</span>
+      <div>
+        <p class="tile-value">{{ tarjetas.pendiente_formalizacion_garantias }}</p>
+        <p class="tile-label">Pendientes para Formalización de Garantías</p>
+      </div>
+    </div>
+    <div class="tile-card clickable" (click)="filtrarPorTarjeta('pendiente_registro_cyf')">
+      <span class="material-symbols-outlined tile-icon info">account_balance</span>
+      <div>
+        <p class="tile-value">{{ tarjetas.pendiente_registro_cyf }}</p>
+        <p class="tile-label">Registro de Crédito en CYF</p>
+      </div>
+    </div>
   </div>
 
   <div class="content-card mt-4">
@@ -60,6 +74,8 @@
         <option value="aprobada_garantias">Aprobada para garantías</option>
         <option value="rechazada_comite">Rechazada por Comité</option>
         <option value="pendiente_comite">Pendiente por Comité</option>
+        <option value="pendiente_formalizacion_garantias">Pendiente Formalización de Garantías</option>
+        <option value="pendiente_registro_cyf">Pendiente Registro de Crédito en CYF</option>
       </select>
       <select class="pro-input" [(ngModel)]="filtroGestionada">
         <option value="todos">Solicitud gestionada: Todos</option>
@@ -116,7 +132,7 @@
             <td>{{ credito.fecha_gestion ? (credito.fecha_gestion | date:'dd/MM/yyyy') : '—' }}</td>
             <td class="text-right actions-cell">
               <button class="btn-pro sm" [class.primary]="puedeGestionar(credito)" [class.secondary]="!puedeGestionar(credito)"
-                      [routerLink]="['/gestion-creditos', credito.id]">
+                      [routerLink]="rutaGestion(credito)">
                 <span class="material-symbols-outlined">{{ accionIcono(credito) }}</span>
                 {{ accionLabel(credito) }}
               </button>
