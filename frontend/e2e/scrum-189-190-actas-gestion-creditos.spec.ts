@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { execSync } from 'child_process';
 import { loginAs } from './helpers/auth';
 
 /**
@@ -8,12 +9,26 @@ import { loginAs } from './helpers/auth';
  *   docker cp e2e/fixtures/seed_actas_comite_190.php factoring_backend:/tmp/seed_actas_comite_190.php
  *   docker exec factoring_backend php artisan tinker --execute="require '/tmp/seed_actas_comite_190.php';"
  *
- * Cubre: previsualizar sin 500 (punto 5), buscador de cliente + dropdown de
- * tipo + separador de miles en "Agregar solicitud manual" (punto 2),
- * identificación + dropdown de amortización en Decisión (punto 3/4),
- * prefill de monto_decision en Resumen (punto 4), y materialización de la
- * solicitud manual visible en Gestión de Créditos (SCRUM-190.1).
+ * Cubre: previsualizar sin 500 (punto 5), identificación + dropdown de
+ * amortización en Decisión (punto 3/4), prefill de monto_decision en Resumen
+ * (punto 4), y materialización de la solicitud "de sistema" visible en
+ * Gestión de Créditos (SCRUM-190.1).
+ *
+ * SCRUM-198 (2026-08-16): el alta manual dejó de admitir texto libre — ahora
+ * solo enlaza un crédito ya existente y elegible (buscarCreditosElegibles).
+ * El crédito para ese buscador se crea DESPUÉS de generar el acta (ver
+ * tinker() abajo), simulando la ventana real de uso: sincronizarSolicitudes
+ * Elegibles() ya corrió una vez en el show() inicial, así que este crédito
+ * nuevo NO se auto-incluye como 'sistema' hasta el próximo autoguardado —
+ * si se creara ANTES de generar(), el acta ya lo habría tomado solo.
  */
+
+function tinker(php: string): string {
+  const fs = require('fs');
+  const tmp = '/tmp/_scrum198_e2e_tinker.php';
+  fs.writeFileSync(tmp, php);
+  return execSync(`docker exec -i factoring_backend php artisan tinker < ${tmp}`).toString();
+}
 test('flujo completo Acta de Comité con solicitud manual, visible luego en Gestión de Créditos', async ({ page }) => {
   await loginAs(page, '1234', '1234', 'coordinador_comercial');
 
@@ -29,26 +44,41 @@ test('flujo completo Acta de Comité con solicitud manual, visible luego en Gest
   await page.getByRole('button', { name: '2. Desarrollo' }).click();
   await expect(page.getByText('Cliente Playwright Sistema')).toBeVisible();
 
-  // --- Punto 2: buscador de cliente + dropdown de tipo + separador de miles ---
-  await page.locator('.cliente-autocomplete input').fill('Cliente Playwright Manual');
-  await page.getByText(/Cliente Playwright Manual.*900333444/).click();
-  // El placeholder ganó un "*" (campo obligatorio) en el fix del mismo
-  // SCRUM-189 sobre el mensaje de "Datos incompletos" (2026-08-13) — el
-  // locator exacto quedó desactualizado, no es un bug funcional.
-  await expect(page.locator('.inline-add-solicitud input[placeholder="Cliente *"]')).toHaveValue('Cliente Playwright Manual');
-  await expect(page.locator('.inline-add-solicitud input[placeholder="N.° de identificación"]')).toHaveValue('900333444');
+  // --- SCRUM-198: el crédito para el buscador se crea recién ahora (acta ya
+  // generada y abierta) — simula un crédito que se vuelve elegible mientras
+  // el Coordinador ya está armando el acta. ---
+  const out = tinker(`
+    $cliente = \\App\\Models\\Cliente::where('numero_documento', '900333444')->firstOrFail();
+    $tipo = \\App\\Models\\TipoCredito::where('codigo', 'ORDINARIO')->firstOrFail();
+    $amort = \\App\\Models\\Amortizacion::where('codigo', 'MENSUAL')->firstOrFail();
+    $admin = \\App\\Models\\User::where('numero_documento', '1234')->firstOrFail();
 
-  const tipoSelect = page.locator('.inline-add-solicitud select');
-  await expect(tipoSelect.locator('option')).toContainText(['Crédito Ordinario']);
-  await tipoSelect.selectOption({ label: 'Crédito Ordinario' });
+    \\App\\Models\\CreditoOrdinario::where('numero_solicitud', 'AC-PW-MANUAL')->delete();
 
-  const montoInput = page.locator('.inline-add-solicitud input[inputmode="decimal"]');
-  await montoInput.fill('12000000');
-  await montoInput.blur();
-  await expect(montoInput).toHaveValue('12.000.000');
+    $solicitud = \\App\\Models\\SolicitudCredito::create([
+      'cliente_id' => $cliente->id, 'usuario_registra_id' => $admin->id,
+      'tipo_credito_id' => $tipo->id, 'monto_solicitado' => 12000000, 'plazo_meses' => 24,
+      'amortizacion_id' => $amort->id, 'destino_recurso' => 'Capital de trabajo',
+      'garantia' => 'Pagaré', 'fuente_pago' => 'Ingresos operacionales',
+      'correo_notificacion' => 'ac.manual.playwright@test.com',
+      'asunto_notificacion' => 'Documentación', 'mensaje_notificacion' => 'Adjunta los archivos.',
+    ]);
+    $credito = \\App\\Models\\CreditoOrdinario::create([
+      'numero_solicitud' => 'AC-PW-MANUAL', 'cliente_id' => $admin->id,
+      'solicitud_credito_id' => $solicitud->id, 'monto' => 12000000, 'plazo_meses' => 24,
+      'estado' => 'comite_evaluacion', 'documentos' => [],
+    ]);
+    echo 'ID:'.$credito->id;
+  `);
+  const creditoManualId = out.match(/ID:(\d+)/)?.[1];
+  expect(creditoManualId).toBeTruthy();
 
-  await page.getByRole('button', { name: 'Agregar solicitud manual' }).click();
-  await expect(page.getByText('Manual').first()).toBeVisible();
+  // --- Punto 2 (SCRUM-198): buscador de créditos elegibles, ya no admite
+  // texto libre — busca, selecciona, y el snapshot completo (tipo, monto,
+  // amortización, plazo, fuente de pago) viene del crédito real. ---
+  await page.locator('.credito-elegible-autocomplete input').fill('Cliente Playwright Manual');
+  await page.getByText(/Cliente Playwright Manual.*900333444.*Crédito Ordinario.*12.000.000/).click();
+  await expect(page.getByText('Existente (agregado manualmente)')).toBeVisible();
 
   // --- Completar el resto del acta ANTES de decidir las solicitudes: cada
   // autoguardado (PUT /actas-comite/{id}) vuelve a correr
@@ -88,11 +118,15 @@ test('flujo completo Acta de Comité con solicitud manual, visible luego en Gest
   // el .form-field contenedor en vez de getByLabel().
   const campo = (card: typeof cards, etiqueta: string) => card.locator('.form-field', { hasText: etiqueta });
 
+  // SCRUM-198: la card 'manual_existente' ya NO tiene "Cliente"/"N.° de
+  // identificación" editables (son snapshot de un crédito real) — y
+  // Amortización/Plazo/Fuente de pago ya vienen prellenados del crédito
+  // seleccionado, no hace falta re-tipearlos.
   const cardManual = cards.filter({ hasText: 'Cliente Playwright Manual' });
-  await campo(cardManual, 'Amortización').locator('select').selectOption({ label: 'Mensual' });
-  await campo(cardManual, 'N.° de identificación').locator('input').fill('900333444');
-  await campo(cardManual, 'Plazo (meses)').locator('input').fill('24');
-  await campo(cardManual, 'Fuente de pago').locator('input').fill('Ingresos operacionales');
+  await expect(campo(cardManual, 'Cliente').locator('input')).toHaveCount(0);
+  await expect(campo(cardManual, 'Amortización').locator('select')).toHaveValue('Mensual');
+  await expect(campo(cardManual, 'Plazo (meses)').locator('input')).toHaveValue('24');
+  await expect(campo(cardManual, 'Fuente de pago').locator('input')).toHaveValue('Ingresos operacionales');
   await campo(cardManual, 'Estado').locator('select').selectOption('aprobado');
 
   const cardSistema = cards.filter({ hasText: 'Cliente Playwright Sistema' });

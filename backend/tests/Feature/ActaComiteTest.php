@@ -453,4 +453,114 @@ class ActaComiteTest extends TestCase
         $this->assertTrue($ids->contains($creditoManual->id));
         $this->assertTrue($ids->contains($creditoSistema->id));
     }
+
+    /**
+     * SCRUM-198: buscarCreditosElegibles() usa el mismo criterio de
+     * elegibilidad que sincronizarSolicitudesElegibles() — solo créditos en
+     * comite_evaluacion, y excluye los ya incluidos en ESTA acta.
+     */
+    public function test_buscar_creditos_elegibles_excluye_no_elegibles_y_ya_incluidos(): void
+    {
+        $creditoInicial = $this->crearCreditoEnComiteEvaluacion('inicial');
+        Passport::actingAs($this->coordinador);
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+        $acta = $this->postJson('/api/actas-comite/generar', [], $headers)->assertStatus(201)->json();
+
+        $creditoElegible = $this->crearCreditoEnComiteEvaluacion('elegible');
+
+        $noElegible = CreditoOrdinario::find($creditoInicial->id)->replicate();
+        $noElegible->numero_solicitud = 'CO-ACTA-no-elegible';
+        $noElegible->estado = 'aprobada_garantias';
+        $noElegible->resultado_origen = 'comite_aprobado';
+        $noElegible->save();
+
+        // Menos de 3 caracteres: no busca nada.
+        $this->getJson("/api/actas-comite/{$acta['id']}/creditos-elegibles?q=Ac", $headers)
+            ->assertStatus(200)->assertJsonCount(0);
+
+        $response = $this->getJson("/api/actas-comite/{$acta['id']}/creditos-elegibles?q=Acta Test", $headers);
+        $response->assertStatus(200);
+        $ids = collect($response->json())->pluck('id');
+        $this->assertTrue($ids->contains($creditoElegible->id));
+        $this->assertFalse($ids->contains($creditoInicial->id), 'ya incluido en esta acta, no debe aparecer');
+        $this->assertFalse($ids->contains($noElegible->id), 'no está en comite_evaluacion, no debe aparecer');
+    }
+
+    /**
+     * SCRUM-198: al enlazar un crédito existente, la solicitud queda con
+     * credito_ordinario_id poblado y origen 'manual_existente' — un
+     * snapshot real del crédito, no datos tecleados desde cero.
+     */
+    public function test_agregar_solicitud_con_credito_existente_usa_origen_manual_existente_y_no_crea_credito_duplicado(): void
+    {
+        $creditoInicial = $this->crearCreditoEnComiteEvaluacion('inicial');
+        Passport::actingAs($this->coordinador);
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+        $acta = $this->postJson('/api/actas-comite/generar', [], $headers)->assertStatus(201)->json();
+
+        $creditoExistente = $this->crearCreditoEnComiteEvaluacion('existente');
+
+        $antesCount = CreditoOrdinario::count();
+
+        $response = $this->postJson("/api/actas-comite/{$acta['id']}/solicitudes", [
+            'credito_ordinario_id' => $creditoExistente->id,
+        ], $headers);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('origen', 'manual_existente')
+            ->assertJsonPath('credito_ordinario_id', $creditoExistente->id)
+            ->assertJsonPath('cliente_nombre', 'Acta Test');
+
+        $this->assertSame($antesCount, CreditoOrdinario::count(), 'no debe crear un CreditoOrdinario nuevo');
+
+        // No se puede agregar el mismo crédito dos veces.
+        $this->postJson("/api/actas-comite/{$acta['id']}/solicitudes", [
+            'credito_ordinario_id' => $creditoExistente->id,
+        ], $headers)->assertStatus(422);
+    }
+
+    /**
+     * SCRUM-198: al registrar el acta, una solicitud 'manual_existente' se
+     * mueve por el mismo camino que 'sistema' (sincronizarCreditosOrdinarios,
+     * que solo mira credito_ordinario_id) — materializarSolicitudesManuales()
+     * (que solo procesa origen='manual') no debe tocarla ni duplicar el
+     * crédito.
+     */
+    public function test_registrar_no_materializa_solicitud_manual_existente(): void
+    {
+        $creditoInicial = $this->crearCreditoEnComiteEvaluacion('inicial');
+        Passport::actingAs($this->coordinador);
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+        $acta = $this->postJson('/api/actas-comite/generar', [], $headers)->assertStatus(201)->json();
+        $sistemaId = $acta['solicitudes'][0]['id'];
+
+        $creditoExistente = $this->crearCreditoEnComiteEvaluacion('existente');
+        $manualExistente = $this->postJson("/api/actas-comite/{$acta['id']}/solicitudes", [
+            'credito_ordinario_id' => $creditoExistente->id,
+        ], $headers)->assertStatus(201)->json();
+
+        $antesCount = CreditoOrdinario::count();
+
+        $this->putJson("/api/actas-comite/{$acta['id']}/solicitudes/{$manualExistente['id']}", [
+            'estado_decision' => 'aprobado', 'monto_decision' => 30000000,
+        ], $headers)->assertStatus(200);
+        $this->putJson("/api/actas-comite/{$acta['id']}/solicitudes/{$sistemaId}", [
+            'estado_decision' => 'rechazado', 'monto_decision' => 0,
+        ], $headers)->assertStatus(200);
+
+        $this->putJson("/api/actas-comite/{$acta['id']}", [
+            'fecha_reunion' => '2026-08-12', 'lugar' => '<p>Sala</p>', 'hora_inicio' => '09:00',
+            'asistentes' => [['nombre' => 'Juan Pérez']], 'observaciones_generales' => '<p>—</p>',
+            'hora_finalizacion' => '10:00', 'firmantes' => [['nombre' => 'Juan Pérez', 'rol' => 'Presidente']],
+        ], $headers)->assertStatus(200);
+        $this->postJson("/api/actas-comite/{$acta['id']}/aprobar-orden-dia", [], $headers)->assertStatus(200);
+
+        $this->postJson("/api/actas-comite/{$acta['id']}/registrar", [], $headers)->assertStatus(200);
+
+        $this->assertSame($antesCount, CreditoOrdinario::count(), 'no debe crear ningún crédito nuevo');
+
+        $creditoExistente->refresh();
+        $this->assertSame('aprobada_garantias', $creditoExistente->estado);
+        $this->assertSame('comite_aprobado', $creditoExistente->resultado_origen);
+    }
 }

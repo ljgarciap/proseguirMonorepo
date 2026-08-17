@@ -36,7 +36,7 @@ test('pendiente_comite sin requerir documentos vuelve directo a comite_evaluacio
   await expect(page.locator('tr', { hasText: 'GC191-PW-SIN-DOCS' })).toHaveCount(0);
 });
 
-test('pendiente_comite con documentos: cliente reenvía, coordinador aprueba, vuelve a comite_evaluacion', async ({ page }) => {
+test('pendiente_comite con documentos: cliente reenvía, coordinador aprueba, pasa a aprobada_garantias y se re-gestiona (SCRUM-199)', async ({ page }) => {
   // --- 1. Coordinador notifica requiriendo documentos ---
   await loginAs(page, '1234', '1234', 'coordinador_comercial');
   await page.goto('/gestion-creditos');
@@ -82,7 +82,34 @@ test('pendiente_comite con documentos: cliente reenvía, coordinador aprueba, vu
   await page.getByRole('button', { name: 'Aprobar' }).first().click();
   await page.getByRole('button', { name: 'Sí, aprobar' }).click();
 
-  await expect(page.getByText('ya volvió a estar disponible para el Comité de Crédito')).toBeVisible({ timeout: 10000 });
+  // El mismo texto aparece tanto en el Swal como en el banner de la
+  // página (una vez se actualiza el estado local) — se espera el Swal
+  // específicamente para no chocar con el "strict mode" de Playwright.
+  await expect(page.getByLabel('¡Listo!').getByText('el crédito quedó aprobado y disponible para gestionar sus garantías')).toBeVisible({ timeout: 10000 });
+  await page.getByRole('button', { name: 'OK' }).click();
+
+  // --- 4. SCRUM-199: el crédito vuelve a la bandeja pendiente de gestión,
+  // ahora como "Aprobada para garantías" — el Coordinador lo re-gestiona
+  // normalmente, seleccionando preset de garantías.
+  await page.goto('/gestion-creditos');
+  const filaGarantias = page.locator('tr', { hasText: 'GC191-PW-CON-DOCS' });
+  await expect(filaGarantias).toBeVisible({ timeout: 10000 });
+  await filaGarantias.getByRole('button', { name: /Gestionar/i }).click();
+  await expect(page).toHaveURL(/\/gestion-creditos\/\d+$/);
+
+  await page.locator('input[type="email"]').fill('cliente@test.com');
+  await page.getByPlaceholder('Asunto del correo').fill('Crédito aprobado — gestión de garantías');
+  await page.getByPlaceholder('Mensaje que verá el cliente').fill('Su crédito fue aprobado, continuamos con la gestión de garantías.');
+  await page.locator('.form-group', { hasText: 'Documentación Requerida' }).locator('select').selectOption({ label: 'Preset Playwright 191' });
+
+  await page.getByRole('button', { name: /Registrar y enviar notificación/i }).click();
+  await page.getByRole('button', { name: 'Sí, enviar' }).click();
+  await expect(page.getByText('¡Listo!')).toBeVisible({ timeout: 10000 });
+  await page.getByRole('button', { name: 'OK' }).click();
+
+  // Ya no debe aparecer pendiente de gestión (quedó en formalizacion_garantias).
+  await expect(page).toHaveURL(/\/gestion-creditos$/, { timeout: 10000 });
+  await expect(page.locator('tr', { hasText: 'GC191-PW-CON-DOCS' })).toHaveCount(0);
 });
 
 test('el cliente no puede ver el Acta de Comité desde su crédito', async ({ page }) => {

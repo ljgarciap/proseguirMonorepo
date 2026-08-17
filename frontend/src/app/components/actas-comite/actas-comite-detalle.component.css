@@ -1,5 +1,8 @@
 .view-container {
-  max-width: 1100px;
+  /* SCRUM-198: 1100px dejaba los cajones de texto de Desarrollo angostos —
+     subido a 1300px. Los grids del resto de pestañas usan
+     minmax(160px, 1fr), fluidos, se reacomodan solos con más ancho. */
+  max-width: 1300px;
   margin: 0 auto;
   padding: 1.5rem;
 }

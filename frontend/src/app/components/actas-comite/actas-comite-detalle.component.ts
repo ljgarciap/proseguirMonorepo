@@ -8,7 +8,7 @@ import { Subject, Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
-import { ClienteAutocompleteComponent } from '../shared/cliente-autocomplete/cliente-autocomplete.component';
+import { CreditoElegibleAutocompleteComponent } from '../shared/credito-elegible-autocomplete/credito-elegible-autocomplete.component';
 import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 import Swal from 'sweetalert2';
 
@@ -36,7 +36,7 @@ interface OrdenDiaItem {
 @Component({
   selector: 'app-actas-comite-detalle',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, QuillModule, ClienteAutocompleteComponent, MilesSeparatorDirective],
+  imports: [CommonModule, FormsModule, RouterModule, QuillModule, CreditoElegibleAutocompleteComponent, MilesSeparatorDirective],
   templateUrl: './actas-comite-detalle.component.html',
   styleUrls: ['./actas-comite-detalle.component.css']
 })
@@ -62,13 +62,6 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
 
   nuevoAsistente = '';
   nuevoItemOrdenDia = '';
-  nuevaSolicitud = { cliente_nombre: '', cliente_identificacion: '', tipo_solicitud: '', monto: null as number | null };
-  // Throwaway: solo dispara (clienteSeleccionado), no se envía tal cual al
-  // backend — ActaComiteSolicitud guarda cliente_nombre/identificación como
-  // snapshot de texto, no un cliente_id (ver spec SCRUM-169, admite buscador
-  // o campo libre).
-  nuevaSolicitudClienteBusqueda: number | null = null;
-  tiposCredito: any[] = [];
   amortizaciones: any[] = [];
 
   private modulesCache: Record<string, any> = {};
@@ -91,15 +84,9 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
     this.cargarCatalogos();
   }
 
-  // SCRUM-189 (2026-08-12, punto 2/4): catálogos reales para reemplazar los
-  // campos de texto libre de "Agregar solicitud manual" y el dropdown de
-  // Amortización en Decisión — mismos endpoints que usa Solicitudes de
-  // Crédito (parameters/tipo_creditos, parameters/amortizaciones).
+  // SCRUM-189 (2026-08-12, punto 4): catálogo real para el dropdown de
+  // Amortización en Decisión — mismo endpoint que usa Solicitudes de Crédito.
   private cargarCatalogos(): void {
-    this.http.get<any[]>(`${environment.apiUrl}/parameters/tipo_creditos`).subscribe({
-      next: data => this.tiposCredito = data,
-      error: () => {}
-    });
     this.http.get<any[]>(`${environment.apiUrl}/parameters/amortizaciones`).subscribe({
       next: data => this.amortizaciones = data,
       error: () => {}
@@ -263,35 +250,18 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
   }
 
   // --- Solicitudes ---
-  // SCRUM-189 (2026-08-12, punto 2): al elegir un cliente del buscador se
-  // autocompletan nombre/identificación — sigue siendo texto editable
-  // después (el spec original admite buscador O campo libre, no exclusivo).
-  onClienteManualSeleccionado(cliente: any): void {
-    this.nuevaSolicitud.cliente_nombre = cliente?.nombre || '';
-    this.nuevaSolicitud.cliente_identificacion = cliente?.numero_documento || '';
-  }
-
-  // SCRUM-189 (2026-08-12, reincidencia comentario Juan): la validación en
-  // sí era correcta (bloqueaba con "Tipo de solicitud" sin seleccionar),
-  // pero el mensaje genérico no decía cuál campo faltaba y el select no
-  // tiene marca visual de obligatorio como el resto del formulario — el
-  // usuario no detectaba qué le faltaba diligenciar. Se listan los campos
-  // faltantes por nombre.
-  agregarSolicitudManual(): void {
-    const faltantes: string[] = [];
-    if (!this.nuevaSolicitud.cliente_nombre) faltantes.push('Cliente');
-    if (!this.nuevaSolicitud.tipo_solicitud) faltantes.push('Tipo de solicitud');
-    if (!this.nuevaSolicitud.monto) faltantes.push('Monto');
-    if (faltantes.length) {
-      Swal.fire('Datos incompletos', `Falta diligenciar: ${faltantes.join(', ')}.`, 'warning');
-      return;
-    }
-    this.http.post<any>(`${environment.apiUrl}/actas-comite/${this.actaId}/solicitudes`, this.nuevaSolicitud, this.headers()).subscribe({
+  // SCRUM-198: el alta manual solo enlaza un crédito ya existente y
+  // elegible para comité (buscarCreditosElegibles) — ya no se puede
+  // tipear un crédito desde cero.
+  onCreditoElegibleSeleccionado(credito: any): void {
+    this.http.post<any>(
+      `${environment.apiUrl}/actas-comite/${this.actaId}/solicitudes`,
+      { credito_ordinario_id: credito.id },
+      this.headers()
+    ).subscribe({
       next: (solicitud) => {
         this.prellenarMontoDecision(solicitud);
         this.acta.solicitudes.push(solicitud);
-        this.nuevaSolicitud = { cliente_nombre: '', cliente_identificacion: '', tipo_solicitud: '', monto: null };
-        this.nuevaSolicitudClienteBusqueda = null;
       },
       error: (err) => Swal.fire('Error', err?.error?.message || 'No se pudo agregar la solicitud.', 'error')
     });

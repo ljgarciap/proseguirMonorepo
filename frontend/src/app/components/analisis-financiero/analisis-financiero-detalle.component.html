@@ -298,10 +298,6 @@
     <!-- ================= PATRIMONIO ================= -->
     <div *ngIf="activeTab === 'patrimonio'">
       <h3 class="card-title">PATRIMONIO</h3>
-      <p class="field-note">
-        <span class="material-symbols-outlined">info</span>
-        Validación contable: TOTAL ACTIVO debe ser igual a TOTAL PASIVO + PATRIMONIO. Las diferencias se muestran en la pestaña RESUMEN.
-      </p>
       <table class="items-table">
         <thead>
           <tr>
@@ -546,10 +542,6 @@
           </tr>
         </tfoot>
       </table>
-      <p class="field-note">
-        <span class="material-symbols-outlined">info</span>
-        El TOTAL ORI se calcula automáticamente. Los valores negativos se presentan con signo menos.
-      </p>
     </div>
 
     <!-- ================= CARTERA ================= -->
@@ -601,10 +593,6 @@
           <canvas baseChart *ngIf="carteraChartData[anio]" [data]="carteraChartData[anio]" [options]="carteraChartOptions" [type]="'doughnut'"></canvas>
         </div>
       </div>
-      <p class="field-note">
-        <span class="material-symbols-outlined">info</span>
-        La provisión no se incluye en los gráficos circulares por ser un valor negativo; sí se considera en el cálculo de CARTERA NETA.
-      </p>
     </div>
 
     <!-- ================= RESUMEN ================= -->
