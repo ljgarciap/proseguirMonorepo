@@ -1,0 +1,89 @@
+<div class="view-container" *ngIf="!loading && credito">
+  <header class="view-header">
+    <div class="title-area">
+      <button class="btn-pro secondary sm back-btn" (click)="cancelar()">
+        <span class="material-symbols-outlined">arrow_back</span> Volver a la bandeja
+      </button>
+      <h1>Aprobación Registro de Crédito en CYF — {{ credito.numero_solicitud }}</h1>
+      <p>Revisión del registro en CYF realizado por Dirección Administrativa.</p>
+    </div>
+    <div class="header-actions">
+      <span class="status-pill info">Pendiente Aprobación</span>
+    </div>
+  </header>
+
+  <div class="alert-readonly" *ngIf="!puedeGestionar">
+    <span class="material-symbols-outlined">visibility</span>
+    Estás viendo esta solicitud en modo solo lectura.
+  </div>
+
+  <div class="detail-grid">
+    <!-- Información del cliente y del crédito -->
+    <div class="content-card">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">badge</span>
+        Información del Cliente y del Crédito (no editable)
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Número de Crédito</label><p class="readonly-value">{{ credito.numero_solicitud }}</p></div>
+        <div class="form-group"><label>Tipo de Crédito</label><p class="readonly-value">{{ solicitud?.tipo_credito?.nombre || '—' }}</p></div>
+        <div class="form-group"><label>Fecha de Solicitud</label><p class="readonly-value">{{ credito.created_at | date:'dd/MM/yyyy' }}</p></div>
+        <div class="form-group span-2"><label>Cliente</label><p class="readonly-value">{{ cliente?.nombre_razon_social || (cliente?.nombres + ' ' + cliente?.primer_apellido) || credito.cliente?.name || '—' }}</p></div>
+        <div class="form-group"><label>Identificación</label><p class="readonly-value">{{ cliente?.document_type?.nombre || '—' }} {{ cliente?.numero_documento || '' }}</p></div>
+        <div class="form-group"><label>Monto Solicitado</label><p class="readonly-value">$ {{ (solicitud?.monto_solicitado || credito.monto || 0) | number:'1.0-0':'es-CO' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Registro de Crédito en CYF -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">account_balance</span>
+        Registro de Crédito en CYF (no editable)
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Fecha del Registro</label><p class="readonly-value">{{ credito.fecha_registro_cyf ? (credito.fecha_registro_cyf | date:'dd/MM/yyyy') : '—' }}</p></div>
+        <div class="form-group"><label># de Radicado en CYF</label><p class="readonly-value">{{ credito.radicado_cyf || '—' }}</p></div>
+        <div class="form-group"><label>Registrado por</label><p class="readonly-value">{{ registroCyf?.usuario || '—' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Decisión -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">rule</span>
+        Decisión
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group span-2">
+          <label>Decisión <span class="required">*</span></label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="decision" value="aprobar" [(ngModel)]="decision" [disabled]="!puedeGestionar"> Aprobar
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="decision" value="rechazar" [(ngModel)]="decision" [disabled]="!puedeGestionar"> Rechazar
+            </label>
+          </div>
+        </div>
+        <div class="form-group span-3">
+          <label>Observaciones <span class="required" *ngIf="decision === 'rechazar'">*</span></label>
+          <textarea class="pro-input" rows="3" [(ngModel)]="observaciones" [disabled]="!puedeGestionar"
+                    placeholder="Obligatorio si la decisión es Rechazar"></textarea>
+        </div>
+      </div>
+
+      <div class="form-footer mt-4" *ngIf="puedeGestionar">
+        <button class="btn-pro secondary" (click)="cancelar()">
+          <span class="material-symbols-outlined">close</span> Cancelar
+        </button>
+        <button class="btn-pro primary" [disabled]="guardando" (click)="guardar()">
+          <span class="material-symbols-outlined">save</span> Guardar decisión
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="view-container" *ngIf="loading">
+  <p class="text-center py-4">Cargando solicitud...</p>
+</div>

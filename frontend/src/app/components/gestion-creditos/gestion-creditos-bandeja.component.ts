@@ -25,7 +25,11 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
   creditos: any[] = [];
   tarjetas: any = {
     sarlaft_desfavorable: 0, aprobada_garantias: 0, rechazada_comite: 0, pendiente_comite: 0,
-    pendiente_formalizacion_garantias: 0, pendiente_registro_cyf: 0
+    pendiente_formalizacion_garantias: 0, pendiente_registro_cyf: 0,
+    // SCRUM-211/215/219: el backend solo devuelve las claves visibles para
+    // el rol activo (ver ROLES_POR_CLAVE) — estos 3 quedan en undefined
+    // para coordinador_comercial, y el template los oculta con *ngIf.
+    aprobacion_registro_cyf: undefined, desembolso_ingreso: undefined, desembolso_aprobacion: undefined
   };
   loading = false;
   activeRole = '';
@@ -143,6 +147,9 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
     const mapaEstado: Record<string, string> = {
       pendiente_formalizacion_garantias: 'Pendiente Formalización de Garantías',
       pendiente_registro_cyf: 'Pendiente Registro de Crédito en CYF',
+      aprobacion_registro_cyf: 'Pendiente Aprobación Registro de Crédito en CYF',
+      desembolso_ingreso: 'Pendiente Registro de Operación de Desembolso en CYF',
+      desembolso_aprobacion: 'Pendiente Aprobación Registro de Operación de Desembolso en CYF',
     };
     if (mapaEstado[credito.estado]) return mapaEstado[credito.estado];
 
@@ -158,16 +165,34 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
   estadoPillClass(credito: any): any {
     return {
       'danger': credito.resultado_origen === 'sarlaft' || credito.resultado_origen === 'comite_rechazado',
-      'success': credito.resultado_origen === 'comite_aprobado',
-      'warning': credito.resultado_origen === 'comite_pendiente',
-      'purple': credito.estado === 'pendiente_formalizacion_garantias',
+      'success': credito.resultado_origen === 'comite_aprobado' || credito.estado === 'desembolso_aprobacion',
+      'warning': credito.resultado_origen === 'comite_pendiente' || credito.estado === 'aprobacion_registro_cyf',
+      'purple': credito.estado === 'pendiente_formalizacion_garantias' || credito.estado === 'desembolso_ingreso',
       'info': credito.estado === 'pendiente_registro_cyf',
     };
   }
 
+  /** SCRUM-211/215/219: cada uno de los 3 estados nuevos es del dominio
+   * exclusivo de un rol (Gerente o Operativo) — mismo mapa que el backend
+   * (ROLES_POR_CLAVE), replicado acá porque el rol que puede actuar cambia
+   * según el estado de la fila, no es fijo para todo el módulo. */
+  private rolPorEstado(estado: string): string | null {
+    const mapa: Record<string, string> = {
+      aprobacion_registro_cyf: 'gerente',
+      desembolso_ingreso: 'operativo',
+      desembolso_aprobacion: 'gerente',
+    };
+    return mapa[estado] || null;
+  }
+
   puedeGestionar(credito: any): boolean {
     if (credito.solicitud_gestionada) return false;
-    return this.activeRole === 'coordinador_comercial' || this.activeRole === 'superadmin';
+    if (this.activeRole === 'superadmin') return true;
+
+    const rolRequerido = this.rolPorEstado(credito.estado);
+    if (rolRequerido) return this.activeRole === rolRequerido;
+
+    return this.activeRole === 'coordinador_comercial';
   }
 
   accionLabel(credito: any): string {
@@ -178,15 +203,18 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
     return this.puedeGestionar(credito) ? 'edit_note' : 'visibility';
   }
 
-  /** SCRUM-193/205: los 2 estados nuevos tienen pantalla propia, distinta
-   * de la genérica /gestion-creditos/:id (4 resultados originales). */
+  /** SCRUM-193/205/211/215/219: cada estado nuevo tiene pantalla propia,
+   * distinta de la genérica /gestion-creditos/:id (4 resultados
+   * originales). */
   rutaGestion(credito: any): any[] {
-    if (credito.estado === 'pendiente_formalizacion_garantias') {
-      return ['/gestion-creditos', credito.id, 'formalizacion-garantias'];
-    }
-    if (credito.estado === 'pendiente_registro_cyf') {
-      return ['/gestion-creditos', credito.id, 'registro-cyf'];
-    }
-    return ['/gestion-creditos', credito.id];
+    const rutasPorEstado: Record<string, string> = {
+      pendiente_formalizacion_garantias: 'formalizacion-garantias',
+      pendiente_registro_cyf: 'registro-cyf',
+      aprobacion_registro_cyf: 'aprobacion-registro-cyf',
+      desembolso_ingreso: 'desembolso-ingreso',
+      desembolso_aprobacion: 'desembolso-aprobacion',
+    };
+    const sufijo = rutasPorEstado[credito.estado];
+    return sufijo ? ['/gestion-creditos', credito.id, sufijo] : ['/gestion-creditos', credito.id];
   }
 }

@@ -2,8 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Mail\DesembolsoAprobadoTesoreriaMail;
+use App\Mail\DesembolsoRechazadoOperativoMail;
+use App\Mail\DesembolsoRegistradoMail;
 use App\Mail\FormalizacionGarantiasResultadoMail;
 use App\Mail\GestionCreditoNotificacionMail;
+use App\Mail\RegistroCyfAprobadoMail;
 use App\Models\Amortizacion;
 use App\Models\ClientUpload;
 use App\Models\Cliente;
@@ -36,11 +40,17 @@ class GestionCreditoTest extends TestCase
     private $admin;
     private $coordinador;
     private $comite;
+    private $gerente;
+    private $operativo;
+    private $tesoreria;
     private $docCC;
     private $tipoOrdinario;
     private $amortizacionMensual;
     private $clienteNatural;
     private $preset;
+    private $presetDesembolso;
+    private $reqPagare;
+    private $reqComprobante;
 
     protected function setUp(): void
     {
@@ -83,9 +93,32 @@ class GestionCreditoTest extends TestCase
             'numero_documento' => 'comite_gc', 'tipo_documento_id' => $this->docCC->id, 'roles' => ['comite_credito'],
         ]);
 
+        // SCRUM-211/215/219
+        $this->gerente = User::create([
+            'name' => 'Gerente Test', 'email' => 'gerente.gc@test.com', 'password' => bcrypt('password'),
+            'numero_documento' => 'gerente_gc', 'tipo_documento_id' => $this->docCC->id, 'roles' => ['gerente'],
+        ]);
+
+        $this->operativo = User::create([
+            'name' => 'Operativo Test', 'email' => 'operativo.gc@test.com', 'password' => bcrypt('password'),
+            'numero_documento' => 'operativo_gc', 'tipo_documento_id' => $this->docCC->id, 'roles' => ['operativo'],
+        ]);
+
+        $this->tesoreria = User::create([
+            'name' => 'Tesoreria Test', 'email' => 'tesoreria.gc@test.com', 'password' => bcrypt('password'),
+            'numero_documento' => 'tesoreria_gc', 'tipo_documento_id' => $this->docCC->id, 'roles' => ['tesoreria'],
+        ]);
+
         $this->preset = DocumentPreset::create(['nombre' => 'Preset Garantías', 'descripcion' => 'Documentos de garantías']);
         $requirement = DocumentRequirement::create(['nombre' => 'Pagaré firmado', 'activo' => true]);
         $this->preset->requirements()->attach([$requirement->id]);
+
+        // SCRUM-215: preset de desembolso con 2 documentos, para probar que
+        // TODOS son obligatorios.
+        $this->presetDesembolso = DocumentPreset::create(['nombre' => 'Preset Desembolso', 'descripcion' => 'Documentos de desembolso']);
+        $this->reqPagare = DocumentRequirement::create(['nombre' => 'Pagaré', 'activo' => true]);
+        $this->reqComprobante = DocumentRequirement::create(['nombre' => 'Comprobante de Egreso', 'activo' => true]);
+        $this->presetDesembolso->requirements()->attach([$this->reqPagare->id, $this->reqComprobante->id]);
     }
 
     private function crearSolicitud(string $sufijo): SolicitudCredito
@@ -879,10 +912,268 @@ class GestionCreditoTest extends TestCase
 
         $credito->refresh();
         $this->assertSame('aprobacion_registro_cyf', $credito->estado);
-        $this->assertTrue($credito->solicitud_gestionada);
+        // SCRUM-211: queda en false, no true — 'aprobacion_registro_cyf' ya
+        // tiene tarjeta/pantalla propia (Gerente) y debe aparecer pendiente
+        // de gestión en vez de darse por gestionado acá.
+        $this->assertFalse($credito->solicitud_gestionada);
         $this->assertSame('2026-08-17', $credito->fecha_registro_cyf->toDateString());
         $this->assertSame('RAD-2026-001', $credito->radicado_cyf);
         // Reutiliza el gate legacy de Gerencia (ver docblock de registroCyf()).
         $this->assertSame('RAD-2026-001', $credito->documentos_raw['registro_cyf'] ?? null);
+    }
+
+    // ---- SCRUM-211: Aprobación Registro de Crédito en CYF ----------------
+
+    private function creditoPendienteAprobacionRegistroCyf(string $sufijo): CreditoOrdinario
+    {
+        $credito = $this->creditoPendienteRegistroCyf($sufijo);
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/registro-cyf", [
+            'fecha_registro_cyf' => '2026-08-17',
+            'radicado_cyf' => 'RAD-' . $sufijo,
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+
+        return $credito->fresh();
+    }
+
+    public function test_aprobacion_registro_cyf_falla_si_no_esta_pendiente(): void
+    {
+        $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', 'arc-guard');
+
+        Passport::actingAs($this->gerente);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/aprobacion-registro-cyf", [
+            'decision' => 'aprobar',
+        ], ['X-Active-Role' => 'gerente'])->assertStatus(422);
+    }
+
+    public function test_aprobacion_registro_cyf_solo_gerente_o_superadmin(): void
+    {
+        $credito = $this->creditoPendienteAprobacionRegistroCyf('arc-rol');
+
+        Passport::actingAs($this->operativo);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/aprobacion-registro-cyf", [
+            'decision' => 'aprobar',
+        ], ['X-Active-Role' => 'operativo'])->assertStatus(403);
+    }
+
+    public function test_aprobacion_registro_cyf_rechazar_sin_observaciones_falla(): void
+    {
+        $credito = $this->creditoPendienteAprobacionRegistroCyf('arc-obs');
+
+        Passport::actingAs($this->gerente);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/aprobacion-registro-cyf", [
+            'decision' => 'rechazar',
+        ], ['X-Active-Role' => 'gerente'])
+            ->assertStatus(422)
+            ->assertJson(['message' => 'Ingrese las observaciones del rechazo.']);
+    }
+
+    public function test_aprobacion_registro_cyf_aprobar_pasa_a_desembolso_ingreso_y_notifica_operativo(): void
+    {
+        $credito = $this->creditoPendienteAprobacionRegistroCyf('arc-ok');
+
+        Passport::actingAs($this->gerente);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/aprobacion-registro-cyf", [
+            'decision' => 'aprobar',
+        ], ['X-Active-Role' => 'gerente']);
+
+        $response->assertStatus(200)->assertJsonPath('credito.estado', 'desembolso_ingreso');
+
+        $credito->refresh();
+        $this->assertSame('desembolso_ingreso', $credito->estado);
+        $this->assertFalse($credito->solicitud_gestionada);
+
+        Mail::assertSent(RegistroCyfAprobadoMail::class, function ($mail) use ($credito) {
+            return $mail->credito->id === $credito->id && str_contains($mail->urlIngreso, '/login?returnTo=');
+        });
+    }
+
+    public function test_aprobacion_registro_cyf_rechazar_limpia_datos_y_vuelve_a_pendiente_registro_cyf(): void
+    {
+        $credito = $this->creditoPendienteAprobacionRegistroCyf('arc-rej');
+
+        Passport::actingAs($this->gerente);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/aprobacion-registro-cyf", [
+            'decision' => 'rechazar',
+            'observaciones' => 'Radicado ilegible, cargar de nuevo.',
+        ], ['X-Active-Role' => 'gerente']);
+
+        $response->assertStatus(200)->assertJsonPath('credito.estado', 'pendiente_registro_cyf');
+
+        $credito->refresh();
+        $this->assertSame('pendiente_registro_cyf', $credito->estado);
+        $this->assertNull($credito->fecha_registro_cyf);
+        $this->assertNull($credito->radicado_cyf);
+        $this->assertFalse($credito->solicitud_gestionada);
+        Mail::assertNotSent(RegistroCyfAprobadoMail::class);
+    }
+
+    // ---- SCRUM-215: Registro de Operación Desembolso en CYF ---------------
+
+    private function creditoPendienteDesembolsoIngreso(string $sufijo): CreditoOrdinario
+    {
+        $credito = $this->creditoPendienteAprobacionRegistroCyf($sufijo);
+
+        Passport::actingAs($this->gerente);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/aprobacion-registro-cyf", [
+            'decision' => 'aprobar',
+        ], ['X-Active-Role' => 'gerente'])->assertStatus(200);
+
+        return $credito->fresh();
+    }
+
+    public function test_desembolso_ingreso_falla_si_no_esta_pendiente(): void
+    {
+        $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', 'di-guard');
+
+        Passport::actingAs($this->operativo);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/desembolso-ingreso", [
+            'document_preset_id' => $this->presetDesembolso->id,
+        ], ['X-Active-Role' => 'operativo'])->assertStatus(422);
+    }
+
+    public function test_desembolso_ingreso_solo_operativo_o_superadmin(): void
+    {
+        $credito = $this->creditoPendienteDesembolsoIngreso('di-rol');
+
+        Passport::actingAs($this->gerente);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/desembolso-ingreso", [
+            'document_preset_id' => $this->presetDesembolso->id,
+        ], ['X-Active-Role' => 'gerente'])->assertStatus(403);
+    }
+
+    public function test_desembolso_ingreso_exige_todos_los_documentos_del_preset(): void
+    {
+        $credito = $this->creditoPendienteDesembolsoIngreso('di-falta');
+
+        Passport::actingAs($this->operativo);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/desembolso-ingreso", [
+            'document_preset_id' => $this->presetDesembolso->id,
+            'documentos' => [$this->reqPagare->id => UploadedFile::fake()->create('pagare.pdf', 100, 'application/pdf')],
+        ], ['X-Active-Role' => 'operativo']);
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString('Comprobante de Egreso', $response->json('message'));
+    }
+
+    public function test_desembolso_ingreso_guarda_documentos_y_notifica_gerente(): void
+    {
+        $credito = $this->creditoPendienteDesembolsoIngreso('di-ok');
+
+        Passport::actingAs($this->operativo);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/desembolso-ingreso", [
+            'document_preset_id' => $this->presetDesembolso->id,
+            'observaciones' => 'Todo en orden.',
+            'documentos' => [
+                $this->reqPagare->id => UploadedFile::fake()->create('pagare.pdf', 100, 'application/pdf'),
+                $this->reqComprobante->id => UploadedFile::fake()->create('comprobante.pdf', 100, 'application/pdf'),
+            ],
+        ], ['X-Active-Role' => 'operativo']);
+
+        $response->assertStatus(200)->assertJsonPath('credito.estado', 'desembolso_aprobacion');
+
+        $credito->refresh();
+        $this->assertSame('desembolso_aprobacion', $credito->estado);
+        $this->assertFalse($credito->solicitud_gestionada);
+        $this->assertSame($this->presetDesembolso->id, $credito->documentos_desembolso['preset_id']);
+        $this->assertCount(2, $credito->documentos_desembolso['documentos']);
+        $this->assertNotEmpty($credito->documentos_raw['desembolso_egreso']);
+
+        Mail::assertSent(DesembolsoRegistradoMail::class, function ($mail) use ($credito) {
+            return $mail->credito->id === $credito->id;
+        });
+    }
+
+    // ---- SCRUM-219: Aprobación de Registro de Operación de Desembolso ----
+
+    private function creditoPendienteDesembolsoAprobacion(string $sufijo): CreditoOrdinario
+    {
+        $credito = $this->creditoPendienteDesembolsoIngreso($sufijo);
+
+        Passport::actingAs($this->operativo);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/desembolso-ingreso", [
+            'document_preset_id' => $this->presetDesembolso->id,
+            'documentos' => [
+                $this->reqPagare->id => UploadedFile::fake()->create('pagare.pdf', 100, 'application/pdf'),
+                $this->reqComprobante->id => UploadedFile::fake()->create('comprobante.pdf', 100, 'application/pdf'),
+            ],
+        ], ['X-Active-Role' => 'operativo'])->assertStatus(200);
+
+        return $credito->fresh();
+    }
+
+    public function test_desembolso_aprobacion_falla_si_no_esta_pendiente(): void
+    {
+        $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', 'da-guard');
+
+        Passport::actingAs($this->gerente);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/desembolso-aprobacion", [
+            'decision' => 'aprobar',
+        ], ['X-Active-Role' => 'gerente'])->assertStatus(422);
+    }
+
+    public function test_desembolso_aprobacion_aprobar_pasa_a_ejecucion_transferencia_y_notifica_tesoreria(): void
+    {
+        $credito = $this->creditoPendienteDesembolsoAprobacion('da-ok');
+
+        Passport::actingAs($this->gerente);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/desembolso-aprobacion", [
+            'decision' => 'aprobar',
+        ], ['X-Active-Role' => 'gerente']);
+
+        $response->assertStatus(200)->assertJsonPath('credito.estado', 'ejecucion_transferencia');
+
+        $credito->refresh();
+        $this->assertSame('ejecucion_transferencia', $credito->estado);
+        $this->assertTrue($credito->solicitud_gestionada);
+
+        Mail::assertSent(DesembolsoAprobadoTesoreriaMail::class, function ($mail) use ($credito) {
+            return $mail->credito->id === $credito->id;
+        });
+    }
+
+    public function test_desembolso_aprobacion_rechazar_vuelve_a_desembolso_ingreso_y_notifica_operativo(): void
+    {
+        $credito = $this->creditoPendienteDesembolsoAprobacion('da-rej');
+
+        Passport::actingAs($this->gerente);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/desembolso-aprobacion", [
+            'decision' => 'rechazar',
+            'observaciones' => 'Falta el comprobante correcto.',
+        ], ['X-Active-Role' => 'gerente']);
+
+        $response->assertStatus(200)->assertJsonPath('credito.estado', 'desembolso_ingreso');
+
+        $credito->refresh();
+        $this->assertSame('desembolso_ingreso', $credito->estado);
+        $this->assertFalse($credito->solicitud_gestionada);
+
+        Mail::assertSent(DesembolsoRechazadoOperativoMail::class, function ($mail) use ($credito) {
+            return $mail->credito->id === $credito->id && $mail->observaciones === 'Falta el comprobante correcto.';
+        });
+    }
+
+    // ---- Visibilidad por rol (tarjetas/index) -----------------------------
+
+    public function test_tarjetas_gerente_solo_ve_sus_propias_claves(): void
+    {
+        $this->crearCredito('aprobada_garantias', 'comite_aprobado', 'vis-1');
+        $this->creditoPendienteAprobacionRegistroCyf('vis-2');
+
+        Passport::actingAs($this->gerente);
+        $response = $this->getJson('/api/gestion-creditos/tarjetas', ['X-Active-Role' => 'gerente']);
+
+        $response->assertStatus(200)->assertJson(['aprobacion_registro_cyf' => 1]);
+        $this->assertArrayNotHasKey('aprobada_garantias', $response->json());
+    }
+
+    public function test_operativo_no_puede_ver_detalle_de_credito_fuera_de_su_clave(): void
+    {
+        $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', 'vis-3');
+
+        Passport::actingAs($this->operativo);
+        $this->getJson("/api/gestion-creditos/{$credito->id}", ['X-Active-Role' => 'operativo'])
+            ->assertStatus(404);
     }
 }

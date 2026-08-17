@@ -111,6 +111,14 @@ class ConfiguracionSeeder extends Seeder
                 'grupo'       => 'sesion',
                 'es_secreto'  => false,
             ],
+            // Gestión de Créditos - CYF (SCRUM-219)
+            [
+                'clave'       => 'URL_BASE_SISTEMA_GESTION_LIQUIDEZ',
+                'valor'       => env('URL_BASE_SISTEMA_GESTION_LIQUIDEZ', env('FRONTEND_URL')),
+                'descripcion' => 'URL HTTPS base (administrable por ambiente) del Sistema de Gestión de Liquidez de Proseguir, usada por el botón "Ingresar al sistema" de los correos de aprobación/rechazo de Registro y Desembolso en CYF (SCRUM-211/215/219).',
+                'grupo'       => 'gestion_creditos',
+                'es_secreto'  => false,
+            ],
         ];
 
         foreach ($configs as $config) {
