@@ -218,6 +218,7 @@ Route::prefix('actas-comite')->middleware('auth:api')->group(function () {
     Route::get('/{acta}', [\App\Http\Controllers\ActaComiteController::class, 'show']);
     Route::put('/{acta}', [\App\Http\Controllers\ActaComiteController::class, 'actualizar']);
     Route::post('/{acta}/aprobar-orden-dia', [\App\Http\Controllers\ActaComiteController::class, 'aprobarOrdenDia']);
+    Route::get('/{acta}/creditos-elegibles', [\App\Http\Controllers\ActaComiteController::class, 'buscarCreditosElegibles']);
     Route::post('/{acta}/solicitudes', [\App\Http\Controllers\ActaComiteController::class, 'agregarSolicitud']);
     Route::put('/{acta}/solicitudes/{solicitud}', [\App\Http\Controllers\ActaComiteController::class, 'actualizarSolicitud']);
     Route::delete('/{acta}/solicitudes/{solicitud}', [\App\Http\Controllers\ActaComiteController::class, 'eliminarSolicitud']);

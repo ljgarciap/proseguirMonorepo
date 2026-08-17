@@ -533,7 +533,7 @@ class GestionCreditoTest extends TestCase
             ->assertJsonCount(1, 'items');
     }
 
-    public function test_revisar_documento_aprueba_item_y_habilita_comite_al_completar_todos(): void
+    public function test_revisar_documento_aprueba_item_y_habilita_garantias_al_completar_todos(): void
     {
         $credito = $this->crearCredito('pendiente_comite', 'comite_pendiente', '1');
         $headers = ['X-Active-Role' => 'coordinador_comercial'];
@@ -561,7 +561,7 @@ class GestionCreditoTest extends TestCase
             $headers
         );
 
-        $response->assertStatus(200)->assertJsonPath('credito_disponible_comite', true);
+        $response->assertStatus(200)->assertJsonPath('credito_disponible_garantias', true);
 
         $item->refresh();
         $this->assertSame('aprobado', $item->estado);
@@ -572,7 +572,15 @@ class GestionCreditoTest extends TestCase
         $this->assertSame('completado', $documentRequest->estado);
 
         $credito->refresh();
-        $this->assertSame('comite_evaluacion', $credito->estado);
+        $this->assertSame('aprobada_garantias', $credito->estado);
+        $this->assertSame('comite_aprobado', $credito->resultado_origen);
+        $this->assertFalse($credito->solicitud_gestionada);
+
+        // El crédito vuelve a aparecer pendiente de gestión en la bandeja de
+        // "Aprobada para garantías" (SCRUM-199).
+        $this->getJson('/api/gestion-creditos?estado=aprobada_garantias', $headers)
+            ->assertStatus(200)
+            ->assertJsonFragment(['id' => $credito->id]);
     }
 
     public function test_revisar_documento_rechaza_item_credito_sigue_pendiente_comite(): void
@@ -600,7 +608,7 @@ class GestionCreditoTest extends TestCase
             $headers
         );
 
-        $response->assertStatus(200)->assertJsonPath('credito_disponible_comite', false);
+        $response->assertStatus(200)->assertJsonPath('credito_disponible_garantias', false);
 
         $item->refresh();
         $this->assertSame('rechazado', $item->estado);

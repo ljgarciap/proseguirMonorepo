@@ -104,7 +104,7 @@
               <td>{{ s.cliente_nombre }}</td>
               <td>{{ s.tipo_solicitud }}</td>
               <td>${{ (s.monto || 0) | number:'1.0-0':'es-CO' }}</td>
-              <td>{{ s.origen === 'sistema' ? 'Análisis financiero' : 'Adicionada manualmente' }}</td>
+              <td>{{ s.origen === 'sistema' ? 'Análisis financiero' : (s.origen === 'manual_existente' ? 'Existente (agregado manualmente)' : 'Adicionada manualmente') }}</td>
               <td class="text-right">
                 <button *ngIf="s.origen === 'manual' && !soloLectura" class="btn-pro sm secondary" (click)="eliminarSolicitud(s)">Eliminar</button>
               </td>
@@ -114,23 +114,16 @@
         </table>
       </div>
 
-      <!-- SCRUM-189 (2026-08-12, punto 2): buscador de cliente (autofill de
-           nombre/identificación, sigue admitiendo texto libre), dropdown de
-           tipo de solicitud (catálogo real) y monto con separador de miles. -->
+      <!-- SCRUM-198: el alta manual solo permite enlazar un crédito ya
+           existente y elegible para comité — ya no se puede tipear datos
+           de un crédito desde cero. -->
       <div class="inline-add-solicitud" *ngIf="!soloLectura">
-        <app-cliente-autocomplete
-          [(ngModel)]="nuevaSolicitudClienteBusqueda"
-          (clienteSeleccionado)="onClienteManualSeleccionado($event)"
-          placeholder="Buscar cliente existente...">
-        </app-cliente-autocomplete>
-        <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitud.cliente_nombre" placeholder="Cliente *">
-        <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitud.cliente_identificacion" placeholder="N.° de identificación">
-        <select class="pro-input" [(ngModel)]="nuevaSolicitud.tipo_solicitud">
-          <option value="">Tipo de solicitud... *</option>
-          <option *ngFor="let t of tiposCredito" [value]="t.nombre">{{ t.nombre }}</option>
-        </select>
-        <input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="nuevaSolicitud.monto" placeholder="Monto *">
-        <button class="btn-pro sm primary" (click)="agregarSolicitudManual()">Agregar solicitud manual</button>
+        <app-credito-elegible-autocomplete
+          [actaId]="actaId"
+          [activeRole]="activeRole"
+          (creditoSeleccionado)="onCreditoElegibleSeleccionado($event)"
+          placeholder="Buscar crédito elegible (cliente o identificación)...">
+        </app-credito-elegible-autocomplete>
       </div>
     </section>
 
@@ -144,7 +137,7 @@
         <h4>
           {{ s.cliente_nombre }}
           <span *ngIf="s.cliente_identificacion" class="text-muted">— {{ s.cliente_identificacion }}</span>
-          <span class="text-muted">({{ s.origen === 'sistema' ? 'Análisis financiero' : 'Manual' }})</span>
+          <span class="text-muted">({{ s.origen === 'sistema' ? 'Análisis financiero' : (s.origen === 'manual_existente' ? 'Existente' : 'Manual') }})</span>
         </h4>
         <div class="form-grid">
           <div class="form-field" *ngIf="s.origen === 'manual'">

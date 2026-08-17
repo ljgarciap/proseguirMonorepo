@@ -50,14 +50,20 @@ class ActaComiteController extends Controller
 
     private const ROLES_AUTORIZADOS = ['coordinador_comercial', 'superadmin'];
 
+    /**
+     * SCRUM-198: se quitaron "Presentación de solicitudes de crédito." y
+     * "Decisión de solicitudes presentadas." — son texto libre redundante
+     * con funcionalidad que el Acta ya tiene estructurada (la tabla de
+     * solicitudes de esta misma pestaña y el formulario de decisión de la
+     * pestaña 3). Ver también RemoveOrdenDiaItemsScrum198 (mismo texto
+     * literal, migración retroactiva para actas ya generadas).
+     */
     private const ORDEN_DIA_DEFAULT = [
         'Verificación de quórum.',
         'Designación del presidente y secretario de la reunión.',
         'Lectura del acta anterior.',
         'Revisión Flujo de caja.',
         'Revisión de atribuciones en las operaciones (Capital de trabajo, constructor y factoring).',
-        'Presentación de solicitudes de crédito.',
-        'Decisión de solicitudes presentadas.',
     ];
 
     public function index(Request $request)
@@ -129,7 +135,7 @@ class ActaComiteController extends Controller
         return response()->json($acta->load('solicitudes'), 201);
     }
 
-    private function crearSolicitudDesdeCredito(ActaComite $acta, CreditoOrdinario $credito): ActaComiteSolicitud
+    private function crearSolicitudDesdeCredito(ActaComite $acta, CreditoOrdinario $credito, string $origen = 'sistema'): ActaComiteSolicitud
     {
         $solicitud = $credito->solicitudCredito;
         $cliente = $solicitud?->cliente;
@@ -137,7 +143,7 @@ class ActaComiteController extends Controller
         return ActaComiteSolicitud::create([
             'acta_comite_id' => $acta->id,
             'credito_ordinario_id' => $credito->id,
-            'origen' => 'sistema',
+            'origen' => $origen,
             'cliente_nombre' => $cliente?->nombre,
             'cliente_identificacion' => $cliente?->numero_documento,
             'tipo_solicitud' => $solicitud?->tipoCredito?->nombre,
@@ -241,8 +247,11 @@ class ActaComiteController extends Controller
     }
 
     /**
-     * Agregar solicitud manual (créditos que no existen en el sistema).
-     * VAL-05 si faltan los campos mínimos para presentarla.
+     * SCRUM-198: agregar a mano un crédito ya existente en el sistema
+     * (elegible para comité) — ya no se permite tipear datos desde cero,
+     * el frontend solo expone el buscador de buscarCreditosElegibles().
+     * `credito_ordinario_id` es el único camino real; los campos libres
+     * quedan como fallback defensivo del backend, no expuestos en la UI.
      */
     public function agregarSolicitud(Request $request, ActaComite $acta)
     {
@@ -251,25 +260,73 @@ class ActaComiteController extends Controller
         $this->rechazarSiAprobada($acta);
 
         $validado = $request->validate([
-            'cliente_nombre' => 'required|string|max:255',
-            // SCRUM-189 (2026-08-12, punto 2): opcional — el buscador de
-            // cliente del frontend lo autocompleta al seleccionar, pero
-            // sigue admitiendo texto libre sin identificación (spec
-            // original de SCRUM-169 admite ambos).
+            'credito_ordinario_id' => 'nullable|exists:credito_ordinarios,id',
+            'cliente_nombre' => 'required_without:credito_ordinario_id|string|max:255',
             'cliente_identificacion' => 'nullable|string|max:255',
-            'tipo_solicitud' => 'required|string|max:255',
-            'monto' => 'required|numeric|min:0',
+            'tipo_solicitud' => 'required_without:credito_ordinario_id|string|max:255',
+            'monto' => 'required_without:credito_ordinario_id|numeric|min:0',
         ]);
 
-        $solicitud = ActaComiteSolicitud::create($validado + [
-            'acta_comite_id' => $acta->id,
-            'origen' => 'manual',
-        ]);
+        if (!empty($validado['credito_ordinario_id'])) {
+            $credito = CreditoOrdinario::where('estado', 'comite_evaluacion')
+                ->with(['solicitudCredito.cliente', 'solicitudCredito.tipoCredito', 'solicitudCredito.amortizacion'])
+                ->findOrFail($validado['credito_ordinario_id']);
+
+            $yaIncluido = $acta->solicitudes()->where('credito_ordinario_id', $credito->id)->exists();
+            if ($yaIncluido) {
+                return response()->json(['message' => 'Ese crédito ya está incluido en esta Acta.'], 422);
+            }
+
+            $solicitud = $this->crearSolicitudDesdeCredito($acta, $credito, origen: 'manual_existente');
+        } else {
+            $solicitud = ActaComiteSolicitud::create($validado + [
+                'acta_comite_id' => $acta->id,
+                'origen' => 'manual',
+            ]);
+        }
 
         $acta->estado = $acta->estado === 'pendiente' ? 'borrador' : $acta->estado;
         $acta->save();
 
         return response()->json($solicitud, 201);
+    }
+
+    /**
+     * SCRUM-198: buscador de créditos existentes para el alta manual de la
+     * pestaña Desarrollo — mismo criterio de elegibilidad que
+     * sincronizarSolicitudesElegibles() (estado comite_evaluacion), excluye
+     * los créditos ya vinculados a ESTA acta. Search-as-you-type por
+     * nombre/identificación del cliente, mínimo 3 caracteres.
+     */
+    public function buscarCreditosElegibles(Request $request, ActaComite $acta)
+    {
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarRol($activeRole);
+
+        $q = trim((string) $request->input('q', ''));
+        if (mb_strlen($q) < 3) {
+            return response()->json([]);
+        }
+
+        $idsYaIncluidos = $acta->solicitudes()->whereNotNull('credito_ordinario_id')->pluck('credito_ordinario_id');
+
+        $creditos = CreditoOrdinario::where('estado', 'comite_evaluacion')
+            ->whereNotIn('id', $idsYaIncluidos)
+            ->whereHas('solicitudCredito.cliente', function ($query) use ($q) {
+                $query->where('nombre', 'like', "%{$q}%")
+                    ->orWhere('numero_documento', 'like', "%{$q}%");
+            })
+            ->with(['solicitudCredito.cliente', 'solicitudCredito.tipoCredito'])
+            ->limit(20)
+            ->get();
+
+        return response()->json($creditos->map(fn (CreditoOrdinario $c) => [
+            'id' => $c->id,
+            'cliente_nombre' => $c->solicitudCredito?->cliente?->nombre,
+            'cliente_identificacion' => $c->solicitudCredito?->cliente?->numero_documento,
+            'tipo_solicitud' => $c->solicitudCredito?->tipoCredito?->nombre,
+            'monto' => $c->monto,
+        ]));
     }
 
     /**
