@@ -31,6 +31,7 @@ class CreditoOrdinario extends Model
         'gestion_detalle',
         'fecha_registro_cyf',
         'radicado_cyf',
+        'documentos_desembolso',
     ];
 
     /**
@@ -52,6 +53,7 @@ class CreditoOrdinario extends Model
             'fecha_gestion' => 'datetime',
             'gestion_detalle' => 'array',
             'fecha_registro_cyf' => 'date',
+            'documentos_desembolso' => 'array',
         ];
     }
 
@@ -118,6 +120,30 @@ class CreditoOrdinario extends Model
         }
 
         return Storage::disk('public')->url($valor);
+    }
+
+    /**
+     * SCRUM-215: mismo problema/solución que getDocumentosAttribute() —
+     * las rutas de los documentos de desembolso se guardan relativas al
+     * disco 'public' y se resuelven a URL absoluta recién al leer, con el
+     * APP_URL vigente (SCRUM-148).
+     */
+    public function getDocumentosDesembolsoAttribute($value)
+    {
+        $data = $value !== null ? json_decode($value, true) : null;
+
+        if (!is_array($data) || empty($data['documentos']) || !is_array($data['documentos'])) {
+            return $data;
+        }
+
+        $data['documentos'] = array_map(function ($doc) {
+            if (!empty($doc['path'])) {
+                $doc['url'] = self::resolveStorageUrl($doc['path']);
+            }
+            return $doc;
+        }, $data['documentos']);
+
+        return $data;
     }
 
     /**

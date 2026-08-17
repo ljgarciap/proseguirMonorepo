@@ -49,6 +49,29 @@
         <p class="tile-label">Registro de Crédito en CYF</p>
       </div>
     </div>
+    <!-- SCRUM-211/215/219: el backend solo devuelve estas claves si el rol
+         activo las tiene asignadas (ROLES_POR_CLAVE) — undefined las oculta. -->
+    <div class="tile-card clickable" *ngIf="tarjetas.aprobacion_registro_cyf !== undefined" (click)="filtrarPorTarjeta('aprobacion_registro_cyf')">
+      <span class="material-symbols-outlined tile-icon warning">fact_check</span>
+      <div>
+        <p class="tile-value">{{ tarjetas.aprobacion_registro_cyf }}</p>
+        <p class="tile-label">Aprobación Registro de Crédito en CYF</p>
+      </div>
+    </div>
+    <div class="tile-card clickable" *ngIf="tarjetas.desembolso_ingreso !== undefined" (click)="filtrarPorTarjeta('desembolso_ingreso')">
+      <span class="material-symbols-outlined tile-icon purple">local_shipping</span>
+      <div>
+        <p class="tile-value">{{ tarjetas.desembolso_ingreso }}</p>
+        <p class="tile-label">Registro de Operación en CYF</p>
+      </div>
+    </div>
+    <div class="tile-card clickable" *ngIf="tarjetas.desembolso_aprobacion !== undefined" (click)="filtrarPorTarjeta('desembolso_aprobacion')">
+      <span class="material-symbols-outlined tile-icon success">price_check</span>
+      <div>
+        <p class="tile-value">{{ tarjetas.desembolso_aprobacion }}</p>
+        <p class="tile-label">Aprobación Registro Operación de Desembolso en CYF</p>
+      </div>
+    </div>
   </div>
 
   <div class="content-card mt-4">
@@ -76,6 +99,9 @@
         <option value="pendiente_comite">Pendiente por Comité</option>
         <option value="pendiente_formalizacion_garantias">Pendiente Formalización de Garantías</option>
         <option value="pendiente_registro_cyf">Pendiente Registro de Crédito en CYF</option>
+        <option value="aprobacion_registro_cyf">Pendiente Aprobación Registro CYF</option>
+        <option value="desembolso_ingreso">Pendiente Registro de Operación de Desembolso</option>
+        <option value="desembolso_aprobacion">Pendiente Aprobación Operación de Desembolso</option>
       </select>
       <select class="pro-input" [(ngModel)]="filtroGestionada">
         <option value="todos">Solicitud gestionada: Todos</option>

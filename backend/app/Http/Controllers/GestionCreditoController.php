@@ -3,12 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesActiveRole;
+use App\Mail\DesembolsoAprobadoTesoreriaMail;
+use App\Mail\DesembolsoRechazadoOperativoMail;
+use App\Mail\DesembolsoRegistradoMail;
 use App\Mail\FormalizacionGarantiasResultadoMail;
 use App\Mail\GestionCreditoNotificacionMail;
+use App\Mail\RegistroCyfAprobadoMail;
 use App\Models\CreditoOrdinario;
 use App\Models\DocumentPreset;
 use App\Models\DocumentRequest;
 use App\Models\DocumentRequestItem;
+use App\Models\User;
+use App\Services\ConfiguracionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
@@ -32,6 +38,20 @@ use Throwable;
  * 'pendiente_registro_cyf' (registroCyf(), captura fecha + radicado) →
  * de ahí SÍ entra al 'aprobacion_registro_cyf' legacy para que Gerencia
  * apruebe con la pantalla ya existente.
+ *
+ * SCRUM-211/215/219 (2026-08-17) continúan la cadena tomando posesión
+ * directa, con pantallas propias acá, de los 3 estados legacy que ya
+ * estaban role-mapeados en CreditoOrdinarioController::transition() pero
+ * sin pantalla dedicada ni notificación por correo:
+ * 'aprobacion_registro_cyf' (Gerente aprueba/rechaza el registro de
+ * Operativo/Coordinador — SCRUM-211) → 'desembolso_ingreso' (Operativo
+ * registra la Operación de Desembolso con los documentos del preset —
+ * SCRUM-215) → 'desembolso_aprobacion' (Gerente aprueba/rechaza — SCRUM-219,
+ * aprobado sale a 'ejecucion_transferencia' para Tesorería, sin pantalla
+ * nueva porque esa ya existe en Crédito Ordinario). El switch genérico de
+ * `CreditoOrdinarioController::transition()` para estos 3 estados queda
+ * intacto como vía de escape (mismo criterio no-destructivo que
+ * registroCyf()), pero deja de ser el camino esperado.
  */
 class GestionCreditoController extends Controller
 {
@@ -69,6 +89,33 @@ class GestionCreditoController extends Controller
     private const ESTADOS_SIMPLES = [
         'pendiente_formalizacion_garantias' => 'pendiente_formalizacion_garantias',
         'pendiente_registro_cyf'            => 'pendiente_registro_cyf',
+        // SCRUM-211/215/219: estados legacy que ya existían en el switch de
+        // CreditoOrdinarioController::transition() (clave === estado, ver
+        // docblock de la clase) — acá pasan a tener tarjeta, pantalla propia
+        // y notificación por correo.
+        'aprobacion_registro_cyf'           => 'aprobacion_registro_cyf',
+        'desembolso_ingreso'                => 'desembolso_ingreso',
+        'desembolso_aprobacion'             => 'desembolso_aprobacion',
+    ];
+
+    /**
+     * SCRUM-211/215/219: a diferencia de RESULTADOS/ESTADOS_SIMPLES (qué
+     * credit cae en cada tarjeta), esto define QUIÉN puede ver/contar cada
+     * tarjeta — cada una de las 3 nuevas es del dominio exclusivo de un solo
+     * rol (Gerente o Operativo), a diferencia de las 6 originales que son
+     * todas del Coordinador Comercial. superadmin no pasa por este mapa
+     * (ve todo, ver clavesVisiblesParaRol()).
+     */
+    private const ROLES_POR_CLAVE = [
+        'sarlaft_desfavorable'               => ['coordinador_comercial'],
+        'aprobada_garantias'                 => ['coordinador_comercial'],
+        'rechazada_comite'                   => ['coordinador_comercial'],
+        'pendiente_comite'                   => ['coordinador_comercial'],
+        'pendiente_formalizacion_garantias'  => ['coordinador_comercial'],
+        'pendiente_registro_cyf'             => ['coordinador_comercial'],
+        'aprobacion_registro_cyf'            => ['gerente'],
+        'desembolso_ingreso'                 => ['operativo'],
+        'desembolso_aprobacion'              => ['gerente'],
     ];
 
     /**
@@ -81,6 +128,21 @@ class GestionCreditoController extends Controller
         $this->autorizarRol($activeRole);
 
         $query = $this->queryBase();
+
+        // SCRUM-211/215/219: Gerente/Operativo solo ven las solicitudes de
+        // SU tarjeta (visibilidad restringida por ticket) — superadmin y
+        // coordinador_comercial no se restringen acá, ya que
+        // coordinador_comercial solo tiene claves asignadas de todos modos.
+        if ($activeRole !== 'superadmin') {
+            $clavesVisibles = $this->clavesVisiblesParaRol($activeRole);
+            $query->where(function ($q) use ($clavesVisibles) {
+                foreach ($clavesVisibles as $clave) {
+                    $q->orWhere(function ($qc) use ($clave) {
+                        $this->aplicarCondicionClave($qc, $clave);
+                    });
+                }
+            });
+        }
 
         if ($request->filled('busqueda')) {
             $texto = $request->busqueda;
@@ -105,11 +167,11 @@ class GestionCreditoController extends Controller
             });
         }
 
-        if ($request->filled('estado') && $request->estado !== 'todos' && isset(self::RESULTADOS[$request->estado])) {
-            $resultado = self::RESULTADOS[$request->estado];
-            $query->where('estado', $resultado['estado'])->where('resultado_origen', $resultado['origen']);
-        } elseif ($request->filled('estado') && $request->estado !== 'todos' && isset(self::ESTADOS_SIMPLES[$request->estado])) {
-            $query->where('estado', self::ESTADOS_SIMPLES[$request->estado]);
+        if ($request->filled('estado') && $request->estado !== 'todos'
+            && (isset(self::RESULTADOS[$request->estado]) || isset(self::ESTADOS_SIMPLES[$request->estado]))) {
+            $query->where(function ($q) use ($request) {
+                $this->aplicarCondicionClave($q, $request->estado);
+            });
         }
 
         if ($request->filled('gestionada') && $request->gestionada !== 'todos') {
@@ -150,7 +212,9 @@ class GestionCreditoController extends Controller
     }
 
     /**
-     * Conteos de las 4 tarjetas: solo Solicitud gestionada = No (§3.1).
+     * Conteos de tarjetas: solo Solicitud gestionada = No (§3.1). SCRUM-211/
+     * 215/219: cada rol solo ve las claves que le pertenecen (ver
+     * ROLES_POR_CLAVE) — superadmin ve todas.
      */
     public function tarjetas(Request $request)
     {
@@ -158,16 +222,10 @@ class GestionCreditoController extends Controller
         $this->autorizarRol($activeRole);
 
         $conteos = [];
-        foreach (self::RESULTADOS as $clave => $resultado) {
-            $conteos[$clave] = CreditoOrdinario::where('estado', $resultado['estado'])
-                ->where('resultado_origen', $resultado['origen'])
-                ->where('solicitud_gestionada', false)
-                ->count();
-        }
-        foreach (self::ESTADOS_SIMPLES as $clave => $estado) {
-            $conteos[$clave] = CreditoOrdinario::where('estado', $estado)
-                ->where('solicitud_gestionada', false)
-                ->count();
+        foreach ($this->clavesVisiblesParaRol($activeRole) as $clave) {
+            $query = CreditoOrdinario::query();
+            $this->aplicarCondicionClave($query, $clave);
+            $conteos[$clave] = $query->where('solicitud_gestionada', false)->count();
         }
 
         return response()->json($conteos);
@@ -182,6 +240,16 @@ class GestionCreditoController extends Controller
         $this->autorizarRol($activeRole);
 
         $credito = $this->queryBase()->findOrFail($creditoId);
+
+        // SCRUM-211/215/219: mismo scoping de visibilidad que index()/
+        // tarjetas() — Gerente/Operativo no pueden abrir el detalle de una
+        // solicitud fuera de su propia clave.
+        if ($activeRole !== 'superadmin') {
+            $clave = $this->claveDelCredito($credito);
+            if (!$clave || !in_array($activeRole, self::ROLES_POR_CLAVE[$clave] ?? [], true)) {
+                abort(404);
+            }
+        }
 
         return response()->json($this->conFechaValidacion($credito));
     }
@@ -654,13 +722,293 @@ class GestionCreditoController extends Controller
         $credito->radicado_cyf = $radicado;
         $credito->documentos = $documentos;
         $credito->estado = 'aprobacion_registro_cyf';
-        $credito->solicitud_gestionada = true;
-        $credito->fecha_gestion = now();
+        // SCRUM-211: antes quedaba en true porque 'aprobacion_registro_cyf'
+        // solo alimentaba la pantalla legacy de Crédito Ordinario, sin
+        // tarjeta propia acá. Ahora sí la tiene (aprobacionRegistroCyf()) y
+        // necesita aparecer como pendiente de gestión para Gerencia.
+        $credito->solicitud_gestionada = false;
+        $credito->fecha_gestion = null;
         $credito->historial_estados = $historial;
         $credito->save();
 
         return response()->json([
             'message' => 'El crédito quedó registrado en CYF y disponible para la aprobación de Gerencia.',
+            'credito' => $this->conFechaValidacion($credito->fresh(self::RELACIONES_DETALLE)),
+        ]);
+    }
+
+    /**
+     * SCRUM-211: Gerencia aprueba o rechaza el Registro de Crédito en CYF
+     * (fecha + radicado capturados por registroCyf()). Estado de entrada
+     * obligatorio 'aprobacion_registro_cyf'. Aprobar pasa a
+     * 'desembolso_ingreso' (SCRUM-215) y notifica a Operativo; rechazar
+     * limpia fecha/radicado y vuelve a 'pendiente_registro_cyf' para que se
+     * registre de nuevo (§8.2 del ticket) — no se notifica en ese caso, el
+     * ticket solo define correo para el resultado aprobado.
+     */
+    public function aprobacionRegistroCyf(Request $request, $creditoId)
+    {
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarAccionGerencial($activeRole);
+        $user = Auth::user();
+
+        $credito = CreditoOrdinario::with('cliente')->findOrFail($creditoId);
+
+        if ($credito->estado !== 'aprobacion_registro_cyf') {
+            return response()->json([
+                'message' => 'Esta solicitud no está pendiente de Aprobación de Registro de Crédito en CYF.',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'decision' => 'required|in:aprobar,rechazar',
+            'observaciones' => 'required_if:decision,rechazar|nullable|string',
+        ], [
+            'decision.required' => 'Seleccione una decisión.',
+            'observaciones.required_if' => 'Ingrese las observaciones del rechazo.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        $aprobado = $request->input('decision') === 'aprobar';
+        $observaciones = $request->input('observaciones');
+        $estadoAnterior = $credito->estado;
+
+        if ($aprobado) {
+            $credito->estado = 'desembolso_ingreso';
+            $comentario = 'Registro de Crédito en CYF aprobado por Gerencia. Pasa a Registro de Operación de Desembolso en CYF.';
+        } else {
+            $documentos = $credito->documentos_raw ?? [];
+            $documentos['registro_cyf'] = null;
+            $credito->documentos = $documentos;
+            $credito->fecha_registro_cyf = null;
+            $credito->radicado_cyf = null;
+            $credito->estado = 'pendiente_registro_cyf';
+            $comentario = 'Registro de Crédito en CYF rechazado por Gerencia.'
+                . ($observaciones ? " Observaciones: {$observaciones}." : '')
+                . ' Debe registrarse nuevamente.';
+        }
+
+        $historial = $credito->historial_estados ?? [];
+        $historial[] = [
+            'fecha' => now()->toIso8601String(),
+            'usuario' => $user->name,
+            'rol' => $activeRole,
+            'estado_anterior' => $estadoAnterior,
+            'estado_nuevo' => $credito->estado,
+            'comentario' => $comentario,
+        ];
+        $credito->historial_estados = $historial;
+        $credito->solicitud_gestionada = false;
+        $credito->fecha_gestion = null;
+        $credito->save();
+
+        if ($aprobado) {
+            $urlIngreso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/desembolso-ingreso');
+            $this->notificarPorRol('operativo', new RegistroCyfAprobadoMail($credito, $urlIngreso));
+        }
+
+        return response()->json([
+            'message' => $aprobado
+                ? 'Registro de Crédito en CYF aprobado. Disponible para el Registro de Operación de Desembolso.'
+                : 'Registro de Crédito en CYF rechazado. Vuelve a Registro de Crédito en CYF para corrección.',
+            'credito' => $this->conFechaValidacion($credito->fresh(self::RELACIONES_DETALLE)),
+        ]);
+    }
+
+    /**
+     * SCRUM-215: Operativo (o Super Admin) registra la Operación de
+     * Desembolso en CYF adjuntando los documentos obligatorios de un preset
+     * (DocumentPreset/DocumentRequirement, mismo catálogo de
+     * document-presets ya usado en Formalización de Garantías/notificar()).
+     * A diferencia de esos flujos, acá el propio Operativo sube los
+     * archivos directamente — no hay solicitud al cliente que esperar — por
+     * eso se guarda un snapshot propio en `documentos_desembolso` en vez de
+     * crear un DocumentRequest. Estado de entrada obligatorio
+     * 'desembolso_ingreso' (reutilizable también para editar tras un
+     * rechazo de SCRUM-219, que devuelve la solicitud a este mismo estado).
+     */
+    public function desembolsoIngreso(Request $request, $creditoId)
+    {
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarAccionOperativa($activeRole);
+        $user = Auth::user();
+
+        $credito = CreditoOrdinario::with('cliente')->findOrFail($creditoId);
+
+        if ($credito->estado !== 'desembolso_ingreso') {
+            return response()->json([
+                'message' => 'Esta solicitud no está pendiente de Registro de Operación de Desembolso en CYF.',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'document_preset_id' => 'required|integer|exists:document_presets,id',
+            'observaciones' => 'nullable|string',
+        ], [
+            'document_preset_id.required' => 'Seleccione el preset de documentos de la operación.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        $preset = DocumentPreset::with('requirements')->findOrFail($request->input('document_preset_id'));
+        if ($preset->requirements->isEmpty()) {
+            return response()->json(['message' => 'El preset seleccionado no tiene documentos configurados.'], 422);
+        }
+
+        $archivos = $request->file('documentos') ?? [];
+        $faltantes = [];
+        foreach ($preset->requirements as $requerimiento) {
+            $archivo = $archivos[$requerimiento->id] ?? null;
+            if (!$archivo || !$archivo->isValid()) {
+                $faltantes[] = $requerimiento->nombre;
+            }
+        }
+        if (!empty($faltantes)) {
+            return response()->json([
+                'message' => 'Faltan documentos obligatorios: ' . implode(', ', $faltantes) . '.',
+            ], 422);
+        }
+
+        $documentosGuardados = [];
+        foreach ($preset->requirements as $requerimiento) {
+            $archivo = $archivos[$requerimiento->id];
+            $nombreArchivo = $archivo->getClientOriginalName();
+            $path = $archivo->storeAs('credito_documentos/' . $credito->id . '/desembolso', $nombreArchivo, 'public');
+            $documentosGuardados[] = [
+                'requirement_id' => $requerimiento->id,
+                'nombre' => $requerimiento->nombre,
+                'path' => $path,
+                'original_name' => $nombreArchivo,
+            ];
+        }
+
+        $observaciones = $request->input('observaciones');
+
+        // Legacy compat: mismo criterio que registroCyf() con
+        // 'registro_cyf' — satisface el gate de CreditoOrdinarioController
+        // (`!empty($documentos['desembolso_egreso'])`) sin duplicar esa
+        // lógica acá.
+        $documentosRaw = $credito->documentos_raw ?? [];
+        $documentosRaw['desembolso_egreso'] = array_column($documentosGuardados, 'path');
+        $credito->documentos = $documentosRaw;
+
+        $estadoAnterior = $credito->estado;
+        $credito->documentos_desembolso = [
+            'preset_id' => $preset->id,
+            'preset_nombre' => $preset->nombre,
+            'observaciones' => $observaciones,
+            'documentos' => $documentosGuardados,
+        ];
+        $credito->estado = 'desembolso_aprobacion';
+
+        $historial = $credito->historial_estados ?? [];
+        $historial[] = [
+            'fecha' => now()->toIso8601String(),
+            'usuario' => $user->name,
+            'rol' => $activeRole,
+            'estado_anterior' => $estadoAnterior,
+            'estado_nuevo' => $credito->estado,
+            'comentario' => 'Operación de desembolso registrada en CYF (' . count($documentosGuardados)
+                . ' documento(s), preset "' . $preset->nombre . '").'
+                . ($observaciones ? " Observaciones: {$observaciones}." : '')
+                . ' Pasa a aprobación de Gerencia.',
+        ];
+        $credito->historial_estados = $historial;
+        $credito->solicitud_gestionada = false;
+        $credito->fecha_gestion = null;
+        $credito->save();
+
+        $urlIngreso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/desembolso-aprobacion');
+        $this->notificarPorRol('gerente', new DesembolsoRegistradoMail($credito, $urlIngreso));
+
+        return response()->json([
+            'message' => 'Operación de desembolso registrada. Disponible para la aprobación de Gerencia.',
+            'credito' => $this->conFechaValidacion($credito->fresh(self::RELACIONES_DETALLE)),
+        ]);
+    }
+
+    /**
+     * SCRUM-219: Gerencia aprueba o rechaza el Registro de Operación de
+     * Desembolso en CYF hecho por Operativo (SCRUM-215). Estado de entrada
+     * obligatorio 'desembolso_aprobacion'. Aprobar pasa al estado legacy
+     * 'ejecucion_transferencia' (pantalla ya existente de Crédito Ordinario
+     * para Tesorería, sin cambios) y notifica a Tesorería; rechazar vuelve a
+     * 'desembolso_ingreso' para que Operativo ajuste registro y documentos,
+     * y notifica a Operativo con las observaciones.
+     */
+    public function desembolsoAprobacion(Request $request, $creditoId)
+    {
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarAccionGerencial($activeRole);
+        $user = Auth::user();
+
+        $credito = CreditoOrdinario::with('cliente')->findOrFail($creditoId);
+
+        if ($credito->estado !== 'desembolso_aprobacion') {
+            return response()->json([
+                'message' => 'Esta solicitud no está pendiente de Aprobación de Registro de Operación de Desembolso en CYF.',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'decision' => 'required|in:aprobar,rechazar',
+            'observaciones' => 'nullable|string',
+        ], [
+            'decision.required' => 'Seleccione una decisión.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        $aprobado = $request->input('decision') === 'aprobar';
+        $observaciones = $request->input('observaciones');
+        $estadoAnterior = $credito->estado;
+
+        if ($aprobado) {
+            $credito->estado = 'ejecucion_transferencia';
+            $comentario = 'Operación de desembolso aprobada por Gerencia. Enviada a Tesorería para ejecutar la transferencia.';
+        } else {
+            $credito->estado = 'desembolso_ingreso';
+            $comentario = 'Registro de operación de desembolso rechazado por Gerencia. Vuelve a Dirección Administrativa para ajustes.';
+        }
+        $comentario .= $observaciones ? " Observaciones: {$observaciones}." : '';
+
+        $historial = $credito->historial_estados ?? [];
+        $historial[] = [
+            'fecha' => now()->toIso8601String(),
+            'usuario' => $user->name,
+            'rol' => $activeRole,
+            'estado_anterior' => $estadoAnterior,
+            'estado_nuevo' => $credito->estado,
+            'comentario' => $comentario,
+        ];
+        $credito->historial_estados = $historial;
+        // Aprobado: sale del alcance de las 3 tarjetas nuevas (pasa a
+        // 'ejecucion_transferencia', fuera de ESTADOS_SIMPLES) — se marca
+        // gestionada. Rechazado: vuelve a 'desembolso_ingreso', que sigue
+        // siendo una tarjeta activa — Operativo necesita verla pendiente.
+        $credito->solicitud_gestionada = $aprobado;
+        $credito->fecha_gestion = $aprobado ? now() : null;
+        $credito->save();
+
+        if ($aprobado) {
+            $urlIngreso = $this->urlIngresoSistema('/creditos/' . $credito->id);
+            $this->notificarPorRol('tesoreria', new DesembolsoAprobadoTesoreriaMail($credito, $urlIngreso));
+        } else {
+            $urlIngreso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/desembolso-ingreso');
+            $this->notificarPorRol('operativo', new DesembolsoRechazadoOperativoMail($credito, $observaciones, $urlIngreso));
+        }
+
+        return response()->json([
+            'message' => $aprobado
+                ? 'Operación de desembolso aprobada. Enviada a Tesorería para ejecutar la transferencia.'
+                : 'Operación de desembolso rechazada. Vuelve a Registro de Operación de Desembolso para ajustes.',
             'credito' => $this->conFechaValidacion($credito->fresh(self::RELACIONES_DETALLE)),
         ]);
     }
@@ -825,9 +1173,16 @@ class GestionCreditoController extends Controller
         }
     }
 
+    /**
+     * SCRUM-211/215/219: acceso de módulo (bandeja/tarjetas/detalle) amplía
+     * a Gerente y Operativo — la restricción fina de QUÉ pueden ver/hacer
+     * dentro del módulo vive en ROLES_POR_CLAVE (visibilidad) y en
+     * autorizarAccionGerencial()/autorizarAccionOperativa() (las 3 acciones
+     * nuevas), no acá.
+     */
     private function autorizarRol(string $activeRole): void
     {
-        if ($activeRole === 'superadmin' || $activeRole === 'coordinador_comercial') {
+        if (in_array($activeRole, ['superadmin', 'coordinador_comercial', 'gerente', 'operativo'], true)) {
             return;
         }
 
@@ -835,5 +1190,109 @@ class GestionCreditoController extends Controller
             'message' => 'No tienes autorización para acceder a Gestión de Créditos.',
             'rol_activo' => $activeRole,
         ], 403));
+    }
+
+    private function autorizarAccionGerencial(string $activeRole): void
+    {
+        if ($activeRole === 'superadmin' || $activeRole === 'gerente') {
+            return;
+        }
+
+        abort(response()->json([
+            'message' => 'No tienes autorización para realizar esta acción.',
+            'rol_activo' => $activeRole,
+        ], 403));
+    }
+
+    private function autorizarAccionOperativa(string $activeRole): void
+    {
+        if ($activeRole === 'superadmin' || $activeRole === 'operativo') {
+            return;
+        }
+
+        abort(response()->json([
+            'message' => 'No tienes autorización para realizar esta acción.',
+            'rol_activo' => $activeRole,
+        ], 403));
+    }
+
+    /** Claves (RESULTADOS ∪ ESTADOS_SIMPLES) visibles para un rol — ver
+     * docblock de ROLES_POR_CLAVE. superadmin ve todas. */
+    private function clavesVisiblesParaRol(string $role): array
+    {
+        if ($role === 'superadmin') {
+            return array_keys(self::ROLES_POR_CLAVE);
+        }
+
+        return array_keys(array_filter(
+            self::ROLES_POR_CLAVE,
+            fn ($roles) => in_array($role, $roles, true)
+        ));
+    }
+
+    /** Aplica el where de estado(+resultado_origen) de una clave dada a una
+     * query — extraído de index() para reusarlo también en tarjetas() y en
+     * el scoping por rol. */
+    private function aplicarCondicionClave($query, string $clave): void
+    {
+        if (isset(self::RESULTADOS[$clave])) {
+            $resultado = self::RESULTADOS[$clave];
+            $query->where('estado', $resultado['estado'])->where('resultado_origen', $resultado['origen']);
+            return;
+        }
+
+        if (isset(self::ESTADOS_SIMPLES[$clave])) {
+            $query->where('estado', self::ESTADOS_SIMPLES[$clave]);
+        }
+    }
+
+    /** Inversa de aplicarCondicionClave(): a qué clave pertenece un crédito
+     * ya cargado (para el scoping de visibilidad en show()). */
+    private function claveDelCredito(CreditoOrdinario $credito): ?string
+    {
+        $clave = $this->resolverClaveResultado($credito);
+        if ($clave) {
+            return $clave;
+        }
+
+        foreach (self::ESTADOS_SIMPLES as $clave => $estado) {
+            if ($credito->estado === $estado) {
+                return $clave;
+            }
+        }
+
+        return null;
+    }
+
+    /** SCRUM-211/215/219: envío best-effort a todos los usuarios activos
+     * con un rol dado — mismo idioma que ListasRestrictivasSarlaftController
+     * (User::whereJsonContains) e InternalDocumentController. Un fallo de
+     * envío no revierte la transición ya guardada (igual criterio que
+     * guardarFormalizacionGarantias()). */
+    private function notificarPorRol(string $role, $mailable): void
+    {
+        $destinatarios = User::whereJsonContains('roles', $role)->pluck('email')->filter()->all();
+        if (empty($destinatarios)) {
+            return;
+        }
+
+        try {
+            Mail::to($destinatarios)->send($mailable);
+        } catch (Throwable $e) {
+            // Notificación informativa — no revierte la transición.
+        }
+    }
+
+    /** URL del botón "Ingresar al sistema" de los correos de SCRUM-211/215/
+     * 219 (§10.3 del ticket 219: base HTTPS configurable por ambiente +
+     * ruta de retorno tras el login). */
+    private function urlIngresoSistema(string $returnPath): string
+    {
+        $base = rtrim((string) ConfiguracionService::get(
+            'URL_BASE_SISTEMA_GESTION_LIQUIDEZ',
+            env('FRONTEND_URL', config('app.url'))
+        ), '/');
+
+        return $base . '/login?returnTo=' . urlencode($returnPath);
     }
 }

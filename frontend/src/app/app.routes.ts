@@ -190,10 +190,13 @@ export const routes: Routes = [
         data: { roles: ['oficial_cumplimiento', 'coordinador_comercial', 'superadmin'] }
     },
     {
+        // SCRUM-211/215/219: Gerente y Operativo entran al mismo módulo —
+        // la restricción de qué tarjeta/pantalla ve cada uno vive en el
+        // backend (GestionCreditoController::ROLES_POR_CLAVE), no acá.
         path: 'gestion-creditos',
         loadComponent: () => import('./components/gestion-creditos/gestion-creditos-bandeja.component').then(m => m.GestionCreditosBandejaComponent),
         canActivate: [roleGuard],
-        data: { roles: ['coordinador_comercial', 'superadmin'] }
+        data: { roles: ['coordinador_comercial', 'gerente', 'operativo', 'superadmin'] }
     },
     {
         path: 'gestion-creditos/:creditoId',
@@ -214,6 +217,27 @@ export const routes: Routes = [
         loadComponent: () => import('./components/gestion-creditos/gestion-creditos-registro-cyf.component').then(m => m.GestionCreditosRegistroCyfComponent),
         canActivate: [roleGuard],
         data: { roles: ['coordinador_comercial', 'superadmin'] }
+    },
+    {
+        // SCRUM-211
+        path: 'gestion-creditos/:creditoId/aprobacion-registro-cyf',
+        loadComponent: () => import('./components/gestion-creditos/gestion-creditos-aprobacion-registro-cyf.component').then(m => m.GestionCreditosAprobacionRegistroCyfComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['gerente', 'superadmin'] }
+    },
+    {
+        // SCRUM-215
+        path: 'gestion-creditos/:creditoId/desembolso-ingreso',
+        loadComponent: () => import('./components/gestion-creditos/gestion-creditos-desembolso-ingreso.component').then(m => m.GestionCreditosDesembolsoIngresoComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['operativo', 'superadmin'] }
+    },
+    {
+        // SCRUM-219
+        path: 'gestion-creditos/:creditoId/desembolso-aprobacion',
+        loadComponent: () => import('./components/gestion-creditos/gestion-creditos-desembolso-aprobacion.component').then(m => m.GestionCreditosDesembolsoAprobacionComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['gerente', 'superadmin'] }
     },
     {
         path: 'db-cleaner',

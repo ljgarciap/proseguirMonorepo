@@ -237,8 +237,11 @@ Route::prefix('listas-sarlaft')->middleware('auth:api')->group(function () {
     Route::post('/{creditoId}/finalizar', [\App\Http\Controllers\ListasRestrictivasSarlaftController::class, 'finalizar']);
 });
 
-// Gestión de Créditos (SCRUM-178)
-Route::prefix('gestion-creditos')->middleware(['auth:api', 'checkrole:superadmin,coordinador_comercial'])->group(function () {
+// Gestión de Créditos (SCRUM-178). SCRUM-211/215/219 amplían el acceso de
+// módulo a Gerente y Operativo — la restricción fina de qué puede ver/hacer
+// cada rol dentro del módulo vive dentro del controlador (ROLES_POR_CLAVE,
+// autorizarAccionGerencial()/autorizarAccionOperativa()), no acá.
+Route::prefix('gestion-creditos')->middleware(['auth:api', 'checkrole:superadmin,coordinador_comercial,gerente,operativo'])->group(function () {
     Route::get('/', [\App\Http\Controllers\GestionCreditoController::class, 'index']);
     Route::get('/tarjetas', [\App\Http\Controllers\GestionCreditoController::class, 'tarjetas']);
     Route::get('/{creditoId}', [\App\Http\Controllers\GestionCreditoController::class, 'show']);
@@ -251,6 +254,12 @@ Route::prefix('gestion-creditos')->middleware(['auth:api', 'checkrole:superadmin
     Route::post('/{creditoId}/formalizacion-garantias', [\App\Http\Controllers\GestionCreditoController::class, 'guardarFormalizacionGarantias']);
     // SCRUM-193: Registro de Crédito en CYF (fecha + radicado).
     Route::post('/{creditoId}/registro-cyf', [\App\Http\Controllers\GestionCreditoController::class, 'registroCyf']);
+    // SCRUM-211: aprobación (Gerente) del Registro de Crédito en CYF.
+    Route::post('/{creditoId}/aprobacion-registro-cyf', [\App\Http\Controllers\GestionCreditoController::class, 'aprobacionRegistroCyf']);
+    // SCRUM-215: registro (Operativo) de la Operación de Desembolso en CYF.
+    Route::post('/{creditoId}/desembolso-ingreso', [\App\Http\Controllers\GestionCreditoController::class, 'desembolsoIngreso']);
+    // SCRUM-219: aprobación (Gerente) del Registro de Operación de Desembolso en CYF.
+    Route::post('/{creditoId}/desembolso-aprobacion', [\App\Http\Controllers\GestionCreditoController::class, 'desembolsoAprobacion']);
 });
 
 // Registro de Solicitudes de Crédito

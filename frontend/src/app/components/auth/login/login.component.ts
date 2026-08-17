@@ -186,6 +186,12 @@ export class LoginComponent implements OnInit {
   sessionExpired = false;
   showRoleSelector = false;
   availableRoles: string[] = [];
+  /** SCRUM-219 §8.7/10.3: ruta de retorno tras el login, cuando se llega
+   * desde el botón "Ingresar al sistema" de un correo de Gestión de
+   * Créditos (?returnTo=/gestion-creditos/123/...). Solo se acepta una ruta
+   * relativa interna — nunca una URL absoluta — para no abrir un open
+   * redirect. */
+  private returnTo: string | null = null;
 
   constructor(
     private http: HttpClient,
@@ -196,6 +202,9 @@ export class LoginComponent implements OnInit {
 
   ngOnInit(): void {
     this.sessionExpired = this.route.snapshot.queryParamMap.get('expired') === '1';
+
+    const returnTo = this.route.snapshot.queryParamMap.get('returnTo');
+    this.returnTo = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null;
   }
 
   onLogin(): void {
@@ -205,13 +214,13 @@ export class LoginComponent implements OnInit {
     this.http.post<any>(`${environment.apiUrl}/login`, this.credentials).subscribe({
       next: (response) => {
         this.authService.login(response.token, response.user, response.roles);
-        
+
         if (response.roles && response.roles.length > 1) {
           this.availableRoles = response.roles;
           this.showRoleSelector = true;
           this.isLoading = false;
         } else {
-          this.router.navigate(['/']);
+          this.router.navigateByUrl(this.returnTo || '/');
         }
       },
       error: (err) => {
@@ -223,7 +232,7 @@ export class LoginComponent implements OnInit {
 
   selectRole(role: string): void {
     this.authService.setActiveRole(role);
-    this.router.navigate(['/']);
+    this.router.navigateByUrl(this.returnTo || '/');
   }
 
   onlyNumbers(event: any): boolean {

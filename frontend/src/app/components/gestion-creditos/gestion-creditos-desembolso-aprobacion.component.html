@@ -1,0 +1,145 @@
+<div class="view-container" *ngIf="!loading && credito">
+  <header class="view-header">
+    <div class="title-area">
+      <button class="btn-pro secondary sm back-btn" (click)="cancelar()">
+        <span class="material-symbols-outlined">arrow_back</span> Volver a la bandeja
+      </button>
+      <h1>Aprobación Operación de Desembolso en CYF — {{ credito.numero_solicitud }}</h1>
+      <p>Revisión del registro de Operación de Desembolso realizado por Dirección Administrativa.</p>
+    </div>
+    <div class="header-actions">
+      <span class="status-pill info">Pendiente Aprobación</span>
+    </div>
+  </header>
+
+  <div class="alert-readonly" *ngIf="!puedeGestionar">
+    <span class="material-symbols-outlined">visibility</span>
+    Estás viendo esta solicitud en modo solo lectura.
+  </div>
+
+  <div class="detail-grid">
+    <!-- Información del cliente y del crédito -->
+    <div class="content-card">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">badge</span>
+        Información del Cliente y del Crédito (no editable)
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Número de Crédito</label><p class="readonly-value">{{ credito.numero_solicitud }}</p></div>
+        <div class="form-group"><label>Tipo de Crédito</label><p class="readonly-value">{{ solicitud?.tipo_credito?.nombre || '—' }}</p></div>
+        <div class="form-group span-2"><label>Cliente</label><p class="readonly-value">{{ cliente?.nombre_razon_social || (cliente?.nombres + ' ' + cliente?.primer_apellido) || credito.cliente?.name || '—' }}</p></div>
+        <div class="form-group"><label>Identificación</label><p class="readonly-value">{{ cliente?.document_type?.nombre || '—' }} {{ cliente?.numero_documento || '' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Registro de Crédito en CYF -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">account_balance</span>
+        Registro de Crédito en CYF (no editable)
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Fecha del Registro</label><p class="readonly-value">{{ credito.fecha_registro_cyf ? (credito.fecha_registro_cyf | date:'dd/MM/yyyy') : '—' }}</p></div>
+        <div class="form-group"><label># de Radicado en CYF</label><p class="readonly-value">{{ credito.radicado_cyf || '—' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Aprobación previa del Gerente -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">verified</span>
+        Aprobación previa de Registro CYF (no editable)
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Fecha de Aprobación</label><p class="readonly-value">{{ aprobacionPrevia?.fecha ? (aprobacionPrevia.fecha | date:'dd/MM/yyyy HH:mm') : '—' }}</p></div>
+        <div class="form-group span-2"><label>Aprobado por</label><p class="readonly-value">{{ aprobacionPrevia?.usuario || '—' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Registro de Operación de Desembolso -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">local_shipping</span>
+        Registro de Operación de Desembolso (no editable)
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Fecha de Registro</label><p class="readonly-value">{{ registroDesembolso?.fecha ? (registroDesembolso.fecha | date:'dd/MM/yyyy HH:mm') : '—' }}</p></div>
+        <div class="form-group span-2"><label>Registrado por</label><p class="readonly-value">{{ registroDesembolso?.usuario || '—' }}</p></div>
+        <div class="form-group span-3" *ngIf="credito.documentos_desembolso?.observaciones">
+          <label>Observaciones de Operativo</label>
+          <p class="readonly-value">{{ credito.documentos_desembolso.observaciones }}</p>
+        </div>
+      </div>
+
+      <div class="documentos-list mt-4">
+        <div class="documento-row" *ngFor="let doc of documentosDesembolso">
+          <div class="documento-info">
+            <span class="material-symbols-outlined">description</span>
+            <span>{{ doc.nombre }}</span>
+          </div>
+          <button class="btn-pro secondary sm" (click)="verArchivo(doc.url)">
+            <span class="material-symbols-outlined">visibility</span> Ver / Descargar
+          </button>
+        </div>
+        <p class="text-muted" *ngIf="documentosDesembolso.length === 0">No hay documentos registrados.</p>
+      </div>
+    </div>
+
+    <!-- Trazabilidad -->
+    <div class="content-card mt-4">
+      <h3 class="card-title clickable" (click)="mostrarTrazabilidad = !mostrarTrazabilidad">
+        <span class="material-symbols-outlined">history</span>
+        Ver trazabilidad completa de la solicitud
+        <span class="material-symbols-outlined toggle-icon">{{ mostrarTrazabilidad ? 'expand_less' : 'expand_more' }}</span>
+      </h3>
+      <div class="traza-list mt-4" *ngIf="mostrarTrazabilidad">
+        <div class="traza-row" *ngFor="let h of trazabilidad">
+          <div class="traza-fecha">{{ h.fecha | date:'dd/MM/yyyy HH:mm' }}</div>
+          <div class="traza-body">
+            <p class="traza-titulo">{{ h.usuario }} <span class="traza-rol">({{ h.rol }})</span></p>
+            <p class="traza-comentario">{{ h.comentario }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Decisión -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">rule</span>
+        Decisión
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group span-2">
+          <label>Decisión <span class="required">*</span></label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="decision" value="aprobar" [(ngModel)]="decision" [disabled]="!puedeGestionar"> Aprobar registro
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="decision" value="rechazar" [(ngModel)]="decision" [disabled]="!puedeGestionar"> Rechazar registro
+            </label>
+          </div>
+        </div>
+        <div class="form-group span-3">
+          <label>Observaciones</label>
+          <textarea class="pro-input" rows="3" [(ngModel)]="observaciones" [disabled]="!puedeGestionar"
+                    placeholder="Opcional"></textarea>
+        </div>
+      </div>
+
+      <div class="form-footer mt-4" *ngIf="puedeGestionar">
+        <button class="btn-pro secondary" (click)="cancelar()">
+          <span class="material-symbols-outlined">close</span> Cancelar
+        </button>
+        <button class="btn-pro primary" [disabled]="guardando" (click)="guardar()">
+          <span class="material-symbols-outlined">save</span> Guardar decisión
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="view-container" *ngIf="loading">
+  <p class="text-center py-4">Cargando solicitud...</p>
+</div>

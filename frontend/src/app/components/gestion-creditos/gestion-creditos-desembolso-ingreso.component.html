@@ -1,0 +1,114 @@
+<div class="view-container" *ngIf="!loading && credito">
+  <header class="view-header">
+    <div class="title-area">
+      <button class="btn-pro secondary sm back-btn" (click)="cancelar()">
+        <span class="material-symbols-outlined">arrow_back</span> Volver a la bandeja
+      </button>
+      <h1>Registro de Operación en CYF — {{ credito.numero_solicitud }}</h1>
+      <p>Disponible después de la aprobación del Registro de Crédito en CYF por Gerencia.</p>
+    </div>
+    <div class="header-actions">
+      <span class="status-pill info">Pendiente Registro</span>
+    </div>
+  </header>
+
+  <div class="alert-readonly" *ngIf="!puedeGestionar">
+    <span class="material-symbols-outlined">visibility</span>
+    Estás viendo esta solicitud en modo solo lectura.
+  </div>
+
+  <div class="alert-rechazo" *ngIf="ultimoIngreso?.comentario?.includes('rechazado')">
+    <span class="material-symbols-outlined">error</span>
+    <div>
+      <strong>Registro devuelto por Gerencia.</strong>
+      <p>{{ ultimoIngreso.comentario }}</p>
+    </div>
+  </div>
+
+  <div class="detail-grid">
+    <!-- Información del cliente y del crédito -->
+    <div class="content-card">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">badge</span>
+        Información del Cliente y del Crédito (no editable)
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Número de Crédito</label><p class="readonly-value">{{ credito.numero_solicitud }}</p></div>
+        <div class="form-group"><label>Tipo de Crédito</label><p class="readonly-value">{{ solicitud?.tipo_credito?.nombre || '—' }}</p></div>
+        <div class="form-group span-2"><label>Cliente</label><p class="readonly-value">{{ cliente?.nombre_razon_social || (cliente?.nombres + ' ' + cliente?.primer_apellido) || credito.cliente?.name || '—' }}</p></div>
+        <div class="form-group"><label>Identificación</label><p class="readonly-value">{{ cliente?.document_type?.nombre || '—' }} {{ cliente?.numero_documento || '' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Registro de Crédito en CYF -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">account_balance</span>
+        Registro de Crédito en CYF (no editable)
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Fecha del Registro</label><p class="readonly-value">{{ credito.fecha_registro_cyf ? (credito.fecha_registro_cyf | date:'dd/MM/yyyy') : '—' }}</p></div>
+        <div class="form-group"><label># de Radicado en CYF</label><p class="readonly-value">{{ credito.radicado_cyf || '—' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Registro de Operación de Desembolso -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">local_shipping</span>
+        Registro de Operación de Desembolso en CYF
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group span-3">
+          <label>Preset de Documentos <span class="required">*</span></label>
+          <select class="pro-input" [(ngModel)]="presetId" [disabled]="!puedeGestionar" (ngModelChange)="onPresetChange()">
+            <option [ngValue]="null">Seleccione el preset de documentos...</option>
+            <option *ngFor="let p of presets" [ngValue]="p.id">{{ p.nombre }}</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="documentos-list mt-4" *ngIf="presetSeleccionado">
+        <div class="documento-row" *ngFor="let req of presetSeleccionado.requirements">
+          <div class="documento-info">
+            <span class="material-symbols-outlined">description</span>
+            <span>{{ req.nombre }} <span class="required">*</span></span>
+          </div>
+          <div class="documento-input">
+            <input type="file" accept="application/pdf" [disabled]="!puedeGestionar"
+                   (change)="onArchivoSeleccionado($event, req.id)">
+            <span class="file-ok" *ngIf="archivos[req.id]">
+              <span class="material-symbols-outlined">check_circle</span> {{ archivos[req.id]?.name }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-grid mt-4">
+        <div class="form-group span-3">
+          <label>Observaciones</label>
+          <textarea class="pro-input" rows="3" [(ngModel)]="observaciones" [disabled]="!puedeGestionar"
+                    placeholder="Opcional"></textarea>
+        </div>
+      </div>
+
+      <div class="alert-readonly mt-4">
+        <span class="material-symbols-outlined">info</span>
+        Todos los documentos del preset seleccionado son obligatorios. Al guardar, la solicitud quedará disponible para la aprobación de Gerencia.
+      </div>
+
+      <div class="form-footer mt-4" *ngIf="puedeGestionar">
+        <button class="btn-pro secondary" (click)="cancelar()">
+          <span class="material-symbols-outlined">close</span> Cancelar
+        </button>
+        <button class="btn-pro primary" [disabled]="guardando" (click)="guardar()">
+          <span class="material-symbols-outlined">save</span> Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="view-container" *ngIf="loading">
+  <p class="text-center py-4">Cargando solicitud...</p>
+</div>
