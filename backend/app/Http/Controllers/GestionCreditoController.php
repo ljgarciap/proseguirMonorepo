@@ -1135,25 +1135,37 @@ class GestionCreditoController extends Controller
      */
     private function crearSolicitudDocumentos(CreditoOrdinario $credito, int $presetId, int $creadoPorId): void
     {
-        // SCRUM-193/205 (2026-08-17): acotado por solicitud_credito_id, no
-        // solo cliente_id — un cliente puede tener más de un crédito en
-        // trámite (ej. una re-solicitud de documentos de otro crédito
-        // todavía 'pendiente'); sin este filtro, esa request ajena hacía
-        // que este método no-opeara en silencio y el cliente nunca viera la
-        // solicitud de garantías de ESTE crédito.
-        $existente = DocumentRequest::where('cliente_id', $credito->cliente_id)
-            ->where('solicitud_credito_id', $credito->solicitud_credito_id)
-            ->where('estado', 'pendiente')
-            ->first();
-
-        if ($existente) {
-            return;
-        }
-
         $preset = DocumentPreset::findOrFail($presetId);
         $requirementIds = $preset->requirements()->pluck('document_requirements.id')->toArray();
 
         if (empty($requirementIds)) {
+            return;
+        }
+
+        // SCRUM-199/223 (2026-08-18): el guard anterior (acotado a
+        // solicitud_credito_id, ver SCRUM-193/205) evitaba duplicar la
+        // solicitud si YA había cualquier DocumentRequest 'pendiente' para
+        // este crédito — pero un crédito que llega a pendiente_comite o
+        // aprobada_garantias casi siempre arrastra una request 'pendiente'
+        // vieja de una etapa anterior (onboarding inicial, una ronda previa
+        // de comité) que nadie cerró formalmente. Con ese guard, la nueva
+        // solicitud (con el preset recién elegido) no-opeaba en silencio: el
+        // cliente seguía viendo solo los documentos de la etapa vieja, sin
+        // relación con lo que el Coordinador acababa de pedir. Ahora el
+        // duplicado real que se evita es "misma request, mismo preset"
+        // (mismo set de document_requirement_id) — una request pendiente de
+        // OTRA etapa con documentos distintos ya no bloquea la nueva.
+        $mismoPreset = collect($requirementIds)->sort()->values()->all();
+        $existente = DocumentRequest::where('cliente_id', $credito->cliente_id)
+            ->where('solicitud_credito_id', $credito->solicitud_credito_id)
+            ->where('estado', 'pendiente')
+            ->with('items')
+            ->get()
+            ->first(function (DocumentRequest $dr) use ($mismoPreset) {
+                return $dr->items->pluck('document_requirement_id')->sort()->values()->all() === $mismoPreset;
+            });
+
+        if ($existente) {
             return;
         }
 

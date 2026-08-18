@@ -269,6 +269,54 @@ class GestionCreditoTest extends TestCase
         });
     }
 
+    /**
+     * SCRUM-223 (2026-08-18): un crédito que llega a comité casi siempre
+     * arrastra una DocumentRequest vieja y todavía 'pendiente' de una etapa
+     * anterior (ej. onboarding inicial) con documentos que no tienen nada
+     * que ver con el preset de garantías que el Coordinador pide ahora. El
+     * guard de duplicados de crearSolicitudDocumentos() la veía como "ya
+     * hay una pendiente para este crédito" y no creaba la nueva — el
+     * cliente se quedaba viendo solo los documentos viejos, sin relación
+     * con lo recién solicitado, y el crédito nunca avanzaba.
+     */
+    public function test_notificar_aprobada_garantias_crea_document_request_aunque_haya_una_pendiente_de_otra_etapa(): void
+    {
+        $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', '1');
+
+        $requirementOnboarding = DocumentRequirement::create(['nombre' => 'Aviso de privacidad', 'activo' => true]);
+        $requestVieja = DocumentRequest::create([
+            'cliente_id' => $this->clienteNatural->id,
+            'creado_por' => $this->admin->id,
+            'solicitud_credito_id' => $credito->solicitud_credito_id,
+            'estado' => 'pendiente',
+        ]);
+        DocumentRequestItem::create([
+            'document_request_id' => $requestVieja->id,
+            'document_requirement_id' => $requirementOnboarding->id,
+            'estado' => 'subido',
+        ]);
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/notificar", [
+            'destino' => 'gestion.cliente@test.com',
+            'asunto' => 'Aprobación de garantías',
+            'mensaje' => 'Debe formalizar las garantías.',
+            'preset_id' => $this->preset->id,
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200);
+
+        $this->assertDatabaseCount('document_requests', 2);
+        $nueva = DocumentRequest::where('solicitud_credito_id', $credito->solicitud_credito_id)
+            ->where('id', '!=', $requestVieja->id)
+            ->first();
+        $this->assertNotNull($nueva, 'Debe crearse una nueva DocumentRequest para el preset de garantías.');
+        $this->assertDatabaseHas('document_request_items', [
+            'document_request_id' => $nueva->id,
+            'document_requirement_id' => $this->preset->requirements()->first()->id,
+        ]);
+    }
+
     // ---- notificar(): SARLAFT desfavorable / Rechazada por Comité --------
 
     public function test_notificar_sarlaft_desfavorable_mantiene_estado_rechazado(): void
@@ -368,6 +416,51 @@ class GestionCreditoTest extends TestCase
         $this->assertDatabaseHas('document_requests', [
             'cliente_id' => $this->clienteNatural->id,
             'estado' => 'pendiente',
+        ]);
+    }
+
+    /**
+     * SCRUM-199 (2026-08-18): mismo bug que el de aprobada_garantias
+     * (SCRUM-223) pero para el reenvío de "Pendiente por Comité" — una
+     * DocumentRequest vieja de otra etapa, todavía 'pendiente', bloqueaba
+     * en silencio la creación de la nueva con el preset recién elegido.
+     */
+    public function test_notificar_pendiente_comite_requiere_documentos_crea_document_request_aunque_haya_una_pendiente_de_otra_etapa(): void
+    {
+        $credito = $this->crearCredito('pendiente_comite', 'comite_pendiente', '1');
+
+        $requirementOnboarding = DocumentRequirement::create(['nombre' => 'RUT', 'activo' => true]);
+        $requestVieja = DocumentRequest::create([
+            'cliente_id' => $this->clienteNatural->id,
+            'creado_por' => $this->admin->id,
+            'solicitud_credito_id' => $credito->solicitud_credito_id,
+            'estado' => 'pendiente',
+        ]);
+        DocumentRequestItem::create([
+            'document_request_id' => $requestVieja->id,
+            'document_requirement_id' => $requirementOnboarding->id,
+            'estado' => 'subido',
+        ]);
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/notificar", [
+            'destino' => 'gestion.cliente@test.com',
+            'asunto' => 'Solicitud aplazada',
+            'mensaje' => 'El Comité aplazó su decisión.',
+            'requiere_documentos' => true,
+            'preset_id' => $this->preset->id,
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200)->assertJsonPath('credito.estado', 'pendiente_comite');
+
+        $this->assertDatabaseCount('document_requests', 2);
+        $nueva = DocumentRequest::where('solicitud_credito_id', $credito->solicitud_credito_id)
+            ->where('id', '!=', $requestVieja->id)
+            ->first();
+        $this->assertNotNull($nueva, 'Debe crearse una nueva DocumentRequest para el preset recién elegido.');
+        $this->assertDatabaseHas('document_request_items', [
+            'document_request_id' => $nueva->id,
+            'document_requirement_id' => $this->preset->requirements()->first()->id,
         ]);
     }
 
