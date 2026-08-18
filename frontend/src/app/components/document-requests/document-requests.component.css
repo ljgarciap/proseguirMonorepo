@@ -128,6 +128,7 @@
 
 .status-pill.pendiente { background: #fef3c7; color: #b45309; }
 .status-pill.completado { background: #dcfce7; color: #15803d; }
+.status-pill.cancelado { background: #f1f5f9; color: #64748b; }
 
 /* Modal backdrop and card */
 .modal-backdrop {

@@ -362,7 +362,7 @@ class ClientUploadController extends Controller
             ]);
 
             $request = $item->request;
-            if ($request) {
+            if ($request && $request->estado !== 'cancelado') {
                 $pendingItems = $request->items()->where('estado', '!=', 'aprobado')->count();
                 if ($pendingItems === 0) {
                     $request->update(['estado' => 'completado']);

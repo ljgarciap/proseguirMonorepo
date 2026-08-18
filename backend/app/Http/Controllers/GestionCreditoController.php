@@ -487,6 +487,10 @@ class GestionCreditoController extends Controller
             abort(404);
         }
 
+        if ($item->request?->estado === 'cancelado') {
+            return response()->json(['message' => 'Esta solicitud de documentos fue reemplazada por una más reciente.'], 422);
+        }
+
         if (!$item->client_upload_id) {
             return response()->json(['message' => 'El cliente todavía no ha cargado este documento.'], 422);
         }
@@ -1142,32 +1146,21 @@ class GestionCreditoController extends Controller
             return;
         }
 
-        // SCRUM-199/223 (2026-08-18): el guard anterior (acotado a
-        // solicitud_credito_id, ver SCRUM-193/205) evitaba duplicar la
-        // solicitud si YA había cualquier DocumentRequest 'pendiente' para
-        // este crédito — pero un crédito que llega a pendiente_comite o
-        // aprobada_garantias casi siempre arrastra una request 'pendiente'
-        // vieja de una etapa anterior (onboarding inicial, una ronda previa
-        // de comité) que nadie cerró formalmente. Con ese guard, la nueva
-        // solicitud (con el preset recién elegido) no-opeaba en silencio: el
-        // cliente seguía viendo solo los documentos de la etapa vieja, sin
-        // relación con lo que el Coordinador acababa de pedir. Ahora el
-        // duplicado real que se evita es "misma request, mismo preset"
-        // (mismo set de document_requirement_id) — una request pendiente de
-        // OTRA etapa con documentos distintos ya no bloquea la nueva.
-        $mismoPreset = collect($requirementIds)->sort()->values()->all();
-        $existente = DocumentRequest::where('cliente_id', $credito->cliente_id)
+        // SCRUM-199/223 (2026-08-18, 2ª vuelta): el guard anterior de "misma
+        // request, mismo preset" (comparar sets de document_requirement_id)
+        // seguía no-opeando en silencio cuando dos presets distintos (o el
+        // mismo reenviado) terminaban apuntando al mismo set de requirements
+        // — el catálogo de document_requirements es chico y se reutiliza
+        // entre presets, así que "mismo contenido" no es una señal confiable
+        // de "misma solicitud". En vez de adivinar duplicados por contenido,
+        // cada llamada legítima del Coordinador (acción explícita, no un
+        // reintento automático) cierra cualquier request 'pendiente' previa
+        // de este crédito y crea una nueva siempre — la vieja deja de
+        // aparecerle al cliente como pendiente de cargar.
+        DocumentRequest::where('cliente_id', $credito->cliente_id)
             ->where('solicitud_credito_id', $credito->solicitud_credito_id)
             ->where('estado', 'pendiente')
-            ->with('items')
-            ->get()
-            ->first(function (DocumentRequest $dr) use ($mismoPreset) {
-                return $dr->items->pluck('document_requirement_id')->sort()->values()->all() === $mismoPreset;
-            });
-
-        if ($existente) {
-            return;
-        }
+            ->update(['estado' => 'cancelado']);
 
         $documentRequest = DocumentRequest::create([
             'cliente_id' => $credito->cliente_id,

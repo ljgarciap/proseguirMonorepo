@@ -305,3 +305,12 @@
 ::ng-deep .ql-editor {
   min-height: 100px;
 }
+
+/* SCRUM-198: quill-editor es inline-block por default (ver ngx-quill),
+   se ajusta a su contenido y no a un padre en bloque normal como
+   .orden-dia-item de la pestaña Desarrollo — a diferencia del de "orden
+   del día", que sí se estira porque su padre es flex. */
+::ng-deep .orden-dia-item quill-editor {
+  display: block;
+  width: 100%;
+}
