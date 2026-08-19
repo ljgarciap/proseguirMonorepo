@@ -13,7 +13,10 @@ class DocumentRequest extends Model
         'cliente_id',
         'creado_por',
         'solicitud_credito_id',
-        'estado'
+        'estado',
+        'etapa',
+        'preset_id',
+        'preset_nombre',
     ];
 
     public function cliente()
@@ -29,6 +32,11 @@ class DocumentRequest extends Model
     public function creador()
     {
         return $this->belongsTo(User::class, 'creado_por');
+    }
+
+    public function preset()
+    {
+        return $this->belongsTo(DocumentPreset::class, 'preset_id');
     }
 
     public function items()

@@ -8,6 +8,8 @@ use App\Mail\DesembolsoRegistradoMail;
 use App\Mail\FormalizacionGarantiasResultadoMail;
 use App\Mail\GestionCreditoNotificacionMail;
 use App\Mail\RegistroCyfAprobadoMail;
+use App\Mail\TransferenciaRealizadaClienteMail;
+use App\Mail\TransferenciaRegistradaInternaMail;
 use App\Models\Amortizacion;
 use App\Models\ClientUpload;
 use App\Models\Cliente;
@@ -17,6 +19,7 @@ use App\Models\DocumentRequest;
 use App\Models\DocumentRequestItem;
 use App\Models\DocumentRequirement;
 use App\Models\DocumentType;
+use App\Models\EntidadBancaria;
 use App\Models\SolicitudCredito;
 use App\Models\TipoCredito;
 use App\Models\TipoPersona;
@@ -43,6 +46,7 @@ class GestionCreditoTest extends TestCase
     private $gerente;
     private $operativo;
     private $tesoreria;
+    private $entidadBancaria;
     private $docCC;
     private $tipoOrdinario;
     private $amortizacionMensual;
@@ -119,6 +123,9 @@ class GestionCreditoTest extends TestCase
         $this->reqPagare = DocumentRequirement::create(['nombre' => 'Pagaré', 'activo' => true]);
         $this->reqComprobante = DocumentRequirement::create(['nombre' => 'Comprobante de Egreso', 'activo' => true]);
         $this->presetDesembolso->requirements()->attach([$this->reqPagare->id, $this->reqComprobante->id]);
+
+        // SCRUM-224
+        $this->entidadBancaria = EntidadBancaria::create(['nombre' => 'Bancolombia Test']);
     }
 
     private function crearSolicitud(string $sufijo): SolicitudCredito
@@ -260,6 +267,9 @@ class GestionCreditoTest extends TestCase
             'cliente_id' => $this->clienteNatural->id,
             'solicitud_credito_id' => $credito->solicitud_credito_id,
             'estado' => 'pendiente',
+            'etapa' => 'garantias',
+            'preset_id' => $this->preset->id,
+            'preset_nombre' => $this->preset->nombre,
         ]);
 
         Mail::assertSent(GestionCreditoNotificacionMail::class, function ($mail) use ($credito) {
@@ -267,6 +277,35 @@ class GestionCreditoTest extends TestCase
                 && $mail->credito->id === $credito->id
                 && $mail->asuntoCorreo === 'Aprobación de garantías';
         });
+    }
+
+    /**
+     * SCRUM-229: Crédito Ordinario (Etapa 4) necesita distinguir el
+     * DocumentRequest de garantías del de Etapa 1 (mismo
+     * solicitud_credito_id) para mostrar el preset y los documentos reales
+     * que el Coordinador Comercial solicitó — se apoya en la columna
+     * 'etapa' y en la relación SolicitudCredito::garantiasDocumentRequest().
+     */
+    public function test_garantias_document_request_se_distingue_del_de_etapa_1(): void
+    {
+        $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', '1');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/notificar", [
+            'destino' => 'gestion.cliente@test.com',
+            'asunto' => 'Aprobación de garantías',
+            'mensaje' => 'Debe formalizar las garantías.',
+            'preset_id' => $this->preset->id,
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+
+        $solicitud = $credito->solicitudCredito()->first();
+        $garantiasRequest = $solicitud->garantiasDocumentRequest()->first();
+
+        $this->assertNotNull($garantiasRequest);
+        $this->assertSame('garantias', $garantiasRequest->etapa);
+        $this->assertSame($this->preset->id, $garantiasRequest->preset_id);
+        $this->assertSame($this->preset->nombre, $garantiasRequest->preset_nombre);
+        $this->assertGreaterThan(0, $garantiasRequest->items()->count());
     }
 
     /**
@@ -1219,7 +1258,10 @@ class GestionCreditoTest extends TestCase
 
         $credito->refresh();
         $this->assertSame('ejecucion_transferencia', $credito->estado);
-        $this->assertTrue($credito->solicitud_gestionada);
+        // SCRUM-224: antes quedaba en true porque 'ejecucion_transferencia'
+        // todavía no tenía tarjeta propia — ahora sí (transferenciaBancaria())
+        // y necesita aparecer como pendiente de gestión para Tesorería.
+        $this->assertFalse($credito->solicitud_gestionada);
 
         Mail::assertSent(DesembolsoAprobadoTesoreriaMail::class, function ($mail) use ($credito) {
             return $mail->credito->id === $credito->id;
@@ -1245,6 +1287,147 @@ class GestionCreditoTest extends TestCase
         Mail::assertSent(DesembolsoRechazadoOperativoMail::class, function ($mail) use ($credito) {
             return $mail->credito->id === $credito->id && $mail->observaciones === 'Falta el comprobante correcto.';
         });
+    }
+
+    private function creditoPendienteTransferenciaBancaria(string $sufijo): CreditoOrdinario
+    {
+        $credito = $this->creditoPendienteDesembolsoAprobacion($sufijo);
+
+        Passport::actingAs($this->gerente);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/desembolso-aprobacion", [
+            'decision' => 'aprobar',
+        ], ['X-Active-Role' => 'gerente'])->assertStatus(200);
+
+        return $credito->fresh();
+    }
+
+    private function payloadTransferenciaValido(): array
+    {
+        return [
+            'titular_cuenta' => 'Gestion Test',
+            'tipo_documento_titular_id' => $this->docCC->id,
+            'numero_documento_titular' => '90807060',
+            'entidad_bancaria_id' => $this->entidadBancaria->id,
+            'tipo_cuenta' => 'ahorros',
+            'numero_cuenta' => '1234567890',
+            'numero_cuenta_confirmacion' => '1234567890',
+            'moneda_cuenta' => 'COP',
+            'correo_notificacion_pago' => 'pago.cliente@test.com',
+            'certificado_bancario' => UploadedFile::fake()->create('certificado.pdf', 100, 'application/pdf'),
+            'fecha_transferencia' => now()->format('Y-m-d'),
+            'hora_transferencia' => '10:30',
+            'valor_transaccion' => '30000000',
+            'valor_transaccion_confirmacion' => '30000000',
+            'numero_transaccion' => 'TRX-001',
+            'comprobante_transferencia' => UploadedFile::fake()->create('comprobante.pdf', 100, 'application/pdf'),
+            'declaracion_validacion_bancaria' => '1',
+        ];
+    }
+
+    // ---- SCRUM-224: Registro de Transferencia Bancaria (Tesorería) -------
+
+    public function test_transferencia_bancaria_falla_si_no_esta_pendiente(): void
+    {
+        $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', 'tb-guard');
+
+        Passport::actingAs($this->tesoreria);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/transferencia-bancaria", $this->payloadTransferenciaValido(), [
+            'X-Active-Role' => 'tesoreria',
+        ])->assertStatus(422);
+    }
+
+    public function test_transferencia_bancaria_solo_tesoreria_o_superadmin(): void
+    {
+        $credito = $this->creditoPendienteTransferenciaBancaria('tb-rol');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/transferencia-bancaria", $this->payloadTransferenciaValido(), [
+            'X-Active-Role' => 'coordinador_comercial',
+        ])->assertStatus(403);
+    }
+
+    public function test_transferencia_bancaria_numero_cuenta_y_confirmacion_deben_coincidir(): void
+    {
+        $credito = $this->creditoPendienteTransferenciaBancaria('tb-cuenta');
+
+        Passport::actingAs($this->tesoreria);
+        $payload = $this->payloadTransferenciaValido();
+        $payload['numero_cuenta_confirmacion'] = '0000000000';
+
+        $this->postJson("/api/gestion-creditos/{$credito->id}/transferencia-bancaria", $payload, [
+            'X-Active-Role' => 'tesoreria',
+        ])->assertStatus(422)->assertJsonFragment(['message' => 'El número de cuenta y su confirmación no coinciden.']);
+    }
+
+    public function test_transferencia_bancaria_valor_y_confirmacion_deben_coincidir(): void
+    {
+        $credito = $this->creditoPendienteTransferenciaBancaria('tb-valor');
+
+        Passport::actingAs($this->tesoreria);
+        $payload = $this->payloadTransferenciaValido();
+        $payload['valor_transaccion_confirmacion'] = '1000';
+
+        $this->postJson("/api/gestion-creditos/{$credito->id}/transferencia-bancaria", $payload, [
+            'X-Active-Role' => 'tesoreria',
+        ])->assertStatus(422)->assertJsonFragment(['message' => 'El valor de la transacción y su confirmación no coinciden.']);
+    }
+
+    public function test_transferencia_bancaria_valor_debe_igualar_el_monto_aprobado(): void
+    {
+        $credito = $this->creditoPendienteTransferenciaBancaria('tb-parcial');
+
+        Passport::actingAs($this->tesoreria);
+        $payload = $this->payloadTransferenciaValido();
+        $payload['valor_transaccion'] = '1000';
+        $payload['valor_transaccion_confirmacion'] = '1000';
+
+        $this->postJson("/api/gestion-creditos/{$credito->id}/transferencia-bancaria", $payload, [
+            'X-Active-Role' => 'tesoreria',
+        ])->assertStatus(422)->assertJsonFragment(['message' => 'El valor de la transacción debe ser igual al valor aprobado para desembolso.']);
+    }
+
+    public function test_transferencia_bancaria_numero_transaccion_duplicado_falla(): void
+    {
+        $otro = $this->crearCredito('completado', null, 'tb-dup-otro');
+        $otro->update(['numero_transaccion_bancaria' => 'TRX-001']);
+
+        $credito = $this->creditoPendienteTransferenciaBancaria('tb-dup');
+
+        Passport::actingAs($this->tesoreria);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/transferencia-bancaria", $this->payloadTransferenciaValido(), [
+            'X-Active-Role' => 'tesoreria',
+        ])->assertStatus(422)->assertJsonFragment(['message' => 'El número de la transacción ya se encuentra registrado.']);
+    }
+
+    public function test_transferencia_bancaria_registra_completa_credito_y_notifica(): void
+    {
+        $credito = $this->creditoPendienteTransferenciaBancaria('tb-ok');
+
+        Passport::actingAs($this->tesoreria);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/transferencia-bancaria", $this->payloadTransferenciaValido(), [
+            'X-Active-Role' => 'tesoreria',
+        ]);
+
+        $response->assertStatus(200)->assertJsonPath('credito.estado', 'completado');
+
+        $credito->refresh();
+        $this->assertSame('completado', $credito->estado);
+        $this->assertTrue($credito->solicitud_gestionada);
+        $this->assertSame('TRX-001', $credito->numero_transaccion_bancaria);
+        $this->assertSame('******7890', $credito->transferencia_bancaria['cuenta_enmascarada']);
+        $this->assertSame($this->entidadBancaria->nombre, $credito->transferencia_bancaria['entidad_bancaria_nombre']);
+        // Legacy compat: gate genérico de CreditoOrdinarioController.
+        $this->assertNotEmpty($credito->documentos['comprobante_transferencia']);
+
+        Mail::assertSent(TransferenciaRealizadaClienteMail::class, function ($mail) use ($credito) {
+            return $mail->hasTo('pago.cliente@test.com')
+                && $mail->credito->id === $credito->id
+                && $mail->cuentaEnmascarada === '******7890';
+        });
+        Mail::assertSent(TransferenciaRegistradaInternaMail::class, function ($mail) use ($credito) {
+            return $mail->credito->id === $credito->id;
+        });
+        Mail::assertSentTimes(TransferenciaRegistradaInternaMail::class, 2); // Gerente + Coordinador Comercial
     }
 
     // ---- Visibilidad por rol (tarjetas/index) -----------------------------

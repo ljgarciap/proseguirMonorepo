@@ -9,10 +9,13 @@ use App\Mail\DesembolsoRegistradoMail;
 use App\Mail\FormalizacionGarantiasResultadoMail;
 use App\Mail\GestionCreditoNotificacionMail;
 use App\Mail\RegistroCyfAprobadoMail;
+use App\Mail\TransferenciaRealizadaClienteMail;
+use App\Mail\TransferenciaRegistradaInternaMail;
 use App\Models\CreditoOrdinario;
 use App\Models\DocumentPreset;
 use App\Models\DocumentRequest;
 use App\Models\DocumentRequestItem;
+use App\Models\EntidadBancaria;
 use App\Models\User;
 use App\Services\ConfiguracionService;
 use Illuminate\Http\Request;
@@ -40,18 +43,25 @@ use Throwable;
  * apruebe con la pantalla ya existente.
  *
  * SCRUM-211/215/219 (2026-08-17) continúan la cadena tomando posesión
- * directa, con pantallas propias acá, de los 3 estados legacy que ya
+ * directa, con pantallas propias acá, de 3 de los 4 estados legacy que ya
  * estaban role-mapeados en CreditoOrdinarioController::transition() pero
  * sin pantalla dedicada ni notificación por correo:
  * 'aprobacion_registro_cyf' (Gerente aprueba/rechaza el registro de
  * Operativo/Coordinador — SCRUM-211) → 'desembolso_ingreso' (Operativo
  * registra la Operación de Desembolso con los documentos del preset —
  * SCRUM-215) → 'desembolso_aprobacion' (Gerente aprueba/rechaza — SCRUM-219,
- * aprobado sale a 'ejecucion_transferencia' para Tesorería, sin pantalla
- * nueva porque esa ya existe en Crédito Ordinario). El switch genérico de
- * `CreditoOrdinarioController::transition()` para estos 3 estados queda
- * intacto como vía de escape (mismo criterio no-destructivo que
- * registroCyf()), pero deja de ser el camino esperado.
+ * aprobado salía a 'ejecucion_transferencia' para Tesorería sin pantalla
+ * propia todavía en ese momento).
+ *
+ * SCRUM-224 (2026-08-19) completa la cadena tomando posesión también de
+ * 'ejecucion_transferencia' (Registro de Transferencia Bancaria, rol
+ * Tesorería): transferenciaBancaria() captura la información bancaria del
+ * beneficiario y el registro de la transacción, pasa el crédito al estado
+ * legacy 'completado' (mismo terminal que ya usaba el switch genérico) y
+ * notifica al cliente (con el comprobante adjunto) y a Gerente/Coordinador
+ * Comercial. El switch genérico de `CreditoOrdinarioController::transition()`
+ * para estos 4 estados queda intacto como vía de escape (mismo criterio
+ * no-destructivo que registroCyf()), pero deja de ser el camino esperado.
  */
 class GestionCreditoController extends Controller
 {
@@ -96,6 +106,8 @@ class GestionCreditoController extends Controller
         'aprobacion_registro_cyf'           => 'aprobacion_registro_cyf',
         'desembolso_ingreso'                => 'desembolso_ingreso',
         'desembolso_aprobacion'             => 'desembolso_aprobacion',
+        // SCRUM-224: Registro de Transferencia Bancaria (Tesorería).
+        'ejecucion_transferencia'           => 'ejecucion_transferencia',
     ];
 
     /**
@@ -116,6 +128,7 @@ class GestionCreditoController extends Controller
         'aprobacion_registro_cyf'            => ['gerente'],
         'desembolso_ingreso'                 => ['operativo'],
         'desembolso_aprobacion'              => ['gerente'],
+        'ejecucion_transferencia'            => ['tesoreria'],
     ];
 
     /**
@@ -405,13 +418,15 @@ class GestionCreditoController extends Controller
         // Pendiente por Comité con requiere_documentos = Sí: habilita la
         // carga en Mis créditos vía el mismo mecanismo de SCRUM-146.
         if ($resultado === 'pendiente_comite' && $request->boolean('requiere_documentos')) {
-            $this->crearSolicitudDocumentos($credito, (int) $request->input('preset_id'), $user->id);
+            $this->crearSolicitudDocumentos($credito, (int) $request->input('preset_id'), $user->id, 'pre_comite');
         }
 
         // SCRUM-193/205: Aprobada para Gestión de Garantías siempre requiere
         // preset (VAL-04) — habilita la carga de garantías en Mis créditos.
+        // SCRUM-229: se tagea 'garantias' para que Crédito Ordinario pueda
+        // mostrar específicamente este DocumentRequest en la Etapa 4.
         if ($resultado === 'aprobada_garantias') {
-            $this->crearSolicitudDocumentos($credito, (int) $request->input('preset_id'), $user->id);
+            $this->crearSolicitudDocumentos($credito, (int) $request->input('preset_id'), $user->id, 'garantias');
         }
 
         return response()->json([
@@ -993,16 +1008,20 @@ class GestionCreditoController extends Controller
             'comentario' => $comentario,
         ];
         $credito->historial_estados = $historial;
-        // Aprobado: sale del alcance de las 3 tarjetas nuevas (pasa a
-        // 'ejecucion_transferencia', fuera de ESTADOS_SIMPLES) — se marca
-        // gestionada. Rechazado: vuelve a 'desembolso_ingreso', que sigue
-        // siendo una tarjeta activa — Operativo necesita verla pendiente.
-        $credito->solicitud_gestionada = $aprobado;
-        $credito->fecha_gestion = $aprobado ? now() : null;
+        // SCRUM-224: aprobado pasa a 'ejecucion_transferencia', que ahora SÍ
+        // es una tarjeta activa (Tesorería) — antes de esto quedaba
+        // 'gestionada = true' porque ese estado todavía no tenía tarjeta
+        // propia. Rechazado sigue volviendo a 'desembolso_ingreso', también
+        // una tarjeta activa. Ambos casos: pendiente de gestión.
+        $credito->solicitud_gestionada = false;
+        $credito->fecha_gestion = null;
         $credito->save();
 
         if ($aprobado) {
-            $urlIngreso = $this->urlIngresoSistema('/creditos/' . $credito->id);
+            // SCRUM-224: antes apuntaba a la pantalla legacy de Crédito
+            // Ordinario (/creditos/:id) porque Tesorería todavía no tenía
+            // pantalla propia — ahora sí (transferenciaBancaria()).
+            $urlIngreso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/transferencia-bancaria');
             $this->notificarPorRol('tesoreria', new DesembolsoAprobadoTesoreriaMail($credito, $urlIngreso));
         } else {
             $urlIngreso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/desembolso-ingreso');
@@ -1013,6 +1032,174 @@ class GestionCreditoController extends Controller
             'message' => $aprobado
                 ? 'Operación de desembolso aprobada. Enviada a Tesorería para ejecutar la transferencia.'
                 : 'Operación de desembolso rechazada. Vuelve a Registro de Operación de Desembolso para ajustes.',
+            'credito' => $this->conFechaValidacion($credito->fresh(self::RELACIONES_DETALLE)),
+        ]);
+    }
+
+    /**
+     * SCRUM-224: Tesorería (o Super Admin) registra los datos bancarios del
+     * beneficiario y la transacción de la transferencia que efectúa el
+     * desembolso, para una solicitud con la Operación de Desembolso en CYF
+     * ya aprobada por Gerencia. Estado de entrada obligatorio
+     * 'ejecucion_transferencia'. La confirmación final (valor, beneficiario,
+     * cuenta enmascarada) es responsabilidad del frontend (SweetAlert) antes
+     * de este único POST — acá no hay un segundo paso de "confirmar", igual
+     * que guardarFormalizacionGarantias()/desembolsoIngreso().
+     *
+     * Al guardar: pasa a 'completado' (mismo terminal que ya usaba el switch
+     * genérico de CreditoOrdinarioController para este estado — no se
+     * inventa un estado nuevo), guarda un snapshot completo en
+     * 'transferencia_bancaria' + 'numero_transaccion_bancaria' (columna
+     * plana para la unicidad real de RN-08), y por compatibilidad hacia
+     * atrás escribe también 'documentos.comprobante_transferencia' (mismo
+     * criterio que desembolsoIngreso() con 'desembolso_egreso' — satisface
+     * el gate legacy de CreditoOrdinarioController sin duplicar su lógica).
+     */
+    public function transferenciaBancaria(Request $request, $creditoId)
+    {
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarAccionTesoreria($activeRole);
+        $user = Auth::user();
+
+        $credito = CreditoOrdinario::with(self::RELACIONES_DETALLE)->findOrFail($creditoId);
+
+        if ($credito->estado !== 'ejecucion_transferencia') {
+            return response()->json([
+                'message' => 'Esta solicitud no está pendiente de Registro de Transferencia Bancaria.',
+            ], 422);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'titular_cuenta' => 'required|string|max:255',
+            'tipo_documento_titular_id' => 'required|integer|exists:document_types,id',
+            'numero_documento_titular' => 'required|string|max:50',
+            'entidad_bancaria_id' => 'required|integer|exists:entidades_bancarias,id',
+            'tipo_cuenta' => 'required|in:ahorros,corriente',
+            'numero_cuenta' => 'required|string|max:50',
+            'numero_cuenta_confirmacion' => 'required|string|max:50',
+            'moneda_cuenta' => 'required|string|max:10',
+            'correo_notificacion_pago' => 'required|email',
+            'certificado_bancario' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            'observaciones_bancarias' => 'nullable|string',
+            'fecha_transferencia' => 'required|date|before_or_equal:today',
+            'hora_transferencia' => 'required|string',
+            'valor_transaccion' => 'required|numeric|min:0.01',
+            'valor_transaccion_confirmacion' => 'required|numeric',
+            'numero_transaccion' => 'required|string|max:100|unique:credito_ordinarios,numero_transaccion_bancaria',
+            'comprobante_transferencia' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            'declaracion_validacion_bancaria' => 'required|accepted',
+        ], [
+            'tipo_documento_titular_id.required' => 'Seleccione el tipo de documento del titular.',
+            'entidad_bancaria_id.required' => 'Seleccione la entidad bancaria.',
+            'certificado_bancario.required' => 'Adjunte el certificado bancario para continuar.',
+            'comprobante_transferencia.required' => 'Adjunte el comprobante de la transferencia para continuar.',
+            'fecha_transferencia.before_or_equal' => 'La fecha de la transferencia no puede ser posterior a la fecha actual.',
+            'numero_transaccion.unique' => 'El número de la transacción ya se encuentra registrado.',
+            'declaracion_validacion_bancaria.required' => 'Confirme la validación de los datos bancarios del beneficiario.',
+            'declaracion_validacion_bancaria.accepted' => 'Confirme la validación de los datos bancarios del beneficiario.',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        // RN-04: número de cuenta y confirmación deben coincidir.
+        if ($request->input('numero_cuenta') !== $request->input('numero_cuenta_confirmacion')) {
+            return response()->json(['message' => 'El número de cuenta y su confirmación no coinciden.'], 422);
+        }
+
+        // RN-05: valor de la transacción y confirmación deben coincidir.
+        $valor = (string) $request->input('valor_transaccion');
+        $valorConfirmacion = (string) $request->input('valor_transaccion_confirmacion');
+        if (bccomp($valor, $valorConfirmacion, 2) !== 0) {
+            return response()->json(['message' => 'El valor de la transacción y su confirmación no coinciden.'], 422);
+        }
+
+        // RN-06: el valor debe ser igual al valor aprobado para desembolso —
+        // no se permiten transferencias parciales en esta funcionalidad.
+        if (bccomp($valor, (string) $credito->monto, 2) !== 0) {
+            return response()->json(['message' => 'El valor de la transacción debe ser igual al valor aprobado para desembolso.'], 422);
+        }
+
+        $entidadBancaria = EntidadBancaria::findOrFail($request->input('entidad_bancaria_id'));
+
+        $certificado = $request->file('certificado_bancario');
+        $comprobante = $request->file('comprobante_transferencia');
+        $rutaCertificado = $certificado->store('credito_documentos/' . $credito->id . '/transferencia', 'public');
+        $rutaComprobante = $comprobante->store('credito_documentos/' . $credito->id . '/transferencia', 'public');
+
+        $numeroCuenta = (string) $request->input('numero_cuenta');
+        $cuentaEnmascarada = str_repeat('*', max(strlen($numeroCuenta) - 4, 0)) . substr($numeroCuenta, -4);
+
+        $transferencia = [
+            'titular_cuenta' => $request->input('titular_cuenta'),
+            'tipo_documento_titular_id' => (int) $request->input('tipo_documento_titular_id'),
+            'numero_documento_titular' => $request->input('numero_documento_titular'),
+            'entidad_bancaria_id' => $entidadBancaria->id,
+            'entidad_bancaria_nombre' => $entidadBancaria->nombre,
+            'tipo_cuenta' => $request->input('tipo_cuenta'),
+            'numero_cuenta' => $numeroCuenta,
+            'cuenta_enmascarada' => $cuentaEnmascarada,
+            'moneda_cuenta' => $request->input('moneda_cuenta'),
+            'correo_notificacion_pago' => $request->input('correo_notificacion_pago'),
+            'certificado_bancario' => $rutaCertificado,
+            'observaciones_bancarias' => $request->input('observaciones_bancarias'),
+            'fecha_transferencia' => $request->input('fecha_transferencia'),
+            'hora_transferencia' => $request->input('hora_transferencia'),
+            'valor_transaccion' => $valor,
+            'numero_transaccion' => $request->input('numero_transaccion'),
+            'comprobante_transferencia' => $rutaComprobante,
+            'declaracion_validacion_bancaria' => true,
+            'cliente_nombre' => $this->nombreClienteParaCorreo($credito),
+            'registrado_por_id' => $user->id,
+            'registrado_por_nombre' => $user->name,
+            'registrado_en' => now()->toIso8601String(),
+        ];
+
+        // Legacy compat: mismo criterio que desembolsoIngreso() con
+        // 'desembolso_egreso' — satisface el gate de CreditoOrdinarioController
+        // (`!empty($documentos['comprobante_transferencia'])`) sin duplicar
+        // esa lógica acá.
+        $documentosRaw = $credito->documentos_raw ?? [];
+        $documentosRaw['comprobante_transferencia'] = $rutaComprobante;
+        $credito->documentos = $documentosRaw;
+
+        $estadoAnterior = $credito->estado;
+        $credito->transferencia_bancaria = $transferencia;
+        $credito->numero_transaccion_bancaria = $transferencia['numero_transaccion'];
+        $credito->estado = 'completado';
+
+        $historial = $credito->historial_estados ?? [];
+        $historial[] = [
+            'fecha' => now()->toIso8601String(),
+            'usuario' => $user->name,
+            'rol' => $activeRole,
+            'estado_anterior' => $estadoAnterior,
+            'estado_nuevo' => $credito->estado,
+            'comentario' => 'Transferencia bancaria registrada por Tesorería (transacción '
+                . $transferencia['numero_transaccion'] . ', cuenta ' . $cuentaEnmascarada
+                . ' — ' . $entidadBancaria->nombre . '). ¡Proceso BPMN Completado con Éxito!',
+        ];
+        $credito->historial_estados = $historial;
+        $credito->solicitud_gestionada = true;
+        $credito->fecha_gestion = now();
+        $credito->save();
+
+        // FA-04: un fallo de envío no revierte la transferencia, que ya
+        // quedó guardada (mismo criterio best-effort que notificarPorRol()).
+        try {
+            Mail::to($request->input('correo_notificacion_pago'))
+                ->send(new TransferenciaRealizadaClienteMail($credito, $transferencia, $cuentaEnmascarada));
+        } catch (Throwable $e) {
+            // Notificación informativa — no revierte la transición.
+        }
+
+        $urlIngresoGerente = $this->urlIngresoSistema('/gestion-creditos');
+        $this->notificarPorRol('gerente', new TransferenciaRegistradaInternaMail($credito, $transferencia, $urlIngresoGerente));
+        $this->notificarPorRol('coordinador_comercial', new TransferenciaRegistradaInternaMail($credito, $transferencia, $urlIngresoGerente));
+
+        return response()->json([
+            'message' => 'Transferencia bancaria registrada. El cliente y los usuarios de Gerencia/Coordinación Comercial fueron notificados.',
             'credito' => $this->conFechaValidacion($credito->fresh(self::RELACIONES_DETALLE)),
         ]);
     }
@@ -1137,7 +1324,7 @@ class GestionCreditoController extends Controller
      * porque acá el disparador legítimo es el Coordinador Comercial vía
      * Gestión de Créditos.
      */
-    private function crearSolicitudDocumentos(CreditoOrdinario $credito, int $presetId, int $creadoPorId): void
+    private function crearSolicitudDocumentos(CreditoOrdinario $credito, int $presetId, int $creadoPorId, ?string $etapa = null): void
     {
         $preset = DocumentPreset::findOrFail($presetId);
         $requirementIds = $preset->requirements()->pluck('document_requirements.id')->toArray();
@@ -1167,6 +1354,9 @@ class GestionCreditoController extends Controller
             'creado_por' => $creadoPorId,
             'solicitud_credito_id' => $credito->solicitud_credito_id,
             'estado' => 'pendiente',
+            'etapa' => $etapa,
+            'preset_id' => $preset->id,
+            'preset_nombre' => $preset->nombre,
         ]);
 
         foreach ($requirementIds as $reqId) {
@@ -1179,15 +1369,15 @@ class GestionCreditoController extends Controller
     }
 
     /**
-     * SCRUM-211/215/219: acceso de módulo (bandeja/tarjetas/detalle) amplía
-     * a Gerente y Operativo — la restricción fina de QUÉ pueden ver/hacer
-     * dentro del módulo vive en ROLES_POR_CLAVE (visibilidad) y en
-     * autorizarAccionGerencial()/autorizarAccionOperativa() (las 3 acciones
-     * nuevas), no acá.
+     * SCRUM-211/215/219/224: acceso de módulo (bandeja/tarjetas/detalle)
+     * amplía a Gerente, Operativo y Tesorería — la restricción fina de QUÉ
+     * pueden ver/hacer dentro del módulo vive en ROLES_POR_CLAVE
+     * (visibilidad) y en autorizarAccionGerencial()/autorizarAccionOperativa()/
+     * autorizarAccionTesoreria() (las acciones de escritura), no acá.
      */
     private function autorizarRol(string $activeRole): void
     {
-        if (in_array($activeRole, ['superadmin', 'coordinador_comercial', 'gerente', 'operativo'], true)) {
+        if (in_array($activeRole, ['superadmin', 'coordinador_comercial', 'gerente', 'operativo', 'tesoreria'], true)) {
             return;
         }
 
@@ -1212,6 +1402,18 @@ class GestionCreditoController extends Controller
     private function autorizarAccionOperativa(string $activeRole): void
     {
         if ($activeRole === 'superadmin' || $activeRole === 'operativo') {
+            return;
+        }
+
+        abort(response()->json([
+            'message' => 'No tienes autorización para realizar esta acción.',
+            'rol_activo' => $activeRole,
+        ], 403));
+    }
+
+    private function autorizarAccionTesoreria(string $activeRole): void
+    {
+        if ($activeRole === 'superadmin' || $activeRole === 'tesoreria') {
             return;
         }
 

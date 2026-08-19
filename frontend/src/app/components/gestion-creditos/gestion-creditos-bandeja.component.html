@@ -72,6 +72,14 @@
         <p class="tile-label">Aprobación Registro Operación de Desembolso en CYF</p>
       </div>
     </div>
+    <!-- SCRUM-224 -->
+    <div class="tile-card clickable" *ngIf="tarjetas.ejecucion_transferencia !== undefined" (click)="filtrarPorTarjeta('ejecucion_transferencia')">
+      <span class="material-symbols-outlined tile-icon info">account_balance_wallet</span>
+      <div>
+        <p class="tile-value">{{ tarjetas.ejecucion_transferencia }}</p>
+        <p class="tile-label">Registro de Transferencia Bancaria</p>
+      </div>
+    </div>
   </div>
 
   <div class="content-card mt-4">
@@ -102,6 +110,7 @@
         <option value="aprobacion_registro_cyf">Pendiente Aprobación Registro CYF</option>
         <option value="desembolso_ingreso">Pendiente Registro de Operación de Desembolso</option>
         <option value="desembolso_aprobacion">Pendiente Aprobación Operación de Desembolso</option>
+        <option value="ejecucion_transferencia">Pendiente Registro de Transferencia Bancaria</option>
       </select>
       <select class="pro-input" [(ngModel)]="filtroGestionada">
         <option value="todos">Solicitud gestionada: Todos</option>

@@ -36,7 +36,9 @@ export class ParametersComponent implements OnInit {
     { id: 'amortizaciones', label: 'Amortizaciones', fields: [
       { name: 'codigo', label: 'Código', type: 'text' },
       { name: 'nombre', label: 'Nombre', type: 'text' }
-    ]}
+    ]},
+    // SCRUM-224: catálogo de bancos para el Registro de Transferencia Bancaria.
+    { id: 'entidades_bancarias', label: 'Entidades Bancarias', fields: [{ name: 'nombre', label: 'Nombre', type: 'text' }] }
   ];
 
   activeTable = this.tables[0];

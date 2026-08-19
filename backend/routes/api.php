@@ -241,7 +241,7 @@ Route::prefix('listas-sarlaft')->middleware('auth:api')->group(function () {
 // módulo a Gerente y Operativo — la restricción fina de qué puede ver/hacer
 // cada rol dentro del módulo vive dentro del controlador (ROLES_POR_CLAVE,
 // autorizarAccionGerencial()/autorizarAccionOperativa()), no acá.
-Route::prefix('gestion-creditos')->middleware(['auth:api', 'checkrole:superadmin,coordinador_comercial,gerente,operativo'])->group(function () {
+Route::prefix('gestion-creditos')->middleware(['auth:api', 'checkrole:superadmin,coordinador_comercial,gerente,operativo,tesoreria'])->group(function () {
     Route::get('/', [\App\Http\Controllers\GestionCreditoController::class, 'index']);
     Route::get('/tarjetas', [\App\Http\Controllers\GestionCreditoController::class, 'tarjetas']);
     Route::get('/{creditoId}', [\App\Http\Controllers\GestionCreditoController::class, 'show']);
@@ -260,6 +260,8 @@ Route::prefix('gestion-creditos')->middleware(['auth:api', 'checkrole:superadmin
     Route::post('/{creditoId}/desembolso-ingreso', [\App\Http\Controllers\GestionCreditoController::class, 'desembolsoIngreso']);
     // SCRUM-219: aprobación (Gerente) del Registro de Operación de Desembolso en CYF.
     Route::post('/{creditoId}/desembolso-aprobacion', [\App\Http\Controllers\GestionCreditoController::class, 'desembolsoAprobacion']);
+    // SCRUM-224: registro (Tesorería) de la Transferencia Bancaria del desembolso.
+    Route::post('/{creditoId}/transferencia-bancaria', [\App\Http\Controllers\GestionCreditoController::class, 'transferenciaBancaria']);
 });
 
 // Registro de Solicitudes de Crédito

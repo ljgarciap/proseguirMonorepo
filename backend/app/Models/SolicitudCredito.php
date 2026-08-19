@@ -77,9 +77,40 @@ class SolicitudCredito extends Model
      * Solicitud de Documentos (DocumentRequest) generada a partir del
      * preset elegido al registrar esta solicitud (SCRUM-146).
      */
+    /**
+     * SCRUM-229: excluye explícitamente 'garantias'/'pre_comite' — sin este
+     * filtro, un crédito cuyo ÚNICO DocumentRequest resultó ser el de
+     * garantías (ej. creado directo sin pasar por el registro normal de
+     * SolicitudCredito) hacía que este hasOne lo tomara igual (al ser el
+     * único candidato) y Etapa 1 terminaba mostrando por error los
+     * documentos de garantías. Datos históricos con 'etapa' NULL (previos a
+     * esta columna) siguen matcheando — solo se excluyen los tageados
+     * explícitamente como de otra etapa.
+     */
     public function documentRequest()
     {
-        return $this->hasOne(DocumentRequest::class, 'solicitud_credito_id');
+        // NOT IN con NULL no matchea en SQL (NULL NOT IN (...) = NULL, no
+        // TRUE) — hay que permitir 'etapa' NULL explícitamente o se excluye
+        // por error toda la data histórica previa a esta columna.
+        return $this->hasOne(DocumentRequest::class, 'solicitud_credito_id')
+            ->where(function ($q) {
+                $q->whereNull('etapa')->orWhereNotIn('etapa', ['garantias', 'pre_comite']);
+            });
+    }
+
+    /**
+     * Solicitud de Documentos de garantías (SCRUM-193/205), generada cuando
+     * el Coordinador Comercial gestiona 'aprobada_garantias' con un preset
+     * (GestionCreditoController::crearSolicitudDocumentos()). Distinta de
+     * documentRequest() (Etapa 1, SCRUM-146) aunque comparten la misma FK
+     * solicitud_credito_id — se distinguen por la columna 'etapa'. La más
+     * reciente gana si el preset se reenvió más de una vez (SCRUM-229).
+     */
+    public function garantiasDocumentRequest()
+    {
+        return $this->hasOne(DocumentRequest::class, 'solicitud_credito_id')
+            ->where('etapa', 'garantias')
+            ->latestOfMany('id');
     }
 
     /**

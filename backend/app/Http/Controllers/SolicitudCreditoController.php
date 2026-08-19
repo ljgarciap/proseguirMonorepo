@@ -307,7 +307,15 @@ class SolicitudCreditoController extends Controller
                         'cliente_id' => $user->id,
                         'creado_por' => $request->user()->id,
                         'solicitud_credito_id' => $solicitud->id,
-                        'estado' => 'pendiente'
+                        'estado' => 'pendiente',
+                        // SCRUM-229: tagea el DocumentRequest original de Etapa 1
+                        // para que SolicitudCredito::documentRequest() nunca lo
+                        // confunda con el de garantías/pre-comité (mismo
+                        // solicitud_credito_id, ver GestionCreditoController::
+                        // crearSolicitudDocumentos()).
+                        'etapa' => 'inicial',
+                        'preset_id' => $validated['document_preset_id'],
+                        'preset_nombre' => $preset->nombre,
                     ]);
 
                     foreach ($requirementIds as $reqId) {

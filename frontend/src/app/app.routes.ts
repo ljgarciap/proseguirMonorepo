@@ -196,7 +196,7 @@ export const routes: Routes = [
         path: 'gestion-creditos',
         loadComponent: () => import('./components/gestion-creditos/gestion-creditos-bandeja.component').then(m => m.GestionCreditosBandejaComponent),
         canActivate: [roleGuard],
-        data: { roles: ['coordinador_comercial', 'gerente', 'operativo', 'superadmin'] }
+        data: { roles: ['coordinador_comercial', 'gerente', 'operativo', 'tesoreria', 'superadmin'] }
     },
     {
         path: 'gestion-creditos/:creditoId',
@@ -238,6 +238,13 @@ export const routes: Routes = [
         loadComponent: () => import('./components/gestion-creditos/gestion-creditos-desembolso-aprobacion.component').then(m => m.GestionCreditosDesembolsoAprobacionComponent),
         canActivate: [roleGuard],
         data: { roles: ['gerente', 'superadmin'] }
+    },
+    {
+        // SCRUM-224
+        path: 'gestion-creditos/:creditoId/transferencia-bancaria',
+        loadComponent: () => import('./components/gestion-creditos/gestion-creditos-transferencia-bancaria.component').then(m => m.GestionCreditosTransferenciaBancariaComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['tesoreria', 'superadmin'] }
     },
     {
         path: 'db-cleaner',

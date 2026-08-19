@@ -135,6 +135,9 @@ jobs:
             # 5d. Seeder idempotente de departamentos/ciudades de Colombia (firstOrCreate, seguro en cada deploy)
             docker exec factoring_backend php artisan db:seed --class=ColombiaGeografiaSeeder --force
 
+            # 5e. Seeder idempotente de entidades bancarias (SCRUM-224, updateOrCreate, seguro en cada deploy)
+            docker exec factoring_backend php artisan db:seed --class=EntidadBancariaSeeder --force
+
             # 6. Configurar seguridad Passport
             docker exec factoring_backend php artisan passport:install --no-interaction
             docker exec factoring_backend php artisan migrate --force
@@ -210,6 +213,9 @@ jobs:
 
             # 5d. Seeder idempotente de departamentos/ciudades de Colombia (firstOrCreate, seguro en cada deploy)
             docker exec factoring_backend php artisan db:seed --class=ColombiaGeografiaSeeder --force
+
+            # 5e. Seeder idempotente de entidades bancarias (SCRUM-224, updateOrCreate, seguro en cada deploy)
+            docker exec factoring_backend php artisan db:seed --class=EntidadBancariaSeeder --force
 
             # 6. Configurar seguridad Passport
             docker exec factoring_backend php artisan passport:install --no-interaction
