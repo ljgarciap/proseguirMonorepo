@@ -73,18 +73,26 @@ Chart.register(...registerables);
         <div class="header-filters">
           <div class="pro-input-group">
             <label>Desde</label>
-            <input type="date" [(ngModel)]="filterFechaInicio" (change)="loadStats()" class="pro-input">
+            <input type="date" [(ngModel)]="filterFechaInicio" (change)="refreshCurrentTab()" class="pro-input">
           </div>
           <div class="pro-input-group">
             <label>Hasta</label>
-            <input type="date" [(ngModel)]="filterFechaFin" (change)="loadStats()" class="pro-input">
+            <input type="date" [(ngModel)]="filterFechaFin" (change)="refreshCurrentTab()" class="pro-input">
           </div>
           <div class="pro-input-group">
             <label>Cliente / NIT</label>
             <div class="search-box">
-              <input type="text" [(ngModel)]="filterCliente" (keyup.enter)="loadStats()" placeholder="Filtrar..." class="pro-input">
+              <input type="text" [(ngModel)]="filterCliente" (keyup.enter)="refreshCurrentTab()" placeholder="Filtrar..." class="pro-input">
               <span class="material-symbols-outlined" *ngIf="!filterCliente">search</span>
-              <span class="material-symbols-outlined clear" *ngIf="filterCliente" (click)="filterCliente = ''; loadStats()">close</span>
+              <span class="material-symbols-outlined clear" *ngIf="filterCliente" (click)="filterCliente = ''; refreshCurrentTab()">close</span>
+            </div>
+          </div>
+          <div class="pro-input-group" *ngIf="currentTab === 'cartera_factoring'">
+            <label>Factura N.º</label>
+            <div class="search-box">
+              <input type="text" [(ngModel)]="filterFactura" (keyup.enter)="refreshCurrentTab()" placeholder="Número..." class="pro-input">
+              <span class="material-symbols-outlined" *ngIf="!filterFactura">search</span>
+              <span class="material-symbols-outlined clear" *ngIf="filterFactura" (click)="filterFactura = ''; refreshCurrentTab()">close</span>
             </div>
           </div>
         </div>
@@ -106,11 +114,19 @@ Chart.register(...registerables);
             <button (click)="setTab('pagos_compraventa')" [class.active]="currentTab === 'pagos_compraventa'">
               <span class="material-symbols-outlined">paid</span> Pagos CompraVenta
             </button>
+            <button *ngIf="['operativo', 'superadmin'].includes(authService.getActiveRole() || '')" (click)="setTab('cartera_factoring')" [class.active]="currentTab === 'cartera_factoring'">
+              <span class="material-symbols-outlined">summarize</span> Cartera Factoring
+            </button>
           </div>
 
           <div class="btn-group">
-            <button (click)="loadStats()" class="btn-pro secondary icon-only" [class.spinning]="isRefreshing" title="Refrescar">
+            <button (click)="refreshCurrentTab()" class="btn-pro secondary icon-only" [class.spinning]="isRefreshing" title="Refrescar">
               <span class="material-symbols-outlined">{{ isRefreshing ? 'sync' : 'refresh' }}</span>
+            </button>
+            <button *ngIf="currentTab === 'cartera_factoring' && authService.getActiveRole() === 'superadmin'"
+                    (click)="exportCarteraFactoringExcel()" class="btn-pro secondary" [disabled]="isExportingExcel">
+              <span class="material-symbols-outlined">{{ isExportingExcel ? 'hourglass_bottom' : 'grid_on' }}</span>
+              {{ isExportingExcel ? 'Exportando...' : 'Exportar Excel' }}
             </button>
             <button (click)="exportToPdf()" class="btn-pro primary" [disabled]="isGeneratingPdf">
               <span class="material-symbols-outlined">{{ isGeneratingPdf ? 'hourglass_bottom' : 'picture_as_pdf' }}</span>
@@ -619,6 +635,148 @@ Chart.register(...registerables);
           </div>
         </div>
 
+        <!-- TAB: CARTERA FACTORING (SCRUM-230) -->
+        <div class="tab-view" *ngIf="currentTab === 'cartera_factoring' && stats.cartera_factoring">
+          <div class="kpi-grid">
+            <div class="kpi-card pro-card navy">
+              <div class="kpi-icon"><span class="material-symbols-outlined">description</span></div>
+              <div class="kpi-body">
+                <label>Facturas de Origen</label>
+                <div class="value">{{ stats.cartera_factoring.indicadores.facturas_origen }}</div>
+              </div>
+            </div>
+            <div class="kpi-card pro-card cyan">
+              <div class="kpi-icon"><span class="material-symbols-outlined">account_balance_wallet</span></div>
+              <div class="kpi-body">
+                <label>Valor Cartera Total Después de Pago</label>
+                <div class="value">{{ formatMoney(stats.cartera_factoring.indicadores.valor_cartera_total_despues_pago) }}</div>
+              </div>
+            </div>
+            <div class="kpi-card pro-card purple">
+              <div class="kpi-icon"><span class="material-symbols-outlined">paid</span></div>
+              <div class="kpi-body">
+                <label>Total Valor Pagado</label>
+                <div class="value">{{ formatMoney(stats.cartera_factoring.indicadores.total_valor_pagado) }}</div>
+              </div>
+            </div>
+            <div class="kpi-card pro-card cyan">
+              <div class="kpi-icon"><span class="material-symbols-outlined">task_alt</span></div>
+              <div class="kpi-body">
+                <label>Pagos Coincidentes</label>
+                <div class="value">{{ stats.cartera_factoring.indicadores.pagos_coincidentes }}</div>
+              </div>
+            </div>
+            <div class="kpi-card pro-card orange">
+              <div class="kpi-icon"><span class="material-symbols-outlined">pending_actions</span></div>
+              <div class="kpi-body">
+                <label>Registros Sin Pago</label>
+                <div class="value">{{ stats.cartera_factoring.indicadores.registros_sin_pago }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashboard-grid">
+            <div class="card chart-container span-8">
+              <div class="card-header">
+                <h3>Top 10 Clientes por Cartera</h3>
+              </div>
+              <div class="chart-box" *ngIf="stats.cartera_factoring.top10_clientes.length > 0">
+                <canvas baseChart
+                  [data]="top10CarteraFactoringChartData"
+                  [options]="barChartOptions"
+                  [type]="'bar'">
+                </canvas>
+              </div>
+              <div class="empty-state" style="grid-column: unset; padding: 2.5rem;" *ngIf="stats.cartera_factoring.top10_clientes.length === 0">
+                <span class="material-symbols-outlined">bar_chart</span>
+                <p>Sin saldos de cartera para graficar</p>
+              </div>
+            </div>
+
+            <div class="card table-container span-4">
+              <div class="card-header">
+                <h3>Clientes con Cartera</h3>
+              </div>
+              <div class="search-box" style="margin: 0 1rem 0.75rem;">
+                <input type="text" [(ngModel)]="buscarClienteCF" placeholder="Buscar por documento o nombre..." class="pro-input">
+                <span class="material-symbols-outlined" *ngIf="!buscarClienteCF">search</span>
+                <span class="material-symbols-outlined clear" *ngIf="buscarClienteCF" (click)="buscarClienteCF = ''">close</span>
+              </div>
+              <table class="pro-table x-small">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th class="text-right">Valor Cartera</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let c of filteredCarteraFactoringClientes">
+                    <td>{{ c.cliente }} <span class="text-muted">({{ c.nit_cliente }})</span></td>
+                    <td class="text-right bold">{{ formatMoney(c.valor_cartera) }}</td>
+                  </tr>
+                  <tr *ngIf="filteredCarteraFactoringClientes.length === 0">
+                    <td colspan="2" style="text-align: center; color: #A0AEC0; padding: 1.5rem;">
+                      {{ buscarClienteCF ? 'Sin resultados para la búsqueda.' : 'Sin clientes con cartera aún.' }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="card table-container span-12">
+              <div class="card-header">
+                <h3>Detalle de Cartera</h3>
+              </div>
+              <div class="table-scroll">
+                <table class="pro-table x-small">
+                  <thead>
+                    <tr>
+                      <th>Fecha Inicial</th>
+                      <th>Fecha Final</th>
+                      <th>Factura Número</th>
+                      <th class="text-right">Valor Neto Factura</th>
+                      <th>NIT Cliente</th>
+                      <th>Cliente</th>
+                      <th>NIT Pagador</th>
+                      <th>Pagador</th>
+                      <th>Fecha de Pago</th>
+                      <th class="text-right">Valor Pagado</th>
+                      <th class="text-right">Saldo Después del Pago</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let r of stats.cartera_factoring.detalle.data">
+                      <td>{{ r.fecha_inicial || '-' }}</td>
+                      <td>{{ r.fecha_final || '-' }}</td>
+                      <td>{{ r.factura_numero }}</td>
+                      <td class="text-right">{{ formatMoney(r.valor_neto_factura) }}</td>
+                      <td>{{ r.nit_cliente }}</td>
+                      <td>{{ r.cliente }}</td>
+                      <td>{{ r.nit_pagador || '-' }}</td>
+                      <td>{{ r.pagador || '-' }}</td>
+                      <td>{{ r.fecha_pago || '-' }}</td>
+                      <td class="text-right">{{ formatMoney(r.valor_pagado) }}</td>
+                      <td class="text-right">{{ formatMoney(r.saldo_despues_pago) }}</td>
+                    </tr>
+                    <tr *ngIf="stats.cartera_factoring.detalle.data.length === 0">
+                      <td colspan="11" style="text-align: center; color: #A0AEC0; padding: 1.5rem;">Sin registros para los filtros aplicados.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="footer-pagination">
+                <div class="pagination-info">
+                  {{ stats.cartera_factoring.detalle.from || 0 }} - {{ stats.cartera_factoring.detalle.to || 0 }} de {{ stats.cartera_factoring.detalle.total }}
+                </div>
+                <div class="nav-buttons">
+                  <button (click)="loadCarteraFactoring(carteraFactoringPage - 1)" [disabled]="stats.cartera_factoring.detalle.current_page === 1 || isRefreshing" class="btn-nav">‹</button>
+                  <button (click)="loadCarteraFactoring(carteraFactoringPage + 1)" [disabled]="stats.cartera_factoring.detalle.current_page === stats.cartera_factoring.detalle.last_page || isRefreshing" class="btn-nav">›</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- MODAL FOR ALL CLIENTS WITH BALANCE (SCRUM-66) -->
@@ -829,6 +987,21 @@ Chart.register(...registerables);
         .material-symbols-outlined { font-size: 64px; margin-bottom: 1rem; }
     }
 
+    .text-muted { color: #A0AEC0; font-size: 0.85em; }
+
+    .footer-pagination {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem 1rem; border-top: 1px solid #EDF2F7;
+      .pagination-info { font-size: 0.8rem; color: #718096; }
+      .nav-buttons { display: flex; gap: 0.5rem; }
+      .btn-nav {
+        width: 32px; height: 32px; border-radius: 8px; border: 1px solid #E2E8F0;
+        background: white; cursor: pointer; font-size: 1rem; color: var(--primary);
+        &:disabled { opacity: 0.4; cursor: not-allowed; }
+        &:not(:disabled):hover { background: #F4F7FE; }
+      }
+    }
+
     .loading-overlay {
       position: absolute; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(244, 247, 254, 0.8);
@@ -960,7 +1133,8 @@ export class DashboardComponent implements OnInit {
     cartera: null,
     factoring: null,
     confirming: null,
-    compraventa: null
+    compraventa: null,
+    cartera_factoring: null
   };
   pendingCount: number = 0;
   pendingInternalDocs: number = 0;
@@ -980,6 +1154,22 @@ export class DashboardComponent implements OnInit {
   filterFechaInicio: string = '';
   filterFechaFin: string = '';
   filterCliente: string = '';
+  filterFactura: string = '';
+
+  // Cartera Factoring (SCRUM-230)
+  carteraFactoringPage: number = 1;
+  buscarClienteCF: string = '';
+  isExportingExcel = false;
+
+  get filteredCarteraFactoringClientes() {
+    const list = this.stats?.cartera_factoring?.clientes || [];
+    if (!this.buscarClienteCF) return list;
+    const term = this.buscarClienteCF.toLowerCase().trim();
+    return list.filter((c: any) =>
+      (c.cliente || '').toLowerCase().includes(term) ||
+      (c.nit_cliente || '').toLowerCase().includes(term)
+    );
+  }
 
   // Chart: Actividad
   public activityChartData: ChartData<'doughnut'> = {
@@ -1116,6 +1306,17 @@ export class DashboardComponent implements OnInit {
     datasets: [{ data: [], backgroundColor: ['#5e72e4', '#2dce89', '#fb6340', '#11cdef', '#f5365c'] }]
   };
 
+  // Chart: Top 10 Clientes por Cartera (SCRUM-230)
+  public top10CarteraFactoringChartData: ChartData<'bar'> = {
+    labels: [],
+    datasets: [{
+      data: [],
+      label: 'Saldo Después de Pago',
+      backgroundColor: '#5e72e4',
+      borderRadius: 5
+    }]
+  };
+
   public pieChartOptions: ChartConfiguration['options'] = {
     responsive: true,
     maintainAspectRatio: false,
@@ -1169,12 +1370,94 @@ export class DashboardComponent implements OnInit {
 
   setTab(tab: string) {
     this.currentTab = tab;
+
+    if (tab === 'cartera_factoring') {
+      if (!this.stats.cartera_factoring) {
+        this.loadCarteraFactoring(1);
+      }
+      return;
+    }
+
     // Map pagos to factoring key
     const dataKey = (tab === 'pagos') ? 'factoring' : tab;
-    
+
     if (!this.stats[dataKey]) {
       this.loadStats();
     }
+  }
+
+  // El botón de "Refrescar" y los filtros globales (Desde/Hasta/Cliente) son
+  // compartidos por todas las pestañas, pero Cartera Factoring (SCRUM-230)
+  // no usa el endpoint genérico /dashboard/stats (necesita paginación propia
+  // del detalle) — despacha al loader correcto según la pestaña activa.
+  refreshCurrentTab() {
+    if (this.currentTab === 'cartera_factoring') {
+      this.loadCarteraFactoring(1);
+    } else {
+      this.loadStats();
+    }
+  }
+
+  loadCarteraFactoring(page: number = 1) {
+    this.isRefreshing = true;
+    if (!this.stats.cartera_factoring) this.isLoading = true;
+    this.carteraFactoringPage = page;
+
+    let params = `?t=${Date.now()}&page=${page}`;
+    if (this.filterFechaInicio) params += `&fecha_inicio=${this.filterFechaInicio}`;
+    if (this.filterFechaFin) params += `&fecha_fin=${this.filterFechaFin}`;
+    if (this.filterCliente) params += `&cliente=${encodeURIComponent(this.filterCliente)}`;
+    if (this.filterFactura) params += `&factura=${encodeURIComponent(this.filterFactura)}`;
+
+    this.http.get(`${environment.apiUrl}/dashboard/cartera-factoring${params}`).subscribe({
+      next: (data: any) => {
+        this.stats.cartera_factoring = data;
+        const top10 = data.top10_clientes || [];
+        this.top10CarteraFactoringChartData = {
+          labels: top10.map((c: any) => c.cliente),
+          datasets: [{
+            data: top10.map((c: any) => c.total),
+            label: 'Saldo Después de Pago',
+            backgroundColor: '#5e72e4',
+            borderRadius: 5
+          }]
+        };
+        this.isRefreshing = false;
+        this.isLoading = false;
+      },
+      error: (err) => {
+        console.error('Error fetching cartera factoring stats:', err);
+        this.isRefreshing = false;
+        this.isLoading = false;
+      }
+    });
+  }
+
+  exportCarteraFactoringExcel() {
+    this.isExportingExcel = true;
+    let params = `?t=${Date.now()}`;
+    if (this.filterFechaInicio) params += `&fecha_inicio=${this.filterFechaInicio}`;
+    if (this.filterFechaFin) params += `&fecha_fin=${this.filterFechaFin}`;
+    if (this.filterCliente) params += `&cliente=${encodeURIComponent(this.filterCliente)}`;
+    if (this.filterFactura) params += `&factura=${encodeURIComponent(this.filterFactura)}`;
+
+    this.http.get(`${environment.apiUrl}/dashboard/cartera-factoring/export${params}`, { responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `cartera_factoring_${Date.now()}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        this.isExportingExcel = false;
+      },
+      error: (err) => {
+        console.error('Error exportando cartera factoring:', err);
+        this.isExportingExcel = false;
+      }
+    });
   }
 
   loadStats() {
