@@ -134,6 +134,8 @@ class DashboardCarteraFactoringTest extends TestCase
         $data = $response->json();
 
         $this->assertSame(3, $data['indicadores']['facturas_origen']);
+        $this->assertSame(2, $data['indicadores']['facturas_factoring']);
+        $this->assertSame(1, $data['indicadores']['facturas_compraventa']);
         $this->assertSame(2, $data['indicadores']['pagos_coincidentes']);
         $this->assertSame(1, $data['indicadores']['registros_sin_pago']);
         // saldo despues de pago: 4.000.000 (factoring) + 0 (compraventa) = 4.000.000

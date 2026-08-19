@@ -8,9 +8,20 @@ import { loginAs } from './helpers/auth';
  * la pestaña nueva: indicadores, Top 10 clientes, panel de clientes con
  * búsqueda, detalle paginado y export a Excel (solo Superadmin).
  *
- * Requiere datos sembrados vía tinker (ver comando en el chat de la sesión
- * 2026-08-19): OperacionFactoring PW-CF-001 (con pago, saldo 3.000.000) y
- * PW-CF-002 (sin pago) — identificables por el prefijo PW-CF-.
+ * Requiere haber corrido antes (idempotente, se puede re-ejecutar sin
+ * limpiar nada a mano):
+ *
+ *   docker cp e2e/fixtures/seed_scrum_230_cartera_factoring.php factoring_backend:/tmp/seed_scrum_230_cartera_factoring.php
+ *   docker exec factoring_backend php artisan tinker --execute="require '/tmp/seed_scrum_230_cartera_factoring.php';"
+ *
+ * Validado también con datos 100% reales de la sesión 2026-08-19 (PDF real
+ * "Compraventa_opf sumatec 2.pdf" del ticket, subido vía OCR real —
+ * resultado exacto: 24 registros de origen, 15 Factoring + 9 CompraVenta,
+ * 0 coincidencias, $0 pagado — igual al "control con archivos adjuntos"
+ * documentado en el prototipo adjunto al ticket). Este spec usa datos
+ * sintéticos (PW-CF-) en vez de los reales porque necesita reproducir
+ * también el camino "con pago" (Top10/clientes poblados), que los 4 PDFs
+ * de referencia no ejercitan por sí solos.
  *
  * Requiere: ng serve (localhost:4200) + backend Docker corriendo.
  */

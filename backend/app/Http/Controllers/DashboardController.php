@@ -545,6 +545,8 @@ class DashboardController extends Controller
         $base = $this->carteraFactoringBaseQuery($request);
 
         $totalFacturas = (clone $base)->count();
+        $facturasFactoring = (clone $base)->where('tipo_operacion', 'factoring')->count();
+        $facturasCompraventa = (clone $base)->where('tipo_operacion', 'compraventa')->count();
         $valorCarteraTotal = (float) (clone $base)->sum('saldo_despues_pago');
         $totalValorPagado = (float) (clone $base)->where('tiene_pago', 1)->sum('valor_pagado');
         $pagosCoincidentes = (clone $base)->where('tiene_pago', 1)->count();
@@ -579,6 +581,8 @@ class DashboardController extends Controller
         return response()->json([
             'indicadores' => [
                 'facturas_origen' => $totalFacturas,
+                'facturas_factoring' => $facturasFactoring,
+                'facturas_compraventa' => $facturasCompraventa,
                 'valor_cartera_total_despues_pago' => $valorCarteraTotal,
                 'total_valor_pagado' => $totalValorPagado,
                 'pagos_coincidentes' => $pagosCoincidentes,

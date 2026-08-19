@@ -637,12 +637,18 @@ Chart.register(...registerables);
 
         <!-- TAB: CARTERA FACTORING (SCRUM-230) -->
         <div class="tab-view" *ngIf="currentTab === 'cartera_factoring' && stats.cartera_factoring">
+          <div class="info-banner">
+            <span class="material-symbols-outlined">info</span>
+            Cruce automático por Factura Número. Si no existe coincidencia exacta en el archivo de pagos correspondiente, los cinco campos de pago permanecen vacíos.
+          </div>
+
           <div class="kpi-grid">
             <div class="kpi-card pro-card navy">
               <div class="kpi-icon"><span class="material-symbols-outlined">description</span></div>
               <div class="kpi-body">
                 <label>Facturas de Origen</label>
                 <div class="value">{{ stats.cartera_factoring.indicadores.facturas_origen }}</div>
+                <div class="footer">{{ stats.cartera_factoring.indicadores.facturas_factoring }} Factoring + {{ stats.cartera_factoring.indicadores.facturas_compraventa }} CompraVenta</div>
               </div>
             </div>
             <div class="kpi-card pro-card cyan">
@@ -650,6 +656,7 @@ Chart.register(...registerables);
               <div class="kpi-body">
                 <label>Valor Cartera Total Después de Pago</label>
                 <div class="value">{{ formatMoney(stats.cartera_factoring.indicadores.valor_cartera_total_despues_pago) }}</div>
+                <div class="footer">Σ Saldo Después del Pago</div>
               </div>
             </div>
             <div class="kpi-card pro-card purple">
@@ -657,6 +664,7 @@ Chart.register(...registerables);
               <div class="kpi-body">
                 <label>Total Valor Pagado</label>
                 <div class="value">{{ formatMoney(stats.cartera_factoring.indicadores.total_valor_pagado) }}</div>
+                <div class="footer">Σ Valor Pagado con coincidencia</div>
               </div>
             </div>
             <div class="kpi-card pro-card cyan">
@@ -664,6 +672,7 @@ Chart.register(...registerables);
               <div class="kpi-body">
                 <label>Pagos Coincidentes</label>
                 <div class="value">{{ stats.cartera_factoring.indicadores.pagos_coincidentes }}</div>
+                <div class="footer">Coincidencia exacta por factura</div>
               </div>
             </div>
             <div class="kpi-card pro-card orange">
@@ -671,61 +680,16 @@ Chart.register(...registerables);
               <div class="kpi-body">
                 <label>Registros Sin Pago</label>
                 <div class="value">{{ stats.cartera_factoring.indicadores.registros_sin_pago }}</div>
+                <div class="footer">Campos de pago vacíos</div>
               </div>
             </div>
           </div>
 
           <div class="dashboard-grid">
-            <div class="card chart-container span-8">
-              <div class="card-header">
-                <h3>Top 10 Clientes por Cartera</h3>
-              </div>
-              <div class="chart-box" *ngIf="stats.cartera_factoring.top10_clientes.length > 0">
-                <canvas baseChart
-                  [data]="top10CarteraFactoringChartData"
-                  [options]="barChartOptions"
-                  [type]="'bar'">
-                </canvas>
-              </div>
-              <div class="empty-state" style="grid-column: unset; padding: 2.5rem;" *ngIf="stats.cartera_factoring.top10_clientes.length === 0">
-                <span class="material-symbols-outlined">bar_chart</span>
-                <p>Sin saldos de cartera para graficar</p>
-              </div>
-            </div>
-
-            <div class="card table-container span-4">
-              <div class="card-header">
-                <h3>Clientes con Cartera</h3>
-              </div>
-              <div class="search-box" style="margin: 0 1rem 0.75rem;">
-                <input type="text" [(ngModel)]="buscarClienteCF" placeholder="Buscar por documento o nombre..." class="pro-input">
-                <span class="material-symbols-outlined" *ngIf="!buscarClienteCF">search</span>
-                <span class="material-symbols-outlined clear" *ngIf="buscarClienteCF" (click)="buscarClienteCF = ''">close</span>
-              </div>
-              <table class="pro-table x-small">
-                <thead>
-                  <tr>
-                    <th>Cliente</th>
-                    <th class="text-right">Valor Cartera</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let c of filteredCarteraFactoringClientes">
-                    <td>{{ c.cliente }} <span class="text-muted">({{ c.nit_cliente }})</span></td>
-                    <td class="text-right bold">{{ formatMoney(c.valor_cartera) }}</td>
-                  </tr>
-                  <tr *ngIf="filteredCarteraFactoringClientes.length === 0">
-                    <td colspan="2" style="text-align: center; color: #A0AEC0; padding: 1.5rem;">
-                      {{ buscarClienteCF ? 'Sin resultados para la búsqueda.' : 'Sin clientes con cartera aún.' }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
             <div class="card table-container span-12">
               <div class="card-header">
                 <h3>Detalle de Cartera</h3>
+                <span class="text-muted">Resultados consolidados de Factoring y CompraVenta</span>
               </div>
               <div class="table-scroll">
                 <table class="pro-table x-small">
@@ -764,15 +728,67 @@ Chart.register(...registerables);
                   </tbody>
                 </table>
               </div>
+              <p class="table-footnote" *ngIf="stats.cartera_factoring.detalle.data.length > 0">Los espacios en blanco representan campos de pago sin coincidencia exacta; no corresponden a valores cero.</p>
               <div class="footer-pagination">
                 <div class="pagination-info">
-                  {{ stats.cartera_factoring.detalle.from || 0 }} - {{ stats.cartera_factoring.detalle.to || 0 }} de {{ stats.cartera_factoring.detalle.total }}
+                  Mostrando {{ stats.cartera_factoring.detalle.from || 0 }}-{{ stats.cartera_factoring.detalle.to || 0 }} de {{ stats.cartera_factoring.detalle.total }} registros
                 </div>
                 <div class="nav-buttons">
                   <button (click)="loadCarteraFactoring(carteraFactoringPage - 1)" [disabled]="stats.cartera_factoring.detalle.current_page === 1 || isRefreshing" class="btn-nav">‹</button>
                   <button (click)="loadCarteraFactoring(carteraFactoringPage + 1)" [disabled]="stats.cartera_factoring.detalle.current_page === stats.cartera_factoring.detalle.last_page || isRefreshing" class="btn-nav">›</button>
                 </div>
               </div>
+            </div>
+
+            <div class="card chart-container span-8">
+              <div class="card-header">
+                <h3>Top 10 Clientes por Cartera</h3>
+                <span class="text-muted">Ordenado de mayor a menor según la sumatoria del Saldo Después del Pago por cliente</span>
+              </div>
+              <div class="chart-box" *ngIf="stats.cartera_factoring.top10_clientes.length > 0">
+                <canvas baseChart
+                  [data]="top10CarteraFactoringChartData"
+                  [options]="barChartOptions"
+                  [type]="'bar'">
+                </canvas>
+              </div>
+              <div class="empty-state" style="grid-column: unset; padding: 2.5rem;" *ngIf="stats.cartera_factoring.top10_clientes.length === 0">
+                <span class="material-symbols-outlined">bar_chart</span>
+                <p>Sin saldos de cartera para graficar</p>
+                <span class="text-muted">El gráfico mostrará hasta 10 clientes cuando existan valores en Saldo Después del Pago.</span>
+              </div>
+            </div>
+
+            <div class="card table-container span-4">
+              <div class="card-header">
+                <h3>Clientes con Cartera</h3>
+                <span class="text-muted">Orden ascendente por valor de cartera y luego por nombre</span>
+              </div>
+              <div class="search-box" style="margin: 0 1rem 0.75rem;">
+                <input type="text" [(ngModel)]="buscarClienteCF" placeholder="Buscar por documento o nombre..." class="pro-input">
+                <span class="material-symbols-outlined" *ngIf="!buscarClienteCF">search</span>
+                <span class="material-symbols-outlined clear" *ngIf="buscarClienteCF" (click)="buscarClienteCF = ''">close</span>
+              </div>
+              <table class="pro-table x-small" *ngIf="filteredCarteraFactoringClientes.length > 0">
+                <thead>
+                  <tr>
+                    <th>Cliente</th>
+                    <th class="text-right">Valor Cartera</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let c of filteredCarteraFactoringClientes">
+                    <td>{{ c.cliente }} <span class="text-muted">({{ c.nit_cliente }})</span></td>
+                    <td class="text-right bold">{{ formatMoney(c.valor_cartera) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="empty-state" style="grid-column: unset; padding: 2rem 1.5rem;" *ngIf="filteredCarteraFactoringClientes.length === 0">
+                <span class="material-symbols-outlined">group_off</span>
+                <p>{{ buscarClienteCF ? 'Sin resultados para la búsqueda.' : 'No hay clientes con cartera' }}</p>
+                <span class="text-muted" *ngIf="!buscarClienteCF">La lista se poblará cuando la sumatoria del Saldo Después del Pago sea mayor a $0.</span>
+              </div>
+              <div class="pagination-info" style="padding: 0.5rem 1rem;">{{ filteredCarteraFactoringClientes.length }} cliente(s) encontrado(s)</div>
             </div>
           </div>
         </div>
@@ -988,6 +1004,20 @@ Chart.register(...registerables);
     }
 
     .text-muted { color: #A0AEC0; font-size: 0.85em; }
+
+    .info-banner {
+      display: flex; align-items: center; gap: 0.5rem;
+      background: #EBF4FF; color: #2b6cb0; border: 1px solid #BEE3F8;
+      border-radius: 12px; padding: 0.85rem 1.25rem; margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+      .material-symbols-outlined { font-size: 20px; }
+    }
+
+    .table-footnote {
+      font-size: 0.8rem; color: #A0AEC0; font-style: italic;
+      padding: 0 1.5rem 0.5rem;
+      margin: 0;
+    }
 
     .footer-pagination {
       display: flex; justify-content: space-between; align-items: center;
