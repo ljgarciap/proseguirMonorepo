@@ -12,8 +12,8 @@ use Illuminate\Queue\SerializesModels;
 /**
  * SCRUM-219: notifica a los usuarios con Rol Tesorería que Gerencia aprobó
  * el Registro de Operación de Desembolso en CYF — pueden efectuar y
- * registrar la transferencia bancaria (pantalla legacy de Crédito
- * Ordinario, estado 'ejecucion_transferencia').
+ * registrar la transferencia bancaria (estado 'ejecucion_transferencia',
+ * pantalla propia desde SCRUM-224: transferenciaBancaria()).
  */
 class DesembolsoAprobadoTesoreriaMail extends Mailable
 {

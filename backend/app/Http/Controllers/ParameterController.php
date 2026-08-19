@@ -16,6 +16,7 @@ class ParameterController extends Controller
         'tipo_personas' => \App\Models\TipoPersona::class,
         'tipo_creditos' => \App\Models\TipoCredito::class,
         'amortizaciones' => \App\Models\Amortizacion::class,
+        'entidades_bancarias' => \App\Models\EntidadBancaria::class,
     ];
 
     public function index($table)

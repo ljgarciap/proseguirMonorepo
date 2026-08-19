@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             ConfiguracionSeeder::class,
             DocumentAreaSeeder::class,
             ColombiaGeografiaSeeder::class,
+            EntidadBancariaSeeder::class,
         ]);
     }
 }

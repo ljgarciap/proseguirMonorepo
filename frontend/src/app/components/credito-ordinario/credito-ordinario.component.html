@@ -657,79 +657,33 @@
           <!-- ETAPA 4 / 5 (según tipo de crédito) -->
           <div class="stage-doc-group">
             <h4>Etapa {{ 4 + etapaOffset }}: Formalización de Garantías <span class="stage-owner">Cliente / Dirección Administrativa</span></h4>
+            <!-- SCRUM-229: documentos dirigidos por el preset que solicitó el
+                 Coordinador Comercial al gestionar "Aprobada para gestión de
+                 garantías" (mismo patrón preset+DocumentRequest de Etapa 1,
+                 SCRUM-146 — fallback a la lista fija legacy si el crédito no
+                 tiene DocumentRequest de garantías, ej. créditos anteriores a
+                 SCRUM-193/205). -->
+            <p class="section-desc" *ngIf="etapa4PresetNombre">Documentación solicitada: <strong>{{ etapa4PresetNombre }}</strong></p>
             <div class="documents-grid-grouped">
-              <!-- Borradores (Pagaré, Carta Inst, Contrato) -->
-              <div class="doc-box-new">
+              <div class="doc-box-new" *ngFor="let doc of etapa4Docs">
                 <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.pagare_borrador">description</span>
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="getDocFiles(doc.key).length > 0">description</span>
                   <div class="doc-title-desc">
-                    <h5>Pagaré (Borrador)</h5>
-                    <p>Plantilla de Pagaré para firma. Responsable de carga: Comercial.</p>
+                    <h5>{{ doc.nombre }}</h5>
+                    <p>{{ doc.descripcion }}</p>
                   </div>
                 </div>
                 <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.pagare_borrador">Disponible</span>
-                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.pagare_borrador">Pendiente</span>
-                  <a *ngIf="selectedCredito.documentos?.pagare_borrador" [href]="selectedCredito.documentos.pagare_borrador" target="_blank" class="btn-view-doc">
-                    <span class="material-symbols-outlined">open_in_new</span> Descargar
-                  </a>
-                </div>
-              </div>
+                  <span class="doc-status-pill success" *ngIf="getDocFiles(doc.key).length > 0">Cargado ({{ getDocFiles(doc.key).length }})</span>
+                  <span class="doc-status-pill error" *ngIf="getDocFiles(doc.key).length === 0">Pendiente</span>
 
-              <div class="doc-box-new">
-                <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.carta_instrucciones_borrador">description</span>
-                  <div class="doc-title-desc">
-                    <h5>Carta de Instrucciones (Borrador)</h5>
-                    <p>Plantilla de Carta de Instrucciones para firma. Responsable de carga: Comercial.</p>
-                  </div>
-                </div>
-                <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.carta_instrucciones_borrador">Disponible</span>
-                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.carta_instrucciones_borrador">Pendiente</span>
-                  <a *ngIf="selectedCredito.documentos?.carta_instrucciones_borrador" [href]="selectedCredito.documentos.carta_instrucciones_borrador" target="_blank" class="btn-view-doc">
-                    <span class="material-symbols-outlined">open_in_new</span> Descargar
-                  </a>
-                </div>
-              </div>
-
-              <div class="doc-box-new">
-                <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.contrato_borrador">description</span>
-                  <div class="doc-title-desc">
-                    <h5>Contrato (Borrador)</h5>
-                    <p>Plantilla de Contrato para firma. Responsable de carga: Comercial.</p>
-                  </div>
-                </div>
-                <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.contrato_borrador">Disponible</span>
-                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.contrato_borrador">Pendiente</span>
-                  <a *ngIf="selectedCredito.documentos?.contrato_borrador" [href]="selectedCredito.documentos.contrato_borrador" target="_blank" class="btn-view-doc">
-                    <span class="material-symbols-outlined">open_in_new</span> Descargar
-                  </a>
-                </div>
-              </div>
-
-              <!-- Garantías Firmadas -->
-              <div class="doc-box-new">
-                <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.garantias_firmadas">draw</span>
-                  <div class="doc-title-desc">
-                    <h5>Pagarés y Garantías Firmadas</h5>
-                    <p>Documentos jurídicos formalizados por el cliente. Validación: Dirección Administrativa.</p>
-                  </div>
-                </div>
-                <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="selectedCredito.documentos?.garantias_firmadas">Cargado</span>
-                  <span class="doc-status-pill error" *ngIf="!selectedCredito.documentos?.garantias_firmadas">Pendiente</span>
-                  
-                  <div class="action-inline-upload" *ngIf="selectedCredito.estado === 'formalizacion_garantias' && (activeRole === 'cliente' || activeRole === 'coordinador_comercial' || activeRole === 'superadmin')">
-                    <input type="file" id="inline-file-garantias" (change)="onFileUpload($event, 'garantias_firmadas')" accept=".pdf" hidden>
-                    <label for="inline-file-garantias" class="btn-inline-upload">Subir</label>
+                  <div class="action-inline-upload" *ngIf="['aprobada_garantias', 'formalizacion_garantias'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
+                    <input type="file" id="inline-file-{{doc.key}}" (change)="onMultiFileUpload($event, doc.key)" accept=".pdf" multiple hidden>
+                    <label for="inline-file-{{doc.key}}" class="btn-inline-upload">Subir</label>
                   </div>
 
-                  <a *ngIf="selectedCredito.documentos?.garantias_firmadas" [href]="selectedCredito.documentos.garantias_firmadas" target="_blank" class="btn-view-doc">
-                    <span class="material-symbols-outlined">open_in_new</span> Ver
+                  <a *ngFor="let url of getDocFiles(doc.key)" [href]="url" target="_blank" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> {{ getDocFileName(url) }}
                   </a>
                 </div>
               </div>

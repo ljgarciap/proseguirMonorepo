@@ -26,10 +26,11 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
   tarjetas: any = {
     sarlaft_desfavorable: 0, aprobada_garantias: 0, rechazada_comite: 0, pendiente_comite: 0,
     pendiente_formalizacion_garantias: 0, pendiente_registro_cyf: 0,
-    // SCRUM-211/215/219: el backend solo devuelve las claves visibles para
-    // el rol activo (ver ROLES_POR_CLAVE) — estos 3 quedan en undefined
-    // para coordinador_comercial, y el template los oculta con *ngIf.
-    aprobacion_registro_cyf: undefined, desembolso_ingreso: undefined, desembolso_aprobacion: undefined
+    // SCRUM-211/215/219/224: el backend solo devuelve las claves visibles
+    // para el rol activo (ver ROLES_POR_CLAVE) — estas 4 quedan en undefined
+    // para coordinador_comercial, y el template las oculta con *ngIf.
+    aprobacion_registro_cyf: undefined, desembolso_ingreso: undefined, desembolso_aprobacion: undefined,
+    ejecucion_transferencia: undefined
   };
   loading = false;
   activeRole = '';
@@ -150,6 +151,7 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
       aprobacion_registro_cyf: 'Pendiente Aprobación Registro de Crédito en CYF',
       desembolso_ingreso: 'Pendiente Registro de Operación de Desembolso en CYF',
       desembolso_aprobacion: 'Pendiente Aprobación Registro de Operación de Desembolso en CYF',
+      ejecucion_transferencia: 'Pendiente Registro de Transferencia Bancaria',
     };
     if (mapaEstado[credito.estado]) return mapaEstado[credito.estado];
 
@@ -168,7 +170,7 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
       'success': credito.resultado_origen === 'comite_aprobado' || credito.estado === 'desembolso_aprobacion',
       'warning': credito.resultado_origen === 'comite_pendiente' || credito.estado === 'aprobacion_registro_cyf',
       'purple': credito.estado === 'pendiente_formalizacion_garantias' || credito.estado === 'desembolso_ingreso',
-      'info': credito.estado === 'pendiente_registro_cyf',
+      'info': credito.estado === 'pendiente_registro_cyf' || credito.estado === 'ejecucion_transferencia',
     };
   }
 
@@ -181,6 +183,7 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
       aprobacion_registro_cyf: 'gerente',
       desembolso_ingreso: 'operativo',
       desembolso_aprobacion: 'gerente',
+      ejecucion_transferencia: 'tesoreria',
     };
     return mapa[estado] || null;
   }
@@ -213,6 +216,7 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
       aprobacion_registro_cyf: 'aprobacion-registro-cyf',
       desembolso_ingreso: 'desembolso-ingreso',
       desembolso_aprobacion: 'desembolso-aprobacion',
+      ejecucion_transferencia: 'transferencia-bancaria',
     };
     const sufijo = rutasPorEstado[credito.estado];
     return sufijo ? ['/gestion-creditos', credito.id, sufijo] : ['/gestion-creditos', credito.id];

@@ -367,6 +367,34 @@ export class CreditoOrdinarioComponent implements OnInit {
     ];
   }
 
+  // SCRUM-229: los documentos de Etapa 4 (Formalización de Garantías) se
+  // derivan del DocumentRequest de garantías (preset elegido por el
+  // Coordinador Comercial al gestionar 'aprobada_garantias', tageado
+  // 'etapa' = 'garantias' — ver GestionCreditoController::
+  // crearSolicitudDocumentos()). Si el crédito todavía no llegó a esa
+  // gestión (o es un crédito legacy pre-SCRUM-193/205 que nunca la tuvo),
+  // se mantiene la lista fija original de 4 documentos.
+  get etapa4Docs(): { key: string; nombre: string; descripcion: string }[] {
+    const items = this.selectedCredito?.solicitud_credito?.garantias_document_request?.items;
+    if (items && items.length > 0) {
+      return items.map((item: any) => ({
+        key: 'req_item_' + item.id,
+        nombre: item.requirement?.nombre || 'Documento requerido',
+        descripcion: item.requirement?.descripcion || ''
+      }));
+    }
+    return [
+      { key: 'pagare_borrador', nombre: 'Pagaré (Borrador)', descripcion: 'Plantilla de Pagaré para firma. Responsable de carga: Comercial.' },
+      { key: 'carta_instrucciones_borrador', nombre: 'Carta de Instrucciones (Borrador)', descripcion: 'Plantilla de Carta de Instrucciones para firma. Responsable de carga: Comercial.' },
+      { key: 'contrato_borrador', nombre: 'Contrato (Borrador)', descripcion: 'Plantilla de Contrato para firma. Responsable de carga: Comercial.' },
+      { key: 'garantias_firmadas', nombre: 'Pagarés y Garantías Firmadas', descripcion: 'Documentos jurídicos formalizados por el cliente. Validación: Dirección Administrativa.' }
+    ];
+  }
+
+  get etapa4PresetNombre(): string | null {
+    return this.selectedCredito?.solicitud_credito?.garantias_document_request?.preset_nombre || null;
+  }
+
   onFileUpload(event: Event, campoDoc: string) {
     const target = event.target as HTMLInputElement;
     const file = target.files?.[0];

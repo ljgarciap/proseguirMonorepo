@@ -32,6 +32,8 @@ class CreditoOrdinario extends Model
         'fecha_registro_cyf',
         'radicado_cyf',
         'documentos_desembolso',
+        'transferencia_bancaria',
+        'numero_transaccion_bancaria',
     ];
 
     /**
@@ -54,6 +56,7 @@ class CreditoOrdinario extends Model
             'gestion_detalle' => 'array',
             'fecha_registro_cyf' => 'date',
             'documentos_desembolso' => 'array',
+            'transferencia_bancaria' => 'array',
         ];
     }
 
@@ -142,6 +145,31 @@ class CreditoOrdinario extends Model
             }
             return $doc;
         }, $data['documentos']);
+
+        return $data;
+    }
+
+    /**
+     * SCRUM-224: mismo problema/solución que getDocumentosDesembolsoAttribute()
+     * — el certificado bancario y el comprobante de transferencia se
+     * guardan como ruta relativa al disco 'public'; se agregan las claves
+     * '*_url' resueltas con el APP_URL vigente al leer, sin tocar las rutas
+     * crudas (que siguen sirviendo, ej. para adjuntar el comprobante al
+     * correo del cliente vía Attachment::fromStorageDisk()).
+     */
+    public function getTransferenciaBancariaAttribute($value)
+    {
+        $data = $value !== null ? json_decode($value, true) : null;
+
+        if (!is_array($data)) {
+            return $data;
+        }
+
+        foreach (['certificado_bancario', 'comprobante_transferencia'] as $campo) {
+            if (!empty($data[$campo])) {
+                $data[$campo . '_url'] = self::resolveStorageUrl($data[$campo]);
+            }
+        }
 
         return $data;
     }

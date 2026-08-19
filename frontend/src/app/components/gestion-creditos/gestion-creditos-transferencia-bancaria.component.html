@@ -1,0 +1,251 @@
+<div class="view-container" *ngIf="!loading && credito">
+  <header class="view-header">
+    <div class="title-area">
+      <button class="btn-pro secondary sm back-btn" (click)="cancelar()">
+        <span class="material-symbols-outlined">arrow_back</span> Volver a la bandeja
+      </button>
+      <h1>Registro de Transferencia Bancaria — {{ credito.numero_solicitud }}</h1>
+      <p>Disponible después de la aprobación del Registro de Operación de Desembolso en CYF por Gerencia.</p>
+    </div>
+    <div class="header-actions">
+      <span class="status-pill info">{{ credito.estado === 'ejecucion_transferencia' ? 'Pendiente por realizar transferencia' : (credito.estado | titlecase) }}</span>
+    </div>
+  </header>
+
+  <div class="alert-readonly" *ngIf="!puedeGestionar">
+    <span class="material-symbols-outlined">visibility</span>
+    Estás viendo esta solicitud en modo solo lectura.
+  </div>
+
+  <div class="detail-grid">
+    <!-- Cliente (no editable) -->
+    <div class="content-card">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">badge</span>
+        Información del Cliente (no editable)
+      </h3>
+
+      <div class="form-grid mt-4" *ngIf="!esPersonaJuridica">
+        <div class="form-group"><label>Tipo de persona</label><p class="readonly-value">{{ cliente?.tipo_persona?.nombre || '—' }}</p></div>
+        <div class="form-group"><label>Tipo de documento</label><p class="readonly-value">{{ cliente?.document_type?.nombre || '—' }}</p></div>
+        <div class="form-group"><label>Número de documento</label><p class="readonly-value">{{ cliente?.numero_documento || '—' }}</p></div>
+        <div class="form-group"><label>Nombres</label><p class="readonly-value">{{ cliente?.nombres || '—' }}</p></div>
+        <div class="form-group"><label>Primer apellido</label><p class="readonly-value">{{ cliente?.primer_apellido || '—' }}</p></div>
+        <div class="form-group"><label>Segundo apellido</label><p class="readonly-value">{{ cliente?.segundo_apellido || '—' }}</p></div>
+        <div class="form-group"><label>Correo electrónico</label><p class="readonly-value">{{ cliente?.correo_electronico || '—' }}</p></div>
+        <div class="form-group"><label>Ocupación</label><p class="readonly-value">{{ cliente?.ocupacion || '—' }}</p></div>
+        <div class="form-group"><label>Teléfono</label><p class="readonly-value">{{ cliente?.telefono || '—' }}</p></div>
+        <div class="form-group"><label>País</label><p class="readonly-value">{{ cliente?.pais || '—' }}</p></div>
+        <div class="form-group"><label>Departamento</label><p class="readonly-value">{{ cliente?.departamento || '—' }}</p></div>
+        <div class="form-group"><label>Ciudad</label><p class="readonly-value">{{ cliente?.ciudad || '—' }}</p></div>
+        <div class="form-group span-2"><label>Dirección</label><p class="readonly-value">{{ cliente?.direccion || '—' }}</p></div>
+      </div>
+
+      <div class="form-grid mt-4" *ngIf="esPersonaJuridica">
+        <div class="form-group"><label>Tipo de persona</label><p class="readonly-value">{{ cliente?.tipo_persona?.nombre || '—' }}</p></div>
+        <div class="form-group"><label>Tipo de documento</label><p class="readonly-value">{{ cliente?.document_type?.nombre || '—' }}</p></div>
+        <div class="form-group"><label>Número de documento</label><p class="readonly-value">{{ cliente?.numero_documento || '—' }}</p></div>
+        <div class="form-group span-2"><label>Nombre o razón social</label><p class="readonly-value">{{ cliente?.nombre_razon_social || '—' }}</p></div>
+        <div class="form-group"><label>Tipo de empresa</label><p class="readonly-value">{{ cliente?.tipo_empresa || '—' }}</p></div>
+        <div class="form-group"><label>Actividad económica</label><p class="readonly-value">{{ cliente?.actividad_economica || '—' }}</p></div>
+        <div class="form-group"><label>Correo electrónico</label><p class="readonly-value">{{ cliente?.correo_electronico_empresarial || '—' }}</p></div>
+        <div class="form-group"><label>Página web</label><p class="readonly-value">{{ cliente?.pagina_web || '—' }}</p></div>
+        <div class="form-group"><label>País</label><p class="readonly-value">{{ cliente?.pais || '—' }}</p></div>
+        <div class="form-group"><label>Departamento</label><p class="readonly-value">{{ cliente?.departamento || '—' }}</p></div>
+        <div class="form-group"><label>Ciudad</label><p class="readonly-value">{{ cliente?.ciudad || '—' }}</p></div>
+        <div class="form-group span-2"><label>Dirección</label><p class="readonly-value">{{ cliente?.direccion || '—' }}</p></div>
+
+        <div class="form-group"><label>Rep. legal — Tipo de documento</label><p class="readonly-value">{{ cliente?.rep_document_type?.nombre || '—' }}</p></div>
+        <div class="form-group"><label>Rep. legal — Número de documento</label><p class="readonly-value">{{ cliente?.rep_numero_documento || '—' }}</p></div>
+        <div class="form-group"><label>Rep. legal — Nombres</label><p class="readonly-value">{{ cliente?.rep_nombres || '—' }}</p></div>
+        <div class="form-group"><label>Rep. legal — Primer apellido</label><p class="readonly-value">{{ cliente?.rep_primer_apellido || '—' }}</p></div>
+        <div class="form-group"><label>Rep. legal — Segundo apellido</label><p class="readonly-value">{{ cliente?.rep_segundo_apellido || '—' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Crédito solicitado (no editable) -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">description</span>
+        Crédito Solicitado (no editable)
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Fecha de solicitud</label><p class="readonly-value">{{ solicitud?.created_at ? (solicitud.created_at | date:'dd/MM/yyyy') : '—' }}</p></div>
+        <div class="form-group"><label>Tipo de crédito</label><p class="readonly-value">{{ solicitud?.tipo_credito?.nombre || '—' }}</p></div>
+        <div class="form-group"><label>Monto solicitado</label><p class="readonly-value">${{ (credito.monto | number:'1.0-0') || '—' }}</p></div>
+        <div class="form-group"><label>Plazo</label><p class="readonly-value">{{ credito.plazo_meses }} meses</p></div>
+        <div class="form-group"><label>Amortización</label><p class="readonly-value">{{ solicitud?.amortizacion?.nombre || '—' }}</p></div>
+      </div>
+    </div>
+
+    <!-- Aprobación operación CYF (no editable) -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">verified</span>
+        Aprobación Operación CYF (no editable)
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group"><label>Fecha de aprobación</label><p class="readonly-value">{{ aprobacionCyf?.fecha ? (aprobacionCyf.fecha | date:'dd/MM/yyyy') : '—' }}</p></div>
+        <div class="form-group"><label>Hora de aprobación</label><p class="readonly-value">{{ aprobacionCyf?.fecha ? (aprobacionCyf.fecha | date:'HH:mm') : '—' }}</p></div>
+        <div class="form-group"><label>Usuario que registró en CYF</label><p class="readonly-value">{{ registroCyfUsuario?.usuario || '—' }}</p></div>
+        <div class="form-group"><label>Usuario que aprobó el desembolso</label><p class="readonly-value">{{ aprobacionCyf?.usuario || '—' }}</p></div>
+        <div class="form-group span-3" *ngIf="aprobacionCyf?.comentario">
+          <label>Observaciones de la aprobación</label>
+          <p class="readonly-value">{{ aprobacionCyf.comentario }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Información bancaria -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">account_balance</span>
+        Información Bancaria del Beneficiario
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group span-2">
+          <label>Titular de la cuenta <span class="required">*</span></label>
+          <input class="pro-input" type="text" [(ngModel)]="titularCuenta" [disabled]="!puedeGestionar">
+        </div>
+        <div class="form-group">
+          <label>Tipo de documento del titular <span class="required">*</span></label>
+          <select class="pro-input" [(ngModel)]="tipoDocumentoTitularId" [disabled]="!puedeGestionar">
+            <option [ngValue]="null">Seleccione...</option>
+            <option *ngFor="let t of tiposDocumento" [ngValue]="t.id">{{ t.nombre }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Número de documento del titular <span class="required">*</span></label>
+          <input class="pro-input" type="text" [(ngModel)]="numeroDocumentoTitular" [disabled]="!puedeGestionar">
+        </div>
+        <div class="form-group">
+          <label>Entidad bancaria <span class="required">*</span></label>
+          <select class="pro-input" [(ngModel)]="entidadBancariaId" [disabled]="!puedeGestionar">
+            <option [ngValue]="null">Seleccione...</option>
+            <option *ngFor="let e of entidadesBancarias" [ngValue]="e.id">{{ e.nombre }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tipo de cuenta <span class="required">*</span></label>
+          <select class="pro-input" [(ngModel)]="tipoCuenta" [disabled]="!puedeGestionar">
+            <option value="">Seleccione...</option>
+            <option value="ahorros">Ahorros</option>
+            <option value="corriente">Corriente</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Número de cuenta <span class="required">*</span></label>
+          <input class="pro-input" type="text" [(ngModel)]="numeroCuenta" [disabled]="!puedeGestionar">
+        </div>
+        <div class="form-group">
+          <label>Confirmación del número de cuenta <span class="required">*</span></label>
+          <input class="pro-input" type="text" [(ngModel)]="numeroCuentaConfirmacion" [disabled]="!puedeGestionar">
+        </div>
+        <div class="form-group">
+          <label>Moneda de la cuenta <span class="required">*</span></label>
+          <select class="pro-input" [(ngModel)]="monedaCuenta" [disabled]="!puedeGestionar">
+            <option value="COP">COP</option>
+          </select>
+        </div>
+        <div class="form-group span-2">
+          <label>Correo electrónico para notificación del pago <span class="required">*</span></label>
+          <input class="pro-input" type="email" [(ngModel)]="correoNotificacionPago" [disabled]="!puedeGestionar">
+        </div>
+        <div class="form-group span-3">
+          <label>Certificado bancario (PDF, JPG o PNG) <span class="required">*</span></label>
+          <input type="file" accept=".pdf,.jpg,.jpeg,.png" [disabled]="!puedeGestionar" (change)="onCertificadoSeleccionado($event)">
+          <span class="file-ok" *ngIf="certificadoBancario">
+            <span class="material-symbols-outlined">check_circle</span> {{ certificadoBancario.name }}
+          </span>
+        </div>
+        <div class="form-group span-3">
+          <label>Observaciones</label>
+          <textarea class="pro-input" rows="2" [(ngModel)]="observacionesBancarias" [disabled]="!puedeGestionar" placeholder="Opcional"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Registro de transferencia -->
+    <div class="content-card mt-4">
+      <h3 class="card-title">
+        <span class="material-symbols-outlined">payments</span>
+        Registro de la Transferencia
+      </h3>
+      <div class="form-grid mt-4">
+        <div class="form-group">
+          <label>Fecha <span class="required">*</span></label>
+          <input class="pro-input" type="date" [(ngModel)]="fechaTransferencia" [disabled]="!puedeGestionar" [max]="today">
+        </div>
+        <div class="form-group">
+          <label>Hora <span class="required">*</span></label>
+          <input class="pro-input" type="time" [(ngModel)]="horaTransferencia" [disabled]="!puedeGestionar">
+        </div>
+        <div class="form-group">
+          <label>Valor aprobado para desembolso</label>
+          <p class="readonly-value">${{ (credito.monto | number:'1.0-0') || '—' }}</p>
+        </div>
+        <div class="form-group">
+          <label>Valor de la transacción <span class="required">*</span></label>
+          <input class="pro-input" type="number" min="0" [(ngModel)]="valorTransaccion" [disabled]="!puedeGestionar">
+        </div>
+        <div class="form-group">
+          <label>Confirmación del valor de la transacción <span class="required">*</span></label>
+          <input class="pro-input" type="number" min="0" [(ngModel)]="valorTransaccionConfirmacion" [disabled]="!puedeGestionar">
+        </div>
+        <div class="form-group">
+          <label>Número de la transacción <span class="required">*</span></label>
+          <input class="pro-input" type="text" [(ngModel)]="numeroTransaccion" [disabled]="!puedeGestionar">
+        </div>
+        <div class="form-group span-3">
+          <label>Comprobante de la transferencia (PDF, JPG o PNG) <span class="required">*</span></label>
+          <input type="file" accept=".pdf,.jpg,.jpeg,.png" [disabled]="!puedeGestionar" (change)="onComprobanteSeleccionado($event)">
+          <span class="file-ok" *ngIf="comprobanteTransferencia">
+            <span class="material-symbols-outlined">check_circle</span> {{ comprobanteTransferencia.name }}
+          </span>
+        </div>
+        <div class="form-group span-3">
+          <label class="checkbox-option">
+            <input type="checkbox" [(ngModel)]="declaracionValidacionBancaria" [disabled]="!puedeGestionar">
+            Declaro que validé los datos bancarios del beneficiario. <span class="required">*</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="alert-readonly mt-4">
+        <span class="material-symbols-outlined">info</span>
+        Al registrar, el sistema mostrará una confirmación final con el valor, el beneficiario y la cuenta destino enmascarada.
+      </div>
+
+      <div class="form-footer mt-4" *ngIf="puedeGestionar">
+        <button class="btn-pro secondary" (click)="cancelar()">
+          <span class="material-symbols-outlined">close</span> Cancelar
+        </button>
+        <button class="btn-pro primary" [disabled]="guardando" (click)="registrar()">
+          <span class="material-symbols-outlined">save</span> Registrar
+        </button>
+      </div>
+    </div>
+
+    <!-- Trazabilidad -->
+    <div class="content-card mt-4">
+      <h3 class="card-title clickable" (click)="mostrarTrazabilidad = !mostrarTrazabilidad">
+        <span class="material-symbols-outlined">history</span>
+        Ver trazabilidad completa de la solicitud
+        <span class="material-symbols-outlined toggle-icon">{{ mostrarTrazabilidad ? 'expand_less' : 'expand_more' }}</span>
+      </h3>
+      <div class="traza-list mt-4" *ngIf="mostrarTrazabilidad">
+        <div class="traza-row" *ngFor="let h of trazabilidad">
+          <div class="traza-fecha">{{ h.fecha | date:'dd/MM/yyyy HH:mm' }}</div>
+          <div class="traza-body">
+            <p class="traza-titulo">{{ h.usuario }} <span class="traza-rol">({{ h.rol }})</span></p>
+            <p class="traza-comentario">{{ h.comentario }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="view-container" *ngIf="loading">
+  <p class="text-center py-4">Cargando solicitud...</p>
+</div>
