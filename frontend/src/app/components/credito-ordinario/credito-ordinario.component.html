@@ -524,15 +524,15 @@
               <!-- SCRUM-146: documentos dirigidos por el preset elegido en la Solicitud de Crédito (fallback a la lista fija si el crédito no tiene preset asociado) -->
               <div class="doc-box-new" *ngFor="let doc of etapa1Docs">
                 <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="getDocFiles(doc.key).length > 0">description</span>
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="docFileCount(doc) > 0">description</span>
                   <div class="doc-title-desc">
                     <h5>{{ doc.nombre }}</h5>
                     <p>{{ doc.descripcion }}</p>
                   </div>
                 </div>
                 <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="getDocFiles(doc.key).length > 0">Cargado ({{ getDocFiles(doc.key).length }})</span>
-                  <span class="doc-status-pill error" *ngIf="getDocFiles(doc.key).length === 0">Pendiente</span>
+                  <span class="doc-status-pill success" *ngIf="docFileCount(doc) > 0">Cargado ({{ docFileCount(doc) }})</span>
+                  <span class="doc-status-pill error" *ngIf="docFileCount(doc) === 0">Pendiente</span>
 
                   <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud', 'validacion_documental_constructor', 'completar_solicitud_constructor'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
                     <input type="file" id="inline-file-{{doc.key}}" (change)="onMultiFileUpload($event, doc.key)" accept=".pdf" multiple hidden>
@@ -542,6 +542,9 @@
                   <a *ngFor="let url of getDocFiles(doc.key)" [href]="url" target="_blank" class="btn-view-doc">
                     <span class="material-symbols-outlined">open_in_new</span> {{ getDocFileName(url) }}
                   </a>
+                  <button *ngIf="doc.upload" type="button" (click)="verArchivoSubido(doc.upload.id, doc.upload.original_name)" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> {{ doc.upload.original_name }}
+                  </button>
                 </div>
               </div>
             </div>
@@ -667,15 +670,15 @@
             <div class="documents-grid-grouped">
               <div class="doc-box-new" *ngFor="let doc of etapa4Docs">
                 <div class="doc-main-info">
-                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="getDocFiles(doc.key).length > 0">description</span>
+                  <span class="material-symbols-outlined doc-icon-new" [class.completed]="docFileCount(doc) > 0">description</span>
                   <div class="doc-title-desc">
                     <h5>{{ doc.nombre }}</h5>
                     <p>{{ doc.descripcion }}</p>
                   </div>
                 </div>
                 <div class="doc-action-status">
-                  <span class="doc-status-pill success" *ngIf="getDocFiles(doc.key).length > 0">Cargado ({{ getDocFiles(doc.key).length }})</span>
-                  <span class="doc-status-pill error" *ngIf="getDocFiles(doc.key).length === 0">Pendiente</span>
+                  <span class="doc-status-pill success" *ngIf="docFileCount(doc) > 0">Cargado ({{ docFileCount(doc) }})</span>
+                  <span class="doc-status-pill error" *ngIf="docFileCount(doc) === 0">Pendiente</span>
 
                   <div class="action-inline-upload" *ngIf="['aprobada_garantias', 'formalizacion_garantias'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
                     <input type="file" id="inline-file-{{doc.key}}" (change)="onMultiFileUpload($event, doc.key)" accept=".pdf" multiple hidden>
@@ -685,6 +688,9 @@
                   <a *ngFor="let url of getDocFiles(doc.key)" [href]="url" target="_blank" class="btn-view-doc">
                     <span class="material-symbols-outlined">open_in_new</span> {{ getDocFileName(url) }}
                   </a>
+                  <button *ngIf="doc.upload" type="button" (click)="verArchivoSubido(doc.upload.id, doc.upload.original_name)" class="btn-view-doc">
+                    <span class="material-symbols-outlined">open_in_new</span> {{ doc.upload.original_name }}
+                  </button>
                 </div>
               </div>
             </div>

@@ -350,13 +350,14 @@ export class CreditoOrdinarioComponent implements OnInit {
   // registrar la SolicitudCredito. Si el crédito no tiene preset asociado
   // (créditos legacy anteriores a SCRUM-120/146), se mantiene la lista fija
   // original de 4 documentos.
-  get etapa1Docs(): { key: string; nombre: string; descripcion: string }[] {
+  get etapa1Docs(): { key: string; nombre: string; descripcion: string; upload?: any }[] {
     const items = this.selectedCredito?.solicitud_credito?.document_request?.items;
     if (items && items.length > 0) {
       return items.map((item: any) => ({
         key: 'req_item_' + item.id,
         nombre: item.requirement?.nombre || 'Documento requerido',
-        descripcion: item.requirement?.descripcion || ''
+        descripcion: item.requirement?.descripcion || '',
+        upload: item.upload || null
       }));
     }
     return [
@@ -374,13 +375,14 @@ export class CreditoOrdinarioComponent implements OnInit {
   // crearSolicitudDocumentos()). Si el crédito todavía no llegó a esa
   // gestión (o es un crédito legacy pre-SCRUM-193/205 que nunca la tuvo),
   // se mantiene la lista fija original de 4 documentos.
-  get etapa4Docs(): { key: string; nombre: string; descripcion: string }[] {
+  get etapa4Docs(): { key: string; nombre: string; descripcion: string; upload?: any }[] {
     const items = this.selectedCredito?.solicitud_credito?.garantias_document_request?.items;
     if (items && items.length > 0) {
       return items.map((item: any) => ({
         key: 'req_item_' + item.id,
         nombre: item.requirement?.nombre || 'Documento requerido',
-        descripcion: item.requirement?.descripcion || ''
+        descripcion: item.requirement?.descripcion || '',
+        upload: item.upload || null
       }));
     }
     return [
@@ -445,6 +447,38 @@ export class CreditoOrdinarioComponent implements OnInit {
     } catch {
       return url;
     }
+  }
+
+  // Total de archivos disponibles para un documento de preset: los legacy
+  // guardados en credito.documentos[key] MÁS el ClientUpload real cuando el
+  // cliente lo cargó desde la pantalla de "Solicitud de Documentos"
+  // (Gestión de Créditos), que nunca escribe en credito.documentos (SCRUM-229).
+  docFileCount(doc: { key: string; upload?: any }): number {
+    return this.getDocFiles(doc.key).length + (doc.upload ? 1 : 0);
+  }
+
+  // Descarga/abre un ClientUpload subido vía "Solicitud de Documentos"
+  // (mismo patrón que gestion-creditos-formalizacion-garantias.component.ts).
+  verArchivoSubido(uploadId: number, originalName: string): void {
+    this.http.get(`${environment.apiUrl}/uploads/${uploadId}/download`, {
+      headers: { 'X-Active-Role': this.activeRole },
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        if (blob.type === 'application/pdf' || blob.type.startsWith('image/')) {
+          window.open(url, '_blank');
+        } else {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = originalName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+      },
+      error: () => Swal.fire('Error', 'No se pudo abrir el documento.', 'error')
+    });
   }
 
   executeTransition(accion: string, comentarioDefecto: string = '', extraData: any = {}) {

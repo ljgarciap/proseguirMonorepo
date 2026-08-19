@@ -920,6 +920,29 @@ class GestionCreditoTest extends TestCase
         return [$credito, $item];
     }
 
+    /**
+     * Regresión SCRUM-229: el archivo subido por el cliente desde la
+     * pantalla de "Solicitud de Documentos" (POST /api/uploads con
+     * document_request_item_id, habilitada por
+     * GestionCreditoController::crearSolicitudDocumentos()) debe verse
+     * también desde Crédito Ordinario Etapa 4 — antes solo se veía el
+     * preset (nombres de items), pero no el archivo cargado, porque
+     * GET /api/creditos/{id} no traía la relación item.upload.
+     */
+    public function test_documento_subido_via_solicitud_documentos_visible_en_credito_ordinario(): void
+    {
+        [$credito, $item] = $this->credioPendienteFormalizacion('2');
+
+        Passport::actingAs($credito->cliente);
+        $response = $this->getJson("/api/creditos/{$credito->id}", ['X-Active-Role' => 'cliente']);
+
+        $response->assertStatus(200);
+        $itemJson = collect($response->json('solicitud_credito.garantias_document_request.items'))
+            ->firstWhere('id', $item->id);
+        $this->assertNotNull($itemJson['upload'] ?? null, 'El item de garantías debe traer el upload real.');
+        $this->assertSame('pagare.pdf', $itemJson['upload']['original_name']);
+    }
+
     public function test_guardar_formalizacion_garantias_falla_si_no_esta_pendiente(): void
     {
         $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', 'fg-guard');

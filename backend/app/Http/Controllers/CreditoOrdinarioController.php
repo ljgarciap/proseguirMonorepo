@@ -22,7 +22,7 @@ class CreditoOrdinarioController extends Controller
         $user = Auth::user();
         $activeRole = $this->resolveActiveRole($request);
         
-        $query = CreditoOrdinario::with(['cliente', 'informeTecnico', 'analisisFinanciero', 'solicitudCredito.tipoCredito', 'solicitudCredito.documentRequest.items.requirement', 'solicitudCredito.garantiasDocumentRequest.items.requirement']);
+        $query = CreditoOrdinario::with(['cliente', 'informeTecnico', 'analisisFinanciero', 'solicitudCredito.tipoCredito', 'solicitudCredito.documentRequest.items.requirement', 'solicitudCredito.documentRequest.items.upload', 'solicitudCredito.garantiasDocumentRequest.items.requirement', 'solicitudCredito.garantiasDocumentRequest.items.upload']);
 
         // Si el rol es cliente, solo puede ver sus propias solicitudes
         if ($activeRole === 'cliente') {
@@ -73,7 +73,7 @@ class CreditoOrdinarioController extends Controller
      */
     public function show($id)
     {
-        $credito = CreditoOrdinario::with(['cliente', 'informeTecnico', 'analisisFinanciero', 'solicitudCredito.tipoCredito', 'solicitudCredito.documentRequest.items.requirement', 'solicitudCredito.garantiasDocumentRequest.items.requirement'])->findOrFail($id);
+        $credito = CreditoOrdinario::with(['cliente', 'informeTecnico', 'analisisFinanciero', 'solicitudCredito.tipoCredito', 'solicitudCredito.documentRequest.items.requirement', 'solicitudCredito.documentRequest.items.upload', 'solicitudCredito.garantiasDocumentRequest.items.requirement', 'solicitudCredito.garantiasDocumentRequest.items.upload'])->findOrFail($id);
         return response()->json($credito);
     }
 
