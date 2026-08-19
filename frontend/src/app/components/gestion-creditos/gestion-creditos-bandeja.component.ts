@@ -164,13 +164,31 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
     return mapaOrigen[credito.resultado_origen] || credito.estado;
   }
 
+  /** SCRUM-235: resultado_origen queda en 'comite_aprobado' para siempre
+   * tras el paso por Comité (GestionCreditoController@1260) — un crédito en
+   * 'aprobacion_registro_cyf' sigue arrastrando ese origen, así que chequear
+   * ambas condiciones a la vez (como antes) prendía 'success' Y 'warning'
+   * juntas y el CSS, por orden de declaración, terminaba pintando verde en
+   * vez de amarillo. Igual que estadoLabel(): el estado específico manda
+   * primero, resultado_origen solo decide para los 4 resultados "simples"
+   * que no tienen un estado propio. */
   estadoPillClass(credito: any): any {
+    const mapaEstado: Record<string, string> = {
+      pendiente_formalizacion_garantias: 'purple',
+      pendiente_registro_cyf: 'info',
+      aprobacion_registro_cyf: 'warning',
+      desembolso_ingreso: 'purple',
+      desembolso_aprobacion: 'success',
+      ejecucion_transferencia: 'info',
+    };
+    if (mapaEstado[credito.estado]) {
+      return { [mapaEstado[credito.estado]]: true };
+    }
+
     return {
       'danger': credito.resultado_origen === 'sarlaft' || credito.resultado_origen === 'comite_rechazado',
-      'success': credito.resultado_origen === 'comite_aprobado' || credito.estado === 'desembolso_aprobacion',
-      'warning': credito.resultado_origen === 'comite_pendiente' || credito.estado === 'aprobacion_registro_cyf',
-      'purple': credito.estado === 'pendiente_formalizacion_garantias' || credito.estado === 'desembolso_ingreso',
-      'info': credito.estado === 'pendiente_registro_cyf' || credito.estado === 'ejecucion_transferencia',
+      'success': credito.resultado_origen === 'comite_aprobado',
+      'warning': credito.resultado_origen === 'comite_pendiente',
     };
   }
 

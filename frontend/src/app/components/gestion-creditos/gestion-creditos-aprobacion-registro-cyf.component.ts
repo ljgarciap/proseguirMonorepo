@@ -70,6 +70,14 @@ export class GestionCreditosAprobacionRegistroCyfComponent implements OnInit {
     return this.credito?.solicitud_credito || null;
   }
 
+  get esNatural(): boolean {
+    return (this.cliente?.tipo_persona?.codigo || 'NATURAL').toUpperCase() === 'NATURAL';
+  }
+
+  get esJuridica(): boolean {
+    return !this.esNatural;
+  }
+
   get puedeGestionar(): boolean {
     if (!this.credito) return false;
     if (this.credito.estado !== 'aprobacion_registro_cyf') return false;
