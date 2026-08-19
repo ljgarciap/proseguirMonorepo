@@ -15,6 +15,10 @@ Route::get('/profile/session-duration-options', [AuthController::class, 'session
 
 Route::get('/dashboard/stats', [\App\Http\Controllers\DashboardController::class, 'stats'])->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);
 
+// SCRUM-230 — pestaña "Cartera Factoring": Operativo consulta, Superadmin además exporta (ver tabla de actores del ticket).
+Route::get('/dashboard/cartera-factoring', [\App\Http\Controllers\DashboardController::class, 'carteraFactoring'])->middleware(['auth:api', 'checkrole:operativo,superadmin']);
+Route::get('/dashboard/cartera-factoring/export', [\App\Http\Controllers\DashboardController::class, 'exportCarteraFactoringExcel'])->middleware(['auth:api', 'checkrole:superadmin']);
+
         // Update history routes with auth and role checks
         Route::get('/history/{categoria}', [\App\Http\Controllers\HistoryController::class, 'index'])
             ->middleware(['auth:api', 'checkrole:gerente,operativo,superadmin']);

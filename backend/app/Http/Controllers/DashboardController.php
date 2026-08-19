@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\CarteraFactoringExport;
 
 class DashboardController extends Controller
 {
@@ -520,5 +522,191 @@ class DashboardController extends Controller
             'top_clientes' => $topClientes,
             'ultimos_pagos' => $ultimosPagos
         ];
+    }
+
+    /**
+     * SCRUM-230 — pestaña "Cartera Factoring" del Dashboard.
+     *
+     * Cruza cada factura/título de origen con su documento de pagos
+     * correspondiente por llave exacta (Doc# para Factoring, Id Título
+     * para CompraVenta/Confirming), conservando los registros sin pago.
+     * "CompraVenta" en el ticket corresponde a la categoría de subida
+     * `opf` (modelo OperacionConfirming) — no al modelo Compraventa, que
+     * es un tipo de documento distinto no contemplado en este ticket (ver
+     * columnas Id Título/Emisor/Deudor/Valor a Pagar Deudor del ticket,
+     * que matchean el esquema OCR de `opf`, no el de `compraventa`).
+     *
+     * Si hay más de un pago para la misma factura/título, se toma el más
+     * reciente (mayor id) — el ticket no contempla pagos parciales
+     * múltiples por factura.
+     */
+    public function carteraFactoring(Request $request)
+    {
+        $base = $this->carteraFactoringBaseQuery($request);
+
+        $totalFacturas = (clone $base)->count();
+        $valorCarteraTotal = (float) (clone $base)->sum('saldo_despues_pago');
+        $totalValorPagado = (float) (clone $base)->where('tiene_pago', 1)->sum('valor_pagado');
+        $pagosCoincidentes = (clone $base)->where('tiene_pago', 1)->count();
+        $registrosSinPago = (clone $base)->where('tiene_pago', 0)->count();
+
+        $top10 = (clone $base)
+            ->select('cliente', \Illuminate\Support\Facades\DB::raw('SUM(saldo_despues_pago) as total'))
+            ->groupBy('cliente')
+            ->havingRaw('SUM(saldo_despues_pago) > 0')
+            ->orderBy('total', 'desc')
+            ->limit(10)
+            ->get();
+
+        $clientesQuery = (clone $base)
+            ->select('nit_cliente', 'cliente', \Illuminate\Support\Facades\DB::raw('SUM(saldo_despues_pago) as valor_cartera'))
+            ->groupBy('nit_cliente', 'cliente')
+            ->havingRaw('SUM(saldo_despues_pago) > 0');
+
+        $buscarCliente = $request->query('buscar_cliente');
+        if ($buscarCliente) {
+            $buscarCliente = trim($buscarCliente);
+            $clientesQuery->having(function ($q) use ($buscarCliente) {
+                $q->where('cliente', 'LIKE', "%{$buscarCliente}%")
+                  ->orWhere('nit_cliente', 'LIKE', "%{$buscarCliente}%");
+            });
+        }
+        $clientes = $clientesQuery->orderBy('valor_cartera', 'asc')->orderBy('cliente', 'asc')->get();
+
+        $perPage = (int) ($request->query('per_page', 20));
+        $detalle = (clone $base)->orderBy('created_at', 'desc')->paginate($perPage);
+
+        return response()->json([
+            'indicadores' => [
+                'facturas_origen' => $totalFacturas,
+                'valor_cartera_total_despues_pago' => $valorCarteraTotal,
+                'total_valor_pagado' => $totalValorPagado,
+                'pagos_coincidentes' => $pagosCoincidentes,
+                'registros_sin_pago' => $registrosSinPago,
+            ],
+            'top10_clientes' => $top10,
+            'clientes' => $clientes,
+            'detalle' => $detalle,
+        ]);
+    }
+
+    /**
+     * SCRUM-230 — exporta a Excel el detalle completo (sin paginar) del
+     * cruce, respetando los mismos filtros que la consulta del Dashboard.
+     * Solo Superadministrador exporta (ver tabla de actores del ticket).
+     */
+    public function exportCarteraFactoringExcel(Request $request)
+    {
+        $records = $this->carteraFactoringBaseQuery($request)->orderBy('created_at', 'desc')->get();
+        $filename = 'cartera_factoring_' . date('Ymd_His') . '.xlsx';
+        return Excel::download(new CarteraFactoringExport($records), $filename);
+    }
+
+    /**
+     * Query base (sin paginar) del cruce Factoring↔Pagos Factoring y
+     * CompraVenta(Confirming)↔Pagos CompraVenta, con filtros de fecha
+     * (sobre created_at, mismo criterio que el resto del Dashboard),
+     * cliente/NIT y número de factura ya aplicados.
+     */
+    private function carteraFactoringBaseQuery(Request $request)
+    {
+        // El ticket especifica cruce por igualdad exacta ("Doc# = Doc#",
+        // "Id Título = IdTítulo"), sin normalización — se toma el pago más
+        // reciente (mayor id) si hay más de uno para la misma factura/título.
+        $latestPagoFactoring = \Illuminate\Support\Facades\DB::table('pago_factorings')
+            ->joinSub(
+                \Illuminate\Support\Facades\DB::table('pago_factorings')
+                    ->selectRaw('factura_nro, MAX(id) as max_id')
+                    ->groupBy('factura_nro'),
+                'latest_pf',
+                function ($join) {
+                    $join->on('pago_factorings.factura_nro', '=', 'latest_pf.factura_nro')
+                         ->on('pago_factorings.id', '=', 'latest_pf.max_id');
+                }
+            )
+            ->select('pago_factorings.*');
+
+        $latestPagoCompraventa = \Illuminate\Support\Facades\DB::table('pagos_compraventa')
+            ->joinSub(
+                \Illuminate\Support\Facades\DB::table('pagos_compraventa')
+                    ->selectRaw('id_titulo, MAX(id) as max_id')
+                    ->groupBy('id_titulo'),
+                'latest_pc',
+                function ($join) {
+                    $join->on('pagos_compraventa.id_titulo', '=', 'latest_pc.id_titulo')
+                         ->on('pagos_compraventa.id', '=', 'latest_pc.max_id');
+                }
+            )
+            ->select('pagos_compraventa.*');
+
+        $facturaRows = \Illuminate\Support\Facades\DB::table('operacion_factorings as of')
+            ->leftJoinSub($latestPagoFactoring, 'pf', function ($join) {
+                $join->on('pf.factura_nro', '=', 'of.factura_numero');
+            })
+            ->selectRaw("
+                'factoring' as tipo_operacion,
+                of.id as origen_id,
+                of.fecha_desembolso as fecha_inicial,
+                of.fecha_vencimiento as fecha_final,
+                of.factura_numero as factura_numero,
+                of.monto as valor_neto_factura,
+                of.nit_cliente as nit_cliente,
+                of.cliente as cliente,
+                pf.cc_o_nit as nit_pagador,
+                pf.pagador as pagador,
+                pf.fecha_pago as fecha_pago,
+                pf.monto_pagado as valor_pagado,
+                pf.saldo_restante as saldo_despues_pago,
+                of.created_at as created_at,
+                CASE WHEN pf.id IS NOT NULL THEN 1 ELSE 0 END as tiene_pago
+            ");
+
+        $tituloRows = \Illuminate\Support\Facades\DB::table('operacion_confirmings as oc')
+            ->leftJoinSub($latestPagoCompraventa, 'pc', function ($join) {
+                $join->on('pc.id_titulo', '=', 'oc.id_titulo');
+            })
+            ->selectRaw("
+                'compraventa' as tipo_operacion,
+                oc.id as origen_id,
+                oc.fecha_inicial as fecha_inicial,
+                oc.fecha_final as fecha_final,
+                oc.id_titulo as factura_numero,
+                oc.valor_pagar_deudor as valor_neto_factura,
+                oc.emisor_nit as nit_cliente,
+                oc.emisor as cliente,
+                pc.nit_pagador as nit_pagador,
+                pc.pagador as pagador,
+                pc.fecha_recaudo as fecha_pago,
+                pc.total_pagado as valor_pagado,
+                pc.saldo_despues_pago as saldo_despues_pago,
+                oc.created_at as created_at,
+                CASE WHEN pc.id IS NOT NULL THEN 1 ELSE 0 END as tiene_pago
+            ");
+
+        $union = $facturaRows->unionAll($tituloRows);
+        $base = \Illuminate\Support\Facades\DB::query()->fromSub($union, 'cartera_factoring');
+
+        $fechaInicio = $request->query('fecha_inicio');
+        $fechaFin = $request->query('fecha_fin');
+        $cliente = $request->query('cliente');
+        $factura = $request->query('factura');
+
+        if ($fechaInicio) {
+            $base->whereDate('created_at', '>=', $fechaInicio);
+        }
+        if ($fechaFin) {
+            $base->whereDate('created_at', '<=', $fechaFin);
+        }
+        if ($cliente) {
+            $base->where(function ($q) use ($cliente) {
+                $q->where('cliente', 'LIKE', "%{$cliente}%")
+                  ->orWhere('nit_cliente', 'LIKE', "%{$cliente}%");
+            });
+        }
+        if ($factura) {
+            $base->where('factura_numero', 'LIKE', "%{$factura}%");
+        }
+
+        return $base;
     }
 }
