@@ -718,7 +718,15 @@
                     <label for="inline-file-cyf" class="btn-inline-upload">Subir</label>
                   </div>
 
-                  <a *ngIf="selectedCredito.documentos?.registro_cyf" [href]="selectedCredito.documentos.registro_cyf" target="_blank" class="btn-view-doc">
+                  <!-- SCRUM-240: desde SCRUM-193, 'registro_cyf' puede contener el
+                       radicado en CYF (texto, GestionCreditoController::registroCyf)
+                       en vez de un PDF cargado (flujo legacy de esta pantalla) — el
+                       "Ver" solo aplica cuando de verdad hay un archivo, si no lleva
+                       a un 404 al tratar el radicado como ruta de storage. -->
+                  <span class="doc-radicado-info" *ngIf="selectedCredito.radicado_cyf">
+                    Radicado {{ selectedCredito.radicado_cyf }}<ng-container *ngIf="selectedCredito.fecha_registro_cyf"> — {{ selectedCredito.fecha_registro_cyf | date:'dd/MM/yyyy' }}</ng-container>
+                  </span>
+                  <a *ngIf="selectedCredito.documentos?.registro_cyf && !selectedCredito.radicado_cyf" [href]="selectedCredito.documentos.registro_cyf" target="_blank" class="btn-view-doc">
                     <span class="material-symbols-outlined">open_in_new</span> Ver
                   </a>
                 </div>
