@@ -717,7 +717,7 @@ class GestionCreditoTest extends TestCase
             ->assertJsonCount(1, 'items');
     }
 
-    public function test_revisar_documento_aprueba_item_y_habilita_garantias_al_completar_todos(): void
+    public function test_revisar_documento_aprueba_item_y_vuelve_a_comite_al_completar_todos(): void
     {
         $credito = $this->crearCredito('pendiente_comite', 'comite_pendiente', '1');
         $headers = ['X-Active-Role' => 'coordinador_comercial'];
@@ -745,7 +745,7 @@ class GestionCreditoTest extends TestCase
             $headers
         );
 
-        $response->assertStatus(200)->assertJsonPath('credito_disponible_garantias', true);
+        $response->assertStatus(200)->assertJsonPath('credito_disponible_comite', true);
 
         $item->refresh();
         $this->assertSame('aprobado', $item->estado);
@@ -756,15 +756,12 @@ class GestionCreditoTest extends TestCase
         $this->assertSame('completado', $documentRequest->estado);
 
         $credito->refresh();
-        $this->assertSame('aprobada_garantias', $credito->estado);
-        $this->assertSame('comite_aprobado', $credito->resultado_origen);
+        // SCRUM-236: vuelve a comite_evaluacion (no salta a aprobada_garantias)
+        // para que quede disponible en el pool de una nueva Acta de Comité —
+        // mismo filtro que ActaComiteController@creditosElegibles.
+        $this->assertSame('comite_evaluacion', $credito->estado);
+        $this->assertNull($credito->resultado_origen);
         $this->assertFalse($credito->solicitud_gestionada);
-
-        // El crédito vuelve a aparecer pendiente de gestión en la bandeja de
-        // "Aprobada para garantías" (SCRUM-199).
-        $this->getJson('/api/gestion-creditos?estado=aprobada_garantias', $headers)
-            ->assertStatus(200)
-            ->assertJsonFragment(['id' => $credito->id]);
     }
 
     public function test_revisar_documento_rechaza_item_credito_sigue_pendiente_comite(): void
@@ -792,7 +789,7 @@ class GestionCreditoTest extends TestCase
             $headers
         );
 
-        $response->assertStatus(200)->assertJsonPath('credito_disponible_garantias', false);
+        $response->assertStatus(200)->assertJsonPath('credito_disponible_comite', false);
 
         $item->refresh();
         $this->assertSame('rechazado', $item->estado);
@@ -947,22 +944,33 @@ class GestionCreditoTest extends TestCase
     {
         $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', 'fg-guard');
 
-        Passport::actingAs($this->coordinador);
+        Passport::actingAs($this->operativo);
         $this->postJson("/api/gestion-creditos/{$credito->id}/formalizacion-garantias", [
             'items' => [],
-        ], ['X-Active-Role' => 'coordinador_comercial'])
+        ], ['X-Active-Role' => 'operativo'])
             ->assertStatus(422)
             ->assertJson(['message' => 'Esta solicitud no está pendiente de Formalización de Garantías.']);
+    }
+
+    public function test_guardar_formalizacion_garantias_falla_para_coordinador_comercial(): void
+    {
+        [$credito, $item] = $this->credioPendienteFormalizacion('2b');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/formalizacion-garantias", [
+            'items' => [['item_id' => $item->id, 'validacion' => 'aprobada']],
+        ], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(403);
     }
 
     public function test_guardar_formalizacion_garantias_no_aprobada_sin_observaciones_falla(): void
     {
         [$credito, $item] = $this->credioPendienteFormalizacion('2');
 
-        Passport::actingAs($this->coordinador);
+        Passport::actingAs($this->operativo);
         $this->postJson("/api/gestion-creditos/{$credito->id}/formalizacion-garantias", [
             'items' => [['item_id' => $item->id, 'validacion' => 'no_aprobada']],
-        ], ['X-Active-Role' => 'coordinador_comercial'])
+        ], ['X-Active-Role' => 'operativo'])
             ->assertStatus(422)
             ->assertJson(['message' => 'Las garantías no aprobadas requieren observaciones.']);
     }
@@ -971,14 +979,14 @@ class GestionCreditoTest extends TestCase
     {
         [$credito, $item] = $this->credioPendienteFormalizacion('3');
 
-        Passport::actingAs($this->coordinador);
+        Passport::actingAs($this->operativo);
         $response = $this->postJson("/api/gestion-creditos/{$credito->id}/formalizacion-garantias", [
             'items' => [[
                 'item_id' => $item->id,
                 'validacion' => 'no_aprobada',
                 'observaciones' => 'Falta firma en el formulario.',
             ]],
-        ], ['X-Active-Role' => 'coordinador_comercial']);
+        ], ['X-Active-Role' => 'operativo']);
 
         $response->assertStatus(200)->assertJsonPath('credito.estado', 'aprobada_garantias');
 
@@ -999,10 +1007,10 @@ class GestionCreditoTest extends TestCase
     {
         [$credito, $item] = $this->credioPendienteFormalizacion('4');
 
-        Passport::actingAs($this->coordinador);
+        Passport::actingAs($this->operativo);
         $response = $this->postJson("/api/gestion-creditos/{$credito->id}/formalizacion-garantias", [
             'items' => [['item_id' => $item->id, 'validacion' => 'aprobada']],
-        ], ['X-Active-Role' => 'coordinador_comercial']);
+        ], ['X-Active-Role' => 'operativo']);
 
         $response->assertStatus(200)->assertJsonPath('credito.estado', 'pendiente_registro_cyf');
 
@@ -1022,10 +1030,10 @@ class GestionCreditoTest extends TestCase
     {
         [$credito, $item] = $this->credioPendienteFormalizacion($sufijo);
 
-        Passport::actingAs($this->coordinador);
+        Passport::actingAs($this->operativo);
         $this->postJson("/api/gestion-creditos/{$credito->id}/formalizacion-garantias", [
             'items' => [['item_id' => $item->id, 'validacion' => 'aprobada']],
-        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+        ], ['X-Active-Role' => 'operativo'])->assertStatus(200);
 
         return $credito->fresh();
     }

@@ -35,7 +35,11 @@
         <p class="tile-label">Pendientes - Comité de Créditos</p>
       </div>
     </div>
-    <div class="tile-card clickable" (click)="filtrarPorTarjeta('pendiente_formalizacion_garantias')">
+    <!-- SCRUM-237: pasó de Coordinador Comercial a Operativo (rol exclusivo,
+         igual que las tarjetas de abajo) — el backend ya no devuelve esta
+         clave para roles sin acceso (ROLES_POR_CLAVE), así que necesita el
+         mismo guard *ngIf que ellas para no quedar huérfana en pantalla. -->
+    <div class="tile-card clickable" *ngIf="tarjetas.pendiente_formalizacion_garantias !== undefined" (click)="filtrarPorTarjeta('pendiente_formalizacion_garantias')">
       <span class="material-symbols-outlined tile-icon purple">fact_check</span>
       <div>
         <p class="tile-value">{{ tarjetas.pendiente_formalizacion_garantias }}</p>

@@ -112,7 +112,9 @@ idempotente: resetea los 2 primeros créditos a `pendiente_comite` (y borra cual
    bandeja (volvió solo a `comite_evaluacion`).
 2. Notificar con "requiere documentos: Sí" → login como cliente (`/client-upload`) → recarga el
    documento del preset → login como coordinador → aprueba desde el panel "Documentos reenviados
-   por el cliente" → el crédito vuelve a `comite_evaluacion`.
+   por el cliente" → el crédito vuelve a `comite_evaluacion` (SCRUM-236, 2026-08-20: antes saltaba
+   a `aprobada_garantias`/`comite_aprobado`, saltándose el Comité — ver
+   `GestionCreditoController::retomarComiteSiAplica()`).
 3. Login como cliente → `/creditos` → confirma que el link "Ver" del Acta de Comité Firmada y el
    panel legacy dirigido al Comité no aparecen para ese rol.
 
@@ -146,11 +148,12 @@ ejecución del spec.
 1 test de principio a fin: Coordinador notifica con preset → cliente diligencia la garantía
 (`/client-upload`) → el crédito avanza SOLO (sin acción del Coordinador) a "Pendiente
 Formalización de Garantías" — hook nuevo en `ClientUploadController::store()`, ver docblock de
-`habilitarFormalizacionGarantiasSiAplica()` — → Coordinador aprueba la garantía en la pantalla
-nueva `/gestion-creditos/:id/formalizacion-garantias` → pasa a "Pendiente Registro de Crédito en
-CYF" → Coordinador registra fecha + radicado en `/gestion-creditos/:id/registro-cyf` → el crédito
-sale de Gestión de Créditos (queda en el estado legacy `aprobacion_registro_cyf`, disponible para
-Gerencia en la pantalla de Crédito Ordinario, sin tocar).
+`habilitarFormalizacionGarantiasSiAplica()` — → el rol Operativo aprueba la garantía en la
+pantalla nueva `/gestion-creditos/:id/formalizacion-garantias` (SCRUM-237, 2026-08-20: antes lo
+gestionaba Coordinador Comercial) → pasa a "Pendiente Registro de Crédito en CYF" → Coordinador
+registra fecha + radicado en `/gestion-creditos/:id/registro-cyf` → el crédito sale de Gestión de
+Créditos (queda en el estado legacy `aprobacion_registro_cyf`, disponible para Gerencia en la
+pantalla de Crédito Ordinario, sin tocar).
 
 Nota de accesibilidad encontrada armando el spec: los botones con ícono de Material Symbols
 (`<span class="material-symbols-outlined">save</span> Guardar`) exponen el nombre accesible como

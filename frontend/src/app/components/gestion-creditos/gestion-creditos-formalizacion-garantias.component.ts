@@ -8,7 +8,8 @@ import { AuthService } from '../../services/auth.service';
 import Swal from 'sweetalert2';
 
 /**
- * Formalización de Garantías (SCRUM-205): el Coordinador Comercial (o
+ * Formalización de Garantías (SCRUM-205, rol Operativo desde SCRUM-237 —
+ * antes lo gestionaba Coordinador Comercial): el rol Operativo (o
  * Super Admin) valida cada garantía del preset diligenciado por el cliente
  * (aprobada/no aprobada + observaciones), y el sistema decide el destino
  * de la solicitud (vuelve al cliente para ajustes, o pasa a Registro de
@@ -91,7 +92,7 @@ export class GestionCreditosFormalizacionGarantiasComponent implements OnInit {
   get puedeGestionar(): boolean {
     if (!this.credito) return false;
     if (this.credito.estado !== 'pendiente_formalizacion_garantias') return false;
-    return this.activeRole === 'coordinador_comercial' || this.activeRole === 'superadmin';
+    return this.activeRole === 'operativo' || this.activeRole === 'superadmin';
   }
 
   get items(): any[] {

@@ -12,10 +12,11 @@ import { loginAs } from './helpers/auth';
  *
  * Recorrido completo: Coordinador notifica con preset de garantías →
  * cliente diligencia la garantía → el crédito avanza solo a "Pendiente
- * Formalización de Garantías" → Coordinador aprueba en SCRUM-205 → pasa a
- * "Pendiente Registro de Crédito en CYF" → Coordinador registra fecha +
- * radicado en SCRUM-193 → el crédito queda disponible para la aprobación
- * de Gerencia (flujo legacy, sin tocar).
+ * Formalización de Garantías" → Operativo aprueba en SCRUM-205 (SCRUM-237:
+ * antes lo hacía Coordinador Comercial) → pasa a "Pendiente Registro de
+ * Crédito en CYF" → Coordinador registra fecha + radicado en SCRUM-193 →
+ * el crédito queda disponible para la aprobación de Gerencia (flujo
+ * legacy, sin tocar).
  */
 
 test('flujo completo: notificar garantías → cliente diligencia → Formalización de Garantías → Registro CYF', async ({ page }) => {
@@ -56,8 +57,9 @@ test('flujo completo: notificar garantías → cliente diligencia → Formalizac
     });
   await expect(page.locator('.item-row', { hasText: 'Pagaré Playwright 193-205' }).getByText('SUBIDO')).toBeVisible({ timeout: 15000 });
 
-  // --- 3. El crédito avanza solo a "Pendiente Formalización de Garantías" ---
-  await loginAs(page, '1234', '1234', 'coordinador_comercial');
+  // --- 3. El crédito avanza solo a "Pendiente Formalización de Garantías",
+  // gestionada por el rol Operativo (SCRUM-237) ---
+  await loginAs(page, '1234', '1234', 'operativo');
   await page.goto('/gestion-creditos');
   const filaFormalizacion = page.locator('tr', { hasText: 'GC193205-PW-1' });
   await expect(filaFormalizacion).toBeVisible({ timeout: 10000 });
@@ -75,7 +77,10 @@ test('flujo completo: notificar garantías → cliente diligencia → Formalizac
   await page.getByRole('button', { name: 'OK' }).click();
   await expect(page).toHaveURL(/\/gestion-creditos$/, { timeout: 10000 });
 
-  // --- 4. Pasa a "Pendiente Registro de Crédito en CYF" ---
+  // --- 4. Pasa a "Pendiente Registro de Crédito en CYF" (vuelve a ser
+  // dominio del Coordinador Comercial, sin cambios de SCRUM-237) ---
+  await loginAs(page, '1234', '1234', 'coordinador_comercial');
+  await page.goto('/gestion-creditos');
   const filaCyf = page.locator('tr', { hasText: 'GC193205-PW-1' });
   await expect(filaCyf).toBeVisible({ timeout: 10000 });
   await expect(filaCyf.locator('.status-pill')).toHaveText(/Pendiente Registro de Crédito en CYF/i);

@@ -205,11 +205,11 @@ export const routes: Routes = [
         data: { roles: ['coordinador_comercial', 'superadmin'] }
     },
     {
-        // SCRUM-205
+        // SCRUM-205, rol Operativo desde SCRUM-237 (antes Coordinador Comercial)
         path: 'gestion-creditos/:creditoId/formalizacion-garantias',
         loadComponent: () => import('./components/gestion-creditos/gestion-creditos-formalizacion-garantias.component').then(m => m.GestionCreditosFormalizacionGarantiasComponent),
         canActivate: [roleGuard],
-        data: { roles: ['coordinador_comercial', 'superadmin'] }
+        data: { roles: ['operativo', 'superadmin'] }
     },
     {
         // SCRUM-193

@@ -379,13 +379,13 @@ class ClientUploadController extends Controller
     /**
      * SCRUM-193/205 (2026-08-17): cuando el cliente terminó de subir TODOS
      * los ítems del preset de garantías (no hace falta que estén aprobados
-     * todavía, eso lo decide el Coordinador Comercial en Formalización de
-     * Garantías) el crédito pasa de 'aprobada_garantias' a
-     * 'pendiente_formalizacion_garantias' — a diferencia del chequeo de
-     * arriba (que exige 'aprobado' para dar la request por completada), acá
-     * alcanza con que ningún ítem siga 'pendiente' de carga. Guard
-     * defensivo por estado, mismo criterio que
-     * GestionCreditoController::habilitarGarantiasSiAplica(), para no
+     * todavía, eso lo decide el rol Operativo en Formalización de
+     * Garantías — SCRUM-237, antes Coordinador Comercial) el crédito pasa
+     * de 'aprobada_garantias' a 'pendiente_formalizacion_garantias' — a
+     * diferencia del chequeo de arriba (que exige 'aprobado' para dar la
+     * request por completada), acá alcanza con que ningún ítem siga
+     * 'pendiente' de carga. Guard defensivo por estado, mismo criterio que
+     * GestionCreditoController::retomarComiteSiAplica(), para no
      * interferir con otros flujos que comparten syncRequestItem() (SCRUM-146
      * onboarding inicial, SCRUM-191 reenvío de pendiente_comite).
      */
@@ -412,7 +412,7 @@ class ClientUploadController extends Controller
             'rol' => 'sistema',
             'estado_anterior' => $credito->estado,
             'estado_nuevo' => 'pendiente_formalizacion_garantias',
-            'comentario' => 'El cliente terminó de diligenciar las garantías solicitadas. Bandeja de Formalización de Garantías habilitada para el Coordinador Comercial.',
+            'comentario' => 'El cliente terminó de diligenciar las garantías solicitadas. Bandeja de Formalización de Garantías habilitada para el rol Operativo.',
         ];
 
         $credito->estado = 'pendiente_formalizacion_garantias';

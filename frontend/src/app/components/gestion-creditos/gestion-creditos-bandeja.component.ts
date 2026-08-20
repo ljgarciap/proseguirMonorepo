@@ -192,12 +192,15 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
     };
   }
 
-  /** SCRUM-211/215/219: cada uno de los 3 estados nuevos es del dominio
-   * exclusivo de un rol (Gerente o Operativo) — mismo mapa que el backend
-   * (ROLES_POR_CLAVE), replicado acá porque el rol que puede actuar cambia
-   * según el estado de la fila, no es fijo para todo el módulo. */
+  /** SCRUM-211/215/219/237: cada uno de estos estados es del dominio
+   * exclusivo de un rol (Gerente, Operativo o Tesorería) — mismo mapa que
+   * el backend (ROLES_POR_CLAVE), replicado acá porque el rol que puede
+   * actuar cambia según el estado de la fila, no es fijo para todo el
+   * módulo. 'pendiente_formalizacion_garantias' pasó de Coordinador
+   * Comercial a Operativo en SCRUM-237. */
   private rolPorEstado(estado: string): string | null {
     const mapa: Record<string, string> = {
+      pendiente_formalizacion_garantias: 'operativo',
       aprobacion_registro_cyf: 'gerente',
       desembolso_ingreso: 'operativo',
       desembolso_aprobacion: 'gerente',

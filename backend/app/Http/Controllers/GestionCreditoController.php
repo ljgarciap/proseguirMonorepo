@@ -37,7 +37,8 @@ use Throwable;
  * Operativo en 'formalizacion_garantias', rol Gerente en
  * 'aprobacion_registro_cyf' — ninguno de los dos se toca ni se retira):
  * 'pendiente_formalizacion_garantias' (guardarFormalizacionGarantias(), el
- * Coordinador Comercial valida cada garantía por ítem) →
+ * rol Operativo valida cada garantía por ítem — SCRUM-237, antes lo hacía
+ * Coordinador Comercial, ver ROLES_POR_CLAVE) →
  * 'pendiente_registro_cyf' (registroCyf(), captura fecha + radicado) →
  * de ahí SÍ entra al 'aprobacion_registro_cyf' legacy para que Gerencia
  * apruebe con la pantalla ya existente.
@@ -113,17 +114,21 @@ class GestionCreditoController extends Controller
     /**
      * SCRUM-211/215/219: a diferencia de RESULTADOS/ESTADOS_SIMPLES (qué
      * credit cae en cada tarjeta), esto define QUIÉN puede ver/contar cada
-     * tarjeta — cada una de las 3 nuevas es del dominio exclusivo de un solo
-     * rol (Gerente o Operativo), a diferencia de las 6 originales que son
-     * todas del Coordinador Comercial. superadmin no pasa por este mapa
-     * (ve todo, ver clavesVisiblesParaRol()).
+     * tarjeta — cada una de las 4 nuevas/reasignadas es del dominio
+     * exclusivo de un solo rol (Gerente, Operativo o Tesorería), a
+     * diferencia de las 5 restantes que son del Coordinador Comercial.
+     * superadmin no pasa por este mapa (ve todo, ver
+     * clavesVisiblesParaRol()). 'pendiente_formalizacion_garantias' pasó de
+     * Coordinador Comercial a Operativo en SCRUM-237 (mismo rol que ya
+     * gestiona el tramo legacy 'formalizacion_garantias', ver docblock de
+     * la clase).
      */
     private const ROLES_POR_CLAVE = [
         'sarlaft_desfavorable'               => ['coordinador_comercial'],
         'aprobada_garantias'                 => ['coordinador_comercial'],
         'rechazada_comite'                   => ['coordinador_comercial'],
         'pendiente_comite'                   => ['coordinador_comercial'],
-        'pendiente_formalizacion_garantias'  => ['coordinador_comercial'],
+        'pendiente_formalizacion_garantias'  => ['operativo'],
         'pendiente_registro_cyf'             => ['coordinador_comercial'],
         'aprobacion_registro_cyf'            => ['gerente'],
         'desembolso_ingreso'                 => ['operativo'],
@@ -482,7 +487,9 @@ class GestionCreditoController extends Controller
      * roles distintos, y acá el ticket pide explícitamente que sea el mismo
      * Coordinador Comercial quien decide, dentro de la pantalla que ya es
      * su dominio (Gestión de Créditos). Al aprobar el último ítem
-     * pendiente, el crédito pasa a `aprobada_garantias` (SCRUM-199).
+     * pendiente, el crédito vuelve a `comite_evaluacion` para una nueva
+     * Acta de Comité (SCRUM-236 — antes saltaba directo a
+     * `aprobada_garantias`, saltándose el Comité).
      */
     public function revisarDocumento(Request $request, $creditoId, $itemId)
     {
@@ -526,7 +533,7 @@ class GestionCreditoController extends Controller
 
         if ($pendientes === 0) {
             $documentRequest->update(['estado' => 'completado']);
-            $this->habilitarGarantiasSiAplica($credito, $documentRequest, $user);
+            $this->retomarComiteSiAplica($credito, $documentRequest, $user);
         } else {
             $documentRequest->update(['estado' => 'pendiente']);
         }
@@ -534,7 +541,7 @@ class GestionCreditoController extends Controller
         return response()->json([
             'message' => $accion === 'aprobar' ? 'Documento aprobado.' : 'Documento rechazado — el cliente puede volver a cargarlo.',
             'document_request' => $documentRequest->fresh(['items.requirement', 'items.upload']),
-            'credito_disponible_garantias' => $credito->fresh()->estado === 'aprobada_garantias',
+            'credito_disponible_comite' => $credito->fresh()->estado === 'comite_evaluacion',
         ]);
     }
 
@@ -547,7 +554,7 @@ class GestionCreditoController extends Controller
     public function formalizacionGarantias(Request $request, $creditoId)
     {
         $activeRole = $this->resolveActiveRole($request);
-        $this->autorizarRol($activeRole);
+        $this->autorizarAccionOperativa($activeRole);
 
         $credito = $this->queryBase()->findOrFail($creditoId);
 
@@ -579,7 +586,7 @@ class GestionCreditoController extends Controller
     public function guardarFormalizacionGarantias(Request $request, $creditoId)
     {
         $activeRole = $this->resolveActiveRole($request);
-        $this->autorizarRol($activeRole);
+        $this->autorizarAccionOperativa($activeRole);
         $user = Auth::user();
 
         $credito = CreditoOrdinario::with('cliente')->findOrFail($creditoId);
@@ -1232,15 +1239,23 @@ class GestionCreditoController extends Controller
     }
 
     /**
-     * Todos los documentos reenviados quedaron aprobados: el crédito pasa a
-     * `aprobada_garantias` y vuelve a aparecer pendiente de gestión en esa
-     * bandeja (mismo patrón de reseteo de `solicitud_gestionada`/`fecha_gestion`
-     * que ActaComiteController::sincronizarCreditosOrdinarios()), para que el
-     * Coordinador Comercial lo re-gestione seleccionando el preset de
-     * garantías (SCRUM-199). Defensivo: solo si sigue en `pendiente_comite`
-     * (si ya se movió por otro camino, no lo tocamos de nuevo).
+     * SCRUM-236: todos los documentos que el Comité pidió como condición
+     * "pendiente" quedaron aprobados — el crédito vuelve a
+     * `comite_evaluacion` (mismo patrón de reseteo de
+     * `solicitud_gestionada`/`fecha_gestion` que
+     * ActaComiteController::sincronizarCreditosOrdinarios()) para que quede
+     * disponible de nuevo en el pool de créditos elegibles de una Acta de
+     * Comité (`ActaComiteController::creditosElegibles()`, que solo mira
+     * `estado === 'comite_evaluacion'`). Antes de este fix saltaba directo
+     * a `aprobada_garantias`/`comite_aprobado`, como si el Comité ya lo
+     * hubiera aprobado sin haber vuelto a evaluarlo — error reportado en el
+     * ticket. `resultado_origen` se limpia a null porque el crédito entra
+     * a una evaluación de Comité nueva, sin resultado todavía (ver
+     * feedback_resultado_origen_no_se_limpia). Defensivo: solo si sigue en
+     * `pendiente_comite` (si ya se movió por otro camino, no lo tocamos de
+     * nuevo).
      */
-    private function habilitarGarantiasSiAplica(CreditoOrdinario $credito, DocumentRequest $documentRequest, $user): void
+    private function retomarComiteSiAplica(CreditoOrdinario $credito, DocumentRequest $documentRequest, $user): void
     {
         if ($credito->estado !== 'pendiente_comite') {
             return;
@@ -1252,12 +1267,12 @@ class GestionCreditoController extends Controller
             'usuario' => $user->name,
             'rol' => 'coordinador_comercial',
             'estado_anterior' => $credito->estado,
-            'estado_nuevo' => 'aprobada_garantias',
-            'comentario' => 'Documentación reenviada por el cliente aprobada en su totalidad. Pasa a Aprobada para gestión de garantías.',
+            'estado_nuevo' => 'comite_evaluacion',
+            'comentario' => 'Documentación reenviada por el cliente aprobada en su totalidad. Vuelve a estar disponible para una nueva Acta de Comité.',
         ];
 
-        $credito->estado = 'aprobada_garantias';
-        $credito->resultado_origen = 'comite_aprobado';
+        $credito->estado = 'comite_evaluacion';
+        $credito->resultado_origen = null;
         $credito->solicitud_gestionada = false;
         $credito->fecha_gestion = null;
         $credito->historial_estados = $historial;

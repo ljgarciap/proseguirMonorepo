@@ -10,10 +10,11 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Resultado de la Formalización de Garantías (SCRUM-205). A diferencia de
- * GestionCreditoNotificacionMail, el contenido es fijo (no redactado a mano
- * por el Coordinador Comercial) — dos variantes según si todas las
- * garantías quedaron aprobadas o si alguna requiere ajustes.
+ * Resultado de la Formalización de Garantías (SCRUM-205, rol Operativo
+ * desde SCRUM-237). A diferencia de GestionCreditoNotificacionMail, el
+ * contenido es fijo (no redactado a mano por quien gestiona la pantalla) —
+ * dos variantes según si todas las garantías quedaron aprobadas o si
+ * alguna requiere ajustes.
  */
 class FormalizacionGarantiasResultadoMail extends Mailable
 {

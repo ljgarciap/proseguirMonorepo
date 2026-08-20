@@ -168,11 +168,11 @@ export class GestionCreditosDetalleComponent implements OnInit {
       && this.ultimaGestionRequirioDocumentos;
   }
 
-  /** El crédito pasó a aprobada_garantias (todo lo reenviado quedó
-   * aprobado, SCRUM-199) — deja de estar "gestionable" acá como pendiente
-   * de comité, vuelve a la bandeja pendiente de gestión de garantías. */
-  get creditoDisponibleParaGarantias(): boolean {
-    return this.credito?.estado === 'aprobada_garantias';
+  /** El crédito volvió a comite_evaluacion (todo lo reenviado quedó
+   * aprobado, SCRUM-236) — deja de estar "gestionable" acá como pendiente
+   * de comité, vuelve a estar disponible para una nueva Acta de Comité. */
+  get creditoDisponibleParaComite(): boolean {
+    return this.credito?.estado === 'comite_evaluacion';
   }
 
   cargarDocumentosPendientes(): void {
@@ -235,9 +235,9 @@ export class GestionCreditosDetalleComponent implements OnInit {
       ).subscribe({
         next: (resp) => {
           this.documentRequest = resp.document_request;
-          if (resp.credito_disponible_garantias) {
-            this.credito.estado = 'aprobada_garantias';
-            Swal.fire('¡Listo!', 'Toda la documentación fue aprobada — el crédito quedó aprobado y disponible para gestionar sus garantías.', 'success');
+          if (resp.credito_disponible_comite) {
+            this.credito.estado = 'comite_evaluacion';
+            Swal.fire('¡Listo!', 'Toda la documentación fue aprobada — el crédito vuelve a estar disponible para una nueva Acta de Comité.', 'success');
           }
         },
         error: (err) => Swal.fire('Error', err.error?.message || 'No se pudo procesar el documento.', 'error')

@@ -126,9 +126,9 @@
         Documentos reenviados por el cliente
       </h3>
 
-      <div class="alert-readonly success" *ngIf="creditoDisponibleParaGarantias">
+      <div class="alert-readonly success" *ngIf="creditoDisponibleParaComite">
         <span class="material-symbols-outlined">check_circle</span>
-        Toda la documentación fue aprobada — el crédito quedó aprobado y disponible para gestionar sus garantías.
+        Toda la documentación fue aprobada — el crédito vuelve a estar disponible para una nueva Acta de Comité.
       </div>
 
       <p class="card-subtitle" *ngIf="cargandoDocumentos">Cargando documentos...</p>
@@ -156,7 +156,7 @@
                 <span *ngIf="!item.upload" class="text-muted">Sin cargar</span>
               </td>
               <td class="text-right">
-                <ng-container *ngIf="item.upload && item.estado !== 'aprobado' && !creditoDisponibleParaGarantias">
+                <ng-container *ngIf="item.upload && item.estado !== 'aprobado' && !creditoDisponibleParaComite">
                   <button class="btn-pro sm primary" (click)="revisarItem(item, 'aprobar')">Aprobar</button>
                   <button class="btn-pro sm secondary" (click)="revisarItem(item, 'rechazar')">Rechazar</button>
                 </ng-container>
