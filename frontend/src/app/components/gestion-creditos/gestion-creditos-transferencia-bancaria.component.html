@@ -186,11 +186,11 @@
         </div>
         <div class="form-group">
           <label>Valor de la transacción <span class="required">*</span></label>
-          <input class="pro-input" type="number" min="0" [(ngModel)]="valorTransaccion" [disabled]="!puedeGestionar">
+          <input class="pro-input" type="text" inputmode="decimal" [(ngModel)]="valorTransaccion" milesSeparator [disabled]="!puedeGestionar">
         </div>
         <div class="form-group">
           <label>Confirmación del valor de la transacción <span class="required">*</span></label>
-          <input class="pro-input" type="number" min="0" [(ngModel)]="valorTransaccionConfirmacion" [disabled]="!puedeGestionar">
+          <input class="pro-input" type="text" inputmode="decimal" [(ngModel)]="valorTransaccionConfirmacion" milesSeparator [disabled]="!puedeGestionar">
         </div>
         <div class="form-group">
           <label>Número de la transacción <span class="required">*</span></label>
@@ -209,11 +209,6 @@
             Declaro que validé los datos bancarios del beneficiario. <span class="required">*</span>
           </label>
         </div>
-      </div>
-
-      <div class="alert-readonly mt-4">
-        <span class="material-symbols-outlined">info</span>
-        Al registrar, el sistema mostrará una confirmación final con el valor, el beneficiario y la cuenta destino enmascarada.
       </div>
 
       <div class="form-footer mt-4" *ngIf="puedeGestionar">

@@ -84,6 +84,22 @@ export class GestionCreditosDesembolsoIngresoComponent implements OnInit {
     return this.credito?.solicitud_credito || null;
   }
 
+  get esNatural(): boolean {
+    return (this.cliente?.tipo_persona?.codigo || 'NATURAL').toUpperCase() === 'NATURAL';
+  }
+
+  /** SCRUM-238 (numeral 6.7): aprobación previa de Gerencia sobre el
+   * Registro de Crédito en CYF (SCRUM-211) — mismo getter que ya usaba
+   * gestion-creditos-desembolso-aprobacion.component.ts, filtrando
+   * específicamente aprobacion_registro_cyf -> desembolso_ingreso para no
+   * confundirla con un rechazo posterior de Gerencia (SCRUM-219) que deja
+   * otra entrada con el mismo estado_nuevo. */
+  get aprobacionPrevia(): any {
+    const historial: any[] = this.credito?.historial_estados || [];
+    const candidatas = historial.filter(h => h.estado_anterior === 'aprobacion_registro_cyf' && h.estado_nuevo === 'desembolso_ingreso');
+    return candidatas.length ? candidatas[candidatas.length - 1] : null;
+  }
+
   get puedeGestionar(): boolean {
     if (!this.credito) return false;
     if (this.credito.estado !== 'desembolso_ingreso') return false;

@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
+import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 import Swal from 'sweetalert2';
 
 /**
@@ -19,7 +20,7 @@ import Swal from 'sweetalert2';
 @Component({
   selector: 'app-gestion-creditos-transferencia-bancaria',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, MilesSeparatorDirective],
   templateUrl: './gestion-creditos-transferencia-bancaria.component.html',
   styleUrls: ['./gestion-creditos-transferencia-bancaria.component.css']
 })
@@ -256,7 +257,21 @@ export class GestionCreditosTransferenciaBancariaComponent implements OnInit {
     });
   }
 
+  /** SCRUM-239: pide confirmación antes de descartar — el formulario tiene
+   * varios campos obligatorios (info bancaria + registro de transferencia)
+   * y hasta ahora "Cancelar" navegaba directo sin avisar que se perdían. */
   cancelar(): void {
-    this.router.navigate(['/gestion-creditos']);
+    Swal.fire({
+      title: '¿Cancelar el registro?',
+      text: 'Se perderán todos los datos ingresados en este formulario.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, cancelar',
+      cancelButtonText: 'Volver al formulario',
+      confirmButtonColor: '#dc2626'
+    }).then(result => {
+      if (!result.isConfirmed) return;
+      this.router.navigate(['/gestion-creditos']);
+    });
   }
 }

@@ -817,10 +817,15 @@ class GestionCreditoController extends Controller
                 . ' Debe registrarse nuevamente.';
         }
 
+        // SCRUM-238 (numeral 6.7 de la historia de usuario): la pantalla de
+        // Registro de Operación de Desembolso necesita mostrar "usuario que
+        // realizó la operación" con número de identificación y nombres
+        // completos — hasta acá el historial solo guardaba $user->name.
         $historial = $credito->historial_estados ?? [];
         $historial[] = [
             'fecha' => now()->toIso8601String(),
             'usuario' => $user->name,
+            'usuario_documento' => $user->numero_documento,
             'rol' => $activeRole,
             'estado_anterior' => $estadoAnterior,
             'estado_nuevo' => $credito->estado,

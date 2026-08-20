@@ -72,6 +72,10 @@ export class GestionCreditosDesembolsoAprobacionComponent implements OnInit {
     return this.credito?.solicitud_credito || null;
   }
 
+  get esNatural(): boolean {
+    return (this.cliente?.tipo_persona?.codigo || 'NATURAL').toUpperCase() === 'NATURAL';
+  }
+
   get puedeGestionar(): boolean {
     if (!this.credito) return false;
     if (this.credito.estado !== 'desembolso_aprobacion') return false;

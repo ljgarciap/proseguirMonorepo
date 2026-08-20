@@ -18,17 +18,54 @@
   </div>
 
   <div class="detail-grid">
-    <!-- Información del cliente y del crédito -->
+    <!-- Información del cliente y del crédito (SCRUM-238: info completa,
+         mismo patrón que gestion-creditos-detalle.component.html) -->
     <div class="content-card">
       <h3 class="card-title">
         <span class="material-symbols-outlined">badge</span>
         Información del Cliente y del Crédito (no editable)
       </h3>
-      <div class="form-grid mt-4">
+
+      <ng-container *ngIf="esNatural; else clienteJuridicoAprobacion">
+        <div class="form-grid mt-4">
+          <div class="form-group"><label>Nombres</label><p class="readonly-value">{{ cliente?.nombres || '—' }}</p></div>
+          <div class="form-group"><label>Primer Apellido</label><p class="readonly-value">{{ cliente?.primer_apellido || '—' }}</p></div>
+          <div class="form-group"><label>Segundo Apellido</label><p class="readonly-value">{{ cliente?.segundo_apellido || '—' }}</p></div>
+          <div class="form-group"><label>Ocupación</label><p class="readonly-value">{{ cliente?.ocupacion || '—' }}</p></div>
+          <div class="form-group"><label>Documento</label><p class="readonly-value">{{ cliente?.document_type?.nombre || '—' }} {{ cliente?.numero_documento || '' }}</p></div>
+          <div class="form-group"><label>Correo Electrónico</label><p class="readonly-value">{{ cliente?.correo_electronico || '—' }}</p></div>
+          <div class="form-group"><label>Teléfono</label><p class="readonly-value">{{ cliente?.telefono || '—' }}</p></div>
+          <div class="form-group span-2"><label>Dirección</label><p class="readonly-value">{{ cliente?.direccion || '—' }}</p></div>
+          <div class="form-group"><label>Ciudad</label><p class="readonly-value">{{ cliente?.ciudad || '—' }}, {{ cliente?.departamento || '—' }}</p></div>
+        </div>
+      </ng-container>
+
+      <ng-template #clienteJuridicoAprobacion>
+        <div class="form-grid mt-4">
+          <div class="form-group span-2"><label>Razón Social</label><p class="readonly-value">{{ cliente?.nombre_razon_social || cliente?.nombre || '—' }}</p></div>
+          <div class="form-group"><label>Tipo de Empresa</label><p class="readonly-value">{{ cliente?.tipo_empresa || '—' }}</p></div>
+          <div class="form-group"><label>Actividad Económica</label><p class="readonly-value">{{ cliente?.actividad_economica || '—' }}</p></div>
+          <div class="form-group"><label>NIT</label><p class="readonly-value">{{ cliente?.numero_documento || '—' }}</p></div>
+          <div class="form-group"><label>Correo Electrónico</label><p class="readonly-value">{{ cliente?.correo_electronico_empresarial || '—' }}</p></div>
+          <div class="form-group"><label>Página Web</label><p class="readonly-value">{{ cliente?.pagina_web || '—' }}</p></div>
+          <div class="form-group span-2"><label>Dirección</label><p class="readonly-value">{{ cliente?.direccion || '—' }}</p></div>
+          <div class="form-group"><label>Ciudad</label><p class="readonly-value">{{ cliente?.ciudad || '—' }}, {{ cliente?.departamento || '—' }}</p></div>
+        </div>
+
+        <h4 class="section-subtitle mt-4">Representante Legal</h4>
+        <div class="form-grid">
+          <div class="form-group"><label>Nombres</label><p class="readonly-value">{{ cliente?.rep_nombres || '—' }}</p></div>
+          <div class="form-group"><label>Apellidos</label><p class="readonly-value">{{ cliente?.rep_primer_apellido || '—' }} {{ cliente?.rep_segundo_apellido || '' }}</p></div>
+          <div class="form-group"><label>Documento</label><p class="readonly-value">{{ cliente?.rep_document_type?.nombre || '—' }} {{ cliente?.rep_numero_documento || '' }}</p></div>
+        </div>
+      </ng-template>
+
+      <h4 class="section-subtitle mt-4">Crédito</h4>
+      <div class="form-grid">
         <div class="form-group"><label>Número de Crédito</label><p class="readonly-value">{{ credito.numero_solicitud }}</p></div>
         <div class="form-group"><label>Tipo de Crédito</label><p class="readonly-value">{{ solicitud?.tipo_credito?.nombre || '—' }}</p></div>
-        <div class="form-group span-2"><label>Cliente</label><p class="readonly-value">{{ cliente?.nombre_razon_social || (cliente?.nombres + ' ' + cliente?.primer_apellido) || credito.cliente?.name || '—' }}</p></div>
-        <div class="form-group"><label>Identificación</label><p class="readonly-value">{{ cliente?.document_type?.nombre || '—' }} {{ cliente?.numero_documento || '' }}</p></div>
+        <div class="form-group"><label>Monto Aprobado</label><p class="readonly-value">$ {{ (solicitud?.monto_solicitado || credito.monto || 0) | number:'1.0-0':'es-CO' }}</p></div>
+        <div class="form-group"><label>Plazo</label><p class="readonly-value">{{ solicitud?.plazo_meses || credito.plazo_meses || '—' }} meses</p></div>
       </div>
     </div>
 
@@ -44,15 +81,17 @@
       </div>
     </div>
 
-    <!-- Aprobación previa del Gerente -->
+    <!-- Aprobación previa del Gerente (SCRUM-238, numeral 6.7: fecha y hora
+         separadas + usuario con nombre y documento) -->
     <div class="content-card mt-4">
       <h3 class="card-title">
         <span class="material-symbols-outlined">verified</span>
         Aprobación previa de Registro CYF (no editable)
       </h3>
       <div class="form-grid mt-4">
-        <div class="form-group"><label>Fecha de Aprobación</label><p class="readonly-value">{{ aprobacionPrevia?.fecha ? (aprobacionPrevia.fecha | date:'dd/MM/yyyy HH:mm') : '—' }}</p></div>
-        <div class="form-group span-2"><label>Aprobado por</label><p class="readonly-value">{{ aprobacionPrevia?.usuario || '—' }}</p></div>
+        <div class="form-group"><label>Fecha de Aprobación</label><p class="readonly-value">{{ aprobacionPrevia?.fecha ? (aprobacionPrevia.fecha | date:'dd/MM/yyyy') : '—' }}</p></div>
+        <div class="form-group"><label>Hora de Aprobación</label><p class="readonly-value">{{ aprobacionPrevia?.fecha ? (aprobacionPrevia.fecha | date:'HH:mm') : '—' }}</p></div>
+        <div class="form-group span-2"><label>Usuario que realizó la operación</label><p class="readonly-value">{{ aprobacionPrevia?.usuario || '—' }}{{ aprobacionPrevia?.usuario_documento ? ' — Documento ' + aprobacionPrevia.usuario_documento : '' }}</p></div>
       </div>
     </div>
 

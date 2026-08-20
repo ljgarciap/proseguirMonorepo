@@ -23,15 +23,31 @@ import Swal from 'sweetalert2';
 })
 export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
   creditos: any[] = [];
-  tarjetas: any = {
-    sarlaft_desfavorable: 0, aprobada_garantias: 0, rechazada_comite: 0, pendiente_comite: 0,
-    pendiente_formalizacion_garantias: 0, pendiente_registro_cyf: 0,
-    // SCRUM-211/215/219/224: el backend solo devuelve las claves visibles
-    // para el rol activo (ver ROLES_POR_CLAVE) — estas 4 quedan en undefined
-    // para coordinador_comercial, y el template las oculta con *ngIf.
-    aprobacion_registro_cyf: undefined, desembolso_ingreso: undefined, desembolso_aprobacion: undefined,
-    ejecucion_transferencia: undefined
-  };
+  tarjetas: any = {};
+
+  /** SCRUM-238: tarjetas ordenadas alfabéticamente por label (una sola vez,
+   * a mano — el conjunto es fijo, no hace falta ordenar en runtime). El
+   * backend solo devuelve la clave si el rol activo la tiene asignada
+   * (ROLES_POR_CLAVE) — `tarjetasVisibles` filtra por eso, mismo mecanismo
+   * que antes vivía como 4 `*ngIf` repetidos en el HTML (SCRUM-211/215/219/
+   * 224/237), ahora generalizado a las 10 tarjetas. */
+  private readonly TARJETAS_CONFIG: { clave: string; label: string; icono: string; iconoClase: string }[] = [
+    { clave: 'aprobacion_registro_cyf', label: 'Aprobación Registro de Crédito en CYF', icono: 'fact_check', iconoClase: 'warning' },
+    { clave: 'desembolso_aprobacion', label: 'Aprobación Registro Operación de Desembolso en CYF', icono: 'price_check', iconoClase: 'success' },
+    { clave: 'aprobada_garantias', label: 'Aprobados para gestión de garantías', icono: 'verified', iconoClase: 'success' },
+    { clave: 'sarlaft_desfavorable', label: 'Listas Restrictivas y SARLAFT desfavorable', icono: 'gavel', iconoClase: 'danger' },
+    { clave: 'pendiente_comite', label: 'Pendientes - Comité de Créditos', icono: 'hourglass_top', iconoClase: 'warning' },
+    { clave: 'pendiente_formalizacion_garantias', label: 'Pendientes para Formalización de Garantías', icono: 'fact_check', iconoClase: 'purple' },
+    { clave: 'rechazada_comite', label: 'Rechazados - Comité de Créditos', icono: 'cancel', iconoClase: 'danger' },
+    { clave: 'pendiente_registro_cyf', label: 'Registro de Crédito en CYF', icono: 'account_balance', iconoClase: 'info' },
+    { clave: 'desembolso_ingreso', label: 'Registro de Operación en CYF', icono: 'local_shipping', iconoClase: 'purple' },
+    { clave: 'ejecucion_transferencia', label: 'Registro de Transferencia Bancaria', icono: 'account_balance_wallet', iconoClase: 'info' },
+  ];
+
+  get tarjetasVisibles() {
+    return this.TARJETAS_CONFIG.filter(t => this.tarjetas[t.clave] !== undefined);
+  }
+
   loading = false;
   activeRole = '';
   private roleSub?: Subscription;

@@ -80,6 +80,13 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1.25rem;
+  /* SCRUM-239: alinea los inputs al piso de cada fila — sin esto, una
+     etiqueta que envuelve a 2 líneas (ej. "Confirmación del valor de la
+     transacción") empuja su input hacia abajo respecto al de la celda
+     vecina con etiqueta de 1 línea, aunque técnicamente comparten fila de
+     grid — se ve "uno más abajo que el otro" pese a estar en la misma
+     línea. */
+  align-items: end;
 }
 
 .form-group {

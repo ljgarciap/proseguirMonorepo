@@ -7,81 +7,11 @@
   </header>
 
   <div class="tiles-grid">
-    <div class="tile-card clickable" (click)="filtrarPorTarjeta('sarlaft_desfavorable')">
-      <span class="material-symbols-outlined tile-icon danger">gavel</span>
+    <div class="tile-card clickable" *ngFor="let t of tarjetasVisibles" (click)="filtrarPorTarjeta(t.clave)">
+      <span class="material-symbols-outlined tile-icon" [ngClass]="t.iconoClase">{{ t.icono }}</span>
       <div>
-        <p class="tile-value">{{ tarjetas.sarlaft_desfavorable }}</p>
-        <p class="tile-label">Listas Restrictivas y SARLAFT desfavorable</p>
-      </div>
-    </div>
-    <div class="tile-card clickable" (click)="filtrarPorTarjeta('aprobada_garantias')">
-      <span class="material-symbols-outlined tile-icon success">verified</span>
-      <div>
-        <p class="tile-value">{{ tarjetas.aprobada_garantias }}</p>
-        <p class="tile-label">Aprobados para gestión de garantías</p>
-      </div>
-    </div>
-    <div class="tile-card clickable" (click)="filtrarPorTarjeta('rechazada_comite')">
-      <span class="material-symbols-outlined tile-icon danger">cancel</span>
-      <div>
-        <p class="tile-value">{{ tarjetas.rechazada_comite }}</p>
-        <p class="tile-label">Rechazados - Comité de Créditos</p>
-      </div>
-    </div>
-    <div class="tile-card clickable" (click)="filtrarPorTarjeta('pendiente_comite')">
-      <span class="material-symbols-outlined tile-icon warning">hourglass_top</span>
-      <div>
-        <p class="tile-value">{{ tarjetas.pendiente_comite }}</p>
-        <p class="tile-label">Pendientes - Comité de Créditos</p>
-      </div>
-    </div>
-    <!-- SCRUM-237: pasó de Coordinador Comercial a Operativo (rol exclusivo,
-         igual que las tarjetas de abajo) — el backend ya no devuelve esta
-         clave para roles sin acceso (ROLES_POR_CLAVE), así que necesita el
-         mismo guard *ngIf que ellas para no quedar huérfana en pantalla. -->
-    <div class="tile-card clickable" *ngIf="tarjetas.pendiente_formalizacion_garantias !== undefined" (click)="filtrarPorTarjeta('pendiente_formalizacion_garantias')">
-      <span class="material-symbols-outlined tile-icon purple">fact_check</span>
-      <div>
-        <p class="tile-value">{{ tarjetas.pendiente_formalizacion_garantias }}</p>
-        <p class="tile-label">Pendientes para Formalización de Garantías</p>
-      </div>
-    </div>
-    <div class="tile-card clickable" (click)="filtrarPorTarjeta('pendiente_registro_cyf')">
-      <span class="material-symbols-outlined tile-icon info">account_balance</span>
-      <div>
-        <p class="tile-value">{{ tarjetas.pendiente_registro_cyf }}</p>
-        <p class="tile-label">Registro de Crédito en CYF</p>
-      </div>
-    </div>
-    <!-- SCRUM-211/215/219: el backend solo devuelve estas claves si el rol
-         activo las tiene asignadas (ROLES_POR_CLAVE) — undefined las oculta. -->
-    <div class="tile-card clickable" *ngIf="tarjetas.aprobacion_registro_cyf !== undefined" (click)="filtrarPorTarjeta('aprobacion_registro_cyf')">
-      <span class="material-symbols-outlined tile-icon warning">fact_check</span>
-      <div>
-        <p class="tile-value">{{ tarjetas.aprobacion_registro_cyf }}</p>
-        <p class="tile-label">Aprobación Registro de Crédito en CYF</p>
-      </div>
-    </div>
-    <div class="tile-card clickable" *ngIf="tarjetas.desembolso_ingreso !== undefined" (click)="filtrarPorTarjeta('desembolso_ingreso')">
-      <span class="material-symbols-outlined tile-icon purple">local_shipping</span>
-      <div>
-        <p class="tile-value">{{ tarjetas.desembolso_ingreso }}</p>
-        <p class="tile-label">Registro de Operación en CYF</p>
-      </div>
-    </div>
-    <div class="tile-card clickable" *ngIf="tarjetas.desembolso_aprobacion !== undefined" (click)="filtrarPorTarjeta('desembolso_aprobacion')">
-      <span class="material-symbols-outlined tile-icon success">price_check</span>
-      <div>
-        <p class="tile-value">{{ tarjetas.desembolso_aprobacion }}</p>
-        <p class="tile-label">Aprobación Registro Operación de Desembolso en CYF</p>
-      </div>
-    </div>
-    <!-- SCRUM-224 -->
-    <div class="tile-card clickable" *ngIf="tarjetas.ejecucion_transferencia !== undefined" (click)="filtrarPorTarjeta('ejecucion_transferencia')">
-      <span class="material-symbols-outlined tile-icon info">account_balance_wallet</span>
-      <div>
-        <p class="tile-value">{{ tarjetas.ejecucion_transferencia }}</p>
-        <p class="tile-label">Registro de Transferencia Bancaria</p>
+        <p class="tile-value">{{ tarjetas[t.clave] }}</p>
+        <p class="tile-label">{{ t.label }}</p>
       </div>
     </div>
   </div>

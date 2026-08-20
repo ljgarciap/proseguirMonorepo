@@ -84,6 +84,13 @@
   gap: 8px;
 }
 
+.section-subtitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #334155;
+  margin: 0 0 0.75rem 0;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
