@@ -762,7 +762,7 @@ Chart.register(...registerables);
             <div class="card table-container span-4">
               <div class="card-header">
                 <h3>Clientes con Cartera</h3>
-                <span class="text-muted">Orden ascendente por valor de cartera y luego por nombre</span>
+                <span class="text-muted">Orden descendente por valor de cartera y luego por nombre</span>
               </div>
               <div class="search-box" style="margin: 0 1rem 0.75rem;">
                 <input type="text" [(ngModel)]="buscarClienteCF" placeholder="Buscar por documento o nombre..." class="pro-input">

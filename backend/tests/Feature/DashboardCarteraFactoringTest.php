@@ -212,6 +212,24 @@ class DashboardCarteraFactoringTest extends TestCase
         $this->assertEquals(3000000, $clientes[0]['valor_cartera']);
     }
 
+    public function test_clientes_ordenado_por_valor_cartera_descendente(): void
+    {
+        // SCRUM-242: la lista "Clientes con Cartera" debía mostrarse de mayor
+        // a menor cartera; antes ordenaba ascendente.
+        $this->seedFacturaConPago(); // Cliente Uno, saldo 4.000.000
+        $this->seedFacturaSinPago(); // Cliente Dos, saldo 3.000.000
+
+        Passport::actingAs($this->operativo);
+        $response = $this->getJson('/api/dashboard/cartera-factoring');
+
+        $clientes = $response->json('clientes');
+        $this->assertCount(2, $clientes);
+        $this->assertSame('Cliente Uno', $clientes[0]['cliente']);
+        $this->assertEquals(4000000, $clientes[0]['valor_cartera']);
+        $this->assertSame('Cliente Dos', $clientes[1]['cliente']);
+        $this->assertEquals(3000000, $clientes[1]['valor_cartera']);
+    }
+
     public function test_filtro_por_factura_numero(): void
     {
         $this->seedFacturaConPago();

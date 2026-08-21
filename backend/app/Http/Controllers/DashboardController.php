@@ -573,7 +573,7 @@ class DashboardController extends Controller
                   ->orWhere('nit_cliente', 'LIKE', "%{$buscarCliente}%");
             });
         }
-        $clientes = $clientesQuery->orderBy('valor_cartera', 'asc')->orderBy('cliente', 'asc')->get();
+        $clientes = $clientesQuery->orderBy('valor_cartera', 'desc')->orderBy('cliente', 'asc')->get();
 
         $perPage = (int) ($request->query('per_page', 20));
         $detalle = (clone $base)->orderBy('created_at', 'desc')->paginate($perPage);
