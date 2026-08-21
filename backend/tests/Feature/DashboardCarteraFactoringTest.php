@@ -138,8 +138,9 @@ class DashboardCarteraFactoringTest extends TestCase
         $this->assertSame(1, $data['indicadores']['facturas_compraventa']);
         $this->assertSame(2, $data['indicadores']['pagos_coincidentes']);
         $this->assertSame(1, $data['indicadores']['registros_sin_pago']);
-        // saldo despues de pago: 4.000.000 (factoring) + 0 (compraventa) = 4.000.000
-        $this->assertEquals(4000000, $data['indicadores']['valor_cartera_total_despues_pago']);
+        // saldo despues de pago = valor_neto_factura - valor_pagado (SCRUM-241):
+        // 4.000.000 (factoring con pago) + 3.000.000 (factoring sin pago, valor pagado 0) + 0 (compraventa) = 7.000.000
+        $this->assertEquals(7000000, $data['indicadores']['valor_cartera_total_despues_pago']);
         // valor pagado: 6.000.000 (factoring) + 5.000.000 (compraventa)
         $this->assertEquals(11000000, $data['indicadores']['total_valor_pagado']);
 
@@ -172,7 +173,9 @@ class DashboardCarteraFactoringTest extends TestCase
         $this->assertNotNull($fila);
         $this->assertSame(0, $fila['tiene_pago']);
         $this->assertNull($fila['valor_pagado']);
-        $this->assertNull($fila['saldo_despues_pago']);
+        // SCRUM-241: sin pago (valor pagado 0), saldo despues del pago = valor neto factura
+        $this->assertEquals(3000000, $fila['saldo_despues_pago']);
+        $this->assertEquals(3000000, $fila['valor_neto_factura']);
     }
 
     public function test_top10_clientes_ordenado_por_saldo_descendente(): void
@@ -187,6 +190,26 @@ class DashboardCarteraFactoringTest extends TestCase
         // Solo "Cliente Uno" tiene saldo > 0 (4.000.000); Compraventa quedó en 0 y no debe aparecer.
         $this->assertCount(1, $top10);
         $this->assertSame('Cliente Uno', $top10[0]['cliente']);
+    }
+
+    public function test_registro_sin_pago_alimenta_top10_y_clientes(): void
+    {
+        // SCRUM-241: antes, un registro sin pago quedaba con saldo NULL y por
+        // eso nunca sumaba en el HAVING > 0 de top10/clientes, dejando esas
+        // gráficas vacías aunque hubiera cartera real pendiente.
+        $this->seedFacturaSinPago();
+
+        Passport::actingAs($this->operativo);
+        $response = $this->getJson('/api/dashboard/cartera-factoring');
+
+        $top10 = $response->json('top10_clientes');
+        $this->assertCount(1, $top10);
+        $this->assertSame('Cliente Dos', $top10[0]['cliente']);
+        $this->assertEquals(3000000, $top10[0]['total']);
+
+        $clientes = $response->json('clientes');
+        $this->assertCount(1, $clientes);
+        $this->assertEquals(3000000, $clientes[0]['valor_cartera']);
     }
 
     public function test_filtro_por_factura_numero(): void

@@ -47,15 +47,28 @@ test('Operativo ve indicadores, Top10, clientes y detalle en la pestaña Cartera
   await buscador.fill('900999888');
   await expect(page.getByText('Cliente Playwright CF').first()).toBeVisible();
 
-  // Detalle: la factura sin pago (PW-CF-002) debe verse sin datos de pago
+  // Detalle: la factura sin pago (PW-CF-002) debe verse sin datos de pago,
+  // pero SCRUM-241: "Saldo Después del Pago" debe ser igual al Valor Neto
+  // Factura ($2.000.000), no vacío/"-".
   await expect(page.getByText('Detalle de Cartera')).toBeVisible();
   const filaSinPago = page.locator('tr', { hasText: 'PW-CF-002' });
   await expect(filaSinPago).toBeVisible();
+  // Valor Neto Factura y Saldo Después del Pago deben coincidir ($2.000.000
+  // cada uno) — por eso hay 2 coincidencias del mismo texto en la fila.
+  await expect(filaSinPago.getByText('$ 2.000.000')).toHaveCount(2);
 
   // La factura con pago (PW-CF-001) sí debe traer saldo después de pago
+  // (8.000.000 - 5.000.000 = 3.000.000, SCRUM-241)
   const filaConPago = page.locator('tr', { hasText: 'PW-CF-001' });
   await expect(filaConPago).toBeVisible();
   await expect(filaConPago.getByText('Pagador Real PW')).toBeVisible();
+  await expect(filaConPago.getByText('$ 3.000.000')).toBeVisible();
+
+  // SCRUM-241: al corregir la fórmula, el saldo de PW-CF-002 (sin pago) deja
+  // de ser NULL y ahora suma en las gráficas inferiores (antes quedaban
+  // vacías: "Sin saldos de cartera para graficar").
+  await buscador.fill('900777666');
+  await expect(page.getByText('Cliente Playwright CF Dos').first()).toBeVisible();
 
   // Filtro por Factura N.º (solo visible en esta pestaña)
   const filtroFactura = page.getByPlaceholder('Número...');

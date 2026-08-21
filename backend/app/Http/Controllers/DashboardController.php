@@ -660,7 +660,7 @@ class DashboardController extends Controller
                 pf.pagador as pagador,
                 pf.fecha_pago as fecha_pago,
                 pf.monto_pagado as valor_pagado,
-                pf.saldo_restante as saldo_despues_pago,
+                (of.monto - COALESCE(pf.monto_pagado, 0)) as saldo_despues_pago,
                 of.created_at as created_at,
                 CASE WHEN pf.id IS NOT NULL THEN 1 ELSE 0 END as tiene_pago
             ");
@@ -682,7 +682,7 @@ class DashboardController extends Controller
                 pc.pagador as pagador,
                 pc.fecha_recaudo as fecha_pago,
                 pc.total_pagado as valor_pagado,
-                pc.saldo_despues_pago as saldo_despues_pago,
+                (oc.valor_pagar_deudor - COALESCE(pc.total_pagado, 0)) as saldo_despues_pago,
                 oc.created_at as created_at,
                 CASE WHEN pc.id IS NOT NULL THEN 1 ELSE 0 END as tiene_pago
             ");
