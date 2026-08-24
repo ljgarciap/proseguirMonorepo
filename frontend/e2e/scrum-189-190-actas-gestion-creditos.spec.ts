@@ -126,7 +126,9 @@ test('flujo completo Acta de Comité con solicitud manual, visible luego en Gest
   await expect(campo(cardManual, 'Cliente').locator('input')).toHaveCount(0);
   await expect(campo(cardManual, 'Amortización').locator('select')).toHaveValue('Mensual');
   await expect(campo(cardManual, 'Plazo (meses)').locator('input')).toHaveValue('24');
-  await expect(campo(cardManual, 'Fuente de pago').locator('input')).toHaveValue('Ingresos operacionales');
+  // SCRUM-243: "Fuente de pago" pasó de <input> a <textarea> (campo más
+  // ancho, admite texto extenso).
+  await expect(campo(cardManual, 'Fuente de pago').locator('textarea')).toHaveValue('Ingresos operacionales');
   await campo(cardManual, 'Estado').locator('select').selectOption('aprobado');
 
   const cardSistema = cards.filter({ hasText: 'Cliente Playwright Sistema' });
