@@ -335,6 +335,18 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
       .reduce((sum: number, s: any) => sum + Number(s.monto_decision || 0), 0);
   }
 
+  // SCRUM-243 (punto 2): solo cambia la etiqueta visible de "RECHAZADO" a
+  // "NEGADO" — el valor guardado en estado_decision sigue siendo 'rechazado'
+  // a propósito, es el mismo valor que consume ActaComiteController al
+  // mapear la decisión hacia CreditoOrdinario.estado (compartido con otros
+  // orígenes de rechazo como SARLAFT/Gerencia, fuera de alcance de este
+  // ticket). Cambiar el valor real requeriría migrar actas ya existentes.
+  labelEstadoDecision(estado: string | null | undefined): string {
+    const normalizado = estado || 'pendiente';
+    if (normalizado === 'rechazado') return 'NEGADO';
+    return normalizado.toUpperCase();
+  }
+
   // --- Editor de texto enriquecido (ngx-quill) ---
   // SCRUM-189 (2026-08-13, "las imágenes no se ven en el PDF" — 3ª vuelta):
   // el fix anterior (resolverImagenesParaPdf en el backend) es correcto para

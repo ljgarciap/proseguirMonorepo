@@ -95,6 +95,13 @@
   gap: 4px;
 }
 
+/* SCRUM-243 (punto 3): "Fuente de pago" ocupa 2 columnas del grid en vez de
+   1 — a veces trae texto extenso y competía por espacio con el resto de
+   campos cortos de la grilla. */
+.form-field.wide-field {
+  grid-column: span 2;
+}
+
 .form-field label {
   font-size: 0.8rem;
   font-weight: 600;
@@ -313,4 +320,18 @@
 ::ng-deep .orden-dia-item quill-editor {
   display: block;
   width: 100%;
+}
+
+/* SCRUM-243 (punto 4): mismo fix de SCRUM-198 arriba, aplicado al editor de
+   "Observaciones generales" (pestaña 5) — quedaba angosto porque su
+   contenedor no forzaba block/width:100%. También se sube el min-height
+   para que ocupe un alto acorde al tamaño de pantalla por defecto, en vez
+   de la caja chica original. */
+::ng-deep .observaciones-generales-editor quill-editor {
+  display: block;
+  width: 100%;
+}
+
+::ng-deep .observaciones-generales-editor .ql-editor {
+  min-height: 260px;
 }
