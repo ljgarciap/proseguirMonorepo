@@ -71,6 +71,16 @@
             color: #2d3748;
             font-weight: 500;
         }
+        .btn {
+            display: inline-block;
+            background: #1d4ed8;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 700;
+            margin-top: 10px;
+        }
         .footer {
             background-color: #f8fafc;
             padding: 20px;
@@ -124,6 +134,11 @@
             @endif
 
             <p style="margin-top: 25px;">Si tiene alguna inquietud o requiere apoyo adicional, no dude en contactarse con su Coordinador Comercial asignado.</p>
+
+            <p style="text-align:center;">
+                <a href="{{ $urlIngreso }}" class="btn">INGRESAR A LA PLATAFORMA</a>
+            </p>
+            <p style="font-size: 13px; color: #a0aec0;">Por seguridad, no comparta sus credenciales de acceso. Si requiere asistencia, comuníquese con nuestro equipo de atención.</p>
         </div>
         <div class="footer">
             Este es un correo automático enviado desde la plataforma Proseguir.<br>

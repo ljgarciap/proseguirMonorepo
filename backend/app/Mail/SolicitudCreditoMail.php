@@ -15,14 +15,23 @@ class SolicitudCreditoMail extends Mailable
 
     public $solicitud;
     public $documentosRequeridos;
+    public $urlIngreso;
 
     /**
      * Create a new message instance.
+     *
+     * SCRUM-244 (RF-07): $urlIngreso es el botón "Ingresar a la
+     * plataforma" del correo — independiente de la URL/usuario/clave que
+     * ya vienen incrustados como texto plano dentro de
+     * $solicitud->mensaje_notificacion (editable por el Coordinador
+     * Comercial antes de enviar, SCRUM-173). Mismo helper que ya usan los
+     * correos de staff (ConfiguracionService::urlIngresoSistema()).
      */
-    public function __construct(SolicitudCredito $solicitud, array $documentosRequeridos = [])
+    public function __construct(SolicitudCredito $solicitud, array $documentosRequeridos = [], ?string $urlIngreso = null)
     {
         $this->solicitud = $solicitud;
         $this->documentosRequeridos = $documentosRequeridos;
+        $this->urlIngreso = $urlIngreso ?? \App\Services\ConfiguracionService::urlIngresoSistema();
     }
 
     /**

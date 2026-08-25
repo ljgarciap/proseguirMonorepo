@@ -245,9 +245,36 @@ class SolicitudCreditoTest extends TestCase
 
         // Assert Email was dispatched
         Mail::assertSent(SolicitudCreditoMail::class, function ($mail) {
-            return $mail->hasTo('juan_modificado@test.com') && 
+            return $mail->hasTo('juan_modificado@test.com') &&
                    $mail->solicitud->monto_solicitado == 20000000.00;
         });
+    }
+
+    /**
+     * SCRUM-244 (RF-07): el correo debe incluir un botón real "Ingresar a
+     * la plataforma", además del acceso (URL/usuario/clave) que ya viaja
+     * como texto plano dentro del mensaje editable (SCRUM-173).
+     */
+    public function test_solicitud_credito_mail_incluye_boton_de_acceso(): void
+    {
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $this->clientNatural->id,
+            'usuario_registra_id' => $this->admin->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 10000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        $html = (new \App\Mail\SolicitudCreditoMail($solicitud))->render();
+
+        $this->assertStringContainsString('INGRESAR A LA PLATAFORMA', $html);
+        $this->assertStringContainsString('href="http', $html);
     }
 
     /**
