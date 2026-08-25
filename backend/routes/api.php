@@ -371,3 +371,16 @@ Route::prefix('document-requests')->middleware(['auth:api'])->group(function () 
     Route::post('/', [\App\Http\Controllers\DocumentRequestController::class, 'store'])->middleware('checkrole:superadmin,operativo');
     Route::delete('/{id}', [\App\Http\Controllers\DocumentRequestController::class, 'destroy'])->middleware('checkrole:superadmin,operativo');
 });
+
+// SCRUM-245 — Firma Electrónica (arquitectura genérica, ningún módulo
+// conectado todavía — ver FirmaElectronicaController::TIPOS_FIRMABLES).
+// La autorización por rol es por documento (Firmable::rolesAutorizadosParaFirmar),
+// no por ruta, por eso acá solo se exige sesión autenticada.
+Route::prefix('firmas')->middleware(['auth:api'])->group(function () {
+    // Literal 'verificar/{firma}' va ANTES del comodín '{tipo}/{id}' — con
+    // ambas rutas de 2 segmentos, Laravel resuelve por orden de
+    // declaración y 'verificar' matchearía como {tipo} si quedara después.
+    Route::get('/verificar/{firma}', [\App\Http\Controllers\FirmaElectronicaController::class, 'verificar']);
+    Route::post('/{tipo}/{id}/firmar', [\App\Http\Controllers\FirmaElectronicaController::class, 'firmar']);
+    Route::get('/{tipo}/{id}', [\App\Http\Controllers\FirmaElectronicaController::class, 'index']);
+});
