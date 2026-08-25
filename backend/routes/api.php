@@ -376,6 +376,12 @@ Route::prefix('document-requests')->middleware(['auth:api'])->group(function () 
 // conectado todavía — ver FirmaElectronicaController::TIPOS_FIRMABLES).
 // La autorización por rol es por documento (Firmable::rolesAutorizadosParaFirmar),
 // no por ruta, por eso acá solo se exige sesión autenticada.
+// SCRUM-246 — Log de actividad de usuarios (solo superadmin, ver spec).
+Route::prefix('activity-logs')->middleware(['auth:api', 'checkrole:superadmin'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\ActivityLogController::class, 'index']);
+    Route::get('/acciones', [\App\Http\Controllers\ActivityLogController::class, 'acciones']);
+});
+
 Route::prefix('firmas')->middleware(['auth:api'])->group(function () {
     // Literal 'verificar/{firma}' va ANTES del comodín '{tipo}/{id}' — con
     // ambas rutas de 2 segmentos, Laravel resuelve por orden de

@@ -6,6 +6,7 @@ use App\Contracts\Firmable;
 use App\Contracts\ReautenticacionStrategy;
 use App\Models\FirmaElectronica;
 use App\Models\User;
+use App\Services\ActivityLog\ActivityLogService;
 use App\Services\FirmaElectronica\Reautenticacion\PasswordReauthStrategy;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -30,6 +31,10 @@ class FirmaElectronicaService
         'password_reauth' => PasswordReauthStrategy::class,
     ];
 
+    public function __construct(private ActivityLogService $activityLog)
+    {
+    }
+
     public function firmar(
         Firmable $documento,
         User $usuario,
@@ -52,7 +57,7 @@ class FirmaElectronicaService
         $hash = hash('sha256', $pdfBytes);
         $rutaRelativa = $this->guardarPdfCongelado($documento, $pdfBytes);
 
-        return FirmaElectronica::create([
+        $firma = FirmaElectronica::create([
             'firmable_type' => get_class($documento),
             'firmable_id' => $documento->getKey(),
             'usuario_id' => $usuario->id,
@@ -66,6 +71,19 @@ class FirmaElectronicaService
             'documento_hash_sha256' => $hash,
             'hash_algoritmo' => 'sha256',
         ]);
+
+        // SCRUM-246: entrada en el feed de actividad para que la firma
+        // aparezca en la vista unificada de superadmin — firmas_electronicas
+        // sigue siendo la fuente de verdad legal (con su propio trigger
+        // append-only), esto es solo un puntero para la UI de auditoría.
+        $this->activityLog->registrar(
+            accion: 'firma_electronica.creada',
+            descripcion: "{$usuario->name} firmó electrónicamente un documento ({$documento::firmableSlug()} #{$documento->getKey()}).",
+            usuario: $usuario,
+            entidad: $firma,
+        );
+
+        return $firma;
     }
 
     /**
