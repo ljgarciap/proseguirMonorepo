@@ -87,6 +87,12 @@ class ClientUploadController extends Controller
             // es donde el cliente efectivamente "termina de subir" el ítem.
             if ($item->request) {
                 $this->habilitarFormalizacionGarantiasSiAplica($item->request);
+
+                // SCRUM-252: "Mis Cargas" es uno de los 2 orígenes de la
+                // spec (RF-02) — notifica al Coordinador Comercial si esto
+                // completó el DocumentRequest de Etapa 1.
+                (new \App\Services\DocumentRequestNotificationService())
+                    ->notificarCargaCompletaSiAplica($item->request, 'Mis Cargas');
             }
         }
 
@@ -372,6 +378,13 @@ class ClientUploadController extends Controller
                 }
 
                 $this->habilitarFormalizacionGarantiasSiAplica($request);
+
+                // SCRUM-252: si el ítem ya estaba 'subido' desde antes (store()
+                // ya disparó la notificación), notificado_completado_at hace
+                // esta llamada un no-op — mismo patrón redundante-pero-seguro
+                // que habilitarFormalizacionGarantiasSiAplica() de arriba.
+                (new \App\Services\DocumentRequestNotificationService())
+                    ->notificarCargaCompletaSiAplica($request, 'Mis Cargas');
             }
         }
     }

@@ -254,6 +254,15 @@ class CreditoOrdinarioController extends Controller
                         'estado'           => 'subido',
                         'observaciones'    => null,
                     ]);
+
+                    // SCRUM-252: "Mis Créditos" es el otro origen nombrado en
+                    // la spec (RF-02) — mismo chequeo de completitud que
+                    // ClientUploadController::store() para "Mis Cargas".
+                    $requestItem = DocumentRequestItem::with('request')->find($requestItemId);
+                    if ($requestItem && $requestItem->request) {
+                        (new \App\Services\DocumentRequestNotificationService())
+                            ->notificarCargaCompletaSiAplica($requestItem->request, 'Mis Créditos');
+                    }
                 }
             }
 

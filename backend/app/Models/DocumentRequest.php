@@ -17,6 +17,11 @@ class DocumentRequest extends Model
         'etapa',
         'preset_id',
         'preset_nombre',
+        'notificado_completado_at',
+    ];
+
+    protected $casts = [
+        'notificado_completado_at' => 'datetime',
     ];
 
     public function cliente()
