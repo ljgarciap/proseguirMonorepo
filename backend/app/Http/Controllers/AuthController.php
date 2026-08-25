@@ -10,9 +10,14 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Passport\Passport;
+use App\Services\ActivityLog\ActivityLogService;
 
 class AuthController extends Controller
 {
+    public function __construct(private ActivityLogService $activityLog)
+    {
+    }
+
     // SCRUM-161: fallback SOLO para cuando ConfiguracionService::get() no
     // encuentra fila en `configuraciones` o la lectura falla (ver try/catch
     // en ConfiguracionService::get) — mismo patrón que GeminiService,
@@ -60,6 +65,15 @@ class AuthController extends Controller
         $user = User::where('numero_documento', $request->numero_documento)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
+            // SCRUM-246: sin $usuario (no hay identidad confirmada) — el
+            // numero_documento intentado queda en metadata, útil para
+            // detectar intentos repetidos sobre una misma cuenta.
+            $this->activityLog->registrar(
+                accion: 'auth.login_fallido',
+                descripcion: "Intento de login fallido para numero_documento '{$request->numero_documento}'.",
+                metadata: ['numero_documento_intentado' => $request->numero_documento],
+            );
+
             throw ValidationException::withMessages([
                 'numero_documento' => ['Las credenciales proporcionadas son incorrectas.'],
             ]);
@@ -75,6 +89,12 @@ class AuthController extends Controller
         // propiedades estáticas se reinician en cada request.
         $minutes = $user->session_duration_minutes ?? $this->getSessionDurationDefault();
         Passport::personalAccessTokensExpireIn(now()->addMinutes($minutes));
+
+        $this->activityLog->registrar(
+            accion: 'auth.login',
+            descripcion: "{$user->name} inició sesión.",
+            usuario: $user,
+        );
 
         return response()->json([
             'token' => $user->createToken('authToken')->accessToken,
@@ -151,7 +171,15 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $request->user()->token()->revoke();
+        $user = $request->user();
+
+        $this->activityLog->registrar(
+            accion: 'auth.logout',
+            descripcion: "{$user->name} cerró sesión.",
+            usuario: $user,
+        );
+
+        $user->token()->revoke();
         return response()->json(['message' => 'Sesión cerrada correctamente']);
     }
 

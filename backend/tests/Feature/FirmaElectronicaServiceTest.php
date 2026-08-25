@@ -93,6 +93,13 @@ class FirmaElectronicaServiceTest extends TestCase
         $this->assertSame(hash('sha256', $documento->generarPdfParaFirma()), $firma->documento_hash_sha256);
 
         Storage::disk('public')->assertExists($firma->documento_path);
+
+        // SCRUM-246: la firma también queda en el feed de actividad.
+        $log = \App\Models\ActivityLog::where('accion', 'firma_electronica.creada')->first();
+        $this->assertNotNull($log);
+        $this->assertSame($this->usuario->id, $log->usuario_id);
+        $this->assertSame(\App\Models\FirmaElectronica::class, $log->entidad_type);
+        $this->assertSame($firma->id, $log->entidad_id);
     }
 
     public function test_verificar_detecta_que_el_archivo_fue_alterado_despues_de_firmar(): void

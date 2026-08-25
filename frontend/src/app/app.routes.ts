@@ -44,6 +44,13 @@ export const routes: Routes = [
         data: { roles: ['gerente', 'operativo', 'contable', 'superadmin'] }
     },
     {
+        // SCRUM-246 — distinta de /logs (esa es el pipeline de OCR).
+        path: 'actividad-usuarios',
+        loadComponent: () => import('./components/activity-logs/activity-logs.component').then(m => m.ActivityLogsComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
+    },
+    {
         path: 'sheets',
         loadComponent: () => import('./components/sheets/sheets.component').then(m => m.SheetsComponent),
         canActivate: [roleGuard],
