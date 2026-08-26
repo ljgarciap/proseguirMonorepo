@@ -179,7 +179,7 @@ export class CreditoOrdinarioComponent implements OnInit {
   // abierto.
   stepLabelFor(item: any): string {
     if (item.estado === 'completado') return 'Completado';
-    if (item.estado === 'rechazado') return 'Rechazado';
+    if (item.estado === 'rechazado') return 'Negado'; // SCRUM-257: solo la etiqueta visible, la clave interna 'rechazado' se mantiene (reusada en otros dominios)
     const esConstructor = (item.solicitud_credito?.tipo_credito?.codigo || '').toUpperCase() === 'CONSTRUCTOR';
     const pasos = esConstructor ? this.bpmnStepsConstructor : this.bpmnSteps;
     const paso = pasos.find(s => s.key === item.estado || (s as any).altKeys?.includes(item.estado));
@@ -481,16 +481,20 @@ export class CreditoOrdinarioComponent implements OnInit {
     });
   }
 
-  executeTransition(accion: string, comentarioDefecto: string = '', extraData: any = {}) {
+  // SCRUM-257: `esNegarSolicitud` solo lo pasan los 2 botones de Etapa 1
+  // (revision_documental / validacion_documental_constructor) — el resto de
+  // los "rechazar" del BPMN (Comité, Garantías, CYF, Desembolso) no cambian
+  // de wording, la clave interna `accion` sigue siendo 'rechazar' en todos.
+  executeTransition(accion: string, comentarioDefecto: string = '', extraData: any = {}, esNegarSolicitud: boolean = false) {
     Swal.fire({
-      title: accion === 'rechazar' ? '¿Rechazar Solicitud?' : 'Confirmar Acción',
-      text: accion === 'rechazar' ? 'Por favor ingresa el motivo del rechazo:' : 'Ingresa un comentario de auditoría para este paso (Opcional):',
+      title: accion === 'rechazar' ? (esNegarSolicitud ? '¿Negar Solicitud?' : '¿Rechazar Solicitud?') : 'Confirmar Acción',
+      text: accion === 'rechazar' ? (esNegarSolicitud ? 'Por favor ingresa el motivo de la negación:' : 'Por favor ingresa el motivo del rechazo:') : 'Ingresa un comentario de auditoría para este paso (Opcional):',
       input: 'text',
       inputValue: comentarioDefecto,
       inputPlaceholder: 'Escribe un comentario...',
       icon: accion === 'rechazar' ? 'warning' : 'question',
       showCancelButton: true,
-      confirmButtonText: accion === 'rechazar' ? 'Sí, rechazar' : 'Confirmar y Avanzar',
+      confirmButtonText: accion === 'rechazar' ? (esNegarSolicitud ? 'Sí, negar' : 'Sí, rechazar') : 'Confirmar y Avanzar',
       cancelButtonText: 'Cancelar',
       confirmButtonColor: accion === 'rechazar' ? '#E53E3E' : '#3182CE'
     }).then((result) => {

@@ -109,7 +109,7 @@
         <div class="form-group">
           <label>Estado</label>
           <p class="readonly-value">
-            {{ resultado === 'aprobada_garantias' ? 'Aprobado' : resultado === 'rechazada_comite' ? 'Rechazado' : 'Pendiente' }}
+            {{ resultado === 'aprobada_garantias' ? 'Aprobado' : resultado === 'rechazada_comite' ? 'Negado' : 'Pendiente' }}
           </p>
         </div>
         <div class="form-group span-full"><label>Observaciones</label><p class="readonly-value">{{ decisionComite?.observaciones || '—' }}</p></div>
