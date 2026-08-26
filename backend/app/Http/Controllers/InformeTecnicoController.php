@@ -173,6 +173,10 @@ class InformeTecnicoController extends Controller
             $this->transicionarCredito($credito, 'informe_tecnico_coordinador', $user->name, $activeRole,
                 'Ingeniero registró el informe técnico. Pasa a Coordinador Comercial.');
 
+            // SCRUM-262 (RF-04): primera notificación, solo tras guardar
+            // exitosamente la parte inicial del Ingeniero.
+            (new \App\Services\InformeTecnicoNotificationService())->notificarRegistroIngeniero($credito);
+
             return response()->json($informe->fresh());
         }
 
@@ -191,6 +195,10 @@ class InformeTecnicoController extends Controller
             // llamada, con su propia entrada de historial.
             $this->transicionarCredito($credito, 'sarlaft_control_interno', $user->name, $activeRole,
                 'Informe técnico finalizado. Pasa automáticamente a validación de Listas Restrictivas y SARLAFT.');
+
+            // SCRUM-262 (RF-09): segunda notificación, solo tras guardar o
+            // cerrar exitosamente el informe.
+            (new \App\Services\InformeTecnicoNotificationService())->notificarFinalizacionCoordinador($credito);
 
             return response()->json($informe->fresh());
         }

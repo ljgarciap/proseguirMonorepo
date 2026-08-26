@@ -15,6 +15,8 @@ use App\Models\DocumentRequirement;
 use App\Models\DocumentRequest;
 use App\Models\DocumentRequestItem;
 use App\Models\CreditoOrdinario;
+use App\Mail\InformeTecnicoListoCoordinadorMail;
+use App\Mail\InformeTecnicoFinalizadoControlInternoMail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
@@ -33,6 +35,8 @@ class InformeTecnicoTest extends TestCase
     private $operativo;
     private $gerente;
     private $tesoreria;
+    private $cumplimiento;
+    private $cumplimiento2;
     private $docCC;
     private $tipoNatural;
     private $tipoConstructor;
@@ -128,6 +132,25 @@ class InformeTecnicoTest extends TestCase
             'numero_documento' => 'tes001',
             'tipo_documento_id' => $this->docCC->id,
             'roles' => ['tesoreria']
+        ]);
+
+        // SCRUM-262: dos usuarios con rol Control Interno para verificar que
+        // se notifica a TODOS los activos, no solo al primero.
+        $this->cumplimiento = User::create([
+            'name' => 'Cumplimiento Test',
+            'email' => 'cumplimiento.informe@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'cump001',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['oficial_cumplimiento']
+        ]);
+        $this->cumplimiento2 = User::create([
+            'name' => 'Cumplimiento Test B',
+            'email' => 'cumplimiento2.informe@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'cump002',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['oficial_cumplimiento']
         ]);
     }
 
@@ -514,6 +537,58 @@ class InformeTecnicoTest extends TestCase
         $this->putJson("/api/informes-tecnicos/{$credito->id}/borrador", [
             'observaciones_ingeniero' => 'Intento de edición tardía',
         ], ['X-Active-Role' => 'ingeniero'])->assertStatus(403);
+    }
+
+    // SCRUM-262 (RF-04/RF-05/RF-06): al registrar el Ingeniero, se notifica
+    // al Coordinador Comercial asignado a la solicitud (usuarioRegistra —
+    // acá es $this->admin, quien la registró vía registrarSolicitudConstructor()).
+    public function test_registrar_ingeniero_notifica_al_coordinador_asignado(): void
+    {
+        $credito = $this->crearCreditoEnEstadoIngeniero();
+
+        Passport::actingAs($this->ingeniero);
+        $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'ventas_totales_proyecto' => ['apartamentos' => 1000000],
+            'observaciones_ingeniero' => 'Proyecto viable, documentación completa.',
+        ], ['X-Active-Role' => 'ingeniero'])->assertStatus(200);
+
+        Mail::assertSent(InformeTecnicoListoCoordinadorMail::class, function ($mail) use ($credito) {
+            return $mail->hasTo($this->admin->email) && $mail->credito->id === $credito->id;
+        });
+        Mail::assertNotSent(InformeTecnicoFinalizadoControlInternoMail::class);
+    }
+
+    // SCRUM-262 (RF-09/RF-10/RF-11): al registrar el Coordinador (que cierra
+    // el informe y encadena a sarlaft_control_interno, SCRUM-128), se
+    // notifica a TODOS los usuarios activos con rol Control Interno.
+    public function test_registrar_coordinador_notifica_a_todos_los_control_interno(): void
+    {
+        $credito = $this->crearCreditoEnEstadoIngeniero();
+
+        Passport::actingAs($this->ingeniero);
+        $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'ventas_totales_proyecto' => ['apartamentos' => 1000000],
+            'observaciones_ingeniero' => 'Proyecto viable.',
+        ], ['X-Active-Role' => 'ingeniero'])->assertStatus(200);
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/informes-tecnicos/{$credito->id}/registrar", [
+            'credito_solicitado' => ['credito_solicitado' => 500000000],
+        ], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'registrado');
+
+        $this->assertDatabaseHas('credito_ordinarios', [
+            'id' => $credito->id,
+            'estado' => 'sarlaft_control_interno',
+        ]);
+
+        Mail::assertSent(InformeTecnicoFinalizadoControlInternoMail::class, function ($mail) {
+            return $mail->hasTo('cumplimiento.informe@test.com');
+        });
+        Mail::assertSent(InformeTecnicoFinalizadoControlInternoMail::class, function ($mail) {
+            return $mail->hasTo('cumplimiento2.informe@test.com');
+        });
     }
 
     /**
