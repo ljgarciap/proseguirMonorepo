@@ -63,3 +63,80 @@ test('Gestión de Créditos: tarjeta y filtro dicen Negados, no Rechazados', asy
   await expect(page.getByText('Rechazados - Comité de Créditos')).toHaveCount(0);
   await expect(page.locator('option', { hasText: 'Negada por Comité' })).toHaveCount(1);
 });
+
+/**
+ * SCRUM-257 (comentario Juan Andrés, 2026-08-26): la tarjeta lateral de
+ * Crédito Ordinario ya decía "Negado" — el badge "ESTADO ACTUAL" y la línea
+ * "Estado actual de la etapa" de la cabecera del detalle quedaron sin
+ * cubrir, seguían mostrando "Rechazado".
+ */
+test('Crédito Ordinario: badge y línea de estado de la cabecera dicen Negado', async ({ page }) => {
+  await loginAs(page, '1234', '1234', 'superadmin');
+
+  const clienteId = tinker(`echo \\App\\Models\\User::where('numero_documento','2345')->first()->id;`).trim();
+  const creditoId = tinker(`
+    $c = \\App\\Models\\CreditoOrdinario::iniciar(clienteId: ${clienteId}, monto: 12000000, plazoMeses: 12, usuario: 'PW', rol: 'superadmin', comentario: 'Fixture smoke 257 badge');
+    $c->estado = 'rechazado';
+    $c->save();
+    echo $c->id;
+  `).trim();
+
+  await page.goto(`/creditos/${creditoId}`);
+  await expect(page.locator('.status-detail-badge')).toHaveText('Negado', { timeout: 10000 });
+  await expect(page.getByText('Estado actual de la etapa:')).toContainText('Negado');
+  await expect(page.getByText('Estado actual de la etapa:')).not.toContainText('Rechazado');
+});
+
+/**
+ * SCRUM-256 (comentario Juan Andrés, 2026-08-26): el cliente pudo cargar el
+ * mismo archivo físico como 2 documentos distintos del expediente (cada uno
+ * quedaba "Cargado (1)" válido por separado). El backend ahora lo rechaza
+ * comparando por hash de contenido (DuplicateDocumentGuard) — cobertura de
+ * integración ya está en PHPUnit; esto confirma que el error real llega al
+ * SweetAlert que ve el usuario, no solo que el endpoint devuelve 422.
+ */
+test('Etapa 1 (preset): no permite el mismo archivo para 2 documentos distintos', async ({ page }) => {
+  await loginAs(page, '1234', '1234', 'superadmin');
+
+  const fixture = tinker(`
+    $cliente = \\App\\Models\\Cliente::where('numero_documento','2345')->first();
+    $user = \\App\\Models\\User::where('numero_documento','2345')->first();
+    $admin = \\App\\Models\\User::where('numero_documento','1234')->first();
+    $tipoCredito = \\App\\Models\\TipoCredito::where('codigo','ORDINARIO')->first();
+    $amort = \\App\\Models\\Amortizacion::where('codigo','MENSUAL')->first();
+    $preset = \\App\\Models\\DocumentPreset::create(['nombre' => 'Preset PW Dup ' . now()->timestamp, 'descripcion' => 'Fixture smoke 256 dup']);
+    $req1 = \\App\\Models\\DocumentRequirement::create(['nombre' => 'RUT Playwright Dup', 'activo' => true]);
+    $req2 = \\App\\Models\\DocumentRequirement::create(['nombre' => 'Cedula Playwright Dup', 'activo' => true]);
+    $preset->requirements()->attach([$req1->id, $req2->id]);
+    $solicitud = \\App\\Models\\SolicitudCredito::create(['cliente_id' => $cliente->id, 'usuario_registra_id' => $admin->id, 'tipo_credito_id' => $tipoCredito->id, 'monto_solicitado' => 10000000, 'plazo_meses' => 12, 'amortizacion_id' => $amort->id, 'destino_recurso' => 'Capital', 'fuente_pago' => 'Ventas', 'correo_notificacion' => 'cliente@test.com', 'asunto_notificacion' => 'Asunto', 'mensaje_notificacion' => 'Mensaje']);
+    $dr = \\App\\Models\\DocumentRequest::create(['cliente_id' => $user->id, 'creado_por' => $admin->id, 'estado' => 'pendiente', 'etapa' => 'inicial', 'preset_id' => $preset->id, 'preset_nombre' => $preset->nombre, 'solicitud_credito_id' => $solicitud->id]);
+    $item1 = \\App\\Models\\DocumentRequestItem::create(['document_request_id' => $dr->id, 'document_requirement_id' => $req1->id, 'estado' => 'pendiente']);
+    $item2 = \\App\\Models\\DocumentRequestItem::create(['document_request_id' => $dr->id, 'document_requirement_id' => $req2->id, 'estado' => 'pendiente']);
+    $credito = \\App\\Models\\CreditoOrdinario::iniciar(clienteId: $user->id, monto: 10000000, plazoMeses: 12, usuario: $admin->name, rol: 'superadmin', comentario: 'Fixture smoke 256 dup', solicitudCreditoId: $solicitud->id);
+    echo $credito->id;
+  `).trim();
+  const creditoId = fixture;
+
+  await page.goto(`/creditos/${creditoId}`);
+  await expect(page.getByText('Etapa 1: Registro e Identificación')).toBeVisible({ timeout: 10000 });
+
+  const mismoContenido = Buffer.from('%PDF-1.4 mismo contenido fisico SCRUM-256');
+
+  const rutBox = page.locator('.doc-box-new', { hasText: 'RUT Playwright Dup' });
+  await rutBox.locator('input[type="file"]').setInputFiles({ name: 'rut.pdf', mimeType: 'application/pdf', buffer: mismoContenido });
+  await page.getByRole('button', { name: 'Confirmar y Avanzar' }).click();
+  await page.getByRole('heading', { name: '¡Procesado!' }).waitFor({ state: 'visible', timeout: 10000 });
+  await page.getByRole('button', { name: 'OK' }).click();
+  await expect(rutBox.getByText('Cargado (1)')).toBeVisible({ timeout: 10000 });
+
+  const cedulaBox = page.locator('.doc-box-new', { hasText: 'Cedula Playwright Dup' });
+  await cedulaBox.locator('input[type="file"]').setInputFiles({ name: 'cedula.pdf', mimeType: 'application/pdf', buffer: mismoContenido });
+  await page.getByRole('button', { name: 'Confirmar y Avanzar' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Error' })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText('Este archivo ya fue cargado como "RUT Playwright Dup"')).toBeVisible();
+  await page.getByRole('button', { name: 'OK' }).click();
+
+  // El 2° documento sigue pendiente — no quedó "Cargado" con el archivo duplicado.
+  await expect(cedulaBox.getByText('Pendiente')).toBeVisible();
+});

@@ -262,6 +262,22 @@ class CreditoOrdinarioController extends Controller
                 ? (int) substr($campoDoc, strlen('req_item_'))
                 : null;
 
+            // SCRUM-256 (comentario Juan Andrés, 2026-08-26): valida ANTES de
+            // guardar nada — un archivo duplicado en un lote de varios no
+            // debe dejar los demás ya persistidos a medias.
+            if ($requestItemId) {
+                $requestItemActual = DocumentRequestItem::find($requestItemId);
+                if ($requestItemActual) {
+                    $guard = new \App\Services\DuplicateDocumentGuard();
+                    foreach ($request->file('archivos') as $archivoAValidar) {
+                        $mensajeDuplicado = $guard->archivoDuplicadoEnOtroDocumento($requestItemActual, $archivoAValidar);
+                        if ($mensajeDuplicado) {
+                            return response()->json(['message' => $mensajeDuplicado], 422);
+                        }
+                    }
+                }
+            }
+
             $nombres = [];
             foreach ($request->file('archivos') as $file) {
                 $fileName   = $file->getClientOriginalName();
