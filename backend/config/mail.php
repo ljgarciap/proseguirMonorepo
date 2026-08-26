@@ -79,6 +79,13 @@ return [
             'transport' => 'array',
         ],
 
+        // Microsoft Graph API (Azure AD App Registration, OAuth2
+        // client-credentials) — ver App\Mail\Transport\GraphMailTransport.
+        // Credenciales en la tabla `configuraciones` (grupo 'email'), no acá.
+        'graph' => [
+            'transport' => 'graph',
+        ],
+
         'failover' => [
             'transport' => 'failover',
             'mailers' => [
