@@ -92,19 +92,25 @@ jobs:
     steps:
       - name: Deploy to Server via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GRAPH_MAIL_TENANT_ID: ${{ secrets.GRAPH_MAIL_TENANT_ID }}
+          GRAPH_MAIL_CLIENT_ID: ${{ secrets.GRAPH_MAIL_CLIENT_ID }}
+          GRAPH_MAIL_CLIENT_SECRET: ${{ secrets.GRAPH_MAIL_CLIENT_SECRET }}
+          GRAPH_MAIL_FROM_ADDRESS: ${{ secrets.GRAPH_MAIL_FROM_ADDRESS }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SSH_PORT || 22 }}
+          envs: GRAPH_MAIL_TENANT_ID,GRAPH_MAIL_CLIENT_ID,GRAPH_MAIL_CLIENT_SECRET,GRAPH_MAIL_FROM_ADDRESS
           script: |
             set -e
             cd /home/admpsl/apps/proseguir
-            
+
             # 1. Sincronizar y actualizar código
             git fetch origin
             git reset --hard origin/master
-            
+
             # 2. Copiar archivos .env correctos de producción
             cp PROD.env .env
             if [ -f frontend/.env.prod ]; then
@@ -112,7 +118,22 @@ jobs:
             else
               cp frontend/.env.prod.example frontend/.env
             fi
-            
+
+            # 2b. Correo transaccional vía Microsoft Graph API (2026-08-26) —
+            # credenciales inyectadas desde GitHub Secrets (envs: arriba),
+            # nunca en texto plano en este workflow ni en PROD.env del repo.
+            # Se reescribe en cada deploy, así que no hay drift entre
+            # PROD.env y lo que realmente termina corriendo.
+            sed -i 's/^MAIL_MAILER=.*/MAIL_MAILER=graph/' .env
+            {
+              echo "GRAPH_MAIL_TENANT_ID=$GRAPH_MAIL_TENANT_ID"
+              echo "GRAPH_MAIL_CLIENT_ID=$GRAPH_MAIL_CLIENT_ID"
+              echo "GRAPH_MAIL_CLIENT_SECRET=$GRAPH_MAIL_CLIENT_SECRET"
+              echo "GRAPH_MAIL_FROM_ADDRESS=$GRAPH_MAIL_FROM_ADDRESS"
+              echo "MAIL_FROM_ADDRESS=$GRAPH_MAIL_FROM_ADDRESS"
+              echo 'MAIL_FROM_NAME="Proseguir Soluciones de Liquidez"'
+            } >> .env
+
             # 3. Reconstruir frontend y backend conservando volúmenes
             docker compose up -d --build
             
@@ -166,19 +187,25 @@ jobs:
     steps:
       - name: Deploy to Test Server via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GRAPH_MAIL_TENANT_ID: ${{ secrets.GRAPH_MAIL_TENANT_ID }}
+          GRAPH_MAIL_CLIENT_ID: ${{ secrets.GRAPH_MAIL_CLIENT_ID }}
+          GRAPH_MAIL_CLIENT_SECRET: ${{ secrets.GRAPH_MAIL_CLIENT_SECRET }}
+          GRAPH_MAIL_FROM_ADDRESS: ${{ secrets.GRAPH_MAIL_FROM_ADDRESS }}
         with:
           host: ${{ secrets.TEST_SSH_HOST }}
           username: ${{ secrets.TEST_SSH_USER }}
           password: ${{ secrets.TEST_SSH_PASSWORD }}
           port: ${{ secrets.TEST_SSH_PORT || 22 }}
+          envs: GRAPH_MAIL_TENANT_ID,GRAPH_MAIL_CLIENT_ID,GRAPH_MAIL_CLIENT_SECRET,GRAPH_MAIL_FROM_ADDRESS
           script: |
             set -e
             cd /home/admpsl/apps/proseguir
-            
+
             # 1. Sincronizar y actualizar código para rama test
             git fetch origin
             git reset --hard origin/test
-            
+
             # 2. Copiar archivos .env correctos de pruebas (con fallback a producción si no existen específicos de test)
             if [ -f TEST.env ]; then
               cp TEST.env .env
@@ -191,7 +218,21 @@ jobs:
             else
               cp frontend/.env.prod frontend/.env
             fi
-            
+
+            # 2b. Correo transaccional vía Microsoft Graph API (2026-08-26) —
+            # mismo buzón/app que producción, credenciales inyectadas desde
+            # GitHub Secrets (envs: arriba), nunca en texto plano en este
+            # workflow ni en TEST.env del repo. Se reescribe en cada deploy.
+            sed -i 's/^MAIL_MAILER=.*/MAIL_MAILER=graph/' .env
+            {
+              echo "GRAPH_MAIL_TENANT_ID=$GRAPH_MAIL_TENANT_ID"
+              echo "GRAPH_MAIL_CLIENT_ID=$GRAPH_MAIL_CLIENT_ID"
+              echo "GRAPH_MAIL_CLIENT_SECRET=$GRAPH_MAIL_CLIENT_SECRET"
+              echo "GRAPH_MAIL_FROM_ADDRESS=$GRAPH_MAIL_FROM_ADDRESS"
+              echo "MAIL_FROM_ADDRESS=$GRAPH_MAIL_FROM_ADDRESS"
+              echo 'MAIL_FROM_NAME="Proseguir Soluciones de Liquidez"'
+            } >> .env
+
             # 3. Reconstruir frontend y backend conservando volúmenes
             docker compose up -d --build
             
