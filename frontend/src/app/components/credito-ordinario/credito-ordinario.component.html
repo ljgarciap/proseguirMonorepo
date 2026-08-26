@@ -534,7 +534,7 @@
                   <span class="doc-status-pill success" *ngIf="docFileCount(doc) > 0">Cargado ({{ docFileCount(doc) }})</span>
                   <span class="doc-status-pill error" *ngIf="docFileCount(doc) === 0">Pendiente</span>
 
-                  <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud', 'validacion_documental_constructor', 'completar_solicitud_constructor'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
+                  <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud', 'validacion_documental_constructor', 'completar_solicitud_constructor'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole) && puedeSubirDocumento(doc)">
                     <input type="file" id="inline-file-{{doc.key}}" (change)="onMultiFileUpload($event, doc.key)" accept=".pdf" multiple hidden>
                     <label for="inline-file-{{doc.key}}" class="btn-inline-upload">Subir</label>
                   </div>
@@ -542,7 +542,10 @@
                   <a *ngFor="let url of getDocFiles(doc.key)" [href]="url" target="_blank" class="btn-view-doc">
                     <span class="material-symbols-outlined">open_in_new</span> {{ getDocFileName(url) }}
                   </a>
-                  <button *ngIf="doc.upload" type="button" (click)="verArchivoSubido(doc.upload.id, doc.upload.original_name)" class="btn-view-doc">
+                  <!-- SCRUM-256: doc.upload es el mismo archivo que ya se lista arriba
+                       cuando la carga vino de esta pantalla (ver docFileCount) — solo se
+                       muestra si el arreglo está vacío, o sea la carga vino de otra pantalla. -->
+                  <button *ngIf="doc.upload && getDocFiles(doc.key).length === 0" type="button" (click)="verArchivoSubido(doc.upload.id, doc.upload.original_name)" class="btn-view-doc">
                     <span class="material-symbols-outlined">open_in_new</span> {{ doc.upload.original_name }}
                   </button>
                 </div>

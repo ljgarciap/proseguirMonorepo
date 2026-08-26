@@ -271,7 +271,13 @@ export class CreditoOrdinarioComponent implements OnInit {
 
   get informeTecnicoStatusLabel(): string {
     if (this.selectedCredito?.informe_tecnico?.estado === 'registrado') return 'Completado';
-    const estadosEnProceso = ['validacion_documental_constructor', 'completar_solicitud_constructor', 'informe_tecnico_ingeniero', 'informe_tecnico_coordinador', 'informe_tecnico_finalizado'];
+    // SCRUM-256: 'validacion_documental_constructor' y 'completar_solicitud_constructor'
+    // son ANTERIORES a la aprobación de documentos del Coordinador Comercial —
+    // la transición real a Informe Técnico (informe_tecnico_ingeniero) solo
+    // ocurre al aprobar (CreditoOrdinarioController::transition()). Incluirlos
+    // acá hacía que "En Proceso" saliera antes de que el Coordinador aprobara
+    // nada.
+    const estadosEnProceso = ['informe_tecnico_ingeniero', 'informe_tecnico_coordinador', 'informe_tecnico_finalizado'];
     if (this.selectedCredito?.informe_tecnico || estadosEnProceso.includes(this.selectedCredito?.estado)) return 'En Proceso';
     return 'Pendiente';
   }
@@ -350,14 +356,15 @@ export class CreditoOrdinarioComponent implements OnInit {
   // registrar la SolicitudCredito. Si el crédito no tiene preset asociado
   // (créditos legacy anteriores a SCRUM-120/146), se mantiene la lista fija
   // original de 4 documentos.
-  get etapa1Docs(): { key: string; nombre: string; descripcion: string; upload?: any }[] {
+  get etapa1Docs(): { key: string; nombre: string; descripcion: string; upload?: any; estado?: string }[] {
     const items = this.selectedCredito?.solicitud_credito?.document_request?.items;
     if (items && items.length > 0) {
       return items.map((item: any) => ({
         key: 'req_item_' + item.id,
         nombre: item.requirement?.nombre || 'Documento requerido',
         descripcion: item.requirement?.descripcion || '',
-        upload: item.upload || null
+        upload: item.upload || null,
+        estado: item.estado || null
       }));
     }
     return [
@@ -453,8 +460,30 @@ export class CreditoOrdinarioComponent implements OnInit {
   // guardados en credito.documentos[key] MÁS el ClientUpload real cuando el
   // cliente lo cargó desde la pantalla de "Solicitud de Documentos"
   // (Gestión de Créditos), que nunca escribe en credito.documentos (SCRUM-229).
+  //
+  // SCRUM-256: ese +1 asumía que credito.documentos[key] y doc.upload eran
+  // siempre orígenes mutuamente excluyentes para la misma clave. Dejó de
+  // serlo cuando CreditoOrdinarioController::transition() (SCRUM-146)
+  // empezó a escribir en AMBOS al subir desde esta misma pantalla — el
+  // mismo archivo quedaba contado (y mostrado, ver getDocFiles/doc.upload en
+  // el template) dos veces. Si el arreglo ya tiene algo para esta clave, el
+  // upload vino de acá mismo y doc.upload es ese mismo archivo — no se suma
+  // aparte. doc.upload solo cuenta solo cuando el arreglo está vacío, es
+  // decir, cuando la carga vino exclusivamente de otra pantalla.
   docFileCount(doc: { key: string; upload?: any }): number {
-    return this.getDocFiles(doc.key).length + (doc.upload ? 1 : 0);
+    const enArreglo = this.getDocFiles(doc.key).length;
+    return enArreglo > 0 ? enArreglo : (doc.upload ? 1 : 0);
+  }
+
+  // SCRUM-256: el botón "Subir" debe desaparecer una vez el documento ya
+  // está cargado — antes quedaba visible siempre y cada carga nueva se
+  // apilaba sobre la anterior en credito.documentos[key], produciendo
+  // entradas duplicadas. Excepción: si el ítem fue marcado 'rechazado' por
+  // el Coordinador (corrección solicitada), debe poder volver a cargarse —
+  // mismo criterio que ya usa etapa1KeySatisfecha() en el backend.
+  puedeSubirDocumento(doc: { key: string; upload?: any; estado?: string }): boolean {
+    if (doc.estado === 'rechazado') return true;
+    return this.docFileCount(doc) === 0;
   }
 
   // Descarga/abre un ClientUpload subido vía "Solicitud de Documentos"

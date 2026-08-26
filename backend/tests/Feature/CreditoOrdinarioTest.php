@@ -7,6 +7,13 @@ use App\Models\DocumentType;
 use App\Models\CreditoOrdinario;
 use App\Models\Cliente;
 use App\Models\TipoPersona;
+use App\Models\DocumentPreset;
+use App\Models\DocumentRequest;
+use App\Models\DocumentRequestItem;
+use App\Models\DocumentRequirement;
+use App\Models\SolicitudCredito;
+use App\Models\TipoCredito;
+use App\Models\Amortizacion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -402,5 +409,164 @@ class CreditoOrdinarioTest extends TestCase
             true
         );
         $this->assertStringStartsNotWith('http', $rawTrasSegundaSubida['formulario_solicitud']);
+    }
+
+    // SCRUM-256: antes el widget "Subir" de Etapa 1 quedaba habilitado
+    // siempre, así que un segundo envío para la misma clave se apilaba sobre
+    // el archivo ya cargado en documentos_raw[campo] — el mismo documento
+    // terminaba mostrándose duplicado en el expediente. El endpoint debe
+    // rechazar el segundo intento explícitamente (defensa en profundidad,
+    // el frontend ya oculta el botón vía puedeSubirDocumento()).
+    public function test_no_permite_recargar_documento_etapa1_legacy_ya_cargado(): void
+    {
+        Passport::actingAs($this->admin);
+        $creditoId = $this->postJson('/api/creditos', [
+            'monto' => 50000000.00,
+            'plazo_meses' => 24,
+            'cliente_id' => $this->cliente->id,
+        ], ['X-Active-Role' => 'superadmin'])->json('id');
+
+        Passport::actingAs($this->cliente);
+        $this->subirArchivo($creditoId, 'formulario_solicitud', 'cliente', 'v1.pdf')
+            ->assertStatus(200);
+
+        $this->subirArchivo($creditoId, 'formulario_solicitud', 'cliente', 'v2.pdf')
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Este documento ya fue cargado. Si necesitas reemplazarlo, contacta al Coordinador Comercial.');
+
+        // Solo el primer archivo quedó registrado — no se apiló el segundo.
+        $credito = CreditoOrdinario::find($creditoId);
+        $this->assertStringContainsString('v1.pdf', $credito->documentos_raw['formulario_solicitud']);
+
+        // Otra clave de Etapa 1 sigue disponible con normalidad.
+        $this->subirArchivo($creditoId, 'documentos_identidad', 'cliente')->assertStatus(200);
+    }
+
+    /**
+     * Crea un CreditoOrdinario con Etapa 1 dirigida por preset (SCRUM-146):
+     * SolicitudCredito + DocumentRequest('inicial') + 1 DocumentRequestItem,
+     * mismo patrón que DocumentRequestNotificationTest.
+     */
+    private function creditoConPresetEtapa1(): array
+    {
+        $preset = DocumentPreset::create(['nombre' => 'Preset 256', 'descripcion' => 'Requisitos']);
+        $requirement = DocumentRequirement::create(['nombre' => 'Documento Único', 'activo' => true]);
+        $preset->requirements()->attach([$requirement->id]);
+
+        $tipoCredito = TipoCredito::firstOrCreate(['codigo' => 'ORDINARIO'], ['nombre' => 'Crédito Ordinario']);
+        $amortizacion = Amortizacion::firstOrCreate(['codigo' => 'MENSUAL'], ['nombre' => 'Mensual']);
+
+        // SolicitudCredito.cliente_id apunta a clientes.id (modelo Cliente),
+        // NO a users.id como CreditoOrdinario.cliente_id — mismo nombre de
+        // columna, tabla distinta (gotcha ya documentado en memoria del
+        // proyecto).
+        $clienteRegistro = Cliente::create([
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => '256256',
+            'identificacion' => '256256',
+            'nombre' => 'Cliente Preset 256',
+            'nombres' => 'Cliente',
+            'primer_apellido' => 'Preset256',
+            'correo_electronico' => 'cliente.test@test.com',
+            'telefono' => '3000000000',
+            'direccion' => 'Calle 256',
+            'pais' => 'Colombia', 'departamento' => 'Valle', 'ciudad' => 'Cali', 'activo' => true,
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $clienteRegistro->id,
+            'usuario_registra_id' => $this->coordinador->id,
+            'tipo_credito_id' => $tipoCredito->id,
+            'monto_solicitado' => 10000000,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $amortizacion->id,
+            'destino_recurso' => 'Capital',
+            'fuente_pago' => 'Ventas',
+            'correo_notificacion' => 'cliente.test@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        $documentRequest = DocumentRequest::create([
+            'cliente_id' => $this->cliente->id,
+            'creado_por' => $this->coordinador->id,
+            'estado' => 'pendiente',
+            'etapa' => 'inicial',
+            'preset_id' => $preset->id,
+            'preset_nombre' => $preset->nombre,
+            'solicitud_credito_id' => $solicitud->id,
+        ]);
+
+        $item = DocumentRequestItem::create([
+            'document_request_id' => $documentRequest->id,
+            'document_requirement_id' => $requirement->id,
+            'estado' => 'pendiente',
+        ]);
+
+        $creditoId = CreditoOrdinario::iniciar(
+            clienteId: $this->cliente->id,
+            monto: 10000000,
+            plazoMeses: 12,
+            usuario: $this->coordinador->name,
+            rol: 'coordinador_comercial',
+            comentario: 'Solicitud registrada.',
+            solicitudCreditoId: $solicitud->id,
+        )->id;
+
+        return [$creditoId, $item];
+    }
+
+    public function test_no_permite_recargar_documento_etapa1_preset_ya_cargado(): void
+    {
+        [$creditoId, $item] = $this->creditoConPresetEtapa1();
+        $campo = 'req_item_' . $item->id;
+
+        Passport::actingAs($this->cliente);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => $campo,
+            'archivos' => [$this->pdf('v1.pdf')],
+        ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
+
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => $campo,
+            'archivos' => [$this->pdf('v2.pdf')],
+        ], ['X-Active-Role' => 'cliente'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Este documento ya fue cargado. Si necesitas reemplazarlo, contacta al Coordinador Comercial.');
+
+        // Solo 1 archivo quedó registrado en documentos_raw, y el
+        // DocumentRequestItem sigue apuntando al único ClientUpload real
+        // (no se creó un segundo al rechazar la solicitud).
+        $credito = CreditoOrdinario::find($creditoId);
+        $this->assertCount(1, $credito->documentos_raw[$campo]);
+        $item->refresh();
+        $this->assertNotNull($item->client_upload_id);
+    }
+
+    // Excepción del guard: si el Coordinador marcó el ítem 'rechazado'
+    // (corrección solicitada), etapa1KeySatisfecha() lo trata como "no
+    // satisfecho" — el cliente debe poder volver a cargarlo.
+    public function test_permite_recargar_documento_etapa1_preset_marcado_rechazado(): void
+    {
+        [$creditoId, $item] = $this->creditoConPresetEtapa1();
+        $campo = 'req_item_' . $item->id;
+
+        Passport::actingAs($this->cliente);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => $campo,
+            'archivos' => [$this->pdf('v1.pdf')],
+        ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
+
+        $item->update(['estado' => 'rechazado', 'observaciones' => 'Documento ilegible']);
+
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => $campo,
+            'archivos' => [$this->pdf('v2_corregido.pdf')],
+        ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
     }
 }
