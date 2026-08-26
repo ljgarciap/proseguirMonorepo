@@ -155,8 +155,17 @@ class CreditoOrdinarioController extends Controller
 
         $accion = $request->accion;
         $comentario = $request->comentario ?? 'Acción ejecutada en el flujo de crédito.';
+        // SCRUM-258: el correo debe incluir el comentario del Coordinador
+        // "sin alteraciones" (RF-04) — $comentario se muta más abajo con
+        // prefijos de auditoría para el historial_estados, así que se
+        // conserva el original acá para las notificaciones.
+        $comentarioOriginal = $comentario;
         $estadoActual = $credito->estado;
         $estadoNuevo = $estadoActual;
+        // SCRUM-258: qué notificar tras persistir la transición (ver bloque
+        // al final del método, después de $credito->save()). Se setea desde
+        // las ramas de Etapa 1 (aprobar/completar/rechazar) más abajo.
+        $notificacionValidacion = null;
 
         // Bypassear validaciones estrictas de rol si es superadmin (para facilitar pruebas)
         $isAuthorized = ($activeRole === 'superadmin');
@@ -340,6 +349,13 @@ class CreditoOrdinarioController extends Controller
                 $credito->documentos = $documentos;
                 $comentario = 'Aprobación de desembolso rechazada por Gerencia. Retorna a Dirección Administrativa. ' . $comentario;
             } else {
+                // SCRUM-258 (5.3): solo la negación de Etapa 1 dispara el
+                // correo al cliente de este ticket — las demás etapas que
+                // caen acá (o las que ya tienen su propia rama arriba) no
+                // están en el alcance de 258.
+                if (in_array($estadoActual, ['revision_documental', 'validacion_documental_constructor'], true)) {
+                    $notificacionValidacion = 'rechazar';
+                }
                 $estadoNuevo = 'rechazado';
                 $comentario = 'Crédito rechazado en etapa: ' . $estadoActual . '. ' . $comentario;
             }
@@ -372,9 +388,11 @@ class CreditoOrdinarioController extends Controller
             if ($estadoActual === 'revision_documental') {
                 $estadoNuevo = 'completar_solicitud';
                 $comentario = 'Documentación incompleta. Solicitud enviada al cliente para completar. ' . $comentario;
+                $notificacionValidacion = 'completar'; // SCRUM-258 (5.2)
             } elseif ($estadoActual === 'validacion_documental_constructor') {
                 $estadoNuevo = 'completar_solicitud_constructor';
                 $comentario = 'Documentación incompleta del expediente inicial. Solicitud enviada al cliente para completar. ' . $comentario;
+                $notificacionValidacion = 'completar'; // SCRUM-258 (5.2)
             }
         } elseif ($accion === 'aprobar' || $accion === 'subir_archivo') {
             switch ($estadoActual) {
@@ -392,6 +410,7 @@ class CreditoOrdinarioController extends Controller
                         if ($hasEtapa1) {
                             $estadoNuevo = 'informe_tecnico_ingeniero';
                             $comentario = 'Documentación revisada y aprobada. Bandeja de Informe Técnico habilitada para el Ingeniero.';
+                            $notificacionValidacion = 'aprobar_constructor'; // SCRUM-258 (RF-05/RF-06)
                         } else {
                             $comentario = 'Faltan documentos obligatorios del expediente inicial. No se puede aprobar todavía.';
                         }
@@ -410,6 +429,7 @@ class CreditoOrdinarioController extends Controller
                         if ($hasEtapa1) {
                             $estadoNuevo = 'sarlaft_control_interno';
                             $comentario = 'Documentación revisada y aprobada. Pasa a validación de Listas Restrictivas y SARLAFT.';
+                            $notificacionValidacion = 'aprobar_ordinario'; // SCRUM-258 (RF-05/RF-07)
                         } else {
                             $comentario = 'Faltan documentos obligatorios del expediente inicial. No se puede aprobar todavía.';
                         }
@@ -525,6 +545,14 @@ class CreditoOrdinarioController extends Controller
         $credito->estado = $estadoNuevo;
         $credito->historial_estados = $historial;
         $credito->save();
+
+        // SCRUM-258: se dispara DESPUÉS de persistir, con el comentario
+        // original del Coordinador (sin los prefijos de auditoría que
+        // $comentario acumuló arriba para el historial).
+        if ($notificacionValidacion) {
+            (new \App\Services\ValidacionDocumentalNotificationService())
+                ->notificar($notificacionValidacion, $credito, $comentarioOriginal);
+        }
 
         return response()->json($credito->load('cliente'));
     }
