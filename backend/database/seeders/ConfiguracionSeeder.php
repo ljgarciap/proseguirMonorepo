@@ -75,6 +75,39 @@ class ConfiguracionSeeder extends Seeder
                 'grupo'       => 'email',
                 'es_secreto'  => false,
             ],
+            // Microsoft Graph API (App Registration Azure AD, OAuth2
+            // client-credentials) — usado cuando MAIL_MAILER=graph, ver
+            // App\Mail\Transport\GraphMailTransport. Reemplaza SMTP para
+            // Exchange Online (no acepta SMTP AUTH básico en la mayoría de
+            // tenants).
+            [
+                'clave'       => 'GRAPH_MAIL_TENANT_ID',
+                'valor'       => env('GRAPH_MAIL_TENANT_ID'),
+                'descripcion' => 'Directory (tenant) ID del App Registration de Azure AD para envío de correo (Microsoft Graph)',
+                'grupo'       => 'email',
+                'es_secreto'  => false,
+            ],
+            [
+                'clave'       => 'GRAPH_MAIL_CLIENT_ID',
+                'valor'       => env('GRAPH_MAIL_CLIENT_ID'),
+                'descripcion' => 'Application (client) ID del App Registration de Azure AD para envío de correo (Microsoft Graph)',
+                'grupo'       => 'email',
+                'es_secreto'  => false,
+            ],
+            [
+                'clave'       => 'GRAPH_MAIL_CLIENT_SECRET',
+                'valor'       => env('GRAPH_MAIL_CLIENT_SECRET'),
+                'descripcion' => 'Client Secret del App Registration de Azure AD para envío de correo (Microsoft Graph)',
+                'grupo'       => 'email',
+                'es_secreto'  => true,
+            ],
+            [
+                'clave'       => 'GRAPH_MAIL_FROM_ADDRESS',
+                'valor'       => env('GRAPH_MAIL_FROM_ADDRESS'),
+                'descripcion' => 'Buzón de Microsoft 365 desde el que se envían las notificaciones (debe coincidir con la Application Access Policy configurada en Exchange Online para este App Registration)',
+                'grupo'       => 'email',
+                'es_secreto'  => false,
+            ],
             // Análisis Financiero (SCRUM-155)
             [
                 'clave'       => 'ANALISIS_FINANCIERO_TOLERANCIA_DIFERENCIA_MM',
