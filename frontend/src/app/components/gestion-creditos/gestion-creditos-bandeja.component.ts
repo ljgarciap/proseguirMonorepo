@@ -38,7 +38,7 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
     { clave: 'sarlaft_desfavorable', label: 'Listas Restrictivas y SARLAFT desfavorable', icono: 'gavel', iconoClase: 'danger' },
     { clave: 'pendiente_comite', label: 'Pendientes - Comité de Créditos', icono: 'hourglass_top', iconoClase: 'warning' },
     { clave: 'pendiente_formalizacion_garantias', label: 'Pendientes para Formalización de Garantías', icono: 'fact_check', iconoClase: 'purple' },
-    { clave: 'rechazada_comite', label: 'Rechazados - Comité de Créditos', icono: 'cancel', iconoClase: 'danger' },
+    { clave: 'rechazada_comite', label: 'Negados - Comité de Créditos', icono: 'cancel', iconoClase: 'danger' },
     { clave: 'pendiente_registro_cyf', label: 'Registro de Crédito en CYF', icono: 'account_balance', iconoClase: 'info' },
     { clave: 'desembolso_ingreso', label: 'Registro de Operación en CYF', icono: 'local_shipping', iconoClase: 'purple' },
     { clave: 'ejecucion_transferencia', label: 'Registro de Transferencia Bancaria', icono: 'account_balance_wallet', iconoClase: 'info' },
@@ -174,7 +174,7 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
     const mapaOrigen: Record<string, string> = {
       sarlaft: 'SARLAFT desfavorable',
       comite_aprobado: 'Aprobada para garantías',
-      comite_rechazado: 'Rechazada por Comité',
+      comite_rechazado: 'Negada por Comité',
       comite_pendiente: 'Pendiente por Comité',
     };
     return mapaOrigen[credito.resultado_origen] || credito.estado;

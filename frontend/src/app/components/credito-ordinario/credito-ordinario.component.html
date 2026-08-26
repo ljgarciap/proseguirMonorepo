@@ -219,8 +219,8 @@
                 <button class="btn-pro warning" (click)="executeTransition('completar', 'Se solicita al cliente completar la documentación del expediente inicial.')">
                   <span class="material-symbols-outlined">assignment_return</span> Solicitar Completar Soportes
                 </button>
-                <button class="btn-pro danger" (click)="executeTransition('rechazar', 'Solicitud rechazada en revisión inicial.')">
-                  <span class="material-symbols-outlined">cancel</span> Rechazar Solicitud
+                <button class="btn-pro danger" (click)="executeTransition('rechazar', 'Solicitud negada en revisión inicial.', {}, true)">
+                  <span class="material-symbols-outlined">cancel</span> Negar Solicitud
                 </button>
               </div>
             </div>
@@ -246,8 +246,8 @@
                 <button class="btn-pro warning" (click)="executeTransition('completar', 'Se solicita al cliente completar la documentación.')">
                   <span class="material-symbols-outlined">assignment_return</span> Solicitar Completar Soportes
                 </button>
-                <button class="btn-pro danger" (click)="executeTransition('rechazar', 'Solicitud rechazada en revisión inicial.')">
-                  <span class="material-symbols-outlined">cancel</span> Rechazar Solicitud
+                <button class="btn-pro danger" (click)="executeTransition('rechazar', 'Solicitud negada en revisión inicial.', {}, true)">
+                  <span class="material-symbols-outlined">cancel</span> Negar Solicitud
                 </button>
               </div>
             </div>
