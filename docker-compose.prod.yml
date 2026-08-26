@@ -1,0 +1,17 @@
+# Override SOLO para el job deploy-prod de .github/workflows/deploy.yml.
+# Agrega HTTPS (443) al contenedor frontend sin tocar docker-compose.yml
+# (el que hornea la imagen usada por local/test/prod por igual, ninguno de
+# los cuales debe requerir un certificado).
+#
+# Uso: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Requiere en el servidor, fuera de git (mismo criterio que PROD.env):
+#   /home/admpsl/apps/proseguir/ssl/fullchain.pem
+#   /home/admpsl/apps/proseguir/ssl/privkey.pem
+services:
+  frontend:
+    ports:
+      - "443:443"
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./frontend/nginx-ssl.conf:/etc/nginx/conf.d/default.conf:ro
