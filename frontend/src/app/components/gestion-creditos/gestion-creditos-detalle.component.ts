@@ -63,6 +63,14 @@ export class GestionCreditosDetalleComponent implements OnInit {
       next: (data) => {
         this.credito = data;
         this.destino = this.correoCliente();
+        // SCRUM-268 (CA-01/RN-02): precarga de asunto/mensaje por escenario
+        // — el backend solo la envía cuando la solicitud sigue sin
+        // gestionar (show(), plantillaSugerida()). El Coordinador puede
+        // editarla libremente antes de enviar (RN-03/RN-04).
+        if (data.plantilla_sugerida) {
+          this.asunto = data.plantilla_sugerida.asunto || '';
+          this.mensaje = data.plantilla_sugerida.mensaje || '';
+        }
         this.loading = false;
         if (this.mostrarPanelDocumentos) {
           this.cargarDocumentosPendientes();
@@ -297,6 +305,45 @@ export class GestionCreditosDetalleComponent implements OnInit {
           Swal.fire('Error', err.error?.message || 'La notificación no pudo enviarse. La solicitud continúa pendiente de gestión.', 'error');
         }
       });
+    });
+  }
+
+  /**
+   * SCRUM-268 (RN-06): renderiza en una pestaña nueva el mismo correo que
+   * notificar() enviaría con lo diligenciado en este momento — sin enviar
+   * nada ni tocar el estado de la solicitud.
+   */
+  previsualizar(): void {
+    if (!this.asunto) {
+      Swal.fire('Falta información', 'Ingrese el asunto del correo.', 'warning');
+      return;
+    }
+    if (!this.mensaje) {
+      Swal.fire('Falta información', 'Ingrese el mensaje de acompañamiento.', 'warning');
+      return;
+    }
+    if (this.requierePresetObligatorio && !this.presetId) {
+      Swal.fire('Falta información', 'Seleccione la documentación requerida.', 'warning');
+      return;
+    }
+
+    const payload: any = { asunto: this.asunto, mensaje: this.mensaje };
+    if (this.presetId) payload.preset_id = this.presetId;
+
+    this.http.post(`${environment.apiUrl}/gestion-creditos/${this.creditoId}/notificar/preview`, payload, {
+      headers: { 'X-Active-Role': this.activeRole },
+      responseType: 'text'
+    }).subscribe({
+      next: (html) => {
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+      },
+      error: (err) => {
+        let message = 'No se pudo generar la vista previa.';
+        try { message = JSON.parse(err.error)?.message || message; } catch { /* err.error ya venía como texto plano */ }
+        Swal.fire('Error', message, 'error');
+      }
     });
   }
 
