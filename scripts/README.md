@@ -6,9 +6,12 @@ restauración, resultado del drill) vive en [`docs/backup-recovery.md`](../docs/
 ## ¿Qué se respalda y cuándo?
 
 - **Base de datos** (MySQL, `mysqldump`) + **documentos subidos** (`storage/app/public`, tar).
-- **Diario, 3:00 AM**, vía cron en el servidor de prod. Retención local: 30 días.
-- 3 copias: local (`~/backups/proseguir/`) → VM de test (rsync) → SharePoint corporativo (rclone,
-  **pendiente de activar**, ver abajo).
+- **2 veces al día — 1:00 PM y 11:00 PM hora Colombia** (18:00 y 04:00 UTC, servidor en UTC),
+  vía cron en el servidor de prod. Retención local: 6 archivos por tipo = 3 días de historia
+  (ring buffer: el 4º día se borran los 2 más viejos al entrar los 2 nuevos).
+- 2 copias: local (`~/backups/proseguir/`) → VM de test (rsync). La copia offsite ya **no** es
+  SharePoint (descontinuado 2026-08-26) — la hace el administrador externo a mano, ver
+  "Copia externa" abajo.
 
 ## Verificar que el backup de hoy corrió bien
 
@@ -31,12 +34,11 @@ Si no ves un `db_*.sql.gz` y un `storage_*.tar.gz` de hoy, algo falló — revis
    (`~/backups/proseguir-prod/` en `proseguir-test`) — no dependés de que prod vuelva para
    recuperar los datos.
 
-## Activar la copia offsite en SharePoint (pendiente)
+## Copia externa (reemplaza a SharePoint, descontinuado 2026-08-26)
 
-El script (`backup-diario.sh`) ya intenta subir a SharePoint en cada corrida, pero se salta ese
-paso con un aviso hasta que el remote `proseguir-sharepoint` de `rclone` quede configurado — login
-OAuth único, pasos completos en `docs/backup-recovery.md`. Mientras tanto, las otras 2 copias
-(local + VM de test) siguen funcionando sin depender de esto.
+El administrador externo copia los backups él mismo desde `/home/admpsl/backups/proseguir/` en
+`proseguir-prod` (173.201.39.180, puerto 2282) — no depende del cron ni de este script. Detalle
+completo (comando `scp` de ejemplo) en `docs/backup-recovery.md`.
 
 ## Correr el backup a mano (fuera del horario del cron)
 
