@@ -569,4 +569,121 @@ class CreditoOrdinarioTest extends TestCase
             'archivos' => [$this->pdf('v2_corregido.pdf')],
         ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
     }
+
+    /**
+     * Variante de creditoConPresetEtapa1() con 2 requirements en vez de 1,
+     * para probar duplicados ENTRE documentos distintos del mismo
+     * expediente (a diferencia de los tests de arriba, que prueban
+     * re-cargar el MISMO documento).
+     */
+    private function creditoConPresetEtapa1DosDocumentos(): array
+    {
+        $preset = DocumentPreset::create(['nombre' => 'Preset 256 dup', 'descripcion' => 'Requisitos']);
+        $req1 = DocumentRequirement::create(['nombre' => 'RUT', 'activo' => true]);
+        $req2 = DocumentRequirement::create(['nombre' => 'Documento de identidad', 'activo' => true]);
+        $preset->requirements()->attach([$req1->id, $req2->id]);
+
+        $tipoCredito = TipoCredito::firstOrCreate(['codigo' => 'ORDINARIO'], ['nombre' => 'Crédito Ordinario']);
+        $amortizacion = Amortizacion::firstOrCreate(['codigo' => 'MENSUAL'], ['nombre' => 'Mensual']);
+
+        $clienteRegistro = Cliente::create([
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => '256257',
+            'identificacion' => '256257',
+            'nombre' => 'Cliente Preset 256 dup',
+            'nombres' => 'Cliente',
+            'primer_apellido' => 'Dup256',
+            'correo_electronico' => 'cliente.dup@test.com',
+            'telefono' => '3000000000',
+            'direccion' => 'Calle 256',
+            'pais' => 'Colombia', 'departamento' => 'Valle', 'ciudad' => 'Cali', 'activo' => true,
+        ]);
+
+        $solicitud = SolicitudCredito::create([
+            'cliente_id' => $clienteRegistro->id,
+            'usuario_registra_id' => $this->coordinador->id,
+            'tipo_credito_id' => $tipoCredito->id,
+            'monto_solicitado' => 10000000,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $amortizacion->id,
+            'destino_recurso' => 'Capital',
+            'fuente_pago' => 'Ventas',
+            'correo_notificacion' => 'cliente.dup@test.com',
+            'asunto_notificacion' => 'Asunto',
+            'mensaje_notificacion' => 'Mensaje',
+        ]);
+
+        $documentRequest = DocumentRequest::create([
+            'cliente_id' => $this->cliente->id,
+            'creado_por' => $this->coordinador->id,
+            'estado' => 'pendiente',
+            'etapa' => 'inicial',
+            'preset_id' => $preset->id,
+            'preset_nombre' => $preset->nombre,
+            'solicitud_credito_id' => $solicitud->id,
+        ]);
+
+        $item1 = DocumentRequestItem::create([
+            'document_request_id' => $documentRequest->id,
+            'document_requirement_id' => $req1->id,
+            'estado' => 'pendiente',
+        ]);
+        $item2 = DocumentRequestItem::create([
+            'document_request_id' => $documentRequest->id,
+            'document_requirement_id' => $req2->id,
+            'estado' => 'pendiente',
+        ]);
+
+        $creditoId = CreditoOrdinario::iniciar(
+            clienteId: $this->cliente->id,
+            monto: 10000000,
+            plazoMeses: 12,
+            usuario: $this->coordinador->name,
+            rol: 'coordinador_comercial',
+            comentario: 'Solicitud registrada.',
+            solicitudCreditoId: $solicitud->id,
+        )->id;
+
+        return [$creditoId, $item1, $item2];
+    }
+
+    /**
+     * SCRUM-256 (comentario Juan Andrés, 2026-08-26): un archivo ya cargado
+     * como "RUT" no debe poder registrarse también como "Documento de
+     * identidad" del mismo expediente — el guard existente
+     * (puedeSubirDocumento()/422 de re-carga) solo cubre volver a cargar EL
+     * MISMO documento, no reusar un archivo entre documentos distintos.
+     * Origen "Mis Créditos"/"Crédito Ordinario" (transition()).
+     */
+    public function test_no_permite_el_mismo_archivo_para_dos_documentos_distintos_etapa1_preset(): void
+    {
+        [$creditoId, $item1, $item2] = $this->creditoConPresetEtapa1DosDocumentos();
+
+        Passport::actingAs($this->cliente);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => 'req_item_' . $item1->id,
+            'archivos' => [UploadedFile::fake()->createWithContent('rut.pdf', 'mismo contenido físico')],
+        ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
+
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => 'req_item_' . $item2->id,
+            'archivos' => [UploadedFile::fake()->createWithContent('cedula.pdf', 'mismo contenido físico')],
+        ], ['X-Active-Role' => 'cliente'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Este archivo ya fue cargado como "RUT". Cada documento requiere un archivo distinto.');
+
+        $item2->refresh();
+        $this->assertSame('pendiente', $item2->estado);
+        $this->assertNull($item2->client_upload_id);
+
+        // Un archivo genuinamente distinto para el 2° documento sí procede.
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => 'req_item_' . $item2->id,
+            'archivos' => [UploadedFile::fake()->createWithContent('cedula.pdf', 'contenido genuinamente distinto')],
+        ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
+    }
 }

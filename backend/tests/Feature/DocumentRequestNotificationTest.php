@@ -22,6 +22,13 @@ use Tests\TestCase;
 /**
  * SCRUM-252: notificación al Coordinador Comercial cuando el cliente
  * completa el cargue de todos los documentos requeridos de Etapa 1.
+ *
+ * Nota SCRUM-256 (comentario Juan Andrés, 2026-08-26): los fakes de item1 y
+ * item2 usan createWithContent() con contenido distinto a propósito —
+ * UploadedFile::fake()->create() genera un archivo físico vacío (0 bytes)
+ * sin importar el nombre, y DuplicateDocumentGuard compara por hash de
+ * contenido; con 2 fakes vacíos, el 2° upload se marcaría como duplicado
+ * del 1° y estos tests fallarían con 422 en vez de 200.
  */
 class DocumentRequestNotificationTest extends TestCase
 {
@@ -136,7 +143,7 @@ class DocumentRequestNotificationTest extends TestCase
 
         // Primer documento subido — todavía falta el 2°, no debe notificar.
         $this->postJson('/api/uploads', [
-            'file' => UploadedFile::fake()->create('doc1.pdf', 100, 'application/pdf'),
+            'file' => UploadedFile::fake()->createWithContent('doc1.pdf', 'contenido de prueba doc1 SCRUM-252'),
             'active_role' => 'cliente',
             'document_request_item_id' => $this->item1->id,
         ])->assertStatus(200);
@@ -146,7 +153,7 @@ class DocumentRequestNotificationTest extends TestCase
 
         // Segundo (último) documento — ahora sí debe notificar al coordinador.
         $this->postJson('/api/uploads', [
-            'file' => UploadedFile::fake()->create('doc2.pdf', 100, 'application/pdf'),
+            'file' => UploadedFile::fake()->createWithContent('doc2.pdf', 'contenido de prueba doc2 SCRUM-252'),
             'active_role' => 'cliente',
             'document_request_item_id' => $this->item2->id,
         ])->assertStatus(200);
@@ -166,14 +173,14 @@ class DocumentRequestNotificationTest extends TestCase
         Passport::actingAs($this->clienteUser);
 
         $this->postJson('/api/uploads', [
-            'file' => UploadedFile::fake()->create('doc1.pdf', 100, 'application/pdf'),
+            'file' => UploadedFile::fake()->createWithContent('doc1.pdf', 'contenido de prueba doc1 SCRUM-252'),
             'active_role' => 'cliente',
             'document_request_item_id' => $this->item1->id,
         ])->assertStatus(200);
 
         $upload = $this->item2->fresh();
         $this->postJson('/api/uploads', [
-            'file' => UploadedFile::fake()->create('doc2.pdf', 100, 'application/pdf'),
+            'file' => UploadedFile::fake()->createWithContent('doc2.pdf', 'contenido de prueba doc2 SCRUM-252'),
             'active_role' => 'cliente',
             'document_request_item_id' => $this->item2->id,
         ])->assertStatus(200);
@@ -207,12 +214,12 @@ class DocumentRequestNotificationTest extends TestCase
         Passport::actingAs($this->clienteUser);
 
         $this->postJson('/api/uploads', [
-            'file' => UploadedFile::fake()->create('doc1.pdf', 100, 'application/pdf'),
+            'file' => UploadedFile::fake()->createWithContent('doc1.pdf', 'contenido de prueba doc1 SCRUM-252'),
             'active_role' => 'cliente',
             'document_request_item_id' => $this->item1->id,
         ])->assertStatus(200);
         $this->postJson('/api/uploads', [
-            'file' => UploadedFile::fake()->create('doc2.pdf', 100, 'application/pdf'),
+            'file' => UploadedFile::fake()->createWithContent('doc2.pdf', 'contenido de prueba doc2 SCRUM-252'),
             'active_role' => 'cliente',
             'document_request_item_id' => $this->item2->id,
         ])->assertStatus(200);
@@ -227,12 +234,12 @@ class DocumentRequestNotificationTest extends TestCase
         Passport::actingAs($this->clienteUser);
 
         $this->postJson('/api/uploads', [
-            'file' => UploadedFile::fake()->create('doc1.pdf', 100, 'application/pdf'),
+            'file' => UploadedFile::fake()->createWithContent('doc1.pdf', 'contenido de prueba doc1 SCRUM-252'),
             'active_role' => 'cliente',
             'document_request_item_id' => $this->item1->id,
         ])->assertStatus(200);
         $this->postJson('/api/uploads', [
-            'file' => UploadedFile::fake()->create('doc2.pdf', 100, 'application/pdf'),
+            'file' => UploadedFile::fake()->createWithContent('doc2.pdf', 'contenido de prueba doc2 SCRUM-252'),
             'active_role' => 'cliente',
             'document_request_item_id' => $this->item2->id,
         ])->assertStatus(200);
@@ -267,7 +274,7 @@ class DocumentRequestNotificationTest extends TestCase
         $this->postJson("/api/creditos/{$credito->id}/transition", [
             'accion' => 'subir_archivo',
             'campo_documento' => 'req_item_' . $this->item1->id,
-            'archivos' => [UploadedFile::fake()->create('doc1.pdf', 100, 'application/pdf')],
+            'archivos' => [UploadedFile::fake()->createWithContent('doc1.pdf', 'contenido de prueba doc1 SCRUM-252')],
         ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
 
         Mail::assertNotSent(CargaCompletaCoordinadorMail::class);
@@ -275,11 +282,40 @@ class DocumentRequestNotificationTest extends TestCase
         $this->postJson("/api/creditos/{$credito->id}/transition", [
             'accion' => 'subir_archivo',
             'campo_documento' => 'req_item_' . $this->item2->id,
-            'archivos' => [UploadedFile::fake()->create('doc2.pdf', 100, 'application/pdf')],
+            'archivos' => [UploadedFile::fake()->createWithContent('doc2.pdf', 'contenido de prueba doc2 SCRUM-252')],
         ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
 
         Mail::assertSent(CargaCompletaCoordinadorMail::class, function ($mail) {
             return $mail->hasTo('coordinador.scrum252@test.com') && $mail->origen === 'Mis Créditos';
         });
+    }
+
+    /**
+     * SCRUM-256 (comentario Juan Andrés, 2026-08-26): un archivo cargado
+     * para 'Documento 1' no debe poder registrarse también como 'Documento
+     * 2' del mismo expediente — antes ningún guard lo evitaba, cada
+     * documento quedaba individualmente "Cargado (1)" con el mismo archivo
+     * físico. Origen "Mis Cargas" (ClientUploadController::store()).
+     */
+    public function test_no_permite_el_mismo_archivo_para_dos_documentos_distintos_via_mis_cargas(): void
+    {
+        Passport::actingAs($this->clienteUser);
+
+        $this->postJson('/api/uploads', [
+            'file' => UploadedFile::fake()->createWithContent('compraventa.pdf', 'mismo contenido físico'),
+            'active_role' => 'cliente',
+            'document_request_item_id' => $this->item1->id,
+        ])->assertStatus(200);
+
+        $this->postJson('/api/uploads', [
+            'file' => UploadedFile::fake()->createWithContent('compraventa-renombrado.pdf', 'mismo contenido físico'),
+            'active_role' => 'cliente',
+            'document_request_item_id' => $this->item2->id,
+        ])->assertStatus(422)
+            ->assertJsonPath('message', 'Este archivo ya fue cargado como "Documento 1". Cada documento requiere un archivo distinto.');
+
+        $this->item2->refresh();
+        $this->assertSame('pendiente', $this->item2->estado);
+        $this->assertNull($this->item2->client_upload_id);
     }
 }

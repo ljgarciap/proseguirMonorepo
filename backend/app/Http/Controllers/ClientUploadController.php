@@ -53,6 +53,22 @@ class ClientUploadController extends Controller
         ]);
 
         $file = $request->file('file');
+
+        // SCRUM-256 (comentario Juan Andrés, 2026-08-26): mismo guard que
+        // CreditoOrdinarioController::transition() — evita que el mismo
+        // archivo físico se registre como 2 documentos distintos del
+        // expediente, esta vez desde el origen "Mis Cargas".
+        if ($request->filled('document_request_item_id')) {
+            $itemAValidar = \App\Models\DocumentRequestItem::find($request->document_request_item_id);
+            if ($itemAValidar) {
+                $mensajeDuplicado = (new \App\Services\DuplicateDocumentGuard())
+                    ->archivoDuplicadoEnOtroDocumento($itemAValidar, $file);
+                if ($mensajeDuplicado) {
+                    return response()->json(['message' => $mensajeDuplicado], 422);
+                }
+            }
+        }
+
         $path = $file->store('client_uploads');
 
         $category = $request->category ?? $request->categoria;

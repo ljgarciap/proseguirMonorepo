@@ -91,7 +91,7 @@
           <div>
             <label>ESTADO ACTUAL</label>
             <span class="status-detail-badge" [ngClass]="selectedCredito.estado">
-              {{ selectedCredito.estado | titlecase }}
+              {{ (selectedCredito.estado === 'rechazado' ? 'Negado' : selectedCredito.estado) | titlecase }}
             </span>
           </div>
         </div>
@@ -174,7 +174,7 @@
             </span>
             <div>
               <h3>Acciones de Aprobación del Flujo</h3>
-              <p>Estado actual de la etapa: <strong>{{ selectedCredito.estado | titlecase }}</strong></p>
+              <p>Estado actual de la etapa: <strong>{{ (selectedCredito.estado === 'rechazado' ? 'Negado' : selectedCredito.estado) | titlecase }}</strong></p>
             </div>
           </div>
           <span class="authorized-badge" [class.yes]="isUserRoleAuthorized()">
