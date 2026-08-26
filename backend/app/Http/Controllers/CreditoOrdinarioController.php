@@ -453,14 +453,42 @@ class CreditoOrdinarioController extends Controller
                     break;
 
                 case 'completar_solicitud':
+                    // SCRUM-252 (feedback QA 2026-08-26): antes el cliente
+                    // podía "Enviar Solicitud Completada" sin haber cargado
+                    // ningún documento del preset — esta rama nunca chequeaba
+                    // completitud, a diferencia de la del Coordinador en
+                    // 'revision_documental' (arriba), que sí usa
+                    // etapa1DocumentKeys()/etapa1KeySatisfecha().
                     if ($accion === 'aprobar') {
+                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(
+                            fn ($key) => $this->etapa1KeySatisfecha($key, $documentos, $credito)
+                        );
+
+                        if (!$hasEtapa1) {
+                            return response()->json([
+                                'message' => 'Debe cargar todos los documentos requeridos antes de enviar la solicitud completada.',
+                            ], 422);
+                        }
+
                         $estadoNuevo = 'revision_documental';
                         $comentario = 'El cliente completó la solicitud. Retorna a revisión documental.';
                     }
                     break;
 
                 case 'completar_solicitud_constructor':
+                    // SCRUM-252: mismo guard que 'completar_solicitud' — ver
+                    // comentario arriba.
                     if ($accion === 'aprobar') {
+                        $hasEtapa1 = collect($this->etapa1DocumentKeys($credito))->every(
+                            fn ($key) => $this->etapa1KeySatisfecha($key, $documentos, $credito)
+                        );
+
+                        if (!$hasEtapa1) {
+                            return response()->json([
+                                'message' => 'Debe cargar todos los documentos requeridos antes de enviar la solicitud completada.',
+                            ], 422);
+                        }
+
                         $estadoNuevo = 'validacion_documental_constructor';
                         $comentario = 'El cliente completó la solicitud. Retorna a validación documental del expediente inicial (Constructor).';
                     }

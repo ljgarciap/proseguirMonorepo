@@ -571,6 +571,66 @@ class CreditoOrdinarioTest extends TestCase
     }
 
     /**
+     * SCRUM-252 (feedback QA 2026-08-26): "Enviar Solicitud Completada"
+     * (completar_solicitud -> aprobar, disparado por el Cliente) no debía
+     * validar que los documentos del preset ya estuvieran cargados — un
+     * cliente podía enviarla vacía y el sistema la aceptaba igual.
+     */
+    public function test_completar_solicitud_bloquea_si_faltan_documentos_del_preset(): void
+    {
+        [$creditoId, $item] = $this->creditoConPresetEtapa1();
+        CreditoOrdinario::find($creditoId)->update(['estado' => 'completar_solicitud']);
+
+        Passport::actingAs($this->cliente);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'aprobar',
+            'comentario' => 'Ya subí todo.',
+        ], ['X-Active-Role' => 'cliente'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Debe cargar todos los documentos requeridos antes de enviar la solicitud completada.');
+
+        $this->assertSame('completar_solicitud', CreditoOrdinario::find($creditoId)->estado);
+        $item->refresh();
+        $this->assertSame('pendiente', $item->estado);
+    }
+
+    public function test_completar_solicitud_permite_avanzar_con_documentos_completos(): void
+    {
+        [$creditoId, $item] = $this->creditoConPresetEtapa1();
+        CreditoOrdinario::find($creditoId)->update(['estado' => 'completar_solicitud']);
+        $item->update(['estado' => 'subido']);
+
+        Passport::actingAs($this->cliente);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'aprobar',
+            'comentario' => 'Ya subí todo.',
+        ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
+
+        $this->assertSame('revision_documental', CreditoOrdinario::find($creditoId)->estado);
+    }
+
+    /**
+     * Mismo guard, variante Constructor (completar_solicitud_constructor ->
+     * aprobar) — la que reprodujo exactamente el screenshot de QA
+     * ("Validacion_documental_constructor", documentos en PENDIENTE).
+     */
+    public function test_completar_solicitud_constructor_bloquea_si_faltan_documentos_del_preset(): void
+    {
+        [$creditoId, $item] = $this->creditoConPresetEtapa1();
+        CreditoOrdinario::find($creditoId)->update(['estado' => 'completar_solicitud_constructor']);
+
+        Passport::actingAs($this->cliente);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'aprobar',
+            'comentario' => 'Ya subí todo.',
+        ], ['X-Active-Role' => 'cliente'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Debe cargar todos los documentos requeridos antes de enviar la solicitud completada.');
+
+        $this->assertSame('completar_solicitud_constructor', CreditoOrdinario::find($creditoId)->estado);
+    }
+
+    /**
      * Variante de creditoConPresetEtapa1() con 2 requirements en vez de 1,
      * para probar duplicados ENTRE documentos distintos del mismo
      * expediente (a diferencia de los tests de arriba, que prueban

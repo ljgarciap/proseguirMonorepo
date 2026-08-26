@@ -335,6 +335,16 @@ class InformeTecnicoTest extends TestCase
             'accion' => 'aprobar',
         ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(403);
 
+        // SCRUM-252 (feedback QA 2026-08-26): 'aprobar' desde
+        // completar_solicitud_constructor ahora exige que el expediente de
+        // Etapa 1 esté completo — este test no reenvía documentos reales
+        // (no es su objeto: prueba el gate de rol/estado), así que se marca
+        // el único requirement del preset como ya subido para no chocar con
+        // el guard nuevo.
+        DocumentRequestItem::whereHas('request', function ($q) use ($credito) {
+            $q->where('solicitud_credito_id', $credito->solicitud_credito_id);
+        })->update(['estado' => 'subido']);
+
         // Cliente reenvía la solicitud completada; debe volver a
         // validacion_documental_constructor (no a revision_documental).
         Passport::actingAs($credito->cliente);
