@@ -251,11 +251,13 @@ class SolicitudCreditoTest extends TestCase
     }
 
     /**
-     * SCRUM-244 (RF-07): el correo debe incluir un botón real "Ingresar a
-     * la plataforma", además del acceso (URL/usuario/clave) que ya viaja
-     * como texto plano dentro del mensaje editable (SCRUM-173).
+     * SCRUM-244 (RF-07 + feedback QA 2026-08-26): el correo debe incluir un
+     * botón real "Ingresar a la plataforma" Y un bloque fijo de datos de
+     * acceso (URL/Usuario/Clave) — ambos como componentes automáticos de la
+     * plantilla, ya no como texto concatenado por el frontend dentro del
+     * mensaje editable (ver docblock de SolicitudCreditoMail).
      */
-    public function test_solicitud_credito_mail_incluye_boton_de_acceso(): void
+    public function test_solicitud_credito_mail_incluye_boton_y_datos_de_acceso(): void
     {
         $solicitud = SolicitudCredito::create([
             'cliente_id' => $this->clientNatural->id,
@@ -271,10 +273,55 @@ class SolicitudCreditoTest extends TestCase
             'mensaje_notificacion' => 'Mensaje',
         ]);
 
-        $html = (new \App\Mail\SolicitudCreditoMail($solicitud))->render();
+        $html = (new \App\Mail\SolicitudCreditoMail($solicitud, [], 'juan@test.com', '90807060'))->render();
 
         $this->assertStringContainsString('INGRESAR A LA PLATAFORMA', $html);
         $this->assertStringContainsString('href="http', $html);
+        $this->assertStringContainsString('Usuario:</strong> juan@test.com', $html);
+        $this->assertStringContainsString('Clave:</strong> 90807060', $html);
+    }
+
+    /**
+     * SCRUM-244 (feedback QA 2026-08-26): el usuario/clave del correo deben
+     * ser las credenciales reales de la cuenta de portal recién
+     * aprovisionada — no depender de que el frontend haya concatenado texto
+     * libre. Antes, en el flujo de cliente nuevo (registro manual), el
+     * correo real podía salir sin URL/usuario/clave (bug de "trigger" en
+     * Angular: la reconstrucción del mensaje solo ocurría si el Coordinador
+     * tocaba ciertos selects después de escribir el número de documento).
+     */
+    public function test_solicitud_credito_mail_usa_credenciales_reales_del_usuario_creado(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $payload = [
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 15000000,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'nuevo.cliente@test.com',
+            'asunto_notificacion' => 'Documentos requeridos para continuar con su solicitud de crédito',
+            'mensaje_notificacion' => 'Hemos iniciado el registro de su solicitud de crédito. Para continuar con el proceso, por favor ingrese a la plataforma y cargue los siguientes documentos:',
+            'tipo_persona_id' => $this->tipoNatural->id,
+            'tipo_documento_id' => $this->docCC->id,
+            'numero_documento' => '1099887766',
+            'nombres' => 'Cliente',
+            'primer_apellido' => 'Nuevo',
+            'correo_electronico' => 'nuevo.cliente@test.com',
+            'telefono' => '3000000000',
+            'direccion' => 'Calle 1',
+            'pais' => 'Colombia',
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id,
+        ];
+
+        $this->postJson('/api/solicitudes-credito', $payload)->assertStatus(201);
+
+        Mail::assertSent(\App\Mail\SolicitudCreditoMail::class, function ($mail) {
+            return $mail->usuarioAcceso === 'nuevo.cliente@test.com' && $mail->claveAcceso === '1099887766';
+        });
     }
 
     /**

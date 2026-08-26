@@ -329,7 +329,11 @@ class SolicitudCreditoController extends Controller
             }
 
             // 5. Send Notification Email
-            Mail::to($solicitud->correo_notificacion)->send(new SolicitudCreditoMail($solicitud, $documentosRequeridos));
+            // SCRUM-244: $email/$cleanPassword son las credenciales reales
+            // ya usadas para aprovisionar el User en el paso 2 — se
+            // reutilizan tal cual para que el correo nunca pueda mostrar un
+            // usuario/clave distinto al que realmente funciona.
+            Mail::to($solicitud->correo_notificacion)->send(new SolicitudCreditoMail($solicitud, $documentosRequeridos, $email, $cleanPassword));
 
             return response()->json($solicitud->load(['visita', 'cliente', 'usuarioRegistra', 'tipoCredito', 'amortizacion']), 201);
         });

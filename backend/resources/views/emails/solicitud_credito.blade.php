@@ -133,6 +133,17 @@
                 </ul>
             @endif
 
+            {{-- SCRUM-244: datos de acceso reales, componente automático de
+                 la plantilla (nunca del texto editable por el Coordinador). --}}
+            <div class="highlight-box">
+                <p style="margin:0;">Para realizar esta gestión, utilice los siguientes datos de acceso:</p>
+                <p style="margin:8px 0 0 0;">
+                    <strong>URL:</strong> {{ $urlIngreso }}<br>
+                    <strong>Usuario:</strong> {{ $usuarioAcceso }}<br>
+                    <strong>Clave:</strong> {{ $claveAcceso }}
+                </p>
+            </div>
+
             <p style="margin-top: 25px;">Si tiene alguna inquietud o requiere apoyo adicional, no dude en contactarse con su Coordinador Comercial asignado.</p>
 
             <p style="text-align:center;">
