@@ -11,15 +11,18 @@ use App\Mail\GestionCreditoNotificacionMail;
 use App\Mail\RegistroCyfAprobadoMail;
 use App\Mail\TransferenciaRealizadaClienteMail;
 use App\Mail\TransferenciaRegistradaInternaMail;
+use App\Models\ActivityLog;
 use App\Models\CreditoOrdinario;
 use App\Models\DocumentPreset;
 use App\Models\DocumentRequest;
 use App\Models\DocumentRequestItem;
 use App\Models\EntidadBancaria;
 use App\Models\User;
+use App\Services\ActivityLog\ActivityLogService;
 use App\Services\ConfiguracionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Throwable;
@@ -88,6 +91,37 @@ class GestionCreditoController extends Controller
         'aprobada_garantias'   => ['estado' => 'aprobada_garantias', 'origen' => 'comite_aprobado'],
         'rechazada_comite'     => ['estado' => 'rechazado', 'origen' => 'comite_rechazado'],
         'pendiente_comite'     => ['estado' => 'pendiente_comite', 'origen' => 'comite_pendiente'],
+    ];
+
+    /**
+     * SCRUM-268 (§9, CA-01/RN-02): asunto y mensaje predeterminados por
+     * escenario — precargan el formulario de notificar() (ver show()) y el
+     * Coordinador Comercial los puede editar libremente (RN-03/RN-04); acá
+     * solo vive el cuerpo del mensaje de acompañamiento, NUNCA el
+     * saludo/firma/lista de documentos/botón, que son componentes
+     * automáticos que arma la Mailable (§4 "Composición del correo").
+     * {numero} se sustituye por CreditoOrdinario::numero_solicitud al
+     * precargar (plantillaSugerida()) — si el Coordinador lo borra o lo
+     * reescribe, esa edición es la que se envía (RN-04), no se vuelve a
+     * inyectar.
+     */
+    private const PLANTILLAS = [
+        'aprobada_garantias' => [
+            'asunto' => 'Documentación requerida para la formalización de garantías - Solicitud {numero}',
+            'mensaje' => 'Nos permitimos informarle que su solicitud de crédito {numero} fue aprobada por el Comité de Crédito. Para continuar con la formalización, agradecemos diligenciar y cargar en el sistema los documentos requeridos como garantías.',
+        ],
+        'sarlaft_desfavorable' => [
+            'asunto' => 'Resultado de su solicitud de crédito - {numero}',
+            'mensaje' => "Una vez realizadas las validaciones correspondientes a su solicitud de crédito {numero}, le informamos que no es posible continuar con el trámite.\n\nAgradecemos el interés y la confianza depositada en Proseguir Soluciones de Liquidez.",
+        ],
+        'rechazada_comite' => [
+            'asunto' => 'Decisión del Comité de Crédito - Solicitud {numero}',
+            'mensaje' => "Le informamos que, después de evaluar integralmente su solicitud de crédito {numero}, el Comité de Crédito decidió no aprobarla en esta oportunidad.\n\nAgradecemos su interés en nuestros servicios y la confianza depositada en Proseguir Soluciones de Liquidez.",
+        ],
+        'pendiente_comite' => [
+            'asunto' => 'Estado de su solicitud de crédito - {numero}',
+            'mensaje' => "Le informamos que el Comité de Crédito decidió dejar pendiente su solicitud de crédito {numero}.\n\nEsta decisión no corresponde a una aprobación ni a una negación definitiva. Podrá retomar el proceso más adelante, cuando sus condiciones financieras lo permitan. Nuestro equipo estará disponible para orientarle.",
+        ],
     ];
 
     /**
@@ -269,28 +303,37 @@ class GestionCreditoController extends Controller
             }
         }
 
-        return response()->json($this->conFechaValidacion($credito));
+        $credito = $this->conFechaValidacion($credito);
+
+        // SCRUM-268 (CA-01/RN-02): precarga de asunto/mensaje por escenario
+        // — solo tiene sentido mientras la solicitud sigue sin gestionar;
+        // una vez gestionada, el formulario ya no se muestra (puedeGestionar
+        // en el frontend) y gestion_detalle ya conserva lo que se envió.
+        $resultado = $this->resolverClaveResultado($credito);
+        if ($resultado && !$credito->solicitud_gestionada) {
+            $credito->plantilla_sugerida = $this->plantillaSugerida($resultado, $credito);
+        }
+
+        return response()->json($credito);
     }
 
     /**
      * "Registrar y enviar notificación" (§5.5, VAL-01..08): valida,
      * envía el correo y solo si el envío no falla ejecuta la transición,
      * marca Solicitud gestionada = Sí y registra Fecha de la gestión.
+     *
+     * SCRUM-268 (RN-16/CA-16): la solicitud completa corre dentro de un
+     * `lockForUpdate()` sobre el crédito — un doble clic o un reintento de
+     * red que llegue mientras el primero todavía está en curso espera a
+     * que ese primero libere el lock (commit) y encuentra
+     * `solicitud_gestionada = true`, en vez de alcanzar a mandar un
+     * segundo correo.
      */
     public function notificar(Request $request, $creditoId)
     {
         $activeRole = $this->resolveActiveRole($request);
         $this->autorizarRol($activeRole);
         $user = Auth::user();
-
-        $credito = CreditoOrdinario::with('cliente')->findOrFail($creditoId);
-        $resultado = $this->resolverClaveResultado($credito);
-
-        if (!$resultado) {
-            return response()->json([
-                'message' => 'Esta solicitud no tiene un resultado pendiente de gestión.',
-            ], 422);
-        }
 
         $validator = Validator::make($request->all(), [
             'destino' => 'required|email',
@@ -309,135 +352,307 @@ class GestionCreditoController extends Controller
             return response()->json(['message' => $validator->errors()->first()], 422);
         }
 
-        // VAL-04: preset obligatorio para Aprobada para gestión de garantías.
-        if ($resultado === 'aprobada_garantias') {
-            if (!$request->filled('preset_id')) {
-                return response()->json(['message' => 'Seleccione la documentación requerida.'], 422);
-            }
-            // SCRUM-193/205: mismo guard que SCRUM-190 para pendiente_comite
-            // (ver más abajo) — crearSolicitudDocumentos() exige cliente_id
-            // real (FK NOT NULL contra users), y créditos materializados
-            // desde una solicitud manual del Acta pueden no tenerlo.
-            if (!$credito->cliente_id) {
+        return DB::transaction(function () use ($request, $creditoId, $activeRole, $user) {
+            $credito = CreditoOrdinario::with(['cliente', 'solicitudCredito.cliente'])->lockForUpdate()->findOrFail($creditoId);
+            $resultado = $this->resolverClaveResultado($credito);
+
+            if (!$resultado) {
                 return response()->json([
-                    'message' => 'Este cliente no tiene una cuenta de portal para recibir la solicitud de documentación. Contacte al administrador.',
+                    'message' => 'Esta solicitud no tiene un resultado pendiente de gestión.',
                 ], 422);
             }
-        }
 
-        // VAL-05: Pendiente por Comité debe responder si requiere
-        // documentación; si la respuesta es Sí, el preset es obligatorio.
-        if ($resultado === 'pendiente_comite') {
-            if (!$request->has('requiere_documentos')) {
-                return response()->json(['message' => 'Indique si el cliente debe enviar documentación.'], 422);
-            }
-            if ($request->boolean('requiere_documentos') && !$request->filled('preset_id')) {
-                return response()->json(['message' => 'Seleccione la documentación requerida.'], 422);
-            }
-            // SCRUM-190 (2026-08-12): créditos materializados desde una
-            // solicitud manual del Acta de Comité pueden no tener cuenta de
-            // portal asociada (cliente_id null — ver ActaComiteController::
-            // materializarSolicitudesManuales()). crearSolicitudDocumentos()
-            // exige un cliente_id real (FK NOT NULL contra users), así que
-            // se bloquea acá con un mensaje claro en vez de romper por FK.
-            if ($request->boolean('requiere_documentos') && !$credito->cliente_id) {
+            // CA-16/RN-16: la solicitud ya fue gestionada por otra llamada
+            // que ganó el lock primero — no hay un segundo correo que
+            // mandar, se informa con el detalle de la gestión existente.
+            if ($credito->solicitud_gestionada) {
+                $ultimaGestion = collect($credito->gestion_detalle ?? [])->last();
                 return response()->json([
-                    'message' => 'Este cliente no tiene una cuenta de portal para recibir la solicitud de documentación. Gestione sin requerir documentos o contacte al administrador.',
+                    'message' => trim(sprintf(
+                        'Esta solicitud ya fue gestionada%s%s.',
+                        $ultimaGestion ? ' por ' . $ultimaGestion['gestionado_por'] : '',
+                        $credito->fecha_gestion ? ' el ' . $credito->fecha_gestion->format('d/m/Y H:i') : ''
+                    )),
+                ], 409);
+            }
+
+            // VAL-04: preset obligatorio para Aprobada para gestión de garantías.
+            if ($resultado === 'aprobada_garantias') {
+                if (!$request->filled('preset_id')) {
+                    return response()->json(['message' => 'Seleccione la documentación requerida.'], 422);
+                }
+                // SCRUM-193/205: mismo guard que SCRUM-190 para pendiente_comite
+                // (ver más abajo) — crearSolicitudDocumentos() exige cliente_id
+                // real (FK NOT NULL contra users), y créditos materializados
+                // desde una solicitud manual del Acta pueden no tenerlo.
+                if (!$credito->cliente_id) {
+                    return response()->json([
+                        'message' => 'Este cliente no tiene una cuenta de portal para recibir la solicitud de documentación. Contacte al administrador.',
+                    ], 422);
+                }
+            }
+
+            // VAL-05: Pendiente por Comité debe responder si requiere
+            // documentación; si la respuesta es Sí, el preset es obligatorio.
+            if ($resultado === 'pendiente_comite') {
+                if (!$request->has('requiere_documentos')) {
+                    return response()->json(['message' => 'Indique si el cliente debe enviar documentación.'], 422);
+                }
+                if ($request->boolean('requiere_documentos') && !$request->filled('preset_id')) {
+                    return response()->json(['message' => 'Seleccione la documentación requerida.'], 422);
+                }
+                // SCRUM-190 (2026-08-12): créditos materializados desde una
+                // solicitud manual del Acta de Comité pueden no tener cuenta de
+                // portal asociada (cliente_id null — ver ActaComiteController::
+                // materializarSolicitudesManuales()). crearSolicitudDocumentos()
+                // exige un cliente_id real (FK NOT NULL contra users), así que
+                // se bloquea acá con un mensaje claro en vez de romper por FK.
+                if ($request->boolean('requiere_documentos') && !$credito->cliente_id) {
+                    return response()->json([
+                        'message' => 'Este cliente no tiene una cuenta de portal para recibir la solicitud de documentación. Gestione sin requerir documentos o contacte al administrador.',
+                    ], 422);
+                }
+            }
+
+            // VAL-06: síntesis SARLAFT debe existir antes de notificar.
+            if ($resultado === 'sarlaft_desfavorable' && empty(($credito->documentos ?? [])['sintesis_oficial_cumplimiento'] ?? null)) {
+                return response()->json([
+                    'message' => 'No fue posible consultar la síntesis de validación. Intente nuevamente o contacte al administrador.',
                 ], 422);
             }
-        }
 
-        // VAL-06: síntesis SARLAFT debe existir antes de notificar.
-        if ($resultado === 'sarlaft_desfavorable' && empty(($credito->documentos ?? [])['sintesis_oficial_cumplimiento'] ?? null)) {
+            $asunto = $request->input('asunto');
+            $mensaje = $request->input('mensaje');
+            $destino = $request->input('destino');
+            $activityLog = app(ActivityLogService::class);
+
+            // §4/§9 "Composición del correo": lista dinámica de documentos
+            // del preset (garantías, o pendiente_comite con documentos) y
+            // URL autenticada del botón de acción (RN-08) — misma
+            // información para el envío real y para la vista previa
+            // (previsualizarNotificacion()).
+            [$documentos, $urlAccion] = $this->documentosYUrlAccion($request, $credito);
+
+            // VAL-07: si el envío falla, la solicitud sigue sin gestionar.
+            try {
+                Mail::to($destino)->send(new GestionCreditoNotificacionMail(
+                    $credito,
+                    $asunto,
+                    $mensaje,
+                    $resultado,
+                    $documentos,
+                    $urlAccion
+                ));
+            } catch (Throwable $e) {
+                // CA-15/CA-17: un intento fallido también es trazabilidad —
+                // antes de SCRUM-268 no quedaba ningún registro de un envío
+                // que falló, solo del que finalmente tuvo éxito.
+                $intentosPrevios = ActivityLog::where('entidad_type', CreditoOrdinario::class)
+                    ->where('entidad_id', $credito->id)
+                    ->where('accion', 'gestion_credito_notificacion_fallida')
+                    ->count();
+
+                $activityLog->registrar(
+                    'gestion_credito_notificacion_fallida',
+                    "Falló el envío de la notificación ({$resultado}) de la solicitud {$credito->numero_solicitud}.",
+                    $user,
+                    $credito,
+                    [
+                        'escenario' => $resultado,
+                        'destino' => $destino,
+                        'asunto' => $asunto,
+                        'mensaje' => $mensaje,
+                        'preset_id' => $request->input('preset_id'),
+                        'requiere_documentos' => $request->has('requiere_documentos') ? $request->boolean('requiere_documentos') : null,
+                        'error' => $e->getMessage(),
+                        'intento_numero' => $intentosPrevios + 1,
+                    ]
+                );
+
+                return response()->json([
+                    'message' => 'La notificación no pudo enviarse. La solicitud continúa pendiente de gestión.',
+                ], 422);
+            }
+
+            $estadoAnterior = $credito->estado;
+            // SCRUM-193/205 (2026-08-17): 'aprobada_garantias' YA NO transiciona
+            // a 'formalizacion_garantias' — ese estado es del flujo legacy
+            // (rol Operativo, pantalla de Crédito Ordinario), que se mantiene
+            // intacto y sin credits nuevos entrando por acá. El estado se queda
+            // en 'aprobada_garantias' mientras el cliente diligencia las
+            // garantías del preset (mismo patrón que 'pendiente_comite' más
+            // abajo); crearSolicitudDocumentos() habilita esa carga y
+            // ClientUploadController::syncRequestItem() avanza automáticamente
+            // a 'pendiente_formalizacion_garantias' cuando el cliente termina.
+            if ($resultado === 'pendiente_comite' && !$request->boolean('requiere_documentos')) {
+                // SCRUM-191 (2026-08-12): si no se requiere documentación
+                // adicional, no hay nada que esperar del cliente — el crédito
+                // vuelve directo a la cola del Comité en vez de quedar
+                // estancado para siempre en pendiente_comite (antes no existía
+                // ninguna salida de este estado sin documentos).
+                $credito->estado = 'comite_evaluacion';
+            }
+            // sarlaft_desfavorable, rechazada_comite y pendiente_comite CON
+            // documentos requeridos conservan el mismo estado (§5.5): solo
+            // cambia la marca de gestión — la salida de pendiente_comite con
+            // documentos ocurre en revisarDocumento(), cuando el Coordinador
+            // aprueba todo lo reenviado por el cliente.
+
+            $credito->solicitud_gestionada = true;
+            $credito->fecha_gestion = now();
+
+            $detalle = $credito->gestion_detalle ?? [];
+            $detalle[] = [
+                'fecha' => now()->toIso8601String(),
+                'destino' => $destino,
+                'asunto' => $asunto,
+                'mensaje' => $mensaje,
+                'preset_id' => $request->input('preset_id'),
+                'requiere_documentos' => $request->has('requiere_documentos') ? $request->boolean('requiere_documentos') : null,
+                'gestionado_por_id' => $user->id,
+                'gestionado_por' => $user->name,
+            ];
+            $credito->gestion_detalle = $detalle;
+
+            $historial = $credito->historial_estados ?? [];
+            $historial[] = [
+                'fecha' => now()->toIso8601String(),
+                'usuario' => $user->name,
+                'rol' => $activeRole,
+                'estado_anterior' => $estadoAnterior,
+                'estado_nuevo' => $credito->estado,
+                'comentario' => 'Gestión registrada y notificación enviada desde Gestión de Créditos.',
+            ];
+            $credito->historial_estados = $historial;
+
+            $credito->save();
+
+            // Pendiente por Comité con requiere_documentos = Sí: habilita la
+            // carga en Mis créditos vía el mismo mecanismo de SCRUM-146.
+            if ($resultado === 'pendiente_comite' && $request->boolean('requiere_documentos')) {
+                $this->crearSolicitudDocumentos($credito, (int) $request->input('preset_id'), $user->id, 'pre_comite');
+            }
+
+            // SCRUM-193/205: Aprobada para Gestión de Garantías siempre requiere
+            // preset (VAL-04) — habilita la carga de garantías en Mis créditos.
+            // SCRUM-229: se tagea 'garantias' para que Crédito Ordinario pueda
+            // mostrar específicamente este DocumentRequest en la Etapa 4.
+            if ($resultado === 'aprobada_garantias') {
+                $this->crearSolicitudDocumentos($credito, (int) $request->input('preset_id'), $user->id, 'garantias');
+            }
+
+            // CA-17/RN-17: trazabilidad centralizada (SCRUM-246) del envío
+            // exitoso, además de gestion_detalle/historial_estados (que ya
+            // alimentan el frontend de Gestión de Créditos).
+            $activityLog->registrar(
+                'gestion_credito_notificacion_enviada',
+                "Notificación ({$resultado}) enviada para la solicitud {$credito->numero_solicitud}.",
+                $user,
+                $credito,
+                [
+                    'escenario' => $resultado,
+                    'destino' => $destino,
+                    'asunto' => $asunto,
+                    'mensaje' => $mensaje,
+                    'preset_id' => $request->input('preset_id'),
+                    'requiere_documentos' => $request->has('requiere_documentos') ? $request->boolean('requiere_documentos') : null,
+                    'estado_anterior' => $estadoAnterior,
+                    'estado_nuevo' => $credito->estado,
+                ]
+            );
+
             return response()->json([
-                'message' => 'No fue posible consultar la síntesis de validación. Intente nuevamente o contacte al administrador.',
+                'message' => 'La gestión fue registrada y la notificación enviada correctamente.',
+                'credito' => $this->conFechaValidacion($credito->fresh(self::RELACIONES_DETALLE)),
+            ]);
+        });
+    }
+
+    /**
+     * Vista previa (RN-06): renderiza la MISMA Mailable que notificar()
+     * usará al enviar, con lo que el Coordinador tenga diligenciado en ese
+     * momento — sin enviar el correo ni tocar el estado de la solicitud.
+     * Evita que la vista previa se desincronice del correo real (dos
+     * plantillas Blade a mantener en paralelo).
+     */
+    public function previsualizarNotificacion(Request $request, $creditoId)
+    {
+        $activeRole = $this->resolveActiveRole($request);
+        $this->autorizarRol($activeRole);
+
+        $credito = CreditoOrdinario::with(['cliente', 'solicitudCredito.cliente'])->findOrFail($creditoId);
+        $resultado = $this->resolverClaveResultado($credito);
+
+        if (!$resultado) {
+            return response()->json([
+                'message' => 'Esta solicitud no tiene un resultado pendiente de gestión.',
             ], 422);
         }
 
-        $asunto = $request->input('asunto');
-        $mensaje = $request->input('mensaje');
-        $destino = $request->input('destino');
-
-        // VAL-07: si el envío falla, la solicitud sigue sin gestionar.
-        try {
-            Mail::to($destino)->send(new GestionCreditoNotificacionMail($credito, $asunto, $mensaje));
-        } catch (Throwable $e) {
-            return response()->json([
-                'message' => 'La notificación no pudo enviarse. La solicitud continúa pendiente de gestión.',
-            ], 422);
-        }
-
-        $estadoAnterior = $credito->estado;
-        // SCRUM-193/205 (2026-08-17): 'aprobada_garantias' YA NO transiciona
-        // a 'formalizacion_garantias' — ese estado es del flujo legacy
-        // (rol Operativo, pantalla de Crédito Ordinario), que se mantiene
-        // intacto y sin credits nuevos entrando por acá. El estado se queda
-        // en 'aprobada_garantias' mientras el cliente diligencia las
-        // garantías del preset (mismo patrón que 'pendiente_comite' más
-        // abajo); crearSolicitudDocumentos() habilita esa carga y
-        // ClientUploadController::syncRequestItem() avanza automáticamente
-        // a 'pendiente_formalizacion_garantias' cuando el cliente termina.
-        if ($resultado === 'pendiente_comite' && !$request->boolean('requiere_documentos')) {
-            // SCRUM-191 (2026-08-12): si no se requiere documentación
-            // adicional, no hay nada que esperar del cliente — el crédito
-            // vuelve directo a la cola del Comité en vez de quedar
-            // estancado para siempre en pendiente_comite (antes no existía
-            // ninguna salida de este estado sin documentos).
-            $credito->estado = 'comite_evaluacion';
-        }
-        // sarlaft_desfavorable, rechazada_comite y pendiente_comite CON
-        // documentos requeridos conservan el mismo estado (§5.5): solo
-        // cambia la marca de gestión — la salida de pendiente_comite con
-        // documentos ocurre en revisarDocumento(), cuando el Coordinador
-        // aprueba todo lo reenviado por el cliente.
-
-        $credito->solicitud_gestionada = true;
-        $credito->fecha_gestion = now();
-
-        $detalle = $credito->gestion_detalle ?? [];
-        $detalle[] = [
-            'fecha' => now()->toIso8601String(),
-            'destino' => $destino,
-            'asunto' => $asunto,
-            'mensaje' => $mensaje,
-            'preset_id' => $request->input('preset_id'),
-            'requiere_documentos' => $request->has('requiere_documentos') ? $request->boolean('requiere_documentos') : null,
-            'gestionado_por_id' => $user->id,
-            'gestionado_por' => $user->name,
-        ];
-        $credito->gestion_detalle = $detalle;
-
-        $historial = $credito->historial_estados ?? [];
-        $historial[] = [
-            'fecha' => now()->toIso8601String(),
-            'usuario' => $user->name,
-            'rol' => $activeRole,
-            'estado_anterior' => $estadoAnterior,
-            'estado_nuevo' => $credito->estado,
-            'comentario' => 'Gestión registrada y notificación enviada desde Gestión de Créditos.',
-        ];
-        $credito->historial_estados = $historial;
-
-        $credito->save();
-
-        // Pendiente por Comité con requiere_documentos = Sí: habilita la
-        // carga en Mis créditos vía el mismo mecanismo de SCRUM-146.
-        if ($resultado === 'pendiente_comite' && $request->boolean('requiere_documentos')) {
-            $this->crearSolicitudDocumentos($credito, (int) $request->input('preset_id'), $user->id, 'pre_comite');
-        }
-
-        // SCRUM-193/205: Aprobada para Gestión de Garantías siempre requiere
-        // preset (VAL-04) — habilita la carga de garantías en Mis créditos.
-        // SCRUM-229: se tagea 'garantias' para que Crédito Ordinario pueda
-        // mostrar específicamente este DocumentRequest en la Etapa 4.
-        if ($resultado === 'aprobada_garantias') {
-            $this->crearSolicitudDocumentos($credito, (int) $request->input('preset_id'), $user->id, 'garantias');
-        }
-
-        return response()->json([
-            'message' => 'La gestión fue registrada y la notificación enviada correctamente.',
-            'credito' => $this->conFechaValidacion($credito->fresh(self::RELACIONES_DETALLE)),
+        $validator = Validator::make($request->all(), [
+            'asunto' => 'required|string',
+            'mensaje' => 'required|string',
+            'preset_id' => 'nullable|exists:document_presets,id',
+        ], [
+            'asunto.required' => 'Ingrese el asunto del correo.',
+            'mensaje.required' => 'Ingrese el mensaje de acompañamiento.',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], 422);
+        }
+
+        [$documentos, $urlAccion] = $this->documentosYUrlAccion($request, $credito);
+
+        $mail = new GestionCreditoNotificacionMail(
+            $credito,
+            $request->input('asunto'),
+            $request->input('mensaje'),
+            $resultado,
+            $documentos,
+            $urlAccion
+        );
+
+        return response($mail->render(), 200)->header('Content-Type', 'text/html; charset=UTF-8');
+    }
+
+    /**
+     * SCRUM-268 (§4/§9): lista de nombres de documentos del preset
+     * seleccionado (vacía si no aplica) + URL autenticada al portal para
+     * el botón de acción — compartido entre notificar() y
+     * previsualizarNotificacion() para que ambos compongan exactamente el
+     * mismo correo.
+     */
+    private function documentosYUrlAccion(Request $request, CreditoOrdinario $credito): array
+    {
+        if (!$request->filled('preset_id')) {
+            return [[], null];
+        }
+
+        $preset = DocumentPreset::find($request->input('preset_id'));
+        $documentos = $preset?->requirements()->pluck('nombre')->toArray() ?? [];
+        $urlAccion = $this->urlIngresoSistema('/creditos/' . $credito->id);
+
+        return [$documentos, $urlAccion];
+    }
+
+    /**
+     * SCRUM-268 (CA-01/RN-02): asunto y mensaje predeterminados del
+     * escenario, con {numero} ya sustituido por el número de solicitud
+     * real (CA-06 — variables automáticas).
+     */
+    private function plantillaSugerida(string $resultado, CreditoOrdinario $credito): array
+    {
+        $plantilla = self::PLANTILLAS[$resultado] ?? null;
+
+        if (!$plantilla) {
+            return ['asunto' => '', 'mensaje' => ''];
+        }
+
+        return [
+            'asunto' => str_replace('{numero}', (string) $credito->numero_solicitud, $plantilla['asunto']),
+            'mensaje' => str_replace('{numero}', (string) $credito->numero_solicitud, $plantilla['mensaje']),
+        ];
     }
 
     /**

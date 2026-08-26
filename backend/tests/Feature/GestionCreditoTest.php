@@ -10,6 +10,7 @@ use App\Mail\GestionCreditoNotificacionMail;
 use App\Mail\RegistroCyfAprobadoMail;
 use App\Mail\TransferenciaRealizadaClienteMail;
 use App\Mail\TransferenciaRegistradaInternaMail;
+use App\Models\ActivityLog;
 use App\Models\Amortizacion;
 use App\Models\ClientUpload;
 use App\Models\Cliente;
@@ -1482,5 +1483,140 @@ class GestionCreditoTest extends TestCase
         Passport::actingAs($this->operativo);
         $this->getJson("/api/gestion-creditos/{$credito->id}", ['X-Active-Role' => 'operativo'])
             ->assertStatus(404);
+    }
+
+    // ---- SCRUM-268: precarga de plantilla, vista previa, auditoría y ------
+    // ---- control de duplicados --------------------------------------------
+
+    public function test_show_precarga_plantilla_sugerida_por_escenario(): void
+    {
+        $credito = $this->crearCredito('rechazado', 'comite_rechazado', 'plt-1');
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->getJson("/api/gestion-creditos/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200);
+        $plantilla = $response->json('plantilla_sugerida');
+
+        $this->assertStringContainsString($credito->numero_solicitud, $plantilla['asunto']);
+        $this->assertStringContainsString($credito->numero_solicitud, $plantilla['mensaje']);
+        $this->assertStringContainsString('Comité de Crédito decidió no aprobarla', $plantilla['mensaje']);
+    }
+
+    public function test_show_no_precarga_plantilla_si_la_solicitud_ya_fue_gestionada(): void
+    {
+        $credito = $this->crearCredito('rechazado', 'comite_rechazado', 'plt-2');
+        $credito->update(['solicitud_gestionada' => true, 'fecha_gestion' => now()]);
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->getJson("/api/gestion-creditos/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200)->assertJsonMissingPath('plantilla_sugerida');
+    }
+
+    public function test_previsualizar_notificacion_renderiza_saludo_lista_y_boton(): void
+    {
+        $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', 'prev-1');
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/notificar/preview", [
+            'asunto' => 'Documentación requerida',
+            'mensaje' => 'Debe formalizar las garantías.',
+            'preset_id' => $this->preset->id,
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200);
+        $html = $response->getContent();
+
+        $this->assertStringContainsString('Estimado(a) Gestion Test:', $html);
+        $this->assertStringContainsString('Pagaré firmado', $html);
+        $this->assertStringContainsString('Diligenciar garantías', $html);
+        // No debe haberse enviado ni registrado nada — es solo vista previa.
+        Mail::assertNothingSent();
+        $this->assertDatabaseHas('credito_ordinarios', ['id' => $credito->id, 'solicitud_gestionada' => false]);
+    }
+
+    public function test_previsualizar_notificacion_sarlaft_incluye_aviso_de_confidencialidad(): void
+    {
+        $credito = $this->crearCredito('rechazado', 'sarlaft', 'prev-2');
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/notificar/preview", [
+            'asunto' => 'Resultado de su solicitud',
+            'mensaje' => 'No es posible continuar con el trámite.',
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200);
+        $this->assertStringContainsString('no incluye coincidencias, hallazgos ni observaciones internas', $response->getContent());
+    }
+
+    public function test_notificar_registra_actividad_al_enviar_exitosamente(): void
+    {
+        $credito = $this->crearCredito('rechazado', 'comite_rechazado', 'log-1');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/notificar", [
+            'destino' => 'gestion.cliente@test.com',
+            'asunto' => 'Decisión del Comité',
+            'mensaje' => 'Su solicitud fue rechazada por el Comité.',
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+
+        $this->assertDatabaseHas('activity_logs', [
+            'accion' => 'gestion_credito_notificacion_enviada',
+            'entidad_type' => CreditoOrdinario::class,
+            'entidad_id' => $credito->id,
+            'usuario_id' => $this->coordinador->id,
+        ]);
+    }
+
+    public function test_notificar_registra_actividad_al_fallar_el_envio(): void
+    {
+        $credito = $this->crearCredito('rechazado', 'comite_rechazado', 'log-2');
+
+        Mail::shouldReceive('to')->once()->with('gestion.cliente@test.com')->andReturnSelf();
+        Mail::shouldReceive('send')->once()->andThrow(new \Exception('SMTP no disponible'));
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/notificar", [
+            'destino' => 'gestion.cliente@test.com',
+            'asunto' => 'Decisión del Comité',
+            'mensaje' => 'Su solicitud fue rechazada por el Comité.',
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(422);
+
+        $this->assertDatabaseHas('activity_logs', [
+            'accion' => 'gestion_credito_notificacion_fallida',
+            'entidad_type' => CreditoOrdinario::class,
+            'entidad_id' => $credito->id,
+        ]);
+
+        $log = ActivityLog::where('accion', 'gestion_credito_notificacion_fallida')->first();
+        $this->assertSame('SMTP no disponible', $log->metadata['error']);
+        $this->assertSame(1, $log->metadata['intento_numero']);
+    }
+
+    /**
+     * RN-16/CA-16: una segunda llamada sobre la misma solicitud ya
+     * gestionada (doble clic, reintento de red) no debe mandar un segundo
+     * correo — se corta antes de llegar a Mail::send().
+     */
+    public function test_notificar_dos_veces_seguidas_no_envia_un_segundo_correo(): void
+    {
+        $credito = $this->crearCredito('rechazado', 'comite_rechazado', 'dup-1');
+
+        Passport::actingAs($this->coordinador);
+        $payload = [
+            'destino' => 'gestion.cliente@test.com',
+            'asunto' => 'Decisión del Comité',
+            'mensaje' => 'Su solicitud fue rechazada por el Comité.',
+        ];
+
+        $this->postJson("/api/gestion-creditos/{$credito->id}/notificar", $payload, ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(200);
+
+        $this->postJson("/api/gestion-creditos/{$credito->id}/notificar", $payload, ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(409)
+            ->assertJsonFragment(['message' => 'Esta solicitud ya fue gestionada por Coordinador Test el ' . $credito->fresh()->fecha_gestion->format('d/m/Y H:i') . '.']);
+
+        Mail::assertSent(GestionCreditoNotificacionMail::class, 1);
     }
 }

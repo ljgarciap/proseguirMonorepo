@@ -250,6 +250,8 @@ Route::prefix('gestion-creditos')->middleware(['auth:api', 'checkrole:superadmin
     Route::get('/tarjetas', [\App\Http\Controllers\GestionCreditoController::class, 'tarjetas']);
     Route::get('/{creditoId}', [\App\Http\Controllers\GestionCreditoController::class, 'show']);
     Route::post('/{creditoId}/notificar', [\App\Http\Controllers\GestionCreditoController::class, 'notificar']);
+    // SCRUM-268 (RN-06): vista previa del correo antes de confirmar el envío.
+    Route::post('/{creditoId}/notificar/preview', [\App\Http\Controllers\GestionCreditoController::class, 'previsualizarNotificacion']);
     // SCRUM-191: documentos reenviados por el cliente tras "Pendiente por Comité".
     Route::get('/{creditoId}/documentos', [\App\Http\Controllers\GestionCreditoController::class, 'documentosPendientes']);
     Route::post('/{creditoId}/documentos/{itemId}/revisar', [\App\Http\Controllers\GestionCreditoController::class, 'revisarDocumento']);
