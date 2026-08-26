@@ -3,12 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesActiveRole;
-use App\Mail\SarlaftDesfavorableCoordinadorMail;
 use App\Models\CreditoOrdinario;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -160,9 +157,9 @@ class ListasRestrictivasSarlaftController extends Controller
         $credito->sarlaft_diligenciado_at = now();
         $credito->save();
 
-        if ($concepto === 'desfavorable') {
-            $this->notificarDesfavorable($credito);
-        }
+        // SCRUM-267: notifica al Coordinador Comercial responsable en los 2
+        // caminos (antes solo el desfavorable disparaba algo).
+        (new \App\Services\SarlaftValidacionNotificationService())->notificar($credito, $concepto);
 
         return response()->json($credito->fresh());
     }
@@ -263,23 +260,6 @@ class ListasRestrictivasSarlaftController extends Controller
                 'message' => 'No tienes autorización para actuar sobre esta validación en su estado actual.',
                 'rol_activo' => $activeRole,
             ], 403));
-        }
-    }
-
-    /**
-     * SCRUM-178: el correo al cliente ya NO se envía automáticamente acá —
-     * pasa a depender de que el Coordinador Comercial lo gestione desde la
-     * bandeja Gestión de Créditos (redacta asunto/mensaje y dispara el
-     * envío manualmente). Este método solo avisa internamente a los
-     * Coordinadores que hay un nuevo resultado desfavorable por gestionar.
-     */
-    private function notificarDesfavorable(CreditoOrdinario $credito): void
-    {
-        $credito->loadMissing('cliente');
-
-        $coordinadores = User::whereJsonContains('roles', 'coordinador_comercial')->pluck('email')->filter()->all();
-        if (!empty($coordinadores)) {
-            Mail::to($coordinadores)->send(new SarlaftDesfavorableCoordinadorMail($credito));
         }
     }
 }

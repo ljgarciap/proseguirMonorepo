@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Mail\SarlaftDesfavorableClienteMail;
 use App\Mail\SarlaftDesfavorableCoordinadorMail;
+use App\Mail\SarlaftFavorableCoordinadorMail;
 use App\Models\User;
 use App\Models\Cliente;
 use App\Models\Departamento;
@@ -94,7 +95,12 @@ class ListasRestrictivasSarlaftTest extends TestCase
      */
     private function crearCreditoEnSarlaftControlInterno(): CreditoOrdinario
     {
-        Passport::actingAs($this->admin);
+        // SCRUM-267: el Coordinador registra la solicitud (no el admin) para
+        // que SolicitudCredito::usuario_registra_id quede en él — es el
+        // "responsable" que ahora resuelve SarlaftValidacionNotificationService
+        // (RF-04), mismo criterio ya usado por DocumentRequestNotificationService
+        // desde SCRUM-252.
+        Passport::actingAs($this->coordinador);
 
         $payload = [
             'cliente_id' => $this->clienteNatural->id,
@@ -213,6 +219,12 @@ class ListasRestrictivasSarlaftTest extends TestCase
         // (esas solo aplican al camino desfavorable).
         Mail::assertNotSent(SarlaftDesfavorableClienteMail::class);
         Mail::assertNotSent(SarlaftDesfavorableCoordinadorMail::class);
+
+        // SCRUM-267: sí notifica al Coordinador responsable que puede
+        // continuar con el Análisis Financiero.
+        Mail::assertSent(SarlaftFavorableCoordinadorMail::class, function ($mail) use ($credito) {
+            return $mail->hasTo('coordinador.sarlaft@test.com') && $mail->credito->id === $credito->id;
+        });
     }
 
     public function test_finalizar_desfavorable_transiciona_a_rechazado_y_avisa_internamente_sin_notificar_al_cliente(): void
@@ -245,6 +257,28 @@ class ListasRestrictivasSarlaftTest extends TestCase
         Mail::assertSent(SarlaftDesfavorableCoordinadorMail::class, function ($mail) use ($credito) {
             return $mail->hasTo('coordinador.sarlaft@test.com') && $mail->credito->id === $credito->id;
         });
+    }
+
+    /**
+     * SCRUM-267 (RF-04): si el Coordinador responsable de la solicitud
+     * (usuario_registra_id) no tiene correo activo, no se envía nada — no
+     * hay a quién notificar. No debe romper la transición ya persistida.
+     */
+    public function test_finalizar_sin_coordinador_responsable_con_correo_no_notifica(): void
+    {
+        $credito = $this->crearCreditoEnSarlaftControlInterno();
+        $this->coordinador->update(['email' => null]);
+
+        Passport::actingAs($this->cumplimiento);
+        $this->postJson("/api/listas-sarlaft/{$credito->id}/finalizar", [
+            'sarlaft_concepto' => 'favorable',
+            'sarlaft_observaciones' => 'Sin coincidencias en listas restrictivas.',
+            'archivo' => $this->pdf(),
+        ], ['X-Active-Role' => 'oficial_cumplimiento'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'pendiente_analisis_financiero');
+
+        Mail::assertNotSent(SarlaftFavorableCoordinadorMail::class);
     }
 
     public function test_finalizar_sin_concepto_falla_422(): void
