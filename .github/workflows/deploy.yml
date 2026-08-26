@@ -124,8 +124,18 @@ jobs:
             # nunca en texto plano en este workflow ni en PROD.env del repo.
             # Se reescribe en cada deploy, así que no hay drift entre
             # PROD.env y lo que realmente termina corriendo.
-            sed -i 's/^MAIL_MAILER=.*/MAIL_MAILER=graph/' .env
+            #
+            # SCRUM-272: el 'sed s/^MAIL_MAILER=.../ ' original solo
+            # reemplaza una línea MAIL_MAILER= preexistente — ni TEST.env ni
+            # PROD.env tienen esa línea, así que era un no-op silencioso y
+            # Laravel caía al default 'log' (config/mail.php: env('MAIL_MAILER',
+            # 'log')): cada correo se escribía en storage/logs/laravel.log en
+            # vez de enviarse, sin ningún error visible. Fix: borrar la línea
+            # si existe y volver a agregarla siempre, mismo criterio idempotente
+            # que las líneas GRAPH_MAIL_* de abajo.
+            sed -i '/^MAIL_MAILER=/d' .env
             {
+              echo "MAIL_MAILER=graph"
               echo "GRAPH_MAIL_TENANT_ID=$GRAPH_MAIL_TENANT_ID"
               echo "GRAPH_MAIL_CLIENT_ID=$GRAPH_MAIL_CLIENT_ID"
               echo "GRAPH_MAIL_CLIENT_SECRET=$GRAPH_MAIL_CLIENT_SECRET"
@@ -226,8 +236,15 @@ jobs:
             # mismo buzón/app que producción, credenciales inyectadas desde
             # GitHub Secrets (envs: arriba), nunca en texto plano en este
             # workflow ni en TEST.env del repo. Se reescribe en cada deploy.
-            sed -i 's/^MAIL_MAILER=.*/MAIL_MAILER=graph/' .env
+            #
+            # SCRUM-272: mismo fix que en deploy-prod — el 'sed s/^MAIL_MAILER=.../'
+            # original era un no-op porque TEST.env nunca tuvo esa línea, y
+            # Laravel caía en silencio al mailer 'log' (correos volcados a
+            # storage/logs/laravel.log en vez de enviarse). Borrar-y-reagregar,
+            # idempotente.
+            sed -i '/^MAIL_MAILER=/d' .env
             {
+              echo "MAIL_MAILER=graph"
               echo "GRAPH_MAIL_TENANT_ID=$GRAPH_MAIL_TENANT_ID"
               echo "GRAPH_MAIL_CLIENT_ID=$GRAPH_MAIL_CLIENT_ID"
               echo "GRAPH_MAIL_CLIENT_SECRET=$GRAPH_MAIL_CLIENT_SECRET"
