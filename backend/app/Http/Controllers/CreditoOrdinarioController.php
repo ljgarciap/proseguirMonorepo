@@ -114,20 +114,25 @@ class CreditoOrdinarioController extends Controller
      *    ajeno a esta pantalla) — basta con que el cliente ya haya subido
      *    algo ('subido' en adelante, distinto de 'pendiente'/'rechazado').
      */
+    // SCRUM-256: para claves 'req_item_{id}' el DocumentRequestItem.estado
+    // es la fuente de verdad y se chequea PRIMERO — antes se miraba
+    // documentos_raw[key] primero, así que un ítem marcado 'rechazado' por
+    // el Coordinador (corrección solicitada) seguía contando como
+    // "satisfecho" mientras el archivo viejo (ya rechazado) siguiera en el
+    // arreglo, dejando aprobar la etapa sin que el cliente corrigiera nada,
+    // y bloqueando el re-cargo del documento corregido (ver guard nuevo en
+    // transition()). El arreglo documentos_raw solo sigue siendo la fuente
+    // para las 4 claves legacy sin preset, que no tienen DocumentRequestItem.
     private function etapa1KeySatisfecha(string $key, array $documentos, CreditoOrdinario $credito): bool
     {
-        $valor = $documentos[$key] ?? null;
-        if (is_array($valor) ? count($valor) > 0 : !empty($valor)) {
-            return true;
-        }
-
         if (str_starts_with($key, 'req_item_')) {
             $itemId = (int) substr($key, strlen('req_item_'));
             $item = $credito->solicitudCredito?->documentRequest?->items?->firstWhere('id', $itemId);
             return $item && !in_array($item->estado, ['pendiente', 'rechazado'], true);
         }
 
-        return false;
+        $valor = $documentos[$key] ?? null;
+        return is_array($valor) ? count($valor) > 0 : !empty($valor);
     }
 
     /**
@@ -207,6 +212,25 @@ class CreditoOrdinarioController extends Controller
         // absoluta, cada transición hornearía de nuevo el APP_URL vigente
         // en todos los campos, no solo en el que cambia (SCRUM-148).
         $documentos = $credito->documentos_raw ?? [];
+
+        // SCRUM-256: no permitir volver a cargar un documento de Etapa 1 que
+        // ya fue cargado — antes el widget "Subir" quedaba habilitado
+        // siempre y cada envío nuevo se apilaba sobre lo ya cargado en
+        // documentos_raw[campo], produciendo entradas duplicadas visibles en
+        // el expediente (defensa en profundidad: el frontend ya oculta el
+        // botón vía puedeSubirDocumento(), esto cubre el endpoint directo).
+        // Se excluye el caso 'rechazado' del DocumentRequestItem —
+        // etapa1KeySatisfecha() ya lo trata como "no satisfecho" para
+        // permitir la corrección pedida por el Coordinador.
+        if ($request->filled('campo_documento') && ($request->hasFile('archivos') || $request->hasFile('archivo'))) {
+            $campoDocumentoIntento = $request->campo_documento;
+            if (in_array($campoDocumentoIntento, $this->etapa1DocumentKeys($credito), true)
+                && $this->etapa1KeySatisfecha($campoDocumentoIntento, $documentos, $credito)) {
+                return response()->json([
+                    'message' => 'Este documento ya fue cargado. Si necesitas reemplazarlo, contacta al Coordinador Comercial.',
+                ], 422);
+            }
+        }
 
         // 1. Manejo de Carga de Archivos
         // Documentos de Etapa 1 dirigidos por preset (claves 'req_item_{id}',
