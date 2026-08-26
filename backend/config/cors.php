@@ -23,6 +23,7 @@ return [
         'http://localhost',
         'http://localhost:4200',
         'http://auto.proseguirliquidez.com',
+        'https://auto.proseguirliquidez.com',
         'http://173.201.39.182',
         env('FRONTEND_URL', '*')
     ],
