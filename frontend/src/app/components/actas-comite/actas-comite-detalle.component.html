@@ -106,7 +106,10 @@
               <td>${{ (s.monto || 0) | number:'1.0-0':'es-CO' }}</td>
               <td>{{ s.origen === 'sistema' ? 'Análisis financiero' : (s.origen === 'manual_existente' ? 'Existente (agregado manualmente)' : 'Adicionada manualmente') }}</td>
               <td class="text-right">
-                <button *ngIf="s.origen === 'manual' && !soloLectura" class="btn-pro sm secondary" (click)="eliminarSolicitud(s)">Eliminar</button>
+                <!-- SCRUM-279: antes solo se podía eliminar origen 'manual'
+                     — 'sistema'/'manual_existente' (crédito real) también se
+                     puede quitar de esta acta puntual, ver eliminarSolicitud(). -->
+                <button *ngIf="!soloLectura" class="btn-pro sm secondary" (click)="eliminarSolicitud(s)">Eliminar</button>
               </td>
             </tr>
             <tr *ngIf="!acta.solicitudes?.length"><td colspan="5" class="text-center text-muted py-4">No hay solicitudes presentadas.</td></tr>

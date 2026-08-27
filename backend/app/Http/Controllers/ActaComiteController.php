@@ -175,9 +175,14 @@ class ActaComiteController extends Controller
         }
 
         $idsYaIncluidos = $acta->solicitudes()->whereNotNull('credito_ordinario_id')->pluck('credito_ordinario_id');
+        // SCRUM-279: créditos que el Coordinador eliminó explícitamente de
+        // ESTA acta (ver eliminarSolicitud()) — siguen en comite_evaluacion
+        // (elegibles para una futura acta) pero no se auto-reincorporan acá.
+        $idsExcluidos = $acta->creditos_excluidos ?? [];
 
         $creditosNuevos = CreditoOrdinario::where('estado', 'comite_evaluacion')
             ->whereNotIn('id', $idsYaIncluidos)
+            ->whereNotIn('id', $idsExcluidos)
             ->with(['solicitudCredito.cliente', 'solicitudCredito.tipoCredito', 'solicitudCredito.amortizacion'])
             ->get();
 
@@ -278,6 +283,15 @@ class ActaComiteController extends Controller
             }
 
             $solicitud = $this->crearSolicitudDesdeCredito($acta, $credito, origen: 'manual_existente');
+
+            // SCRUM-279: si se había excluido antes (ver eliminarSolicitud()),
+            // re-agregarlo a mano revierte la exclusión — si no, quedaría un
+            // ID excluido "huérfano" sin ningún efecto real pero confuso de
+            // leer más adelante.
+            $excluidos = $acta->creditos_excluidos ?? [];
+            if (in_array($credito->id, $excluidos, true)) {
+                $acta->creditos_excluidos = array_values(array_diff($excluidos, [$credito->id]));
+            }
         } else {
             $solicitud = ActaComiteSolicitud::create($validado + [
                 'acta_comite_id' => $acta->id,
@@ -379,8 +393,16 @@ class ActaComiteController extends Controller
     }
 
     /**
-     * Elimina una solicitud manual. Las solicitudes de origen "sistema" no
-     * se pueden eliminar desde acá (regla explícita del ticket).
+     * Elimina una solicitud de "Presentación de solicitudes" (SCRUM-279).
+     * Si está vinculada a un CreditoOrdinario real que sigue en
+     * comite_evaluacion (origen 'sistema' o 'manual_existente'), borrar la
+     * fila no alcanza: sincronizarSolicitudesElegibles() la vuelve a traer
+     * en la próxima carga porque el crédito real sigue siendo elegible — se
+     * registra en `creditos_excluidos` para que el auto-sync la ignore.
+     * Decisión explícita de Luis (2026-08-27): el crédito sigue disponible
+     * para una futura acta, no cambia de estado, solo se excluye de ESTA
+     * acta puntual (se puede volver a agregar a mano desde el buscador si
+     * fue un error).
      */
     public function eliminarSolicitud(Request $request, ActaComite $acta, ActaComiteSolicitud $solicitud)
     {
@@ -392,10 +414,13 @@ class ActaComiteController extends Controller
         $this->autorizarRol($activeRole);
         $this->rechazarSiAprobada($acta);
 
-        if ($solicitud->origen !== 'manual') {
-            return response()->json([
-                'message' => 'Solo se pueden eliminar solicitudes agregadas manualmente.',
-            ], 422);
+        if ($solicitud->credito_ordinario_id) {
+            $excluidos = $acta->creditos_excluidos ?? [];
+            if (!in_array($solicitud->credito_ordinario_id, $excluidos, true)) {
+                $excluidos[] = $solicitud->credito_ordinario_id;
+                $acta->creditos_excluidos = $excluidos;
+                $acta->save();
+            }
         }
 
         $solicitud->delete();

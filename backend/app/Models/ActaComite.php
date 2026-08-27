@@ -23,6 +23,7 @@ class ActaComite extends Model
         'orden_dia',
         'orden_dia_aprobado',
         'desarrollo',
+        'creditos_excluidos',
         'observaciones_generales',
         'firmantes',
         'elaborada_por_id',
@@ -36,6 +37,7 @@ class ActaComite extends Model
             'fecha_reunion' => 'date',
             'asistentes' => 'array',
             'orden_dia_aprobado' => 'boolean',
+            'creditos_excluidos' => 'array',
             'firmantes' => 'array',
             'registrada_at' => 'datetime',
         ];
