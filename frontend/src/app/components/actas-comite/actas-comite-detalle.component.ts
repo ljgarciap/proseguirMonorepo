@@ -9,6 +9,7 @@ import { debounceTime } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
 import { CreditoElegibleAutocompleteComponent } from '../shared/credito-elegible-autocomplete/credito-elegible-autocomplete.component';
+import { TimeSelect12hComponent } from '../shared/time-select-12h/time-select-12h.component';
 import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 import Swal from 'sweetalert2';
 
@@ -36,7 +37,7 @@ interface OrdenDiaItem {
 @Component({
   selector: 'app-actas-comite-detalle',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, QuillModule, CreditoElegibleAutocompleteComponent, MilesSeparatorDirective],
+  imports: [CommonModule, FormsModule, RouterModule, QuillModule, CreditoElegibleAutocompleteComponent, TimeSelect12hComponent, MilesSeparatorDirective],
   templateUrl: './actas-comite-detalle.component.html',
   styleUrls: ['./actas-comite-detalle.component.css']
 })

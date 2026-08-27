@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { execSync } from 'child_process';
 import { loginAs } from './helpers/auth';
+import { seleccionarHora12h } from './helpers/time-select';
 
 /**
  * Validación visual SCRUM-189 (Actas Comité de Crédito) + SCRUM-190
@@ -88,7 +89,9 @@ test('flujo completo Acta de Comité con solicitud manual, visible luego en Gest
   // Decidir todo DESPUÉS de este bloque evita dejar alguna sin decisión. ---
   await page.getByRole('button', { name: '1. Orden del día' }).click();
   await page.locator('input[type="date"]').fill('2026-08-12');
-  await page.locator('input[type="time"]').first().fill('09:00');
+  // SCRUM-277: el <input type="time"> nativo se reemplazó por
+  // <app-time-select-12h> (3 <select>) — ver helpers/time-select.ts.
+  await seleccionarHora12h(page.locator('.form-field', { hasText: 'Hora de inicio' }), '09:00');
   const editorLugar = page.locator('.ql-editor').first();
   await editorLugar.click();
   await editorLugar.fill('Sala de juntas Playwright');
@@ -98,7 +101,7 @@ test('flujo completo Acta de Comité con solicitud manual, visible luego en Gest
   await page.getByRole('button', { name: 'OK' }).click(); // SweetAlert2 "Orden del día aprobado"
 
   await page.getByRole('button', { name: '5. Observaciones' }).click();
-  await page.locator('input[type="time"]').fill('10:30');
+  await seleccionarHora12h(page.locator('.form-field', { hasText: 'Termina la reunión' }), '10:30');
 
   await page.getByRole('button', { name: '6. Firmantes' }).click();
   // .first(): el acta prellena "Asistentes" con los de la última acta
