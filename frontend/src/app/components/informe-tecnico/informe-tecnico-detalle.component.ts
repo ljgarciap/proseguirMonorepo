@@ -242,9 +242,13 @@ export class InformeTecnicoDetalleComponent implements OnInit, OnDestroy {
 
     this.observacionesIngeniero = this.informe.observaciones_ingeniero || '';
 
+    // SCRUM-276: si el coordinador todavía no guardó un valor propio, se
+    // prellena con el monto ya solicitado en el crédito (this.credito.monto,
+    // ver MONTO SOLICITADO en credito-ordinario.component.html) — sigue
+    // siendo editable, solo evita que el usuario tenga que buscarlo/tipearlo.
     const cs = this.informe.credito_solicitado || {};
     this.creditoSolicitadoInput = {
-      credito_solicitado: cs.credito_solicitado ?? null,
+      credito_solicitado: cs.credito_solicitado ?? this.credito?.monto ?? null,
       aptos_vendidos: cs.aptos_vendidos ?? null,
       porcentaje_cuotas_iniciales_pendientes: cs.porcentaje_cuotas_iniciales_pendientes ?? 0.30
     };

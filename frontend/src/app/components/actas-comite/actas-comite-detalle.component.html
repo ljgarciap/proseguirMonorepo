@@ -40,7 +40,7 @@
         </div>
         <div class="form-field">
           <label>Hora de inicio *</label>
-          <input class="pro-input" type="time" [(ngModel)]="horaInicio" (change)="onFieldChangeInmediato()" [disabled]="soloLectura">
+          <app-time-select-12h [(ngModel)]="horaInicio" (ngModelChange)="onFieldChangeInmediato()" [disabled]="soloLectura"></app-time-select-12h>
         </div>
       </div>
 
@@ -154,7 +154,7 @@
           </div>
           <div class="form-field">
             <label>Monto</label>
-            <input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="s.monto" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+            <input class="pro-input text-right" type="text" inputmode="decimal" milesSeparator [(ngModel)]="s.monto" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
           </div>
           <!-- SCRUM-189 (2026-08-12, comentario de Juan): también sin
                dropdown para créditos manuales — ahora es catálogo real para
@@ -243,7 +243,7 @@
                 <!-- SCRUM-189 (2026-08-12, punto 4): se prellena con el monto
                      del crédito al cargar (ver prellenarMontoDecision), sigue
                      editable. -->
-                <input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="s.monto_decision" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
+                <input class="pro-input text-right" type="text" inputmode="decimal" milesSeparator [(ngModel)]="s.monto_decision" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
               </td>
             </tr>
             <tr *ngIf="!acta.solicitudes?.length"><td colspan="3" class="text-center text-muted py-4">No hay solicitudes registradas.</td></tr>
@@ -270,7 +270,7 @@
 
       <div class="form-field mt-3">
         <label>Termina la reunión a las... *</label>
-        <input class="pro-input" type="time" [(ngModel)]="horaFinalizacion" (change)="onFieldChangeInmediato()" [disabled]="soloLectura">
+        <app-time-select-12h [(ngModel)]="horaFinalizacion" (ngModelChange)="onFieldChangeInmediato()" [disabled]="soloLectura"></app-time-select-12h>
       </div>
     </section>
 
