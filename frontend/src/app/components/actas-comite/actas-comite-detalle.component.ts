@@ -268,9 +268,18 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
     });
   }
 
+  // SCRUM-279: para una solicitud vinculada a un crédito real
+  // (origen 'sistema'/'manual_existente') el backend no borra el crédito ni
+  // le cambia el estado — solo lo excluye de ESTA acta (sigue elegible para
+  // una futura). Aclarar esto en el diálogo evita que se lea como "borré el
+  // crédito" cuando en realidad sigue disponible.
   eliminarSolicitud(solicitud: any): void {
+    const esCreditoReal = !!solicitud.credito_ordinario_id;
     Swal.fire({
       title: '¿Eliminar solicitud?',
+      text: esCreditoReal
+        ? 'El crédito no se elimina ni cambia de estado — solo se quita de esta Acta. Puede volver a agregarse desde el buscador si hace falta.'
+        : undefined,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Eliminar',

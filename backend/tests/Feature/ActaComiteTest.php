@@ -336,10 +336,44 @@ class ActaComiteTest extends TestCase
 
         $manualId = $manual->json('id');
         $this->deleteJson("/api/actas-comite/{$acta['id']}/solicitudes/{$manualId}", [], $headers)->assertStatus(200);
+    }
 
-        // Las de origen "sistema" no se pueden eliminar.
+    /**
+     * SCRUM-279 (2026-08-27, decisión de Luis): eliminar una solicitud de
+     * origen "sistema"/"manual_existente" (vinculada a un CreditoOrdinario
+     * real que sigue en comite_evaluacion) ya no está bloqueado — se
+     * excluye SOLO de esta acta puntual (creditos_excluidos), sin cambiar
+     * el estado del crédito, para que sincronizarSolicitudesElegibles() no
+     * la vuelva a traer en el próximo show(). Se puede volver a agregar a
+     * mano desde el buscador.
+     */
+    public function test_eliminar_solicitud_de_credito_real_la_excluye_sin_que_reaparezca(): void
+    {
+        $credito = $this->crearCreditoEnComiteEvaluacion();
+        Passport::actingAs($this->coordinador);
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+        $acta = $this->postJson('/api/actas-comite/generar', [], $headers)->json();
         $sistemaId = $acta['solicitudes'][0]['id'];
-        $this->deleteJson("/api/actas-comite/{$acta['id']}/solicitudes/{$sistemaId}", [], $headers)->assertStatus(422);
+
+        $this->deleteJson("/api/actas-comite/{$acta['id']}/solicitudes/{$sistemaId}", [], $headers)
+            ->assertStatus(200);
+
+        // El crédito real no cambió de estado — sigue elegible para otra acta.
+        $credito->refresh();
+        $this->assertSame('comite_evaluacion', $credito->estado);
+
+        // Pero un show() (dispara sincronizarSolicitudesElegibles()) no lo
+        // vuelve a traer a ESTA acta, porque quedó en creditos_excluidos.
+        $recargada = $this->getJson("/api/actas-comite/{$acta['id']}", $headers)->assertStatus(200)->json();
+        $this->assertCount(0, $recargada['solicitudes']);
+
+        // Se puede volver a agregar a mano — y sale de creditos_excluidos.
+        $this->postJson("/api/actas-comite/{$acta['id']}/solicitudes", [
+            'credito_ordinario_id' => $credito->id,
+        ], $headers)->assertStatus(201)->assertJsonPath('origen', 'manual_existente');
+
+        $actaModelo = \App\Models\ActaComite::find($acta['id']);
+        $this->assertNotContains($credito->id, $actaModelo->creditos_excluidos ?? []);
     }
 
     /**
