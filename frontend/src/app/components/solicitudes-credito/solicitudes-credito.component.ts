@@ -57,6 +57,18 @@ export class SolicitudesCreditoComponent implements OnInit {
   // solo evita que el usuario intente un cambio que sabemos que va a fallar.
   editingTieneCreditoOrdinario = false;
 
+  // SCRUM-244 (2º rebote QA 2026-08-27): el texto por defecto de asunto/
+  // mensaje solo se asignaba dentro de onRegisterVisit()/onNewManualRequest()
+  // (fix previo 73f8cc9) — la pestaña "Registrar Solicitud" (switchTab) no
+  // pasa por ninguno de los dos, así que ese camino mostraba el formulario
+  // con asunto/mensaje en '' aunque el resto de campos sí se podía
+  // diligenciar a mano (cliente, proyecto, etc.). El default ahora vive acá,
+  // fuente única, referenciada también en resetForm() y en los dos métodos
+  // de arriba — así cualquier estado "nuevo" del formulario nace ya con el
+  // texto correcto, sin depender de qué método lo puso en pantalla.
+  private readonly defaultAsuntoNotificacion = 'Documentos requeridos para continuar con su solicitud de crédito';
+  private readonly defaultMensajeNotificacion = 'Hemos iniciado el registro de su solicitud de crédito. Para continuar con el proceso, por favor ingrese a la plataforma y cargue los siguientes documentos:';
+
   // Form Fields
   form: any = {
     cliente_id: '',
@@ -104,8 +116,8 @@ export class SolicitudesCreditoComponent implements OnInit {
 
     // Notification fields
     correo_notificacion: '',
-    asunto_notificacion: '',
-    mensaje_notificacion: ''
+    asunto_notificacion: this.defaultAsuntoNotificacion,
+    mensaje_notificacion: this.defaultMensajeNotificacion
   };
 
   constructor(private http: HttpClient, private authService: AuthService) {}
@@ -272,8 +284,8 @@ export class SolicitudesCreditoComponent implements OnInit {
     // con cliente nuevo, si no se tocaban esos campos después, el correo
     // real salía sin credenciales (bug reportado por QA).
     const tcName = visit.tipo_credito?.nombre || 'Crédito Ordinario';
-    this.form.asunto_notificacion = 'Documentos requeridos para continuar con su solicitud de crédito';
-    this.form.mensaje_notificacion = 'Hemos iniciado el registro de su solicitud de crédito. Para continuar con el proceso, por favor ingrese a la plataforma y cargue los siguientes documentos:';
+    this.form.asunto_notificacion = this.defaultAsuntoNotificacion;
+    this.form.mensaje_notificacion = this.defaultMensajeNotificacion;
 
     // Attempt to auto-select a preset matching the credit type name
     this.autoSelectPreset(tcName);
@@ -378,8 +390,8 @@ export class SolicitudesCreditoComponent implements OnInit {
     this.resetForm();
     this.isFromVisit = false;
     this.selectedVisitId = null;
-    this.form.asunto_notificacion = 'Documentos requeridos para continuar con su solicitud de crédito';
-    this.form.mensaje_notificacion = 'Hemos iniciado el registro de su solicitud de crédito. Para continuar con el proceso, por favor ingrese a la plataforma y cargue los siguientes documentos:';
+    this.form.asunto_notificacion = this.defaultAsuntoNotificacion;
+    this.form.mensaje_notificacion = this.defaultMensajeNotificacion;
     this.activeTab = 'registrar';
   }
 
@@ -624,8 +636,8 @@ export class SolicitudesCreditoComponent implements OnInit {
       fuente_pago: '',
 
       correo_notificacion: '',
-      asunto_notificacion: '',
-      mensaje_notificacion: ''
+      asunto_notificacion: this.defaultAsuntoNotificacion,
+      mensaje_notificacion: this.defaultMensajeNotificacion
     };
   }
 
