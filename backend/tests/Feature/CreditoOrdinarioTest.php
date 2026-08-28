@@ -746,4 +746,60 @@ class CreditoOrdinarioTest extends TestCase
             'archivos' => [UploadedFile::fake()->createWithContent('cedula.pdf', 'contenido genuinamente distinto')],
         ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
     }
+
+    /**
+     * SCRUM-292: 'aprobada_garantias' se fija apenas el Comité aprueba, ANTES
+     * de que el Coordinador Comercial gestione la solicitud (elija preset,
+     * GestionCreditoController::notificar()). Antes del fix, ninguno de los
+     * 2 controles existía: (a) el mapa de roles de transition() no tenía
+     * entrada para este estado, así que CUALQUIER rol podía subir sin
+     * restricción, y (b) no había ningún chequeo de solicitud_gestionada.
+     */
+    public function test_no_permite_subir_documentos_de_garantias_antes_de_que_coordinador_gestione(): void
+    {
+        Passport::actingAs($this->admin);
+        $creditoId = $this->postJson('/api/creditos', [
+            'monto' => 50000000.00,
+            'plazo_meses' => 24,
+            'cliente_id' => $this->cliente->id,
+        ], ['X-Active-Role' => 'superadmin'])->json('id');
+
+        $credito = CreditoOrdinario::find($creditoId);
+        $credito->estado = 'aprobada_garantias';
+        $credito->solicitud_gestionada = false;
+        $credito->save();
+
+        // Cliente: bloqueado con 422 explícito (no un 403 genérico de rol).
+        Passport::actingAs($this->cliente);
+        $this->subirArchivo($creditoId, 'pagare_borrador', 'cliente', 'pagare.pdf')
+            ->assertStatus(422)
+            ->assertJsonPath(
+                'message',
+                'La gestión de garantías aún no ha sido completada por el Coordinador Comercial. La carga de documentos se habilita una vez enviada esa gestión.'
+            );
+
+        // Coordinador Comercial: mismo bloqueo, la guarda no depende del rol.
+        Passport::actingAs($this->coordinador);
+        $this->subirArchivo($creditoId, 'pagare_borrador', 'coordinador_comercial', 'pagare.pdf')
+            ->assertStatus(422);
+
+        // Un rol sin autorización en este estado (ej. tesorería) sigue
+        // recibiendo el 403 de roles_requeridos, no el 422 de gestión.
+        Passport::actingAs($this->tesoreria);
+        $this->subirArchivo($creditoId, 'pagare_borrador', 'tesoreria', 'pagare.pdf')
+            ->assertStatus(403);
+
+        $this->assertEmpty(CreditoOrdinario::find($creditoId)->documentos_raw['pagare_borrador'] ?? null);
+
+        // Una vez el Coordinador gestiona (marca solicitud_gestionada), la
+        // carga del cliente procede con normalidad.
+        $credito->refresh();
+        $credito->solicitud_gestionada = true;
+        $credito->save();
+
+        Passport::actingAs($this->cliente);
+        $this->subirArchivo($creditoId, 'pagare_borrador', 'cliente', 'pagare.pdf')
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'aprobada_garantias');
+    }
 }

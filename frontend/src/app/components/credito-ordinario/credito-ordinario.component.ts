@@ -375,13 +375,26 @@ export class CreditoOrdinarioComponent implements OnInit {
     ];
   }
 
+  // SCRUM-292: 'aprobada_garantias' se fija apenas el Comité aprueba
+  // (antes de cualquier gestión) y solo pasa a solicitud_gestionada = true
+  // cuando el Coordinador Comercial completa GestionCreditoController::
+  // notificar() con el preset elegido. En esa ventana intermedia no existe
+  // todavía ningún DocumentRequest real de garantías — la carga del
+  // cliente debe quedar deshabilitada.
+  get etapa4PendienteGestion(): boolean {
+    return this.selectedCredito?.estado === 'aprobada_garantias' && !this.selectedCredito?.solicitud_gestionada;
+  }
+
   // SCRUM-229: los documentos de Etapa 4 (Formalización de Garantías) se
   // derivan del DocumentRequest de garantías (preset elegido por el
   // Coordinador Comercial al gestionar 'aprobada_garantias', tageado
   // 'etapa' = 'garantias' — ver GestionCreditoController::
-  // crearSolicitudDocumentos()). Si el crédito todavía no llegó a esa
-  // gestión (o es un crédito legacy pre-SCRUM-193/205 que nunca la tuvo),
-  // se mantiene la lista fija original de 4 documentos.
+  // crearSolicitudDocumentos()). Si el crédito es legacy (estado
+  // 'formalizacion_garantias', pre-SCRUM-193/205, que nunca tuvo ese
+  // DocumentRequest) se mantiene la lista fija original de 4 documentos.
+  // SCRUM-292: si en cambio todavía está 'aprobada_garantias' SIN
+  // gestionar, no se muestra ningún documento — la lista fija no
+  // corresponde a ningún preset real todavía elegido.
   get etapa4Docs(): { key: string; nombre: string; descripcion: string; upload?: any }[] {
     const items = this.selectedCredito?.solicitud_credito?.garantias_document_request?.items;
     if (items && items.length > 0) {
@@ -391,6 +404,9 @@ export class CreditoOrdinarioComponent implements OnInit {
         descripcion: item.requirement?.descripcion || '',
         upload: item.upload || null
       }));
+    }
+    if (this.etapa4PendienteGestion) {
+      return [];
     }
     return [
       { key: 'pagare_borrador', nombre: 'Pagaré (Borrador)', descripcion: 'Plantilla de Pagaré para firma. Responsable de carga: Comercial.' },

@@ -670,7 +670,11 @@
                  tiene DocumentRequest de garantías, ej. créditos anteriores a
                  SCRUM-193/205). -->
             <p class="section-desc" *ngIf="etapa4PresetNombre">Documentación solicitada: <strong>{{ etapa4PresetNombre }}</strong></p>
-            <div class="documents-grid-grouped">
+            <!-- SCRUM-292: mientras el Coordinador Comercial no complete la
+                 gestión (elegir preset en Gestión de Créditos), todavía no
+                 existe ningún documento real que cargar. -->
+            <p class="section-desc" *ngIf="etapa4PendienteGestion">Pendiente de gestión por el Coordinador Comercial. La carga de documentos se habilita una vez enviada esa gestión desde Gestión de Créditos.</p>
+            <div class="documents-grid-grouped" *ngIf="!etapa4PendienteGestion">
               <div class="doc-box-new" *ngFor="let doc of etapa4Docs">
                 <div class="doc-main-info">
                   <span class="material-symbols-outlined doc-icon-new" [class.completed]="docFileCount(doc) > 0">description</span>
@@ -683,7 +687,7 @@
                   <span class="doc-status-pill success" *ngIf="docFileCount(doc) > 0">Cargado ({{ docFileCount(doc) }})</span>
                   <span class="doc-status-pill error" *ngIf="docFileCount(doc) === 0">Pendiente</span>
 
-                  <div class="action-inline-upload" *ngIf="['aprobada_garantias', 'formalizacion_garantias'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
+                  <div class="action-inline-upload" *ngIf="['aprobada_garantias', 'formalizacion_garantias'].includes(selectedCredito.estado) && !etapa4PendienteGestion && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole)">
                     <input type="file" id="inline-file-{{doc.key}}" (change)="onMultiFileUpload($event, doc.key)" accept=".pdf" multiple hidden>
                     <label for="inline-file-{{doc.key}}" class="btn-inline-upload">Subir</label>
                   </div>
