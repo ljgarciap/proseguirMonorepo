@@ -6,9 +6,11 @@ use App\Http\Controllers\Concerns\ResolvesActiveRole;
 use App\Mail\DesembolsoAprobadoTesoreriaMail;
 use App\Mail\DesembolsoRechazadoOperativoMail;
 use App\Mail\DesembolsoRegistradoMail;
+use App\Mail\FormalizacionGarantiasCoordinadorMail;
 use App\Mail\FormalizacionGarantiasResultadoMail;
 use App\Mail\GestionCreditoNotificacionMail;
 use App\Mail\RegistroCyfAprobadoMail;
+use App\Mail\RegistroCyfPendienteAprobacionMail;
 use App\Mail\TransferenciaRealizadaClienteMail;
 use App\Mail\TransferenciaRegistradaInternaMail;
 use App\Models\ActivityLog;
@@ -894,6 +896,21 @@ class GestionCreditoController extends Controller
             }
         }
 
+        // SCRUM-284: la notificación al Coordinador Comercial solo se genera
+        // cuando todas las garantías quedaron aprobadas (§5 REGLA CRÍTICA del
+        // ticket) — si hay ajustes, únicamente se avisa al cliente (arriba).
+        if (!$hayNoAprobada) {
+            $coordinador = $credito->solicitudCredito?->usuarioRegistra;
+            if ($coordinador && $coordinador->email) {
+                $urlAcceso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/registro-cyf');
+                try {
+                    Mail::to($coordinador->email)->send(new FormalizacionGarantiasCoordinadorMail($credito, $nombreCliente, $urlAcceso));
+                } catch (Throwable $e) {
+                    // Informativo — no revierte la transición ya guardada.
+                }
+            }
+        }
+
         return response()->json([
             'message' => $hayNoAprobada
                 ? 'Validación registrada. La solicitud vuelve al cliente para ajustes.'
@@ -971,6 +988,17 @@ class GestionCreditoController extends Controller
         $credito->fecha_gestion = null;
         $credito->historial_estados = $historial;
         $credito->save();
+
+        // SCRUM-288: 'gerente' no tiene modelo de asignación por crédito
+        // (igual que 'operativo' en SCRUM-280) — se notifica a todos los
+        // activos con el rol, vía notificarPorRol().
+        $urlAcceso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/aprobacion-registro-cyf');
+        $this->notificarPorRol('gerente', new RegistroCyfPendienteAprobacionMail(
+            $credito,
+            $this->nombreClienteParaCorreo($credito),
+            $user->name,
+            $urlAcceso
+        ));
 
         return response()->json([
             'message' => 'El crédito quedó registrado en CYF y disponible para la aprobación de Gerencia.',
