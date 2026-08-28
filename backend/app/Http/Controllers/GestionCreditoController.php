@@ -9,8 +9,10 @@ use App\Mail\DesembolsoRegistradoMail;
 use App\Mail\FormalizacionGarantiasCoordinadorMail;
 use App\Mail\FormalizacionGarantiasResultadoMail;
 use App\Mail\GestionCreditoNotificacionMail;
+use App\Mail\RegistroCyfAprobadoCoordinadorMail;
 use App\Mail\RegistroCyfAprobadoMail;
 use App\Mail\RegistroCyfPendienteAprobacionMail;
+use App\Mail\RegistroCyfRechazadoCoordinadorMail;
 use App\Mail\TransferenciaRealizadaClienteMail;
 use App\Mail\TransferenciaRegistradaInternaMail;
 use App\Models\ActivityLog;
@@ -1079,9 +1081,21 @@ class GestionCreditoController extends Controller
         $credito->fecha_gestion = null;
         $credito->save();
 
+        // SCRUM-294: NTF-01 y NTF-02 son independientes entre sí (una no
+        // depende de que la otra haya tenido éxito) — Operativo recibe la
+        // acción a ejecutar, Coordinador Comercial solo el aviso de que el
+        // proceso continúa. En rechazo, únicamente NTF-03 a Coordinador
+        // Comercial (§4.2 del ticket: no se notifica a Operativo ni se envía
+        // aviso de continuidad).
         if ($aprobado) {
-            $urlIngreso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/desembolso-ingreso');
-            $this->notificarPorRol('operativo', new RegistroCyfAprobadoMail($credito, $urlIngreso));
+            $urlIngresoOperativo = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/desembolso-ingreso');
+            $this->notificarPorRol('operativo', new RegistroCyfAprobadoMail($credito, $urlIngresoOperativo), $credito, 'registro_cyf_aprobado_operativo');
+
+            $urlIngresoCoordinador = $this->urlIngresoSistema('/gestion-creditos');
+            $this->notificarPorRol('coordinador_comercial', new RegistroCyfAprobadoCoordinadorMail($credito, $urlIngresoCoordinador), $credito, 'registro_cyf_aprobado_coordinador');
+        } else {
+            $urlIngresoCoordinador = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/registro-cyf');
+            $this->notificarPorRol('coordinador_comercial', new RegistroCyfRechazadoCoordinadorMail($credito, $observaciones, $urlIngresoCoordinador), $credito, 'registro_cyf_rechazado_coordinador');
         }
 
         return response()->json([
@@ -1197,8 +1211,14 @@ class GestionCreditoController extends Controller
         $credito->fecha_gestion = null;
         $credito->save();
 
+        // SCRUM-299: mismo endpoint atiende el registro inicial y la
+        // corrección posterior a un rechazo de Gerencia (desembolsoAprobacion()
+        // devuelve el estado a 'desembolso_ingreso') — cada llamada aquí es
+        // un evento de notificación nuevo, no un reintento del anterior, así
+        // que no hay guard de duplicado que aplicar además del de estado ya
+        // validado arriba.
         $urlIngreso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/desembolso-aprobacion');
-        $this->notificarPorRol('gerente', new DesembolsoRegistradoMail($credito, $urlIngreso));
+        $this->notificarPorRol('gerente', new DesembolsoRegistradoMail($credito, $urlIngreso), $credito, 'desembolso_registrado_gerente');
 
         return response()->json([
             'message' => 'Operación de desembolso registrada. Disponible para la aprobación de Gerencia.',
@@ -1738,18 +1758,55 @@ class GestionCreditoController extends Controller
      * con un rol dado — mismo idioma que ListasRestrictivasSarlaftController
      * (User::whereJsonContains) e InternalDocumentController. Un fallo de
      * envío no revierte la transición ya guardada (igual criterio que
-     * guardarFormalizacionGarantias()). */
-    private function notificarPorRol(string $role, $mailable): void
+     * guardarFormalizacionGarantias()).
+     *
+     * SCRUM-294/299 (§"Registro de..."/"Auditoría"): $credito y
+     * $tipoNotificacion son opcionales para no tocar los call sites que ya
+     * estaban en producción (SCRUM-219/224) — cuando se pasan, cada intento
+     * (enviado, fallido, o sin destinatarios activos) queda trazado en
+     * ActivityLog, mismo criterio de auditoría que notificar()
+     * (gestion_credito_notificacion_enviada/_fallida). */
+    private function notificarPorRol(string $role, $mailable, ?CreditoOrdinario $credito = null, ?string $tipoNotificacion = null): void
     {
         $destinatarios = User::whereJsonContains('roles', $role)->pluck('email')->filter()->all();
+
         if (empty($destinatarios)) {
+            if ($credito && $tipoNotificacion) {
+                app(ActivityLogService::class)->registrar(
+                    'notificacion_rol_sin_destinatarios',
+                    "No hay usuarios activos con rol {$role} para la notificación {$tipoNotificacion} de la solicitud {$credito->numero_solicitud}.",
+                    Auth::user(),
+                    $credito,
+                    ['tipo_notificacion' => $tipoNotificacion, 'rol_destino' => $role]
+                );
+            }
+
             return;
         }
 
         try {
             Mail::to($destinatarios)->send($mailable);
+
+            if ($credito && $tipoNotificacion) {
+                app(ActivityLogService::class)->registrar(
+                    'notificacion_rol_enviada',
+                    "Notificación {$tipoNotificacion} enviada a rol {$role} para la solicitud {$credito->numero_solicitud}.",
+                    Auth::user(),
+                    $credito,
+                    ['tipo_notificacion' => $tipoNotificacion, 'rol_destino' => $role, 'destinatarios' => $destinatarios]
+                );
+            }
         } catch (Throwable $e) {
             // Notificación informativa — no revierte la transición.
+            if ($credito && $tipoNotificacion) {
+                app(ActivityLogService::class)->registrar(
+                    'notificacion_rol_fallida',
+                    "Falló el envío de la notificación {$tipoNotificacion} a rol {$role} para la solicitud {$credito->numero_solicitud}.",
+                    Auth::user(),
+                    $credito,
+                    ['tipo_notificacion' => $tipoNotificacion, 'rol_destino' => $role, 'destinatarios' => $destinatarios, 'error' => $e->getMessage()]
+                );
+            }
         }
     }
 

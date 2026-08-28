@@ -77,9 +77,6 @@ class GestionCreditoNotificacionMail extends Mailable
             // de "entrar a cargar lo pedido", no la formalización de la
             // aprobación del Comité.
             'botonTexto' => $this->resultado === 'aprobada_garantias' ? 'Diligenciar garantías' : 'Ingresar a Mis Créditos',
-            // RN-11: aviso explícito de que el correo no expone hallazgos
-            // ni observaciones internas — solo aplica al escenario SARLAFT.
-            'mostrarAvisoSarlaft' => $this->resultado === 'sarlaft_desfavorable',
         ]);
     }
 
