@@ -695,7 +695,12 @@
                   <a *ngFor="let url of getDocFiles(doc.key)" [href]="url" target="_blank" class="btn-view-doc">
                     <span class="material-symbols-outlined">open_in_new</span> {{ getDocFileName(url) }}
                   </a>
-                  <button *ngIf="doc.upload" type="button" (click)="verArchivoSubido(doc.upload.id, doc.upload.original_name)" class="btn-view-doc">
+                  <!-- SCRUM-292 (rebote): mismo bug que SCRUM-256 ya resolvió para Etapa 1
+                       (línea ~548) pero nunca se replicó acá — doc.upload es el mismo
+                       archivo que ya se lista arriba cuando la carga vino de esta pantalla
+                       (ver docFileCount). Solo se muestra si el arreglo está vacío, o sea
+                       la carga vino de otra pantalla (ej. "Solicitud de Documentos"). -->
+                  <button *ngIf="doc.upload && getDocFiles(doc.key).length === 0" type="button" (click)="verArchivoSubido(doc.upload.id, doc.upload.original_name)" class="btn-view-doc">
                     <span class="material-symbols-outlined">open_in_new</span> {{ doc.upload.original_name }}
                   </button>
                 </div>
