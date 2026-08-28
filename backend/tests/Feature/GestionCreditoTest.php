@@ -920,6 +920,49 @@ class GestionCreditoTest extends TestCase
     }
 
     /**
+     * SCRUM-293: reproduce el escenario exacto del ticket (crédito
+     * CO-2026-KUIS25) — el cliente carga el documento de garantías directo
+     * desde Crédito Ordinario (POST /api/creditos/{id}/transition, botón
+     * "Subir" de Etapa 4/5, habilitado para el rol cliente por SCRUM-292),
+     * NO desde "Solicitud de Documentos" (POST /api/uploads, que sí
+     * disparaba correctamente el avance — ver los 2 tests de arriba). Antes
+     * del fix, GarantiasFormalizacionService nunca se invocaba desde este
+     * segundo camino: el crédito quedaba trabado en 'aprobada_garantias'
+     * para siempre, sin notificar a Operativo ni aparecer en su bandeja.
+     */
+    public function test_subir_garantias_desde_credito_ordinario_avanza_y_notifica_operativo(): void
+    {
+        [$credito, $clienteUser] = $this->crearCreditoConClientePortal('293');
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+
+        Passport::actingAs($this->coordinador);
+        $this->notificarAprobadaGarantias($credito, $headers);
+
+        $item = DocumentRequestItem::whereHas('request', function ($q) use ($credito) {
+            $q->where('solicitud_credito_id', $credito->solicitud_credito_id);
+        })->firstOrFail();
+
+        Passport::actingAs($clienteUser);
+        $this->postJson("/api/creditos/{$credito->id}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => 'req_item_' . $item->id,
+            'archivos' => [UploadedFile::fake()->create('pagare.pdf', 100, 'application/pdf')],
+        ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
+
+        $credito->refresh();
+        $this->assertSame('pendiente_formalizacion_garantias', $credito->estado);
+        $this->assertFalse($credito->solicitud_gestionada);
+        $this->assertNull($credito->fecha_gestion);
+
+        $item->refresh();
+        $this->assertSame('subido', $item->estado);
+
+        Mail::assertSent(FormalizacionGarantiasPendienteOperativoMail::class, function ($mail) {
+            return $mail->hasTo($this->operativo->email);
+        });
+    }
+
+    /**
      * Trae el crédito hasta 'pendiente_formalizacion_garantias' (mismo
      * camino que el test de arriba) para los tests de guardarFormalizacionGarantias().
      */

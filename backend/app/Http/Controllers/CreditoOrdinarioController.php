@@ -328,6 +328,17 @@ class CreditoOrdinarioController extends Controller
                     if ($requestItem && $requestItem->request) {
                         (new \App\Services\DocumentRequestNotificationService())
                             ->notificarCargaCompletaSiAplica($requestItem->request, 'Mis Créditos');
+
+                        // SCRUM-293: este mismo punto (carga directa desde
+                        // Crédito Ordinario, habilitada para el rol cliente
+                        // por SCRUM-292) nunca disparaba el avance de
+                        // 'aprobada_garantias' a 'pendiente_formalizacion_
+                        // garantias' — solo ClientUploadController lo hacía.
+                        // Un crédito cargado ÍNTEGRAMENTE desde esta pantalla
+                        // se quedaba trabado sin notificar a Operativo ni
+                        // aparecer en su bandeja.
+                        (new \App\Services\GarantiasFormalizacionService())
+                            ->habilitarSiAplica($requestItem->request);
                     }
                 }
             }

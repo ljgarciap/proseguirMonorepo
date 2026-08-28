@@ -4,13 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 
-use App\Mail\FormalizacionGarantiasPendienteOperativoMail;
 use App\Models\ClientUpload;
-use App\Models\User;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
-use Throwable;
 
 class ClientUploadController extends Controller
 {
@@ -107,7 +102,9 @@ class ClientUploadController extends Controller
             // usado acá para el preset de garantías) no pasan por ahí — acá
             // es donde el cliente efectivamente "termina de subir" el ítem.
             if ($item->request) {
-                $this->habilitarFormalizacionGarantiasSiAplica($item->request);
+                // SCRUM-293: movido a servicio compartido — ver docblock de
+                // GarantiasFormalizacionService.
+                (new \App\Services\GarantiasFormalizacionService())->habilitarSiAplica($item->request);
 
                 // SCRUM-252: "Mis Cargas" es uno de los 2 orígenes de la
                 // spec (RF-02) — notifica al Coordinador Comercial si esto
@@ -398,97 +395,14 @@ class ClientUploadController extends Controller
                     $request->update(['estado' => 'pendiente']);
                 }
 
-                $this->habilitarFormalizacionGarantiasSiAplica($request);
+                (new \App\Services\GarantiasFormalizacionService())->habilitarSiAplica($request);
 
                 // SCRUM-252: si el ítem ya estaba 'subido' desde antes (store()
                 // ya disparó la notificación), notificado_completado_at hace
                 // esta llamada un no-op — mismo patrón redundante-pero-seguro
-                // que habilitarFormalizacionGarantiasSiAplica() de arriba.
+                // que GarantiasFormalizacionService::habilitarSiAplica() de arriba.
                 (new \App\Services\DocumentRequestNotificationService())
                     ->notificarCargaCompletaSiAplica($request, 'Mis Cargas');
-            }
-        }
-    }
-
-    /**
-     * SCRUM-193/205 (2026-08-17): cuando el cliente terminó de subir TODOS
-     * los ítems del preset de garantías (no hace falta que estén aprobados
-     * todavía, eso lo decide el rol Operativo en Formalización de
-     * Garantías — SCRUM-237, antes Coordinador Comercial) el crédito pasa
-     * de 'aprobada_garantias' a 'pendiente_formalizacion_garantias' — a
-     * diferencia del chequeo de arriba (que exige 'aprobado' para dar la
-     * request por completada), acá alcanza con que ningún ítem siga
-     * 'pendiente' de carga. Guard defensivo por estado, mismo criterio que
-     * GestionCreditoController::retomarComiteSiAplica(), para no
-     * interferir con otros flujos que comparten syncRequestItem() (SCRUM-146
-     * onboarding inicial, SCRUM-191 reenvío de pendiente_comite).
-     */
-    private function habilitarFormalizacionGarantiasSiAplica(\App\Models\DocumentRequest $request): void
-    {
-        if (!$request->solicitud_credito_id) {
-            return;
-        }
-
-        $credito = \App\Models\CreditoOrdinario::with('solicitudCredito.cliente')
-            ->where('solicitud_credito_id', $request->solicitud_credito_id)
-            ->first();
-        if (!$credito || $credito->estado !== 'aprobada_garantias') {
-            return;
-        }
-
-        $itemsSinSubir = $request->items()->where('estado', 'pendiente')->count();
-        if ($itemsSinSubir > 0) {
-            return;
-        }
-
-        $historial = $credito->historial_estados ?? [];
-        $historial[] = [
-            'fecha' => now()->toIso8601String(),
-            'usuario' => 'Sistema',
-            'rol' => 'sistema',
-            'estado_anterior' => $credito->estado,
-            'estado_nuevo' => 'pendiente_formalizacion_garantias',
-            'comentario' => 'El cliente terminó de diligenciar las garantías solicitadas. Bandeja de Formalización de Garantías habilitada para el rol Operativo.',
-        ];
-
-        $credito->estado = 'pendiente_formalizacion_garantias';
-        $credito->solicitud_gestionada = false;
-        $credito->fecha_gestion = null;
-        $credito->historial_estados = $historial;
-        $credito->save();
-
-        $this->notificarOperativoFormalizacionGarantias($credito);
-    }
-
-    /**
-     * SCRUM-280: 'operativo' no tiene modelo de asignación por crédito (a
-     * diferencia de Coordinador Comercial, ver
-     * ValidacionDocumentalNotificationService) — se notifica a todos los
-     * usuarios activos con ese rol, cada uno en su propio try/catch para que
-     * un fallo puntual no bloquee al resto (mismo criterio que
-     * ValidacionDocumentalNotificationService::notificarAprobacion()).
-     */
-    private function notificarOperativoFormalizacionGarantias(\App\Models\CreditoOrdinario $credito): void
-    {
-        $cliente = $credito->solicitudCredito?->cliente;
-        $nombreCliente = $cliente?->nombre_razon_social
-            ?: trim(($cliente?->nombres ?? '') . ' ' . ($cliente?->primer_apellido ?? ''))
-            ?: 'cliente';
-
-        $urlAcceso = rtrim(env('FRONTEND_URL', config('app.url')), '/')
-            . '/login?returnTo=' . urlencode('/gestion-creditos/' . $credito->id . '/formalizacion-garantias');
-
-        $usuarios = User::whereJsonContains('roles', 'operativo')->whereNotNull('email')->get();
-        if ($usuarios->isEmpty()) {
-            Log::warning("SCRUM-280: crédito {$credito->id} con cargue completo de Formalización de Garantías sin ningún usuario activo con rol 'operativo' para notificar.");
-            return;
-        }
-
-        foreach ($usuarios as $usuario) {
-            try {
-                Mail::to($usuario->email)->send(new FormalizacionGarantiasPendienteOperativoMail($credito, $nombreCliente, $urlAcceso));
-            } catch (Throwable $e) {
-                Log::error("SCRUM-280: no se pudo enviar notificación de cargue completo del crédito {$credito->id} a {$usuario->email}: " . $e->getMessage());
             }
         }
     }
