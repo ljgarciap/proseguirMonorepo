@@ -9,8 +9,10 @@ use App\Mail\FormalizacionGarantiasCoordinadorMail;
 use App\Mail\FormalizacionGarantiasPendienteOperativoMail;
 use App\Mail\FormalizacionGarantiasResultadoMail;
 use App\Mail\GestionCreditoNotificacionMail;
+use App\Mail\RegistroCyfAprobadoCoordinadorMail;
 use App\Mail\RegistroCyfAprobadoMail;
 use App\Mail\RegistroCyfPendienteAprobacionMail;
+use App\Mail\RegistroCyfRechazadoCoordinadorMail;
 use App\Mail\TransferenciaRealizadaClienteMail;
 use App\Mail\TransferenciaRegistradaInternaMail;
 use App\Models\ActivityLog;
@@ -1256,6 +1258,32 @@ class GestionCreditoTest extends TestCase
         });
     }
 
+    // ---- SCRUM-294: NTF-02/NTF-03 a Coordinador Comercial ------------------
+
+    public function test_aprobacion_registro_cyf_aprobar_notifica_tambien_a_coordinador_comercial(): void
+    {
+        $credito = $this->creditoPendienteAprobacionRegistroCyf('arc-ntf02');
+
+        Passport::actingAs($this->gerente);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/aprobacion-registro-cyf", [
+            'decision' => 'aprobar',
+        ], ['X-Active-Role' => 'gerente'])->assertStatus(200);
+
+        // NTF-01 y NTF-02 son independientes entre sí (§4.1 del ticket) —
+        // ambas deben salir por la misma decisión de aprobación.
+        Mail::assertSent(RegistroCyfAprobadoMail::class);
+        Mail::assertSent(RegistroCyfAprobadoCoordinadorMail::class, function ($mail) use ($credito) {
+            return $mail->credito->id === $credito->id;
+        });
+        Mail::assertNotSent(RegistroCyfRechazadoCoordinadorMail::class);
+
+        $this->assertDatabaseHas('activity_logs', [
+            'accion' => 'notificacion_rol_enviada',
+            'entidad_type' => CreditoOrdinario::class,
+            'entidad_id' => $credito->id,
+        ]);
+    }
+
     public function test_aprobacion_registro_cyf_rechazar_limpia_datos_y_vuelve_a_pendiente_registro_cyf(): void
     {
         $credito = $this->creditoPendienteAprobacionRegistroCyf('arc-rej');
@@ -1273,7 +1301,17 @@ class GestionCreditoTest extends TestCase
         $this->assertNull($credito->fecha_registro_cyf);
         $this->assertNull($credito->radicado_cyf);
         $this->assertFalse($credito->solicitud_gestionada);
+        // §4.2 del ticket: rechazo no envía NTF-01 (Operativo) ni el aviso
+        // de continuidad (NTF-02) — únicamente NTF-03 a Coordinador Comercial.
         Mail::assertNotSent(RegistroCyfAprobadoMail::class);
+        Mail::assertNotSent(RegistroCyfAprobadoCoordinadorMail::class);
+        Mail::assertSent(RegistroCyfRechazadoCoordinadorMail::class, function ($mail) use ($credito) {
+            // urlIngresoSistema() urlencode() la ruta de retorno — no queda
+            // literal el '/' de '/registro-cyf' en la URL final.
+            return $mail->credito->id === $credito->id
+                && $mail->observaciones === 'Radicado ilegible, cargar de nuevo.'
+                && str_contains($mail->urlIngreso, 'registro-cyf');
+        });
     }
 
     // ---- SCRUM-215: Registro de Operación Desembolso en CYF ---------------
@@ -1350,6 +1388,60 @@ class GestionCreditoTest extends TestCase
         Mail::assertSent(DesembolsoRegistradoMail::class, function ($mail) use ($credito) {
             return $mail->credito->id === $credito->id;
         });
+    }
+
+    public function test_desembolso_ingreso_registra_actividad_de_la_notificacion_a_gerente(): void
+    {
+        $credito = $this->creditoPendienteDesembolsoIngreso('di-log');
+
+        Passport::actingAs($this->operativo);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/desembolso-ingreso", [
+            'document_preset_id' => $this->presetDesembolso->id,
+            'documentos' => [
+                $this->reqPagare->id => UploadedFile::fake()->create('pagare.pdf', 100, 'application/pdf'),
+                $this->reqComprobante->id => UploadedFile::fake()->create('comprobante.pdf', 100, 'application/pdf'),
+            ],
+        ], ['X-Active-Role' => 'operativo'])->assertStatus(200);
+
+        // creditoPendienteDesembolsoIngreso() ya generó su propia entrada
+        // 'notificacion_rol_enviada' (NTF-01/02 de aprobacionRegistroCyf())
+        // para este mismo crédito — se filtra por tipo_notificacion en vez
+        // de tomar la primera fila.
+        $log = ActivityLog::where('accion', 'notificacion_rol_enviada')
+            ->where('entidad_id', $credito->id)
+            ->get()
+            ->firstWhere('metadata.tipo_notificacion', 'desembolso_registrado_gerente');
+        $this->assertNotNull($log, 'No se registró la auditoría de la notificación a Gerente.');
+        $this->assertSame('gerente', $log->metadata['rol_destino']);
+    }
+
+    public function test_desembolso_ingreso_registra_actividad_al_fallar_la_notificacion_a_gerente(): void
+    {
+        $credito = $this->creditoPendienteDesembolsoIngreso('di-log-fail');
+
+        Mail::shouldReceive('to')->once()->andReturnSelf();
+        Mail::shouldReceive('send')->once()->andThrow(new \Exception('SMTP no disponible'));
+
+        Passport::actingAs($this->operativo);
+        // Un fallo de envío es solo informativo (§"Registro de intentos,
+        // resultados, fallas" de SCRUM-299) — no revierte el registro de la
+        // operación, que ya quedó guardado.
+        $this->postJson("/api/gestion-creditos/{$credito->id}/desembolso-ingreso", [
+            'document_preset_id' => $this->presetDesembolso->id,
+            'documentos' => [
+                $this->reqPagare->id => UploadedFile::fake()->create('pagare.pdf', 100, 'application/pdf'),
+                $this->reqComprobante->id => UploadedFile::fake()->create('comprobante.pdf', 100, 'application/pdf'),
+            ],
+        ], ['X-Active-Role' => 'operativo'])->assertStatus(200);
+
+        $credito->refresh();
+        $this->assertSame('desembolso_aprobacion', $credito->estado);
+
+        $this->assertDatabaseHas('activity_logs', [
+            'accion' => 'notificacion_rol_fallida',
+            'entidad_type' => CreditoOrdinario::class,
+            'entidad_id' => $credito->id,
+        ]);
     }
 
     // ---- SCRUM-219: Aprobación de Registro de Operación de Desembolso ----
@@ -1639,8 +1731,11 @@ class GestionCreditoTest extends TestCase
         $this->assertDatabaseHas('credito_ordinarios', ['id' => $credito->id, 'solicitud_gestionada' => false]);
     }
 
-    public function test_previsualizar_notificacion_sarlaft_incluye_aviso_de_confidencialidad(): void
+    public function test_previsualizar_notificacion_sarlaft_no_incluye_aviso_de_confidencialidad(): void
     {
+        // SCRUM-298: el aviso "no incluye coincidencias, hallazgos ni
+        // observaciones internas" se eliminó del correo al cliente — ya no
+        // debe aparecer en ningún escenario, tampoco en SARLAFT desfavorable.
         $credito = $this->crearCredito('rechazado', 'sarlaft', 'prev-2');
 
         Passport::actingAs($this->coordinador);
@@ -1650,7 +1745,7 @@ class GestionCreditoTest extends TestCase
         ], ['X-Active-Role' => 'coordinador_comercial']);
 
         $response->assertStatus(200);
-        $this->assertStringContainsString('no incluye coincidencias, hallazgos ni observaciones internas', $response->getContent());
+        $this->assertStringNotContainsString('no incluye coincidencias, hallazgos ni observaciones internas', $response->getContent());
     }
 
     public function test_notificar_registra_actividad_al_enviar_exitosamente(): void

@@ -14,7 +14,6 @@
         .mensaje-box { background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0; white-space: pre-line; }
         .documentos-box { background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 16px 20px; margin: 20px 0; border-radius: 8px; }
         .documentos-box ul { margin: 8px 0 0 0; padding-left: 20px; }
-        .aviso-box { background-color: #fff7ed; border: 1px solid #fed7aa; padding: 16px 20px; margin: 20px 0; border-radius: 8px; font-size: 14px; color: #9a3412; }
         .boton-wrap { text-align: center; margin: 24px 0 10px 0; }
         .boton { display: inline-block; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 700; }
         .footer { background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #edf2f7; font-size: 13px; color: #a0aec0; }
@@ -49,12 +48,6 @@
                             <li>{{ $documento }}</li>
                         @endforeach
                     </ul>
-                </div>
-            @endif
-
-            @if($mostrarAvisoSarlaft)
-                <div class="aviso-box">
-                    Por políticas de seguridad y cumplimiento, este correo no incluye coincidencias, hallazgos ni observaciones internas.
                 </div>
             @endif
 
