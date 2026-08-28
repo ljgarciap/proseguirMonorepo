@@ -199,6 +199,10 @@ class CreditoOrdinarioController extends Controller
             // retiró el botón manual de aprobar/rechazar — la única salida
             // de ese estado es ActaComiteController::registrar().
             'formalizacion_garantias' => ['coordinador_comercial', 'cliente', 'operativo'],
+            // SCRUM-292: sin esta entrada, isset() más abajo era false para
+            // este estado y CUALQUIER rol activo podía subir archivos sin
+            // restricción — el gap real no era solo de UI.
+            'aprobada_garantias' => ['coordinador_comercial', 'cliente'],
             'aprobacion_registro_cyf' => ['coordinador_comercial', 'gerente'],
             'desembolso_ingreso' => ['operativo'],
             'desembolso_aprobacion' => ['gerente'],
@@ -214,6 +218,19 @@ class CreditoOrdinarioController extends Controller
                     'roles_requeridos' => $rolesAutorizados[$estadoActual]
                 ], 403);
             }
+        }
+
+        // SCRUM-292: 'aprobada_garantias' se fija apenas el Comité aprueba
+        // (ActaComiteController), ANTES de que el Coordinador Comercial
+        // gestione la solicitud y elija el preset (GestionCreditoController
+        // ::notificar(), que recién ahí crea el DocumentRequest 'garantias'
+        // y marca solicitud_gestionada = true). Sin esta guarda, el cliente
+        // podía cargar documentos contra claves fijas que no correspondían
+        // a ningún preset real todavía elegido.
+        if (!$isAuthorized && $accion === 'subir_archivo' && $estadoActual === 'aprobada_garantias' && !$credito->solicitud_gestionada) {
+            return response()->json([
+                'message' => 'La gestión de garantías aún no ha sido completada por el Coordinador Comercial. La carga de documentos se habilita una vez enviada esa gestión.',
+            ], 422);
         }
 
         // documentos_raw (no documentos): esto se relee y se reescribe
