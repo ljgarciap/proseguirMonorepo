@@ -5,9 +5,12 @@ namespace Tests\Feature;
 use App\Mail\DesembolsoAprobadoTesoreriaMail;
 use App\Mail\DesembolsoRechazadoOperativoMail;
 use App\Mail\DesembolsoRegistradoMail;
+use App\Mail\FormalizacionGarantiasCoordinadorMail;
+use App\Mail\FormalizacionGarantiasPendienteOperativoMail;
 use App\Mail\FormalizacionGarantiasResultadoMail;
 use App\Mail\GestionCreditoNotificacionMail;
 use App\Mail\RegistroCyfAprobadoMail;
+use App\Mail\RegistroCyfPendienteAprobacionMail;
 use App\Mail\TransferenciaRealizadaClienteMail;
 use App\Mail\TransferenciaRegistradaInternaMail;
 use App\Models\ActivityLog;
@@ -890,6 +893,32 @@ class GestionCreditoTest extends TestCase
         $this->assertSame('subido', $item->estado);
     }
 
+    /** SCRUM-280: al completar el cargue, Operativo (no asignación por
+     * crédito) debe recibir la notificación — todos los activos con el rol. */
+    public function test_cliente_completa_garantias_notifica_a_operativo(): void
+    {
+        [$credito, $clienteUser] = $this->crearCreditoConClientePortal('1b');
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+
+        Passport::actingAs($this->coordinador);
+        $this->notificarAprobadaGarantias($credito, $headers);
+
+        $item = DocumentRequestItem::whereHas('request', function ($q) use ($credito) {
+            $q->where('solicitud_credito_id', $credito->solicitud_credito_id);
+        })->firstOrFail();
+
+        Passport::actingAs($clienteUser);
+        $this->postJson('/api/uploads', [
+            'file' => UploadedFile::fake()->create('pagare.pdf', 100, 'application/pdf'),
+            'active_role' => 'cliente',
+            'document_request_item_id' => $item->id,
+        ])->assertStatus(200);
+
+        Mail::assertSent(FormalizacionGarantiasPendienteOperativoMail::class, function ($mail) {
+            return $mail->hasTo($this->operativo->email);
+        });
+    }
+
     /**
      * Trae el crédito hasta 'pendiente_formalizacion_garantias' (mismo
      * camino que el test de arriba) para los tests de guardarFormalizacionGarantias().
@@ -1002,6 +1031,9 @@ class GestionCreditoTest extends TestCase
         Mail::assertSent(FormalizacionGarantiasResultadoMail::class, function ($mail) {
             return $mail->requiereAjustes === true && $mail->urlPortalCliente !== null;
         });
+
+        // SCRUM-284 REGLA CRÍTICA: con ajustes NO se notifica al Coordinador.
+        Mail::assertNotSent(FormalizacionGarantiasCoordinadorMail::class);
     }
 
     public function test_guardar_formalizacion_garantias_todas_aprobadas_pasa_a_pendiente_registro_cyf(): void
@@ -1024,6 +1056,17 @@ class GestionCreditoTest extends TestCase
 
         Mail::assertSent(FormalizacionGarantiasResultadoMail::class, function ($mail) {
             return $mail->requiereAjustes === false && $mail->urlPortalCliente === null;
+        });
+
+        // SCRUM-284: todas aprobadas → avisa al Coordinador Comercial
+        // ASIGNADO (solicitudCredito->usuarioRegistra, acá $this->admin por
+        // crearSolicitud()) — no a todos los usuarios con rol
+        // coordinador_comercial ($this->coordinador no debe recibirlo).
+        Mail::assertSent(FormalizacionGarantiasCoordinadorMail::class, function ($mail) {
+            return $mail->hasTo($this->admin->email);
+        });
+        Mail::assertNotSent(FormalizacionGarantiasCoordinadorMail::class, function ($mail) {
+            return $mail->hasTo($this->coordinador->email);
         });
     }
 
@@ -1084,6 +1127,23 @@ class GestionCreditoTest extends TestCase
         $this->assertSame('RAD-2026-001', $credito->radicado_cyf);
         // Reutiliza el gate legacy de Gerencia (ver docblock de registroCyf()).
         $this->assertSame('RAD-2026-001', $credito->documentos_raw['registro_cyf'] ?? null);
+    }
+
+    /** SCRUM-288: al guardar fecha + radicado, Gerencia (no asignación por
+     * crédito) debe recibir la notificación — todos los activos con el rol. */
+    public function test_registro_cyf_notifica_a_gerente(): void
+    {
+        $credito = $this->creditoPendienteRegistroCyf('6b');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/registro-cyf", [
+            'fecha_registro_cyf' => '2026-08-17',
+            'radicado_cyf' => 'RAD-2026-002',
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+
+        Mail::assertSent(RegistroCyfPendienteAprobacionMail::class, function ($mail) {
+            return $mail->hasTo($this->gerente->email) && $mail->nombreCoordinador === $this->coordinador->name;
+        });
     }
 
     // ---- SCRUM-211: Aprobación Registro de Crédito en CYF ----------------

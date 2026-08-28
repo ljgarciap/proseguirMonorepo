@@ -4,8 +4,13 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 
+use App\Mail\FormalizacionGarantiasPendienteOperativoMail;
 use App\Models\ClientUpload;
+use App\Models\User;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class ClientUploadController extends Controller
 {
@@ -424,7 +429,9 @@ class ClientUploadController extends Controller
             return;
         }
 
-        $credito = \App\Models\CreditoOrdinario::where('solicitud_credito_id', $request->solicitud_credito_id)->first();
+        $credito = \App\Models\CreditoOrdinario::with('solicitudCredito.cliente')
+            ->where('solicitud_credito_id', $request->solicitud_credito_id)
+            ->first();
         if (!$credito || $credito->estado !== 'aprobada_garantias') {
             return;
         }
@@ -449,6 +456,41 @@ class ClientUploadController extends Controller
         $credito->fecha_gestion = null;
         $credito->historial_estados = $historial;
         $credito->save();
+
+        $this->notificarOperativoFormalizacionGarantias($credito);
+    }
+
+    /**
+     * SCRUM-280: 'operativo' no tiene modelo de asignación por crédito (a
+     * diferencia de Coordinador Comercial, ver
+     * ValidacionDocumentalNotificationService) — se notifica a todos los
+     * usuarios activos con ese rol, cada uno en su propio try/catch para que
+     * un fallo puntual no bloquee al resto (mismo criterio que
+     * ValidacionDocumentalNotificationService::notificarAprobacion()).
+     */
+    private function notificarOperativoFormalizacionGarantias(\App\Models\CreditoOrdinario $credito): void
+    {
+        $cliente = $credito->solicitudCredito?->cliente;
+        $nombreCliente = $cliente?->nombre_razon_social
+            ?: trim(($cliente?->nombres ?? '') . ' ' . ($cliente?->primer_apellido ?? ''))
+            ?: 'cliente';
+
+        $urlAcceso = rtrim(env('FRONTEND_URL', config('app.url')), '/')
+            . '/login?returnTo=' . urlencode('/gestion-creditos/' . $credito->id . '/formalizacion-garantias');
+
+        $usuarios = User::whereJsonContains('roles', 'operativo')->whereNotNull('email')->get();
+        if ($usuarios->isEmpty()) {
+            Log::warning("SCRUM-280: crédito {$credito->id} con cargue completo de Formalización de Garantías sin ningún usuario activo con rol 'operativo' para notificar.");
+            return;
+        }
+
+        foreach ($usuarios as $usuario) {
+            try {
+                Mail::to($usuario->email)->send(new FormalizacionGarantiasPendienteOperativoMail($credito, $nombreCliente, $urlAcceso));
+            } catch (Throwable $e) {
+                Log::error("SCRUM-280: no se pudo enviar notificación de cargue completo del crédito {$credito->id} a {$usuario->email}: " . $e->getMessage());
+            }
+        }
     }
 
     /**
