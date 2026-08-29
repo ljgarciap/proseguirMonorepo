@@ -161,9 +161,9 @@
           </div>
         </div>
         <div class="form-group span-3">
-          <label>Observaciones</label>
+          <label>Observaciones <span class="required" *ngIf="decision === 'rechazar'">*</span></label>
           <textarea class="pro-input" rows="3" [(ngModel)]="observaciones" [disabled]="!puedeGestionar"
-                    placeholder="Opcional"></textarea>
+                    placeholder="Obligatorio si la decisión es Rechazar"></textarea>
         </div>
       </div>
 
