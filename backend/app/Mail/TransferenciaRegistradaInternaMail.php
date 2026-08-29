@@ -5,6 +5,7 @@ namespace App\Mail;
 use App\Models\CreditoOrdinario;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -14,6 +15,10 @@ use Illuminate\Queue\SerializesModels;
  * Coordinador Comercial que Tesorería registró la transferencia bancaria —
  * enlace autenticado que respeta los permisos del usuario que ingresa
  * (GestionCreditoController::urlIngresoSistema()).
+ *
+ * SCRUM-307: incluye el comprobante de transferencia adjunto, igual que
+ * TransferenciaRealizadaClienteMail — el ticket exige el adjunto "en ambas
+ * notificaciones", no solo en la del cliente.
  */
 class TransferenciaRegistradaInternaMail extends Mailable
 {
@@ -44,6 +49,16 @@ class TransferenciaRegistradaInternaMail extends Mailable
 
     public function attachments(): array
     {
-        return [];
+        $path = $this->transferencia['comprobante_transferencia'] ?? null;
+        if (!$path) {
+            return [];
+        }
+
+        $extension = pathinfo($path, PATHINFO_EXTENSION) ?: 'pdf';
+
+        return [
+            Attachment::fromStorageDisk('public', $path)
+                ->as('comprobante_transferencia_' . $this->credito->numero_solicitud . '.' . $extension),
+        ];
     }
 }

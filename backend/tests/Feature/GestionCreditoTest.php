@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\DesembolsoAprobadoOperativoMail;
 use App\Mail\DesembolsoAprobadoTesoreriaMail;
 use App\Mail\DesembolsoRechazadoOperativoMail;
 use App\Mail\DesembolsoRegistradoMail;
@@ -1493,6 +1494,24 @@ class GestionCreditoTest extends TestCase
         Mail::assertSent(DesembolsoAprobadoTesoreriaMail::class, function ($mail) use ($credito) {
             return $mail->credito->id === $credito->id;
         });
+
+        // SCRUM-303: la aprobación también notifica a Operativo, de forma
+        // informativa — la solicitud sigue bajo gestión de Tesorería.
+        Mail::assertSent(DesembolsoAprobadoOperativoMail::class, function ($mail) use ($credito) {
+            return $mail->credito->id === $credito->id;
+        });
+    }
+
+    public function test_desembolso_aprobacion_rechazar_sin_observaciones_falla(): void
+    {
+        $credito = $this->creditoPendienteDesembolsoAprobacion('da-rej-sin-obs');
+
+        Passport::actingAs($this->gerente);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/desembolso-aprobacion", [
+            'decision' => 'rechazar',
+        ], ['X-Active-Role' => 'gerente'])->assertStatus(422);
+
+        Mail::assertNotSent(DesembolsoRechazadoOperativoMail::class);
     }
 
     public function test_desembolso_aprobacion_rechazar_vuelve_a_desembolso_ingreso_y_notifica_operativo(): void
@@ -1651,8 +1670,10 @@ class GestionCreditoTest extends TestCase
                 && $mail->credito->id === $credito->id
                 && $mail->cuentaEnmascarada === '******7890';
         });
+        // SCRUM-307: el comprobante va adjunto en ambas notificaciones, no
+        // solo en la del cliente.
         Mail::assertSent(TransferenciaRegistradaInternaMail::class, function ($mail) use ($credito) {
-            return $mail->credito->id === $credito->id;
+            return $mail->credito->id === $credito->id && !empty($mail->attachments());
         });
         Mail::assertSentTimes(TransferenciaRegistradaInternaMail::class, 2); // Gerente + Coordinador Comercial
     }

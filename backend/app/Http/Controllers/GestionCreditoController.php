@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesActiveRole;
+use App\Mail\DesembolsoAprobadoOperativoMail;
 use App\Mail\DesembolsoAprobadoTesoreriaMail;
 use App\Mail\DesembolsoRechazadoOperativoMail;
 use App\Mail\DesembolsoRegistradoMail;
@@ -1251,9 +1252,10 @@ class GestionCreditoController extends Controller
 
         $validator = Validator::make($request->all(), [
             'decision' => 'required|in:aprobar,rechazar',
-            'observaciones' => 'nullable|string',
+            'observaciones' => 'required_if:decision,rechazar|nullable|string',
         ], [
             'decision.required' => 'Seleccione una decisión.',
+            'observaciones.required_if' => 'Ingrese las observaciones del rechazo.',
         ]);
 
         if ($validator->fails()) {
@@ -1297,10 +1299,17 @@ class GestionCreditoController extends Controller
             // Ordinario (/creditos/:id) porque Tesorería todavía no tenía
             // pantalla propia — ahora sí (transferenciaBancaria()).
             $urlIngreso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/transferencia-bancaria');
-            $this->notificarPorRol('tesoreria', new DesembolsoAprobadoTesoreriaMail($credito, $urlIngreso));
+            $this->notificarPorRol('tesoreria', new DesembolsoAprobadoTesoreriaMail($credito, $urlIngreso), $credito, 'desembolso_aprobado_tesoreria');
+
+            // SCRUM-303: la aprobación también notifica a Operativo, de
+            // forma informativa — no habilita ninguna acción propia de
+            // Tesorería, solo informa que el registro fue aprobado y que
+            // la solicitud sigue bajo gestión de Tesorería.
+            $urlConsultaOperativo = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id);
+            $this->notificarPorRol('operativo', new DesembolsoAprobadoOperativoMail($credito, $urlConsultaOperativo), $credito, 'desembolso_aprobado_operativo');
         } else {
             $urlIngreso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/desembolso-ingreso');
-            $this->notificarPorRol('operativo', new DesembolsoRechazadoOperativoMail($credito, $observaciones, $urlIngreso));
+            $this->notificarPorRol('operativo', new DesembolsoRechazadoOperativoMail($credito, $observaciones, $urlIngreso), $credito, 'desembolso_rechazado_operativo');
         }
 
         return response()->json([
@@ -1460,18 +1469,35 @@ class GestionCreditoController extends Controller
         $credito->fecha_gestion = now();
         $credito->save();
 
-        // FA-04: un fallo de envío no revierte la transferencia, que ya
-        // quedó guardada (mismo criterio best-effort que notificarPorRol()).
+        // FA-04/FA-05: un fallo de envío no revierte la transferencia, que
+        // ya quedó guardada (mismo criterio best-effort que
+        // notificarPorRol()) — pero sí queda auditada, igual que las
+        // notificaciones por rol.
+        $correoCliente = $request->input('correo_notificacion_pago');
         try {
-            Mail::to($request->input('correo_notificacion_pago'))
+            Mail::to($correoCliente)
                 ->send(new TransferenciaRealizadaClienteMail($credito, $transferencia, $cuentaEnmascarada));
+
+            app(ActivityLogService::class)->registrar(
+                'notificacion_rol_enviada',
+                "Notificación transferencia_realizada_cliente enviada al cliente para la solicitud {$credito->numero_solicitud}.",
+                $user,
+                $credito,
+                ['tipo_notificacion' => 'transferencia_realizada_cliente', 'destinatarios' => [$correoCliente]]
+            );
         } catch (Throwable $e) {
-            // Notificación informativa — no revierte la transición.
+            app(ActivityLogService::class)->registrar(
+                'notificacion_rol_fallida',
+                "Falló el envío de la notificación transferencia_realizada_cliente al cliente para la solicitud {$credito->numero_solicitud}.",
+                $user,
+                $credito,
+                ['tipo_notificacion' => 'transferencia_realizada_cliente', 'destinatarios' => [$correoCliente], 'error' => $e->getMessage()]
+            );
         }
 
         $urlIngresoGerente = $this->urlIngresoSistema('/gestion-creditos');
-        $this->notificarPorRol('gerente', new TransferenciaRegistradaInternaMail($credito, $transferencia, $urlIngresoGerente));
-        $this->notificarPorRol('coordinador_comercial', new TransferenciaRegistradaInternaMail($credito, $transferencia, $urlIngresoGerente));
+        $this->notificarPorRol('gerente', new TransferenciaRegistradaInternaMail($credito, $transferencia, $urlIngresoGerente), $credito, 'transferencia_registrada_interna');
+        $this->notificarPorRol('coordinador_comercial', new TransferenciaRegistradaInternaMail($credito, $transferencia, $urlIngresoGerente), $credito, 'transferencia_registrada_interna');
 
         return response()->json([
             'message' => 'Transferencia bancaria registrada. El cliente y los usuarios de Gerencia/Coordinación Comercial fueron notificados.',

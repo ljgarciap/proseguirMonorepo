@@ -119,6 +119,11 @@ export class GestionCreditosDesembolsoAprobacionComponent implements OnInit {
       return;
     }
 
+    if (this.decision === 'rechazar' && !this.observaciones?.trim()) {
+      Swal.fire('Falta información', 'Ingrese las observaciones del rechazo.', 'warning');
+      return;
+    }
+
     const esAprobar = this.decision === 'aprobar';
     Swal.fire({
       title: esAprobar ? '¿Aprobar la operación de desembolso?' : '¿Rechazar la operación de desembolso?',
