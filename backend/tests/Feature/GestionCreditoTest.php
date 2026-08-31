@@ -1192,6 +1192,25 @@ class GestionCreditoTest extends TestCase
         });
     }
 
+    /** SCRUM-288 (rebote, comentario de Juan): el correo debe incluir tipo de
+     * crédito, tipo de documento y número de documento del cliente. */
+    public function test_registro_cyf_notifica_a_gerente_incluye_tipo_credito_y_documento_cliente(): void
+    {
+        $credito = $this->creditoPendienteRegistroCyf('6c');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/gestion-creditos/{$credito->id}/registro-cyf", [
+            'fecha_registro_cyf' => '2026-08-17',
+            'radicado_cyf' => 'RAD-2026-003',
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+
+        Mail::assertSent(RegistroCyfPendienteAprobacionMail::class, function ($mail) {
+            return $mail->tipoCredito === 'Crédito Ordinario'
+                && $mail->tipoDocumento === 'Cédula'
+                && $mail->numeroDocumento === '90807060';
+        });
+    }
+
     // ---- SCRUM-211: Aprobación Registro de Crédito en CYF ----------------
 
     private function creditoPendienteAprobacionRegistroCyf(string $sufijo): CreditoOrdinario
@@ -1272,9 +1291,23 @@ class GestionCreditoTest extends TestCase
 
         // NTF-01 y NTF-02 son independientes entre sí (§4.1 del ticket) —
         // ambas deben salir por la misma decisión de aprobación.
-        Mail::assertSent(RegistroCyfAprobadoMail::class);
+        // Rebote 2026-08-31 (comentario de Juan): ambos correos deben traer
+        // cliente, fecha de registro CYF y radicado CYF; el de Coordinador
+        // además la decisión de Gerencia (§9 del ticket).
+        Mail::assertSent(RegistroCyfAprobadoMail::class, function ($mail) use ($credito) {
+            return $mail->credito->id === $credito->id
+                && $mail->nombreCliente === 'Gestion Test'
+                && $mail->fechaRegistroCyf->toDateString() === '2026-08-17'
+                && $mail->radicadoCyf === $credito->radicado_cyf
+                && $mail->nombreGerente === $this->gerente->name;
+        });
         Mail::assertSent(RegistroCyfAprobadoCoordinadorMail::class, function ($mail) use ($credito) {
-            return $mail->credito->id === $credito->id;
+            return $mail->credito->id === $credito->id
+                && $mail->nombreCliente === 'Gestion Test'
+                && $mail->fechaRegistroCyf->toDateString() === '2026-08-17'
+                && $mail->radicadoCyf === $credito->radicado_cyf
+                && $mail->nombreGerente === $this->gerente->name
+                && $mail->observaciones === null;
         });
         Mail::assertNotSent(RegistroCyfRechazadoCoordinadorMail::class);
 
@@ -1288,6 +1321,7 @@ class GestionCreditoTest extends TestCase
     public function test_aprobacion_registro_cyf_rechazar_limpia_datos_y_vuelve_a_pendiente_registro_cyf(): void
     {
         $credito = $this->creditoPendienteAprobacionRegistroCyf('arc-rej');
+        $radicadoOriginal = $credito->radicado_cyf;
 
         Passport::actingAs($this->gerente);
         $response = $this->postJson("/api/gestion-creditos/{$credito->id}/aprobacion-registro-cyf", [
@@ -1306,10 +1340,19 @@ class GestionCreditoTest extends TestCase
         // de continuidad (NTF-02) — únicamente NTF-03 a Coordinador Comercial.
         Mail::assertNotSent(RegistroCyfAprobadoMail::class);
         Mail::assertNotSent(RegistroCyfAprobadoCoordinadorMail::class);
-        Mail::assertSent(RegistroCyfRechazadoCoordinadorMail::class, function ($mail) use ($credito) {
+        Mail::assertSent(RegistroCyfRechazadoCoordinadorMail::class, function ($mail) use ($credito, $radicadoOriginal) {
             // urlIngresoSistema() urlencode() la ruta de retorno — no queda
             // literal el '/' de '/registro-cyf' en la URL final.
+            // Rebote 2026-08-31 (comentario de Juan): el correo debe seguir
+            // mostrando la fecha/radicado que se rechazaron, aunque el
+            // rechazo ya los haya puesto en null sobre $credito antes de
+            // notificar — de ahí que se comparen contra el valor capturado
+            // ANTES del rechazo, no contra $credito->radicado_cyf (ya null).
             return $mail->credito->id === $credito->id
+                && $mail->nombreCliente === 'Gestion Test'
+                && $mail->fechaRegistroCyf->toDateString() === '2026-08-17'
+                && $mail->radicadoCyf === $radicadoOriginal
+                && $mail->nombreGerente === $this->gerente->name
                 && $mail->observaciones === 'Radicado ilegible, cargar de nuevo.'
                 && str_contains($mail->urlIngreso, 'registro-cyf');
         });
@@ -1386,8 +1429,14 @@ class GestionCreditoTest extends TestCase
         $this->assertCount(2, $credito->documentos_desembolso['documentos']);
         $this->assertNotEmpty($credito->documentos_raw['desembolso_egreso']);
 
+        // Rebote 2026-08-31 (comentario de Juan): el asunto y el cuerpo no
+        // coincidían con §9 del ticket (SCRUM-299) — faltaban cliente,
+        // registrado por y fecha/hora del registro.
         Mail::assertSent(DesembolsoRegistradoMail::class, function ($mail) use ($credito) {
-            return $mail->credito->id === $credito->id;
+            return $mail->credito->id === $credito->id
+                && $mail->nombreCliente === 'Gestion Test'
+                && $mail->usuarioOperativo === $this->operativo->name
+                && str_contains($mail->envelope()->subject, 'pendiente de validación y aprobación');
         });
     }
 

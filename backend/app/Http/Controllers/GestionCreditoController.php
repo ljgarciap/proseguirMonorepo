@@ -1000,6 +1000,9 @@ class GestionCreditoController extends Controller
             $credito,
             $this->nombreClienteParaCorreo($credito),
             $user->name,
+            $this->tipoCreditoParaCorreo($credito),
+            $this->tipoDocumentoClienteParaCorreo($credito),
+            $this->numeroDocumentoClienteParaCorreo($credito),
             $urlAcceso
         ));
 
@@ -1013,10 +1016,11 @@ class GestionCreditoController extends Controller
      * SCRUM-211: Gerencia aprueba o rechaza el Registro de Crédito en CYF
      * (fecha + radicado capturados por registroCyf()). Estado de entrada
      * obligatorio 'aprobacion_registro_cyf'. Aprobar pasa a
-     * 'desembolso_ingreso' (SCRUM-215) y notifica a Operativo; rechazar
-     * limpia fecha/radicado y vuelve a 'pendiente_registro_cyf' para que se
-     * registre de nuevo (§8.2 del ticket) — no se notifica en ese caso, el
-     * ticket solo define correo para el resultado aprobado.
+     * 'desembolso_ingreso' (SCRUM-215) y notifica a Operativo y Coordinador
+     * Comercial (SCRUM-294, NTF-01/NTF-02); rechazar limpia fecha/radicado,
+     * vuelve a 'pendiente_registro_cyf' para que se registre de nuevo
+     * (§8.2 del ticket) y notifica a Coordinador Comercial con las
+     * observaciones (SCRUM-294, NTF-03).
      */
     public function aprobacionRegistroCyf(Request $request, $creditoId)
     {
@@ -1031,6 +1035,13 @@ class GestionCreditoController extends Controller
                 'message' => 'Esta solicitud no está pendiente de Aprobación de Registro de Crédito en CYF.',
             ], 422);
         }
+
+        // Rebote 2026-08-31 (SCRUM-294): capturados ANTES de que la rama de
+        // rechazo, más abajo, los ponga en null sobre $credito — los
+        // correos de aprobación/rechazo necesitan mostrar qué fecha y
+        // radicado se registraron, incluso cuando el resultado es rechazo.
+        $fechaRegistroCyf = $credito->fecha_registro_cyf;
+        $radicadoCyf = $credito->radicado_cyf;
 
         $validator = Validator::make($request->all(), [
             'decision' => 'required|in:aprobar,rechazar',
@@ -1088,15 +1099,40 @@ class GestionCreditoController extends Controller
         // proceso continúa. En rechazo, únicamente NTF-03 a Coordinador
         // Comercial (§4.2 del ticket: no se notifica a Operativo ni se envía
         // aviso de continuidad).
+        $nombreCliente = $this->nombreClienteParaCorreo($credito);
+
         if ($aprobado) {
             $urlIngresoOperativo = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/desembolso-ingreso');
-            $this->notificarPorRol('operativo', new RegistroCyfAprobadoMail($credito, $urlIngresoOperativo), $credito, 'registro_cyf_aprobado_operativo');
+            $this->notificarPorRol('operativo', new RegistroCyfAprobadoMail(
+                $credito,
+                $nombreCliente,
+                $fechaRegistroCyf,
+                $radicadoCyf,
+                $user->name,
+                $urlIngresoOperativo
+            ), $credito, 'registro_cyf_aprobado_operativo');
 
             $urlIngresoCoordinador = $this->urlIngresoSistema('/gestion-creditos');
-            $this->notificarPorRol('coordinador_comercial', new RegistroCyfAprobadoCoordinadorMail($credito, $urlIngresoCoordinador), $credito, 'registro_cyf_aprobado_coordinador');
+            $this->notificarPorRol('coordinador_comercial', new RegistroCyfAprobadoCoordinadorMail(
+                $credito,
+                $nombreCliente,
+                $fechaRegistroCyf,
+                $radicadoCyf,
+                $user->name,
+                $observaciones,
+                $urlIngresoCoordinador
+            ), $credito, 'registro_cyf_aprobado_coordinador');
         } else {
             $urlIngresoCoordinador = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/registro-cyf');
-            $this->notificarPorRol('coordinador_comercial', new RegistroCyfRechazadoCoordinadorMail($credito, $observaciones, $urlIngresoCoordinador), $credito, 'registro_cyf_rechazado_coordinador');
+            $this->notificarPorRol('coordinador_comercial', new RegistroCyfRechazadoCoordinadorMail(
+                $credito,
+                $nombreCliente,
+                $fechaRegistroCyf,
+                $radicadoCyf,
+                $user->name,
+                $observaciones,
+                $urlIngresoCoordinador
+            ), $credito, 'registro_cyf_rechazado_coordinador');
         }
 
         return response()->json([
@@ -1219,7 +1255,13 @@ class GestionCreditoController extends Controller
         // que no hay guard de duplicado que aplicar además del de estado ya
         // validado arriba.
         $urlIngreso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/desembolso-aprobacion');
-        $this->notificarPorRol('gerente', new DesembolsoRegistradoMail($credito, $urlIngreso), $credito, 'desembolso_registrado_gerente');
+        $this->notificarPorRol('gerente', new DesembolsoRegistradoMail(
+            $credito,
+            $this->nombreClienteParaCorreo($credito),
+            $user->name,
+            now(),
+            $urlIngreso
+        ), $credito, 'desembolso_registrado_gerente');
 
         return response()->json([
             'message' => 'Operación de desembolso registrada. Disponible para la aprobación de Gerencia.',
@@ -1530,6 +1572,27 @@ class GestionCreditoController extends Controller
         }
 
         return trim(($cliente->nombres ?? '') . ' ' . ($cliente->primer_apellido ?? '')) ?: 'cliente';
+    }
+
+    /**
+     * SCRUM-288 (rebote): mismo criterio de acceso perezoso vía
+     * solicitudCredito que nombreClienteParaCorreo() — el resumen del
+     * correo necesita tipo de crédito y tipo/número de documento del
+     * cliente, ausentes hasta ahora.
+     */
+    private function tipoCreditoParaCorreo(CreditoOrdinario $credito): string
+    {
+        return $credito->solicitudCredito?->tipoCredito?->nombre ?: '—';
+    }
+
+    private function tipoDocumentoClienteParaCorreo(CreditoOrdinario $credito): string
+    {
+        return $credito->solicitudCredito?->cliente?->documentType?->nombre ?: '—';
+    }
+
+    private function numeroDocumentoClienteParaCorreo(CreditoOrdinario $credito): string
+    {
+        return $credito->solicitudCredito?->cliente?->numero_documento ?: '—';
     }
 
     /**

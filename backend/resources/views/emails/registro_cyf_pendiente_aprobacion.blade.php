@@ -30,7 +30,19 @@
                 PENDIENTE DE REVISIÓN Y APROBACIÓN
                 <table>
                     <tr>
-                        <td style="font-weight: bold; width: 180px;">Monto:</td>
+                        <td style="font-weight: bold; width: 180px;">Tipo de crédito:</td>
+                        <td>{{ $tipoCredito }}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold;">Tipo de documento:</td>
+                        <td>{{ $tipoDocumento }}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold;">Número de documento:</td>
+                        <td>{{ $numeroDocumento }}</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight: bold;">Monto:</td>
                         <td>${{ number_format($credito->monto, 0, ',', '.') }} COP</td>
                     </tr>
                     <tr>

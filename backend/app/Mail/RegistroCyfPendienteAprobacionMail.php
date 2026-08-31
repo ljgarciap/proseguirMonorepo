@@ -17,6 +17,10 @@ use Illuminate\Queue\SerializesModels;
  * crédito pasa a 'aprobacion_registro_cyf' (ese guard de estado es la única
  * protección contra duplicados, mismo criterio que
  * RegistroCyfAprobadoMail/notificarPorRol()).
+ *
+ * Rebote 2026-08-31 (comentario de Juan): faltaban tipo de crédito, tipo de
+ * documento y número de documento del cliente en el resumen del correo
+ * (§9 del ticket).
  */
 class RegistroCyfPendienteAprobacionMail extends Mailable
 {
@@ -25,13 +29,26 @@ class RegistroCyfPendienteAprobacionMail extends Mailable
     public CreditoOrdinario $credito;
     public string $nombreCliente;
     public string $nombreCoordinador;
+    public string $tipoCredito;
+    public string $tipoDocumento;
+    public string $numeroDocumento;
     public string $urlAcceso;
 
-    public function __construct(CreditoOrdinario $credito, string $nombreCliente, string $nombreCoordinador, string $urlAcceso)
-    {
+    public function __construct(
+        CreditoOrdinario $credito,
+        string $nombreCliente,
+        string $nombreCoordinador,
+        string $tipoCredito,
+        string $tipoDocumento,
+        string $numeroDocumento,
+        string $urlAcceso
+    ) {
         $this->credito = $credito;
         $this->nombreCliente = $nombreCliente;
         $this->nombreCoordinador = $nombreCoordinador;
+        $this->tipoCredito = $tipoCredito;
+        $this->tipoDocumento = $tipoDocumento;
+        $this->numeroDocumento = $numeroDocumento;
         $this->urlAcceso = $urlAcceso;
     }
 
