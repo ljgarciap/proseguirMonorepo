@@ -320,6 +320,16 @@ class GestionCreditoController extends Controller
             $credito->plantilla_sugerida = $this->plantillaSugerida($resultado, $credito);
         }
 
+        // Rebote 2026-08-31 (comentario de Juan en SCRUM-307): el campo de
+        // correo del formulario de Transferencia Bancaria era texto libre
+        // sin precarga — Tesorería tipeó una variante distinta al correo
+        // registrado del cliente y la notificación se envió a la dirección
+        // equivocada. Se expone acá el mismo correo ya resuelto que usa la
+        // notificación de Desembolso CYF (correoClienteParaNotificacion())
+        // para que el frontend lo precargue, editable, en vez de partir de
+        // un campo vacío.
+        $credito->correo_cliente_sugerido = $this->correoClienteParaNotificacion($credito);
+
         return response()->json($credito);
     }
 
