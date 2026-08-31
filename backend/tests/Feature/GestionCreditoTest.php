@@ -1803,6 +1803,20 @@ class GestionCreditoTest extends TestCase
         $response->assertStatus(200)->assertJsonMissingPath('plantilla_sugerida');
     }
 
+    // ---- SCRUM-307 (rebote 2ª vuelta): correo sugerido para precargar -----
+    // ---- el formulario de Transferencia Bancaria --------------------------
+
+    public function test_show_expone_correo_cliente_sugerido_para_precargar_transferencia(): void
+    {
+        $credito = $this->crearCredito('ejecucion_transferencia', null, 'correo-sug-1');
+
+        Passport::actingAs($this->tesoreria);
+        $response = $this->getJson("/api/gestion-creditos/{$credito->id}", ['X-Active-Role' => 'tesoreria']);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('correo_cliente_sugerido', 'gestion.cliente@test.com');
+    }
+
     public function test_previsualizar_notificacion_renderiza_saludo_lista_y_boton(): void
     {
         $credito = $this->crearCredito('aprobada_garantias', 'comite_aprobado', 'prev-1');

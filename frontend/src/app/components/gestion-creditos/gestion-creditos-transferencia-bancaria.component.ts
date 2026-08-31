@@ -79,6 +79,12 @@ export class GestionCreditosTransferenciaBancariaComponent implements OnInit {
       next: (data) => {
         this.credito = data;
         this.loading = false;
+        // Rebote SCRUM-307 (2026-08-31): precarga editable con el correo
+        // resuelto del cliente — antes el campo arrancaba vacío y
+        // dependía de que Tesorería lo tipeara bien a mano.
+        if (!this.correoNotificacionPago && data?.correo_cliente_sugerido) {
+          this.correoNotificacionPago = data.correo_cliente_sugerido;
+        }
       },
       error: (err) => {
         this.loading = false;
