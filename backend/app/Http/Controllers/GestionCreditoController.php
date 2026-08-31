@@ -21,6 +21,7 @@ use App\Models\CreditoOrdinario;
 use App\Models\DocumentPreset;
 use App\Models\DocumentRequest;
 use App\Models\DocumentRequestItem;
+use App\Models\DocumentType;
 use App\Models\EntidadBancaria;
 use App\Models\User;
 use App\Services\ActivityLog\ActivityLogService;
@@ -1336,22 +1337,51 @@ class GestionCreditoController extends Controller
         $credito->fecha_gestion = null;
         $credito->save();
 
+        // Rebote 2026-08-31 (comentario de Juan en SCRUM-303): mismo
+        // resumen (cliente, tipo de crédito, quién decidió, fecha/hora) en
+        // los 3 correos de esta decisión — capturado una sola vez acá.
+        $nombreClienteCorreo = $this->nombreClienteParaCorreo($credito);
+        $tipoCreditoCorreo = $this->tipoCreditoParaCorreo($credito);
+        $fechaHoraDecision = now();
+
         if ($aprobado) {
             // SCRUM-224: antes apuntaba a la pantalla legacy de Crédito
             // Ordinario (/creditos/:id) porque Tesorería todavía no tenía
             // pantalla propia — ahora sí (transferenciaBancaria()).
             $urlIngreso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/transferencia-bancaria');
-            $this->notificarPorRol('tesoreria', new DesembolsoAprobadoTesoreriaMail($credito, $urlIngreso), $credito, 'desembolso_aprobado_tesoreria');
+            $this->notificarPorRol('tesoreria', new DesembolsoAprobadoTesoreriaMail(
+                $credito,
+                $nombreClienteCorreo,
+                $tipoCreditoCorreo,
+                $user->name,
+                $fechaHoraDecision,
+                $urlIngreso
+            ), $credito, 'desembolso_aprobado_tesoreria');
 
             // SCRUM-303: la aprobación también notifica a Operativo, de
             // forma informativa — no habilita ninguna acción propia de
             // Tesorería, solo informa que el registro fue aprobado y que
             // la solicitud sigue bajo gestión de Tesorería.
             $urlConsultaOperativo = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id);
-            $this->notificarPorRol('operativo', new DesembolsoAprobadoOperativoMail($credito, $urlConsultaOperativo), $credito, 'desembolso_aprobado_operativo');
+            $this->notificarPorRol('operativo', new DesembolsoAprobadoOperativoMail(
+                $credito,
+                $nombreClienteCorreo,
+                $tipoCreditoCorreo,
+                $user->name,
+                $fechaHoraDecision,
+                $urlConsultaOperativo
+            ), $credito, 'desembolso_aprobado_operativo');
         } else {
             $urlIngreso = $this->urlIngresoSistema('/gestion-creditos/' . $credito->id . '/desembolso-ingreso');
-            $this->notificarPorRol('operativo', new DesembolsoRechazadoOperativoMail($credito, $observaciones, $urlIngreso), $credito, 'desembolso_rechazado_operativo');
+            $this->notificarPorRol('operativo', new DesembolsoRechazadoOperativoMail(
+                $credito,
+                $observaciones,
+                $nombreClienteCorreo,
+                $tipoCreditoCorreo,
+                $user->name,
+                $fechaHoraDecision,
+                $urlIngreso
+            ), $credito, 'desembolso_rechazado_operativo');
         }
 
         return response()->json([
@@ -1448,6 +1478,10 @@ class GestionCreditoController extends Controller
         }
 
         $entidadBancaria = EntidadBancaria::findOrFail($request->input('entidad_bancaria_id'));
+        // Rebote 2026-08-31 (comentario de Juan en SCRUM-307): el correo
+        // necesita el nombre del tipo de documento del titular, no solo su
+        // id — mismo criterio que $entidadBancaria->nombre debajo.
+        $tipoDocumentoTitular = DocumentType::findOrFail($request->input('tipo_documento_titular_id'));
 
         $certificado = $request->file('certificado_bancario');
         $comprobante = $request->file('comprobante_transferencia');
@@ -1460,6 +1494,7 @@ class GestionCreditoController extends Controller
         $transferencia = [
             'titular_cuenta' => $request->input('titular_cuenta'),
             'tipo_documento_titular_id' => (int) $request->input('tipo_documento_titular_id'),
+            'tipo_documento_titular_nombre' => $tipoDocumentoTitular->nombre,
             'numero_documento_titular' => $request->input('numero_documento_titular'),
             'entidad_bancaria_id' => $entidadBancaria->id,
             'entidad_bancaria_nombre' => $entidadBancaria->nombre,
@@ -1515,10 +1550,24 @@ class GestionCreditoController extends Controller
         // ya quedó guardada (mismo criterio best-effort que
         // notificarPorRol()) — pero sí queda auditada, igual que las
         // notificaciones por rol.
+        // Rebote 2026-08-31 (comentario de Juan en SCRUM-307): sección
+        // "Información del crédito" del ticket, común a las 2 notificaciones
+        // de este endpoint — capturada una sola vez acá.
+        $tipoDocumentoClienteCorreo = $this->tipoDocumentoClienteParaCorreo($credito);
+        $fechaSolicitudCorreo = $credito->solicitudCredito?->created_at;
+        $tipoCreditoCorreo = $this->tipoCreditoParaCorreo($credito);
+
         $correoCliente = $request->input('correo_notificacion_pago');
         try {
             Mail::to($correoCliente)
-                ->send(new TransferenciaRealizadaClienteMail($credito, $transferencia, $cuentaEnmascarada));
+                ->send(new TransferenciaRealizadaClienteMail(
+                    $credito,
+                    $transferencia,
+                    $cuentaEnmascarada,
+                    $tipoDocumentoClienteCorreo,
+                    $fechaSolicitudCorreo,
+                    $tipoCreditoCorreo
+                ));
 
             app(ActivityLogService::class)->registrar(
                 'notificacion_rol_enviada',
@@ -1538,8 +1587,22 @@ class GestionCreditoController extends Controller
         }
 
         $urlIngresoGerente = $this->urlIngresoSistema('/gestion-creditos');
-        $this->notificarPorRol('gerente', new TransferenciaRegistradaInternaMail($credito, $transferencia, $urlIngresoGerente), $credito, 'transferencia_registrada_interna');
-        $this->notificarPorRol('coordinador_comercial', new TransferenciaRegistradaInternaMail($credito, $transferencia, $urlIngresoGerente), $credito, 'transferencia_registrada_interna');
+        $this->notificarPorRol('gerente', new TransferenciaRegistradaInternaMail(
+            $credito,
+            $transferencia,
+            $urlIngresoGerente,
+            $tipoDocumentoClienteCorreo,
+            $fechaSolicitudCorreo,
+            $tipoCreditoCorreo
+        ), $credito, 'transferencia_registrada_interna');
+        $this->notificarPorRol('coordinador_comercial', new TransferenciaRegistradaInternaMail(
+            $credito,
+            $transferencia,
+            $urlIngresoGerente,
+            $tipoDocumentoClienteCorreo,
+            $fechaSolicitudCorreo,
+            $tipoCreditoCorreo
+        ), $credito, 'transferencia_registrada_interna');
 
         return response()->json([
             'message' => 'Transferencia bancaria registrada. El cliente y los usuarios de Gerencia/Coordinación Comercial fueron notificados.',

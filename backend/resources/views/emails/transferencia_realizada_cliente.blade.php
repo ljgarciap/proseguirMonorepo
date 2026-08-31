@@ -29,13 +29,20 @@
             <div class="highlight-box">TRANSFERENCIA REALIZADA</div>
 
             <table class="detalle">
+                <tr><td class="label">Tipo de documento</td><td>{{ $tipoDocumentoCliente }}</td></tr>
                 <tr><td class="label">Número de crédito</td><td>{{ $credito->numero_solicitud }}</td></tr>
-                <tr><td class="label">Beneficiario</td><td>{{ $transferencia['titular_cuenta'] ?? '—' }}</td></tr>
-                <tr><td class="label">Fecha y hora</td><td>{{ $transferencia['fecha_transferencia'] ?? '—' }} {{ $transferencia['hora_transferencia'] ?? '' }}</td></tr>
+                <tr><td class="label">Fecha de solicitud</td><td>{{ optional($fechaSolicitud)->format('d/m/Y') ?? '—' }}</td></tr>
+                <tr><td class="label">Tipo de crédito</td><td>{{ $tipoCredito }}</td></tr>
+                <tr><td class="label">Monto solicitado</td><td>${{ number_format($credito->monto, 0, ',', '.') }} COP</td></tr>
+                <tr><td class="label">Titular de la cuenta</td><td>{{ $transferencia['titular_cuenta'] ?? '—' }}</td></tr>
+                <tr><td class="label">Tipo de documento del titular</td><td>{{ $transferencia['tipo_documento_titular_nombre'] ?? '—' }}</td></tr>
+                <tr><td class="label">Número de documento del titular</td><td>{{ $transferencia['numero_documento_titular'] ?? '—' }}</td></tr>
+                <tr><td class="label">Entidad bancaria</td><td>{{ $transferencia['entidad_bancaria_nombre'] ?? '—' }}</td></tr>
+                <tr><td class="label">Tipo de cuenta</td><td>{{ $transferencia['tipo_cuenta'] ? ucfirst($transferencia['tipo_cuenta']) : '—' }}</td></tr>
+                <tr><td class="label">Número de cuenta</td><td>{{ $cuentaEnmascarada }}</td></tr>
+                <tr><td class="label">Fecha y hora de la transferencia</td><td>{{ $transferencia['fecha_transferencia'] ?? '—' }} {{ $transferencia['hora_transferencia'] ?? '' }}</td></tr>
                 <tr><td class="label">Valor transferido</td><td>${{ number_format((float) ($transferencia['valor_transaccion'] ?? 0), 2) }} {{ $transferencia['moneda_cuenta'] ?? 'COP' }}</td></tr>
                 <tr><td class="label">Número de la transacción</td><td>{{ $transferencia['numero_transaccion'] ?? '—' }}</td></tr>
-                <tr><td class="label">Entidad bancaria destino</td><td>{{ $transferencia['entidad_bancaria_nombre'] ?? '—' }}</td></tr>
-                <tr><td class="label">Cuenta destino</td><td>{{ $cuentaEnmascarada }}</td></tr>
             </table>
 
             <p>Adjuntamos el comprobante de la transferencia para su registro.</p>

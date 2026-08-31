@@ -1540,14 +1540,22 @@ class GestionCreditoTest extends TestCase
         // y necesita aparecer como pendiente de gestión para Tesorería.
         $this->assertFalse($credito->solicitud_gestionada);
 
+        // Rebote 2026-08-31 (comentario de Juan): ambos correos deben traer
+        // cliente, tipo de crédito, quién decidió y fecha/hora de la decisión.
         Mail::assertSent(DesembolsoAprobadoTesoreriaMail::class, function ($mail) use ($credito) {
-            return $mail->credito->id === $credito->id;
+            return $mail->credito->id === $credito->id
+                && $mail->nombreCliente === 'Gestion Test'
+                && $mail->tipoCredito === 'Crédito Ordinario'
+                && $mail->nombreGerente === $this->gerente->name;
         });
 
         // SCRUM-303: la aprobación también notifica a Operativo, de forma
         // informativa — la solicitud sigue bajo gestión de Tesorería.
         Mail::assertSent(DesembolsoAprobadoOperativoMail::class, function ($mail) use ($credito) {
-            return $mail->credito->id === $credito->id;
+            return $mail->credito->id === $credito->id
+                && $mail->nombreCliente === 'Gestion Test'
+                && $mail->tipoCredito === 'Crédito Ordinario'
+                && $mail->nombreGerente === $this->gerente->name;
         });
     }
 
@@ -1579,8 +1587,14 @@ class GestionCreditoTest extends TestCase
         $this->assertSame('desembolso_ingreso', $credito->estado);
         $this->assertFalse($credito->solicitud_gestionada);
 
+        // Rebote 2026-08-31 (comentario de Juan): mismo resumen que en la
+        // aprobación (cliente, tipo de crédito, quién decidió, fecha/hora).
         Mail::assertSent(DesembolsoRechazadoOperativoMail::class, function ($mail) use ($credito) {
-            return $mail->credito->id === $credito->id && $mail->observaciones === 'Falta el comprobante correcto.';
+            return $mail->credito->id === $credito->id
+                && $mail->observaciones === 'Falta el comprobante correcto.'
+                && $mail->nombreCliente === 'Gestion Test'
+                && $mail->tipoCredito === 'Crédito Ordinario'
+                && $mail->nombreGerente === $this->gerente->name;
         });
     }
 
@@ -1714,15 +1728,25 @@ class GestionCreditoTest extends TestCase
         // Legacy compat: gate genérico de CreditoOrdinarioController.
         $this->assertNotEmpty($credito->documentos['comprobante_transferencia']);
 
+        // Rebote 2026-08-31 (comentario de Juan): faltaban tipo de documento
+        // del cliente, fecha de solicitud, tipo de crédito y toda la sección
+        // de datos bancarios del titular en ambos correos.
         Mail::assertSent(TransferenciaRealizadaClienteMail::class, function ($mail) use ($credito) {
             return $mail->hasTo('pago.cliente@test.com')
                 && $mail->credito->id === $credito->id
-                && $mail->cuentaEnmascarada === '******7890';
+                && $mail->cuentaEnmascarada === '******7890'
+                && $mail->tipoDocumentoCliente === 'Cédula'
+                && $mail->tipoCredito === 'Crédito Ordinario'
+                && $mail->transferencia['tipo_documento_titular_nombre'] === 'Cédula';
         });
         // SCRUM-307: el comprobante va adjunto en ambas notificaciones, no
         // solo en la del cliente.
         Mail::assertSent(TransferenciaRegistradaInternaMail::class, function ($mail) use ($credito) {
-            return $mail->credito->id === $credito->id && !empty($mail->attachments());
+            return $mail->credito->id === $credito->id
+                && !empty($mail->attachments())
+                && $mail->tipoDocumentoCliente === 'Cédula'
+                && $mail->tipoCredito === 'Crédito Ordinario'
+                && $mail->transferencia['tipo_documento_titular_nombre'] === 'Cédula';
         });
         Mail::assertSentTimes(TransferenciaRegistradaInternaMail::class, 2); // Gerente + Coordinador Comercial
     }
