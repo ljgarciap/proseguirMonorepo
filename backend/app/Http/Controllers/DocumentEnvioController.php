@@ -3,14 +3,31 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Mail\BandejaDocumentoAprobadoFinalMail;
+use App\Mail\BandejaDocumentoAprobadoIntermedioMail;
+use App\Mail\BandejaDocumentoDevueltoMail;
+use App\Mail\BandejaDocumentoNuevoMail;
 use App\Models\DocumentEnvio;
 use App\Models\DocumentEnvioStep;
 use App\Models\DocumentEnvioFile;
 use App\Models\DocumentArea;
+use App\Models\User;
+use App\Services\ActivityLog\ActivityLogService;
+use App\Services\ConfiguracionService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
+/**
+ * SCRUM-311: notificaciones de la Bandeja Interna de Documentos —
+ * documento nuevo (al área del primer paso), devuelto (al remitente),
+ * aprobación final (al remitente) y aprobación intermedia (al remitente y
+ * al área del siguiente paso). "reenviar" no está en el alcance del
+ * ticket (solo 4 notificaciones listadas) y hoy no notifica a nadie —
+ * gap señalado a Luis/Jira, no implementado sin confirmación.
+ */
 class DocumentEnvioController extends Controller
 {
     /**
@@ -101,6 +118,20 @@ class DocumentEnvioController extends Controller
         });
 
         $envio->load(['steps.area', 'files', 'sender', 'category', 'priority']);
+
+        // SCRUM-311 (§6.1/§7.1): notifica al área del primer paso de la ruta.
+        $primerPaso = $envio->steps->firstWhere('orden', 1);
+        if ($primerPaso) {
+            $rolOrigen = DocumentArea::etiqueta($envio->sender->roles[0] ?? null);
+            $urlIngreso = ConfiguracionService::urlIngresoSistema('/internal-docs');
+
+            $this->notificarArea(
+                $primerPaso->area->codigo,
+                new BandejaDocumentoNuevoMail($envio, $rolOrigen, $urlIngreso),
+                $envio,
+                'bandeja_documento_nuevo'
+            );
+        }
 
         return response()->json($envio, 201);
     }
@@ -208,6 +239,39 @@ class DocumentEnvioController extends Controller
 
         $envio->refresh()->load(['steps.area', 'steps.usuario', 'files', 'sender', 'category', 'priority']);
 
+        // SCRUM-311 (§6.2/§6.4/§6.5/§7.2-7.4): notifica según la acción.
+        // "reenviar" queda fuera del alcance del ticket (ver docblock de la
+        // clase) — no dispara notificación.
+        if (in_array($request->accion, ['devolver', 'procesar'], true)) {
+            $rolOrigen = DocumentArea::etiqueta($envio->sender->roles[0] ?? null);
+            $urlIngreso = ConfiguracionService::urlIngresoSistema('/internal-docs');
+            $stepActualizado = $envio->steps->firstWhere('id', $step->id);
+
+            if ($request->accion === 'devolver') {
+                $this->notificarSender(
+                    new BandejaDocumentoDevueltoMail($envio, $stepActualizado, $rolOrigen, $urlIngreso),
+                    $envio,
+                    'bandeja_documento_devuelto'
+                );
+            } else {
+                $siguientePaso = $envio->steps->firstWhere('orden', $stepActualizado->orden + 1);
+
+                if ($siguientePaso) {
+                    $mailable = new BandejaDocumentoAprobadoIntermedioMail(
+                        $envio, $stepActualizado, $siguientePaso, $rolOrigen, $urlIngreso
+                    );
+                    $this->notificarSender($mailable, $envio, 'bandeja_documento_aprobado_intermedio');
+                    $this->notificarArea($siguientePaso->area->codigo, $mailable, $envio, 'bandeja_documento_aprobado_intermedio');
+                } else {
+                    $this->notificarSender(
+                        new BandejaDocumentoAprobadoFinalMail($envio, $stepActualizado, $rolOrigen, $urlIngreso),
+                        $envio,
+                        'bandeja_documento_aprobado_final'
+                    );
+                }
+            }
+        }
+
         return response()->json($envio);
     }
 
@@ -287,5 +351,90 @@ class DocumentEnvioController extends Controller
         }
 
         return false;
+    }
+
+    /**
+     * SCRUM-311: envía $mailable a todos los usuarios activos con rol
+     * $codigoArea y audita el resultado — mismo patrón que
+     * GestionCreditoController::notificarPorRol(), generalizado a
+     * DocumentEnvio como $entidad.
+     */
+    private function notificarArea(string $codigoArea, $mailable, DocumentEnvio $envio, string $tipoNotificacion): void
+    {
+        $destinatarios = User::whereJsonContains('roles', $codigoArea)->pluck('email')->filter()->all();
+
+        if (empty($destinatarios)) {
+            app(ActivityLogService::class)->registrar(
+                'notificacion_rol_sin_destinatarios',
+                "No hay usuarios activos con rol {$codigoArea} para la notificación {$tipoNotificacion} del envío \"{$envio->titulo}\".",
+                Auth::user(),
+                $envio,
+                ['tipo_notificacion' => $tipoNotificacion, 'rol_destino' => $codigoArea]
+            );
+
+            return;
+        }
+
+        try {
+            Mail::to($destinatarios)->send($mailable);
+
+            app(ActivityLogService::class)->registrar(
+                'notificacion_rol_enviada',
+                "Notificación {$tipoNotificacion} enviada a rol {$codigoArea} para el envío \"{$envio->titulo}\".",
+                Auth::user(),
+                $envio,
+                ['tipo_notificacion' => $tipoNotificacion, 'rol_destino' => $codigoArea, 'destinatarios' => $destinatarios]
+            );
+        } catch (Throwable $e) {
+            app(ActivityLogService::class)->registrar(
+                'notificacion_rol_fallida',
+                "Falló el envío de la notificación {$tipoNotificacion} a rol {$codigoArea} para el envío \"{$envio->titulo}\".",
+                Auth::user(),
+                $envio,
+                ['tipo_notificacion' => $tipoNotificacion, 'rol_destino' => $codigoArea, 'destinatarios' => $destinatarios, 'error' => $e->getMessage()]
+            );
+        }
+    }
+
+    /**
+     * SCRUM-311: envía $mailable al usuario origen (remitente) del envío y
+     * audita el resultado — best-effort, un fallo de envío no revierte la
+     * acción ya guardada (mismo criterio que notificarArea()).
+     */
+    private function notificarSender($mailable, DocumentEnvio $envio, string $tipoNotificacion): void
+    {
+        $destino = $envio->sender?->email;
+
+        if (!$destino) {
+            app(ActivityLogService::class)->registrar(
+                'notificacion_rol_sin_destinatarios',
+                "El usuario origen del envío \"{$envio->titulo}\" no tiene correo registrado para la notificación {$tipoNotificacion}.",
+                Auth::user(),
+                $envio,
+                ['tipo_notificacion' => $tipoNotificacion]
+            );
+
+            return;
+        }
+
+        try {
+            Mail::to($destino)->send($mailable);
+
+            app(ActivityLogService::class)->registrar(
+                'notificacion_rol_enviada',
+                "Notificación {$tipoNotificacion} enviada al usuario origen para el envío \"{$envio->titulo}\".",
+                Auth::user(),
+                $envio,
+                ['tipo_notificacion' => $tipoNotificacion, 'destinatarios' => [$destino]]
+            );
+        } catch (Throwable $e) {
+            app(ActivityLogService::class)->registrar(
+                'notificacion_rol_fallida',
+                "Falló el envío de la notificación {$tipoNotificacion} al usuario origen para el envío \"{$envio->titulo}\".",
+                Auth::user(),
+                $envio,
+                ['tipo_notificacion' => $tipoNotificacion, 'destinatarios' => [$destino], 'error' => $e->getMessage()]
+            );
+        }
     }
 }
