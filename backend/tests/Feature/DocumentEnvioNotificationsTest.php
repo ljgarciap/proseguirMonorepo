@@ -6,6 +6,7 @@ use App\Mail\BandejaDocumentoAprobadoFinalMail;
 use App\Mail\BandejaDocumentoAprobadoIntermedioMail;
 use App\Mail\BandejaDocumentoDevueltoMail;
 use App\Mail\BandejaDocumentoNuevoMail;
+use App\Mail\BandejaDocumentoReenviadoMail;
 use App\Models\AccountingCategory;
 use App\Models\AccountingPriority;
 use App\Models\DocumentArea;
@@ -195,12 +196,17 @@ class DocumentEnvioNotificationsTest extends TestCase
         Mail::assertSentTimes(BandejaDocumentoAprobadoIntermedioMail::class, 2);
     }
 
-    public function test_reenviar_no_dispara_ninguna_notificacion(): void
+    public function test_reenviar_notifica_al_area_del_paso_con_el_motivo_de_devolucion(): void
     {
         $envio = $this->makeEnvio();
         $step1 = $envio->steps()->where('orden', 1)->first();
-        $step1->update(['estado' => 'devuelto', 'observacion' => 'Factura ilegible.']);
+        $step1->update([
+            'estado' => 'devuelto',
+            'observacion' => 'Factura ilegible.',
+            'fecha_procesamiento' => now(),
+        ]);
         $envio->update(['estado_general' => 'devuelto']);
+        $contableDestino = $this->makeUser('contable', 'reenv1');
 
         Passport::actingAs($this->sender);
         $response = $this->patchJson("/api/document-envios/{$envio->id}/steps/{$step1->id}", [
@@ -209,6 +215,14 @@ class DocumentEnvioNotificationsTest extends TestCase
         ]);
 
         $response->assertStatus(200);
-        Mail::assertNothingSent();
+
+        Mail::assertSent(BandejaDocumentoReenviadoMail::class, function ($mail) use ($envio, $contableDestino) {
+            return $mail->hasTo($contableDestino->email)
+                && $mail->envio->id === $envio->id
+                && $mail->step->area->codigo === 'contable'
+                && $mail->motivoDevolucion === 'Factura ilegible.'
+                && str_contains($mail->notaReenvio, 'Ya se corrigió.');
+        });
+        Mail::assertSentTimes(BandejaDocumentoReenviadoMail::class, 1);
     }
 }

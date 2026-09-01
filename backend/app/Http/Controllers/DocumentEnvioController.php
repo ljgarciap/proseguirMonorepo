@@ -7,6 +7,7 @@ use App\Mail\BandejaDocumentoAprobadoFinalMail;
 use App\Mail\BandejaDocumentoAprobadoIntermedioMail;
 use App\Mail\BandejaDocumentoDevueltoMail;
 use App\Mail\BandejaDocumentoNuevoMail;
+use App\Mail\BandejaDocumentoReenviadoMail;
 use App\Models\DocumentEnvio;
 use App\Models\DocumentEnvioStep;
 use App\Models\DocumentEnvioFile;
@@ -23,10 +24,11 @@ use Throwable;
 /**
  * SCRUM-311: notificaciones de la Bandeja Interna de Documentos —
  * documento nuevo (al área del primer paso), devuelto (al remitente),
- * aprobación final (al remitente) y aprobación intermedia (al remitente y
- * al área del siguiente paso). "reenviar" no está en el alcance del
- * ticket (solo 4 notificaciones listadas) y hoy no notifica a nadie —
- * gap señalado a Luis/Jira, no implementado sin confirmación.
+ * aprobación final (al remitente), aprobación intermedia (al remitente y
+ * al área del siguiente paso) y reenviado tras devolución (al área del
+ * paso que vuelve a quedar pendiente — rebote 2026-09-01, Juan: la
+ * acción "reenviar" no estaba entre las 4 notificaciones listadas en el
+ * ticket original y no disparaba nada).
  */
 class DocumentEnvioController extends Controller
 {
@@ -186,7 +188,11 @@ class DocumentEnvioController extends Controller
             }
         }
 
-        DB::transaction(function () use ($request, $envio, $step) {
+        $motivoDevolucion = null;
+        $fechaDevolucion = null;
+        $notaReenvio = null;
+
+        DB::transaction(function () use ($request, $envio, $step, &$motivoDevolucion, &$fechaDevolucion, &$notaReenvio) {
             if ($request->accion === 'devolver') {
                 $step->update([
                     'estado' => 'devuelto',
@@ -200,6 +206,8 @@ class DocumentEnvioController extends Controller
             }
 
             if ($request->accion === 'reenviar') {
+                $motivoDevolucion = $step->observacion;
+                $fechaDevolucion = $step->fecha_procesamiento;
                 $notaReenvio = '[Reenviado ' . now()->format('d/m/Y H:i') . '] ' . $request->observacion;
 
                 $step->update([
@@ -239,36 +247,42 @@ class DocumentEnvioController extends Controller
 
         $envio->refresh()->load(['steps.area', 'steps.usuario', 'files', 'sender', 'category', 'priority']);
 
-        // SCRUM-311 (§6.2/§6.4/§6.5/§7.2-7.4): notifica según la acción.
-        // "reenviar" queda fuera del alcance del ticket (ver docblock de la
-        // clase) — no dispara notificación.
-        if (in_array($request->accion, ['devolver', 'procesar'], true)) {
-            $rolOrigen = DocumentArea::etiqueta($envio->sender->roles[0] ?? null);
-            $urlIngreso = ConfiguracionService::urlIngresoSistema('/internal-docs');
-            $stepActualizado = $envio->steps->firstWhere('id', $step->id);
+        // SCRUM-311 (§6.2/§6.4/§6.5/§7.2-7.4) + rebote 2026-09-01 (reenviar):
+        // notifica según la acción.
+        $rolOrigen = DocumentArea::etiqueta($envio->sender->roles[0] ?? null);
+        $urlIngreso = ConfiguracionService::urlIngresoSistema('/internal-docs');
+        $stepActualizado = $envio->steps->firstWhere('id', $step->id);
 
-            if ($request->accion === 'devolver') {
-                $this->notificarSender(
-                    new BandejaDocumentoDevueltoMail($envio, $stepActualizado, $rolOrigen, $urlIngreso),
-                    $envio,
-                    'bandeja_documento_devuelto'
+        if ($request->accion === 'devolver') {
+            $this->notificarSender(
+                new BandejaDocumentoDevueltoMail($envio, $stepActualizado, $rolOrigen, $urlIngreso),
+                $envio,
+                'bandeja_documento_devuelto'
+            );
+        } elseif ($request->accion === 'reenviar') {
+            $this->notificarArea(
+                $stepActualizado->area->codigo,
+                new BandejaDocumentoReenviadoMail(
+                    $envio, $stepActualizado, $motivoDevolucion, $fechaDevolucion, $notaReenvio, $rolOrigen, $urlIngreso
+                ),
+                $envio,
+                'bandeja_documento_reenviado'
+            );
+        } else {
+            $siguientePaso = $envio->steps->firstWhere('orden', $stepActualizado->orden + 1);
+
+            if ($siguientePaso) {
+                $mailable = new BandejaDocumentoAprobadoIntermedioMail(
+                    $envio, $stepActualizado, $siguientePaso, $rolOrigen, $urlIngreso
                 );
+                $this->notificarSender($mailable, $envio, 'bandeja_documento_aprobado_intermedio');
+                $this->notificarArea($siguientePaso->area->codigo, $mailable, $envio, 'bandeja_documento_aprobado_intermedio');
             } else {
-                $siguientePaso = $envio->steps->firstWhere('orden', $stepActualizado->orden + 1);
-
-                if ($siguientePaso) {
-                    $mailable = new BandejaDocumentoAprobadoIntermedioMail(
-                        $envio, $stepActualizado, $siguientePaso, $rolOrigen, $urlIngreso
-                    );
-                    $this->notificarSender($mailable, $envio, 'bandeja_documento_aprobado_intermedio');
-                    $this->notificarArea($siguientePaso->area->codigo, $mailable, $envio, 'bandeja_documento_aprobado_intermedio');
-                } else {
-                    $this->notificarSender(
-                        new BandejaDocumentoAprobadoFinalMail($envio, $stepActualizado, $rolOrigen, $urlIngreso),
-                        $envio,
-                        'bandeja_documento_aprobado_final'
-                    );
-                }
+                $this->notificarSender(
+                    new BandejaDocumentoAprobadoFinalMail($envio, $stepActualizado, $rolOrigen, $urlIngreso),
+                    $envio,
+                    'bandeja_documento_aprobado_final'
+                );
             }
         }
 
