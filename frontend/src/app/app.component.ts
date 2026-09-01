@@ -292,17 +292,19 @@ export class AppComponent implements OnInit, OnDestroy {
         { label: 'Config Requisitos', route: '/document-config', icon: 'settings_applications', roles: ['operativo', 'superadmin'] },
       ],
     },
-    {
-      // El bloque original usaba getActiveRole() === 'superadmin'. isAuthorized(['superadmin'])
-      // es equivalente: true solo cuando el rol activo es superadmin (ver AuthService.isAuthorized).
-      title: 'Notificaciones',
-      roles: ['superadmin'],
-      items: [
-        { label: 'Destinatarios', route: '/destinatarios', icon: 'mail_lock', roles: ['superadmin'] },
-        { label: 'Notificaciones', route: '/notificaciones', icon: 'notifications_active', roles: ['superadmin'] },
-        { label: 'Asignaciones', route: '/asignaciones', icon: 'assignment_ind', roles: ['superadmin'] },
-      ],
-    },
+    // SCRUM-315: bloque "Notificaciones" (Destinatarios/Notificaciones/Asignaciones) oculto del
+    // menú lateral a pedido de Juan Andrés. Las rutas y componentes siguen intactos — solo se
+    // saca la entrada de navegación de rawNavSections. Si se vuelve a pedir visible, restaurar
+    // este bloque (roles: ['superadmin']) tal cual estaba.
+    // {
+    //   title: 'Notificaciones',
+    //   roles: ['superadmin'],
+    //   items: [
+    //     { label: 'Destinatarios', route: '/destinatarios', icon: 'mail_lock', roles: ['superadmin'] },
+    //     { label: 'Notificaciones', route: '/notificaciones', icon: 'notifications_active', roles: ['superadmin'] },
+    //     { label: 'Asignaciones', route: '/asignaciones', icon: 'assignment_ind', roles: ['superadmin'] },
+    //   ],
+    // },
     {
       title: 'Planificación',
       roles: ['superadmin'],
