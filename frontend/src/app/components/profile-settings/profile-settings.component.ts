@@ -86,6 +86,10 @@ import { AuthService } from '../../services/auth.service';
               <input type="password" [(ngModel)]="pwdData.new_password_confirmation" name="new_password_confirmation" required class="pro-input">
             </div>
 
+            <div class="status-msg error" *ngIf="pwdData.new_password && pwdData.current_password && pwdData.new_password === pwdData.current_password">
+              <span class="material-symbols-outlined">error</span>
+              La nueva contraseña debe ser diferente a la actual.
+            </div>
             <div class="status-msg success" *ngIf="successMessage">
               <span class="material-symbols-outlined">check_circle</span>
               {{ successMessage }}
@@ -95,7 +99,7 @@ import { AuthService } from '../../services/auth.service';
               {{ errorMessage }}
             </div>
 
-            <button type="submit" class="btn-pro primary" [disabled]="isLoading || !pwdForm.valid || pwdData.new_password !== pwdData.new_password_confirmation">
+            <button type="submit" class="btn-pro primary" [disabled]="isLoading || !pwdForm.valid || pwdData.new_password !== pwdData.new_password_confirmation || pwdData.new_password === pwdData.current_password">
               <span class="material-symbols-outlined">key</span>
               {{ isLoading ? 'Actualizando...' : 'Actualizar Contraseña' }}
             </button>

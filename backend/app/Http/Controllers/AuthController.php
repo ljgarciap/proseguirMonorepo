@@ -3,14 +3,18 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Mail\PasswordCambiadaMail;
 use App\Models\User;
 use App\Services\ConfiguracionService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Passport\Passport;
 use App\Services\ActivityLog\ActivityLogService;
+use Throwable;
 
 class AuthController extends Controller
 {
@@ -198,9 +202,54 @@ class AuthController extends Controller
             ]);
         }
 
+        // SCRUM-317: el ticket exige rechazar el cambio si la nueva
+        // contraseña es igual a la vigente — el 'confirmed' de arriba solo
+        // valida que new_password == new_password_confirmation, no dice
+        // nada sobre la contraseña actual.
+        if (Hash::check($request->new_password, $user->password)) {
+            throw ValidationException::withMessages([
+                'new_password' => ['La nueva contraseña debe ser diferente a la contraseña actual.'],
+            ]);
+        }
+
         $user->update([
             'password' => Hash::make($request->new_password)
         ]);
+
+        $fechaCambio = now();
+
+        // SCRUM-317 (§"Registrar trazabilidad del evento..."): el evento del
+        // cambio de contraseña en sí, aparte del resultado del envío del
+        // correo (logueado más abajo) — mismo criterio que auth.login/logout.
+        $this->activityLog->registrar(
+            accion: 'auth.password_cambiada',
+            descripcion: "{$user->name} cambió su contraseña.",
+            usuario: $user,
+            metadata: ['fecha_cambio' => $fechaCambio->toDateTimeString()],
+        );
+
+        // Best-effort: la contraseña ya quedó actualizada aunque el envío
+        // falle (flujo alterno "Falla en el envío del correo" del ticket) —
+        // mismo criterio que las demás notificaciones del proyecto.
+        try {
+            Mail::to($user->email)->send(new PasswordCambiadaMail($user, $fechaCambio));
+
+            $this->activityLog->registrar(
+                accion: 'auth.password_cambiada_notificacion_enviada',
+                descripcion: "Correo de confirmación de cambio de contraseña enviado a {$user->email}.",
+                usuario: $user,
+                metadata: ['destinatario' => $user->email, 'fecha_cambio' => $fechaCambio->toDateTimeString()],
+            );
+        } catch (Throwable $e) {
+            Log::error("SCRUM-317: no se pudo enviar la confirmación de cambio de contraseña a {$user->email}: " . $e->getMessage());
+
+            $this->activityLog->registrar(
+                accion: 'auth.password_cambiada_notificacion_fallida',
+                descripcion: "Fallo al enviar la confirmación de cambio de contraseña a {$user->email}.",
+                usuario: $user,
+                metadata: ['destinatario' => $user->email, 'fecha_cambio' => $fechaCambio->toDateTimeString(), 'error' => $e->getMessage()],
+            );
+        }
 
         return response()->json(['message' => 'Contraseña actualizada correctamente']);
     }
