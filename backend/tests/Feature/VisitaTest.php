@@ -11,7 +11,10 @@ use App\Models\Amortizacion;
 use App\Models\Visita;
 use App\Models\Departamento;
 use App\Models\Ciudad;
+use App\Models\ActivityLog;
+use App\Mail\VisitaCreditoDetectadoCoordinadorMail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Laravel\Passport\Passport;
 use Tests\TestCase;
 
@@ -298,6 +301,117 @@ class VisitaTest extends TestCase
             'ciudad' => 'Manizales',
             'departamento_id' => $this->risaralda->id,
             'ciudad_id' => $this->manizales->id,
+        ]);
+    }
+
+    /**
+     * SCRUM-316: registrar una visita con requiere_credito=true notifica a
+     * todos los usuarios activos con rol Coordinador Comercial, sin
+     * importar qué rol tiene quien la registró (decisión de Luis
+     * 2026-09-02).
+     */
+    public function test_store_visit_with_credit_notifies_coordinador_comercial(): void
+    {
+        Mail::fake();
+
+        $coordinador = User::create([
+            'name' => 'Coordinador Comercial Test',
+            'email' => 'coordinador.test.' . uniqid() . '@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'coord_doc_' . uniqid(),
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['coordinador_comercial']
+        ]);
+
+        Passport::actingAs($this->admin);
+
+        $response = $this->postJson('/api/visitas', [
+            'fecha' => '2026-06-02',
+            'departamento_id' => $this->risaralda->id,
+            'ciudad_id' => $this->pereira->id,
+            'cliente_id' => $this->activeClient->id,
+            'asistentes' => 'Carlos, Luis',
+            'requiere_credito' => true,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 50000000.00,
+            'plazo' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'garantia' => 'Firma personal',
+            'fuente_pago' => 'Flujo de caja operacional'
+        ]);
+
+        $response->assertStatus(201);
+
+        Mail::assertSent(VisitaCreditoDetectadoCoordinadorMail::class, function ($mail) use ($coordinador) {
+            return $mail->hasTo($coordinador->email);
+        });
+
+        $this->assertDatabaseHas('activity_logs', [
+            'accion' => 'visita_notificacion_enviada',
+        ]);
+    }
+
+    /**
+     * SCRUM-316: si no requiere crédito, no se envía ninguna notificación.
+     */
+    public function test_store_visit_without_credit_does_not_notify(): void
+    {
+        Mail::fake();
+
+        User::create([
+            'name' => 'Coordinador Comercial Test',
+            'email' => 'coordinador.test.' . uniqid() . '@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => 'coord_doc_' . uniqid(),
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['coordinador_comercial']
+        ]);
+
+        Passport::actingAs($this->admin);
+
+        $response = $this->postJson('/api/visitas', [
+            'fecha' => '2026-06-02',
+            'departamento_id' => $this->risaralda->id,
+            'ciudad_id' => $this->pereira->id,
+            'cliente_id' => $this->activeClient->id,
+            'asistentes' => 'Carlos, Luis',
+            'requiere_credito' => false
+        ]);
+
+        $response->assertStatus(201);
+        Mail::assertNothingSent();
+    }
+
+    /**
+     * SCRUM-316: sin Coordinador Comercial activo, la visita se conserva y
+     * queda registrada la novedad en ActivityLog.
+     */
+    public function test_store_visit_with_credit_and_no_coordinador_logs_sin_destinatarios(): void
+    {
+        Mail::fake();
+
+        Passport::actingAs($this->admin);
+
+        $response = $this->postJson('/api/visitas', [
+            'fecha' => '2026-06-02',
+            'departamento_id' => $this->risaralda->id,
+            'ciudad_id' => $this->pereira->id,
+            'cliente_id' => $this->activeClient->id,
+            'asistentes' => 'Carlos, Luis',
+            'requiere_credito' => true,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 50000000.00,
+            'plazo' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'fuente_pago' => 'Flujo de caja operacional'
+        ]);
+
+        $response->assertStatus(201);
+        Mail::assertNothingSent();
+        $this->assertDatabaseHas('activity_logs', [
+            'accion' => 'visita_notificacion_sin_destinatarios',
         ]);
     }
 }
