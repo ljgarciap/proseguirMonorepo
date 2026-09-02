@@ -2,12 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\VisitaCreditoDetectadoCoordinadorMail;
 use App\Models\Visita;
 use App\Models\Cliente;
 use App\Models\Ciudad;
+use App\Models\User;
+use App\Services\ActivityLog\ActivityLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class VisitaController extends Controller
 {
@@ -98,8 +105,19 @@ class VisitaController extends Controller
         $validated['ciudad'] = $this->resolverTextoCiudad($validated['departamento_id'], $validated['ciudad_id']);
 
         $visita = Visita::create($validated);
+        $visita->load(['cliente.tipoPersona', 'cliente.documentType', 'tipoCredito', 'amortizacion']);
 
-        return response()->json($visita->load(['cliente.tipoPersona', 'tipoCredito', 'amortizacion']), 201);
+        // SCRUM-316: el registro exitoso de una visita que sí requiere
+        // crédito notifica a Coordinador Comercial — se dispara siempre que
+        // la condición se cumpla, sin importar qué rol tiene quien la
+        // registró (decisión explícita de Luis 2026-09-02: Registro de
+        // Visita a Cliente hoy también lo usan Operativo/Superadmin, no
+        // solo Gerente).
+        if ($visita->requiere_credito) {
+            $this->notificarCoordinadorComercial($visita);
+        }
+
+        return response()->json($visita, 201);
     }
 
     public function update(Request $request, $id)
@@ -159,6 +177,60 @@ class VisitaController extends Controller
         $visita->delete();
 
         return response()->json(['message' => 'Visita eliminada correctamente']);
+    }
+
+    /**
+     * SCRUM-316: envío best-effort a todos los usuarios activos con rol
+     * Coordinador Comercial — mismo idioma que
+     * GestionCreditoController::notificarPorRol() (User::whereJsonContains,
+     * un fallo de envío no revierte la visita ya guardada). Cada intento
+     * (enviado, fallido, o sin destinatarios) queda trazado en ActivityLog.
+     */
+    private function notificarCoordinadorComercial(Visita $visita): void
+    {
+        $gerente = Auth::user();
+        $destinatarios = User::whereJsonContains('roles', 'coordinador_comercial')
+            ->whereNotNull('email')
+            ->pluck('email')
+            ->all();
+
+        if (empty($destinatarios)) {
+            app(ActivityLogService::class)->registrar(
+                'visita_notificacion_sin_destinatarios',
+                "No hay usuarios activos con rol Coordinador Comercial para notificar la visita {$visita->id} ({$visita->cliente->nombre}).",
+                $gerente,
+                $visita,
+            );
+
+            return;
+        }
+
+        $urlAcceso = rtrim(env('FRONTEND_URL', config('app.url')), '/')
+            . '/login?returnTo=' . urlencode('/visitas');
+
+        try {
+            Mail::to($destinatarios)->send(
+                new VisitaCreditoDetectadoCoordinadorMail($visita, $gerente?->name ?? 'Usuario', $urlAcceso)
+            );
+
+            app(ActivityLogService::class)->registrar(
+                'visita_notificacion_enviada',
+                "Notificación de visita con crédito enviada a Coordinador Comercial para la visita {$visita->id} ({$visita->cliente->nombre}).",
+                $gerente,
+                $visita,
+                ['destinatarios' => $destinatarios]
+            );
+        } catch (Throwable $e) {
+            Log::error("SCRUM-316: no se pudo enviar la notificación de la visita {$visita->id} a Coordinador Comercial: " . $e->getMessage());
+
+            app(ActivityLogService::class)->registrar(
+                'visita_notificacion_fallida',
+                "Fallo al enviar la notificación de la visita {$visita->id} ({$visita->cliente->nombre}) a Coordinador Comercial.",
+                $gerente,
+                $visita,
+                ['destinatarios' => $destinatarios, 'error' => $e->getMessage()]
+            );
+        }
     }
 
     /**
