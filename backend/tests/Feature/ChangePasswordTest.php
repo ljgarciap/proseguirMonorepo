@@ -6,6 +6,7 @@ use App\Mail\PasswordCambiadaMail;
 use App\Models\DocumentType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Passport\Passport;
 use Tests\TestCase;
@@ -61,6 +62,37 @@ class ChangePasswordTest extends TestCase
             'usuario_id' => $this->user->id,
             'accion' => 'auth.password_cambiada_notificacion_enviada',
         ]);
+    }
+
+    /**
+     * SCRUM-317 rebote (Juan, 2026-09-02): la prueba se hizo a las 4pm hora
+     * Colombia pero el correo mostró ~9pm — config('app.timezone') es UTC
+     * (ver config/app.php) y el correo formateaba $fechaCambio sin
+     * convertir. 21:00 UTC == 16:00 America/Bogota (UTC-5, sin horario de
+     * verano), reproduce el caso reportado.
+     */
+    public function test_change_password_confirmation_email_shows_bogota_time(): void
+    {
+        Carbon::setTestNow(Carbon::create(2026, 9, 2, 21, 0, 0, 'UTC'));
+        Passport::actingAs($this->user);
+
+        try {
+            $response = $this->postJson('/api/change-password', [
+                'current_password' => 'password_actual',
+                'new_password' => 'password_nueva123',
+                'new_password_confirmation' => 'password_nueva123',
+            ]);
+
+            $response->assertStatus(200);
+
+            $html = (new PasswordCambiadaMail($this->user, now()))->render();
+
+            $this->assertStringContainsString('16:00', $html);
+            $this->assertStringContainsString('hora Colombia', $html);
+            $this->assertStringNotContainsString('21:00', $html);
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_change_password_rejects_incorrect_current_password(): void

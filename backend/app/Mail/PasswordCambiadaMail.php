@@ -16,6 +16,14 @@ use Illuminate\Queue\SerializesModels;
  * pantalla "Mi Perfil"). Disparado desde AuthController::changePassword(),
  * best-effort — la contraseña ya quedó actualizada aunque el envío falle
  * (ver flujo alterno "Falla en el envío del correo" del ticket).
+ *
+ * SCRUM-317 rebote (Juan, 2026-09-02): $fechaCambio llega en server time
+ * (config('app.timezone') = 'UTC', ver config/app.php) — sin conversión, el
+ * correo mostraba la hora 5h adelantada de Bogotá. Se guarda aparte
+ * $fechaCambioBogota (America/Bogota) solo para el texto del correo;
+ * $fechaCambio se deja intacto porque AuthController también lo usa para
+ * el metadata de ActivityLog en server time, igual que el resto de la
+ * auditoría del proyecto.
  */
 class PasswordCambiadaMail extends Mailable
 {
@@ -23,11 +31,13 @@ class PasswordCambiadaMail extends Mailable
 
     public User $usuario;
     public Carbon $fechaCambio;
+    public Carbon $fechaCambioBogota;
 
     public function __construct(User $usuario, Carbon $fechaCambio)
     {
         $this->usuario = $usuario;
         $this->fechaCambio = $fechaCambio;
+        $this->fechaCambioBogota = $fechaCambio->copy()->setTimezone('America/Bogota');
     }
 
     public function envelope(): Envelope
