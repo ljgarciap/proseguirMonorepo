@@ -35,7 +35,7 @@
                 <tr><td class="label">Título</td><td>{{ $envio->titulo }}</td></tr>
                 <tr><td class="label">Enviado por</td><td>{{ $envio->sender->name ?? '—' }} ({{ $envio->sender->documentType->nombre ?? 'Documento' }} {{ $envio->sender->numero_documento ?? '—' }})</td></tr>
                 <tr><td class="label">Rol de quien envía</td><td>{{ $rolOrigen }}</td></tr>
-                <tr><td class="label">Fecha y hora del envío</td><td>{{ $envio->created_at->format('d/m/Y H:i') }}</td></tr>
+                <tr><td class="label">Fecha y hora del envío</td><td>{{ $envio->created_at->bogota()->format('d/m/Y H:i') }}</td></tr>
                 <tr>
                     <td class="label">Ruta de aprobación</td>
                     <td>
@@ -62,7 +62,7 @@
             <table class="detalle">
                 <tr><td class="label">Aprobó</td><td>{{ $step->usuario->name ?? '—' }} ({{ $step->usuario->documentType->nombre ?? 'Documento' }} {{ $step->usuario->numero_documento ?? '—' }})</td></tr>
                 <tr><td class="label">Rol de quien aprobó</td><td>{{ $step->area->nombre ?? '—' }}</td></tr>
-                <tr><td class="label">Fecha y hora de aprobación</td><td>{{ optional($step->fecha_procesamiento)->format('d/m/Y H:i') ?? '—' }}</td></tr>
+                <tr><td class="label">Fecha y hora de aprobación</td><td>{{ optional($step->fecha_procesamiento?->bogota())->format('d/m/Y H:i') ?? '—' }}</td></tr>
                 <tr><td class="label">Estado</td><td>Aprobado — Ruta finalizada</td></tr>
             </table>
 

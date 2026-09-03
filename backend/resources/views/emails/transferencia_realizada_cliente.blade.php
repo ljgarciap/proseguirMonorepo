@@ -31,7 +31,7 @@
             <table class="detalle">
                 <tr><td class="label">Tipo de documento</td><td>{{ $tipoDocumentoCliente }}</td></tr>
                 <tr><td class="label">Número de crédito</td><td>{{ $credito->numero_solicitud }}</td></tr>
-                <tr><td class="label">Fecha de solicitud</td><td>{{ optional($fechaSolicitud)->format('d/m/Y') ?? '—' }}</td></tr>
+                <tr><td class="label">Fecha de solicitud</td><td>{{ optional($fechaSolicitud?->bogota())->format('d/m/Y') ?? '—' }}</td></tr>
                 <tr><td class="label">Tipo de crédito</td><td>{{ $tipoCredito }}</td></tr>
                 <tr><td class="label">Monto solicitado</td><td>${{ number_format($credito->monto, 0, ',', '.') }} COP</td></tr>
                 <tr><td class="label">Titular de la cuenta</td><td>{{ $transferencia['titular_cuenta'] ?? '—' }}</td></tr>

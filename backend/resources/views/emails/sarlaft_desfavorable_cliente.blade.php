@@ -22,7 +22,7 @@
         </div>
         <div class="content">
             <p>Estimado(a) cliente,</p>
-            <p>Le informamos que su solicitud de crédito <strong>{{ $credito->numero_solicitud }}</strong> no continuará en el proceso, luego de la validación de Listas Restrictivas y SARLAFT realizada el {{ optional($credito->sarlaft_diligenciado_at)->format('d/m/Y') }}.</p>
+            <p>Le informamos que su solicitud de crédito <strong>{{ $credito->numero_solicitud }}</strong> no continuará en el proceso, luego de la validación de Listas Restrictivas y SARLAFT realizada el {{ optional($credito->sarlaft_diligenciado_at?->bogota())->format('d/m/Y') }}.</p>
             <div class="highlight-box">
                 <p style="margin:0;"><strong>Motivo:</strong> {{ $credito->sarlaft_observaciones }}</p>
             </div>

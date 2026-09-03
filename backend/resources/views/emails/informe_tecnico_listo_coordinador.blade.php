@@ -46,7 +46,7 @@
                     </tr>
                     <tr>
                         <td style="font-weight: bold;">Fecha y hora de registro del Ingeniero:</td>
-                        <td>{{ optional($credito->informeTecnico->diligenciado_por_ingeniero_at)->format('d/m/Y H:i') }}</td>
+                        <td>{{ optional($credito->informeTecnico->diligenciado_por_ingeniero_at?->bogota())->format('d/m/Y H:i') }}</td>
                     </tr>
                     <tr>
                         <td style="font-weight: bold;">Estado:</td>

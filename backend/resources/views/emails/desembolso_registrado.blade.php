@@ -48,7 +48,7 @@
                     </tr>
                     <tr>
                         <td style="font-weight: bold;">Fecha y hora:</td>
-                        <td>{{ $fechaHoraRegistro->format('d/m/Y H:i') }}</td>
+                        <td>{{ $fechaHoraRegistro->bogota()->format('d/m/Y H:i') }}</td>
                     </tr>
                 </table>
             </div>

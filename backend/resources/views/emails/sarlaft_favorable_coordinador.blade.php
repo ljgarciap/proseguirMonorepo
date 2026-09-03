@@ -23,7 +23,7 @@
         $nombreCliente = $cliente->nombre ?? '—';
         $tipoDocumento = $cliente?->documentType->codigo ?? '';
         $numeroDocumento = $cliente->identificacion ?? $cliente->numero_documento ?? '—';
-        $fechaValidacion = optional($credito->sarlaft_diligenciado_at)->format('d/m/Y H:i');
+        $fechaValidacion = optional($credito->sarlaft_diligenciado_at?->bogota())->format('d/m/Y H:i');
     @endphp
     <div class="container">
         <div class="header">

@@ -26,7 +26,7 @@
             <p>Le informamos que la contraseña de acceso al Sistema de Gestión de Liquidez fue modificada exitosamente.</p>
 
             <div class="info-box">
-                Fecha: {{ $fechaCambioBogota->format('d/m/Y') }} &nbsp;&nbsp; Hora: {{ $fechaCambioBogota->format('H:i') }} (hora Colombia)
+                Fecha: {{ $fechaCambio->bogota()->format('d/m/Y') }} &nbsp;&nbsp; Hora: {{ $fechaCambio->bogota()->format('H:i') }} (hora Colombia)
             </div>
 
             <p>Si realizó este cambio, no es necesario efectuar ninguna acción adicional.</p>

@@ -46,7 +46,7 @@
                     </tr>
                     <tr>
                         <td style="font-weight: bold;">Fecha y hora de finalización:</td>
-                        <td>{{ optional($credito->informeTecnico->diligenciado_por_coordinador_at)->format('d/m/Y H:i') }}</td>
+                        <td>{{ optional($credito->informeTecnico->diligenciado_por_coordinador_at?->bogota())->format('d/m/Y H:i') }}</td>
                     </tr>
                     <tr>
                         <td style="font-weight: bold;">Estado:</td>

@@ -46,7 +46,7 @@
                     </tr>
                     <tr>
                         <td style="font-weight: bold;">Fecha de aprobación:</td>
-                        <td>{{ now()->format('d/m/Y H:i') }}</td>
+                        <td>{{ now()->bogota()->format('d/m/Y H:i') }}</td>
                     </tr>
                 </table>
             </div>

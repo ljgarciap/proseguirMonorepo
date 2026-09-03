@@ -51,7 +51,7 @@
                     </tr>
                     <tr>
                         <td style="font-weight: bold;">Fecha y hora de cargue:</td>
-                        <td>{{ now()->format('d/m/Y H:i') }}</td>
+                        <td>{{ now()->bogota()->format('d/m/Y H:i') }}</td>
                     </tr>
                     <tr>
                         <td style="font-weight: bold;">Origen del cargue:</td>
