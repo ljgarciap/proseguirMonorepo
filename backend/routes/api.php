@@ -79,9 +79,12 @@ Route::get('/dashboard/cartera-factoring/export', [\App\Http\Controllers\Dashboa
             Route::get('/ciudades/buscar', [\App\Http\Controllers\UbicacionController::class, 'buscarCiudades']);
         });
         
-        // Destinatarios (Superadmin only)
+        // Destinatarios (Superadmin only) — RBAC Fase 2 pilot swap
+        // (docs/specs/rbac-fase2-enforcement.md): primer grupo migrado de
+        // checkrole: al catálogo paramétrico, para probar el mecanismo
+        // completo (CheckPermission + seeder) antes de migrar el resto.
         Route::apiResource('destinatarios', \App\Http\Controllers\DestinatarioController::class)
-            ->middleware(['auth:api', 'checkrole:superadmin']);
+            ->middleware(['auth:api', 'checkpermission:destinatarios']);
         
         // Notificaciones (Superadmin only)
         Route::apiResource('notificaciones', \App\Http\Controllers\NotificacionController::class)

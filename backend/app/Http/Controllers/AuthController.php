@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Mail\PasswordCambiadaMail;
+use App\Models\Role;
 use App\Models\User;
 use App\Services\ConfiguracionService;
 use Illuminate\Support\Facades\Hash;
@@ -254,8 +255,37 @@ class AuthController extends Controller
         return response()->json(['message' => 'Contraseña actualizada correctamente']);
     }
 
+    /**
+     * RBAC Fase 2 (docs/specs/rbac-fase2-enforcement.md): `permissions`
+     * es la unión de claves de permiso de todos los roles del usuario —
+     * el frontend la usa para el gate de pantalla (roleGuard) en vez de
+     * comparar contra data.roles hardcodeado. superadmin recibe TODAS las
+     * claves del catálogo, igual que su bypass en CheckPermission —
+     * consistente entre backend y frontend, ninguna pantalla/acción
+     * debería quedar inaccesible para superadmin por un permiso que el
+     * catálogo no le haya asignado explícitamente.
+     */
     public function me(Request $request)
     {
-        return response()->json($request->user());
+        $user = $request->user();
+        $userRoles = is_array($user->roles) ? $user->roles : [];
+
+        if (in_array('superadmin', $userRoles, true)) {
+            $permissions = \App\Models\Permission::pluck('clave');
+        } else {
+            $permissions = Role::whereIn('slug', $userRoles)
+                ->with('permissions:id,clave')
+                ->get()
+                ->pluck('permissions')
+                ->flatten()
+                ->pluck('clave')
+                ->unique()
+                ->values();
+        }
+
+        $data = $user->toArray();
+        $data['permissions'] = $permissions;
+
+        return response()->json($data);
     }
 }

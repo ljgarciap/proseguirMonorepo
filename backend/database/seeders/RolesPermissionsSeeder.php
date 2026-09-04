@@ -102,6 +102,40 @@ class RolesPermissionsSeeder extends Seeder
     ];
 
     /**
+     * RBAC Fase 2 (docs/specs/rbac-fase2-enforcement.md, 2026-09-04): estos
+     * 6 módulos tienen roles DISTINTOS por acción dentro del mismo prefijo
+     * de ruta backend — el catálogo "una pantalla = un permiso" de arriba
+     * no alcanza para ellos. Cada entrada acá replica 1:1 el
+     * `checkrole:` real de esa acción en routes/api.php (verificado línea
+     * por línea, no de memoria, el 2026-09-04). Acciones con el mismo set
+     * de roles se colapsan en un solo permiso (ej. mandatos:gestionar
+     * cubre status+editar+eliminar, los 3 con [operativo,superadmin]).
+     *
+     * @var array<int, array{clave: string, nombre: string, modulo: string, roles: string[]}>
+     */
+    private const PERMISOS_ACCION = [
+        ['clave' => 'uploads:subir', 'nombre' => 'Subir Documento (OCR)', 'modulo' => 'OCR y Cargas', 'roles' => ['cliente', 'operativo']],
+        ['clave' => 'uploads:descargar', 'nombre' => 'Descargar Documento (OCR)', 'modulo' => 'OCR y Cargas', 'roles' => ['cliente', 'operativo', 'gerente', 'coordinador_comercial', 'superadmin']],
+        ['clave' => 'uploads:validar', 'nombre' => 'Validar Documento (OCR)', 'modulo' => 'OCR y Cargas', 'roles' => ['operativo']],
+        ['clave' => 'uploads:aprobar', 'nombre' => 'Aprobar Documento (OCR)', 'modulo' => 'OCR y Cargas', 'roles' => ['gerente']],
+        ['clave' => 'uploads:eliminar', 'nombre' => 'Eliminar Documento (OCR)', 'modulo' => 'OCR y Cargas', 'roles' => ['cliente', 'superadmin']],
+
+        ['clave' => 'mandatos:crear', 'nombre' => 'Crear Mandato', 'modulo' => 'General', 'roles' => ['cliente']],
+        ['clave' => 'mandatos:ver', 'nombre' => 'Ver Mandatos', 'modulo' => 'General', 'roles' => ['cliente', 'gerente', 'operativo', 'superadmin']],
+        ['clave' => 'mandatos:exportar', 'nombre' => 'Exportar Mandato', 'modulo' => 'General', 'roles' => ['cliente', 'gerente', 'operativo', 'contable', 'superadmin']],
+        ['clave' => 'mandatos:gestionar', 'nombre' => 'Gestionar Mandato (estado/editar/eliminar)', 'modulo' => 'General', 'roles' => ['operativo', 'superadmin']],
+
+        ['clave' => 'parameters:gestionar', 'nombre' => 'Gestionar Parámetros Genéricos', 'modulo' => 'Administración', 'roles' => ['superadmin']],
+
+        ['clave' => 'document-presets:ver', 'nombre' => 'Ver Presets de Documentos', 'modulo' => 'Documentos', 'roles' => ['superadmin', 'operativo', 'coordinador_comercial']],
+        ['clave' => 'document-presets:gestionar', 'nombre' => 'Gestionar Presets de Documentos', 'modulo' => 'Documentos', 'roles' => ['superadmin', 'operativo']],
+
+        ['clave' => 'document-requests:gestionar', 'nombre' => 'Gestionar Solicitudes de Documentos a Clientes', 'modulo' => 'Documentos', 'roles' => ['superadmin', 'operativo']],
+
+        ['clave' => 'solicitudes-credito:editar', 'nombre' => 'Editar Condiciones Financieras de Solicitud de Crédito', 'modulo' => 'Crédito Ordinario', 'roles' => ['coordinador_comercial']],
+    ];
+
+    /**
      * Los 10 roles que hoy viven hardcodeados (whitelist de
      * UserController, checkboxes de user-management.component.ts). El
      * slug es el string legacy exacto — nunca editable desde la UI (ver
@@ -124,8 +158,25 @@ class RolesPermissionsSeeder extends Seeder
 
     public function run(): void
     {
-        $permisosPorClave = [];
-        foreach (self::PERMISOS as $datos) {
+        $catalogo = array_merge(self::PERMISOS, self::PERMISOS_ACCION);
+
+        // Roles primero (los permisos de acción necesitan poder resolver
+        // el rol por slug al asignarse más abajo).
+        foreach (self::ROLES as $datos) {
+            Role::firstOrCreate(
+                ['slug' => $datos['slug']],
+                [
+                    'nombre' => $datos['nombre'],
+                    'descripcion' => $datos['descripcion'],
+                    'es_sistema' => true,
+                ]
+            );
+        }
+
+        $rolesPorSlug = Role::whereIn('slug', array_column(self::ROLES, 'slug'))
+            ->get()->keyBy('slug');
+
+        foreach ($catalogo as $datos) {
             $permiso = Permission::firstOrCreate(
                 ['clave' => $datos['clave']],
                 [
@@ -134,35 +185,26 @@ class RolesPermissionsSeeder extends Seeder
                     'descripcion' => $datos['nombre'],
                 ]
             );
-            $permisosPorClave[$datos['clave']] = $permiso;
-        }
 
-        foreach (self::ROLES as $datos) {
-            $rol = Role::firstOrCreate(
-                ['slug' => $datos['slug']],
-                [
-                    'nombre' => $datos['nombre'],
-                    'descripcion' => $datos['descripcion'],
-                    'es_sistema' => true,
-                ]
-            );
-
-            // No re-sincronizar si el rol ya existía — un superadmin puede
-            // haber cambiado sus permisos desde /roles y este seeder corre
-            // en cada deploy (mismo criterio que ConfiguracionSeeder con
-            // 'valor').
-            if (!$rol->wasRecentlyCreated) {
+            // Un permiso RECIÉN CREADO se asigna a sus roles designados sin
+            // importar si esos roles ya existían — si no, cada permiso que
+            // se agregue en una expansión futura del catálogo (como los de
+            // Fase 2, PERMISOS_ACCION) quedaría huérfano en cualquier
+            // ambiente donde el seeder ya corrió antes (los 10 roles
+            // semilla siempre existen ahí, wasRecentlyCreated ya es false).
+            // Un permiso que YA EXISTÍA no se re-sincroniza — un
+            // superadmin puede haberlo reconfigurado desde /roles (mismo
+            // criterio que ConfiguracionSeeder con 'valor').
+            if (!$permiso->wasRecentlyCreated) {
                 continue;
             }
 
-            $idsPermisos = [];
-            foreach (self::PERMISOS as $datosPermiso) {
-                if (in_array($datos['slug'], $datosPermiso['roles'], true)) {
-                    $idsPermisos[] = $permisosPorClave[$datosPermiso['clave']]->id;
+            foreach ($datos['roles'] as $slugRol) {
+                $rol = $rolesPorSlug->get($slugRol);
+                if ($rol) {
+                    $rol->permissions()->syncWithoutDetaching([$permiso->id]);
                 }
             }
-
-            $rol->permissions()->sync($idsPermisos);
         }
     }
 }
