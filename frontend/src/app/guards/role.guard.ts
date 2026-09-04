@@ -35,9 +35,16 @@ export const roleGuard: CanActivateFn = (route, state) => {
     router.navigate(['/listas-sarlaft']);
   } else if (['comite_credito', 'tesoreria'].includes(role || '')) {
     router.navigate(['/creditos']);
-  } else {
+  } else if (authService.hasPermission('dashboard')) {
     router.navigate(['/dashboard']);
+  } else {
+    // RBAC Fase 2: antes se asumía /dashboard a ciegas acá — correcto
+    // para los 10 roles originales (los únicos que caían a este 'else'
+    // siempre tenían el permiso 'dashboard'), pero un rol NUEVO sin ese
+    // permiso quedaba en un loop de redirect infinito. /sin-acceso no
+    // requiere ningún permiso, siempre es un destino seguro.
+    router.navigate(['/sin-acceso']);
   }
-  
+
   return false;
 };

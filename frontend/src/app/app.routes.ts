@@ -312,5 +312,13 @@ export const routes: Routes = [
         canActivate: [roleGuard],
         data: { permission: 'roles' }
     },
+    {
+        // RBAC Fase 2 — fallback universal de roleGuard cuando el rol activo
+        // no tiene ninguna pantalla "home" conocida (ver role.guard.ts). Sin
+        // guard a propósito: debe ser siempre alcanzable, sin depender de
+        // ningún permiso.
+        path: 'sin-acceso',
+        loadComponent: () => import('./components/sin-acceso/sin-acceso.component').then(m => m.SinAccesoComponent),
+    },
     { path: '**', redirectTo: '' }
 ];

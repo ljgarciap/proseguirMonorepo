@@ -11,13 +11,17 @@ interface NavItem {
   label: string;
   route: string;
   icon: string;
-  roles: string[];
+  // RBAC Fase 2 (docs/specs/rbac-fase2-enforcement.md): reemplaza `roles:
+  // string[]` — antes, un rol NUEVO creado desde /roles nunca aparecía acá
+  // (el menú seguía filtrando por arrays de roles hardcodeados, ajenos al
+  // catálogo), así que aunque el guard lo dejara entrar por URL directa,
+  // no tenía forma de encontrar la pantalla desde la navegación.
+  permission: string;
   badge?: () => number;
 }
 
 interface NavSection {
   title: string;
-  roles: string[];
   items: NavItem[];
 }
 
@@ -235,105 +239,97 @@ export class AppComponent implements OnInit, OnDestroy {
   };
   private pollingSub!: Subscription;
 
-  // SCRUM-160: fuente de datos del menú lateral. El orden de declaración acá NO importa —
-  // navSections se construye ya ordenado alfabéticamente (bloques por title, ítems por label)
-  // en buildSortedNavSections(). Los arrays `roles` reproducen exactamente los *ngIf que había
-  // antes por sección/ítem (ver commits previos) para no alterar la superficie de permisos.
+  // SCRUM-160 / RBAC Fase 2 (docs/specs/rbac-fase2-enforcement.md): fuente de datos del menú
+  // lateral. El orden de declaración acá NO importa — navSections se construye ya ordenado
+  // alfabéticamente (bloques por title, ítems por label) en buildSortedNavSections(). Cada
+  // `permission` es la clave del catálogo paramétrico que gatea esa pantalla — mismas claves que
+  // data.permission en app.routes.ts, salvo los 4 casos 'menu:*' (ver seeder) donde la misma ruta
+  // aparece 2 veces en el menú con audiencias distintas (staff vs. cliente) y el permiso de
+  // pantalla completo sería más amplio que lo que ese ítem puntual debe mostrar. Ya NO hay
+  // `roles` por sección — una sección es visible si tiene al menos un ítem visible
+  // (visibleSections()), así que un rol nuevo que gane acceso a una pantalla automáticamente
+  // hace aparecer la sección que la contiene, sin tocar este archivo.
   private readonly rawNavSections: NavSection[] = [
     {
       title: 'Operaciones',
-      roles: ['gerente', 'operativo', 'contable', 'superadmin'],
       items: [
-        { label: 'Dashboard', route: '/dashboard', icon: 'dashboard', roles: ['gerente', 'operativo', 'contable', 'superadmin'] },
-        { label: 'Base de Datos', route: '/sheets', icon: 'database', roles: ['operativo'] },
-        { label: 'Subir Operación', route: '/upload', icon: 'upload_file', roles: ['operativo'] },
-        { label: 'Validación', route: '/validation', icon: 'rule', roles: ['operativo', 'gerente'], badge: () => this.getValidationBadge() },
-        { label: 'Bandeja Interna', route: '/internal-docs', icon: 'mail', roles: ['operativo', 'contable', 'gerente', 'superadmin'], badge: () => this.getInternalDocsBadge() },
-        { label: 'Revisión Mandatos', route: '/mandatos', icon: 'contract', roles: ['gerente', 'operativo', 'contable', 'superadmin'], badge: () => this.getMandatosBadge() },
+        { label: 'Dashboard', route: '/dashboard', icon: 'dashboard', permission: 'dashboard' },
+        { label: 'Base de Datos', route: '/sheets', icon: 'database', permission: 'sheets' },
+        { label: 'Subir Operación', route: '/upload', icon: 'upload_file', permission: 'upload' },
+        { label: 'Validación', route: '/validation', icon: 'rule', permission: 'validation', badge: () => this.getValidationBadge() },
+        { label: 'Bandeja Interna', route: '/internal-docs', icon: 'mail', permission: 'internal-docs', badge: () => this.getInternalDocsBadge() },
+        { label: 'Revisión Mandatos', route: '/mandatos', icon: 'contract', permission: 'menu:mandatos-staff', badge: () => this.getMandatosBadge() },
       ],
     },
     {
       // SCRUM-153: sección propia de Crédito, ya alfabetizada internamente — se preserva.
       title: 'Crédito',
-      roles: ['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin', 'ingeniero'],
       items: [
-        { label: 'Actas Comité de Crédito', route: '/actas-comite', icon: 'history_edu', roles: ['coordinador_comercial', 'superadmin'] },
-        { label: 'Análisis Financiero', route: '/analisis-financiero', icon: 'finance', roles: ['coordinador_comercial', 'superadmin'] },
-        { label: 'Crédito Ordinario', route: '/creditos', icon: 'payments', roles: ['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin'] },
-        { label: 'Gestión de Créditos', route: '/gestion-creditos', icon: 'task_alt', roles: ['coordinador_comercial', 'gerente', 'operativo', 'tesoreria', 'superadmin'] },
-        { label: 'Informe Técnico', route: '/informes-tecnicos', icon: 'engineering', roles: ['ingeniero', 'coordinador_comercial', 'superadmin'] },
-        { label: 'Listas Restrictivas y SARLAFT', route: '/listas-sarlaft', icon: 'gavel', roles: ['oficial_cumplimiento', 'superadmin'] },
-        { label: 'Registro Solicitud Crédito', route: '/solicitudes-credito', icon: 'assignment_turned_in', roles: ['coordinador_comercial', 'gerente', 'superadmin', 'operativo'] },
+        { label: 'Actas Comité de Crédito', route: '/actas-comite', icon: 'history_edu', permission: 'actas-comite' },
+        { label: 'Análisis Financiero', route: '/analisis-financiero', icon: 'finance', permission: 'analisis-financiero' },
+        { label: 'Crédito Ordinario', route: '/creditos', icon: 'payments', permission: 'menu:creditos-staff' },
+        { label: 'Gestión de Créditos', route: '/gestion-creditos', icon: 'task_alt', permission: 'gestion-creditos' },
+        { label: 'Informe Técnico', route: '/informes-tecnicos', icon: 'engineering', permission: 'informes-tecnicos' },
+        { label: 'Listas Restrictivas y SARLAFT', route: '/listas-sarlaft', icon: 'gavel', permission: 'listas-sarlaft' },
+        { label: 'Registro Solicitud Crédito', route: '/solicitudes-credito', icon: 'assignment_turned_in', permission: 'solicitudes-credito' },
       ],
     },
     {
       title: 'Administración',
-      roles: ['gerente', 'operativo', 'contable', 'superadmin', 'coordinador_comercial'],
       items: [
-        { label: 'Conciliación Susuerte', route: '/conciliacion-susuerte', icon: 'fact_check', roles: ['gerente', 'operativo', 'contable', 'superadmin'] },
-        { label: 'Registro de Clientes', route: '/clientes', icon: 'group', roles: ['gerente', 'operativo', 'superadmin', 'coordinador_comercial'] },
-        { label: 'Registro de Visita a Cliente', route: '/visitas', icon: 'chat_bubble', roles: ['gerente', 'operativo', 'superadmin'] },
+        { label: 'Conciliación Susuerte', route: '/conciliacion-susuerte', icon: 'fact_check', permission: 'conciliacion-susuerte' },
+        { label: 'Registro de Clientes', route: '/clientes', icon: 'group', permission: 'clientes' },
+        { label: 'Registro de Visita a Cliente', route: '/visitas', icon: 'chat_bubble', permission: 'visitas' },
       ],
     },
     {
       title: 'Sistema',
-      roles: ['gerente', 'operativo', 'contable', 'superadmin'],
       items: [
-        // Auditoría no tenía *ngIf propio: hereda el permiso del bloque.
-        { label: 'Auditoría', route: '/logs', icon: 'shield_person', roles: ['gerente', 'operativo', 'contable', 'superadmin'] },
+        { label: 'Auditoría', route: '/logs', icon: 'shield_person', permission: 'logs' },
       ],
     },
     {
       title: 'Configuración Documentos',
-      roles: ['operativo', 'superadmin'],
       items: [
-        // Ítems sin *ngIf propio: heredan el permiso del bloque.
-        { label: 'Solicitudes Documentos', route: '/document-requests', icon: 'checklist', roles: ['operativo', 'superadmin'] },
-        { label: 'Config Requisitos', route: '/document-config', icon: 'settings_applications', roles: ['operativo', 'superadmin'] },
+        { label: 'Solicitudes Documentos', route: '/document-requests', icon: 'checklist', permission: 'document-requests' },
+        { label: 'Config Requisitos', route: '/document-config', icon: 'settings_applications', permission: 'document-config' },
       ],
     },
     // SCRUM-315: bloque "Notificaciones" (Destinatarios/Notificaciones/Asignaciones) oculto del
     // menú lateral a pedido de Juan Andrés. Las rutas y componentes siguen intactos — solo se
     // saca la entrada de navegación de rawNavSections. Si se vuelve a pedir visible, restaurar
-    // este bloque (roles: ['superadmin']) tal cual estaba.
+    // este bloque (permission: 'destinatarios'/'notificaciones'/'asignaciones') tal cual estaba.
     // {
     //   title: 'Notificaciones',
-    //   roles: ['superadmin'],
     //   items: [
-    //     { label: 'Destinatarios', route: '/destinatarios', icon: 'mail_lock', roles: ['superadmin'] },
-    //     { label: 'Notificaciones', route: '/notificaciones', icon: 'notifications_active', roles: ['superadmin'] },
-    //     { label: 'Asignaciones', route: '/asignaciones', icon: 'assignment_ind', roles: ['superadmin'] },
+    //     { label: 'Destinatarios', route: '/destinatarios', icon: 'mail_lock', permission: 'destinatarios' },
+    //     { label: 'Notificaciones', route: '/notificaciones', icon: 'notifications_active', permission: 'notificaciones' },
+    //     { label: 'Asignaciones', route: '/asignaciones', icon: 'assignment_ind', permission: 'asignaciones' },
     //   ],
     // },
     {
       title: 'Planificación',
-      roles: ['superadmin'],
       items: [
-        { label: 'Roadmap del Sistema', route: '/roadmap', icon: 'route', roles: ['superadmin'] },
+        { label: 'Roadmap del Sistema', route: '/roadmap', icon: 'route', permission: 'roadmap' },
       ],
     },
     {
       title: 'Configuración',
-      roles: ['superadmin'],
       items: [
-        { label: 'Gestión Usuarios', route: '/users', icon: 'group', roles: ['superadmin'] },
-        // RBAC Fase 2 (docs/specs/rbac-fase2-enforcement.md): recién se
-        // expone acá una vez el enforcement real quedó conectado — antes
-        // (Fase 1) la pantalla existía pero solo era catálogo inerte.
-        { label: 'Roles y Permisos', route: '/roles', icon: 'admin_panel_settings', roles: ['superadmin'] },
-        { label: 'Parámetros', route: '/parameters', icon: 'settings_applications', roles: ['superadmin'] },
-        { label: 'Limpieza BD', route: '/db-cleaner', icon: 'restart_alt', roles: ['superadmin'] },
-        { label: 'Configuraciones', route: '/configuraciones', icon: 'key', roles: ['superadmin'] },
-        { label: 'Áreas de Aprobación', route: '/document-areas', icon: 'account_tree', roles: ['superadmin'] },
+        { label: 'Gestión Usuarios', route: '/users', icon: 'group', permission: 'users' },
+        { label: 'Roles y Permisos', route: '/roles', icon: 'admin_panel_settings', permission: 'roles' },
+        { label: 'Parámetros', route: '/parameters', icon: 'settings_applications', permission: 'parameters' },
+        { label: 'Limpieza BD', route: '/db-cleaner', icon: 'restart_alt', permission: 'db-cleaner' },
+        { label: 'Configuraciones', route: '/configuraciones', icon: 'key', permission: 'configuraciones' },
+        { label: 'Áreas de Aprobación', route: '/document-areas', icon: 'account_tree', permission: 'document-areas' },
       ],
     },
     {
       title: 'Portal Cliente',
-      roles: ['cliente'],
       items: [
-        { label: 'Mis Cargas', route: '/client-upload', icon: 'folder_shared', roles: ['cliente'] },
-        { label: 'Diligenciar Mandato', route: '/mandatos', icon: 'description', roles: ['cliente'] },
-        { label: 'Mis Créditos', route: '/creditos', icon: 'payments', roles: ['cliente'] },
+        { label: 'Mis Cargas', route: '/client-upload', icon: 'folder_shared', permission: 'client-upload' },
+        { label: 'Diligenciar Mandato', route: '/mandatos', icon: 'description', permission: 'menu:mandatos-cliente' },
+        { label: 'Mis Créditos', route: '/creditos', icon: 'payments', permission: 'menu:creditos-cliente' },
       ],
     },
   ];
@@ -355,12 +351,15 @@ export class AppComponent implements OnInit, OnDestroy {
       .sort((a, b) => a.title.localeCompare(b.title, 'es'));
   }
 
+  // RBAC Fase 2: una sección es visible si tiene al menos un ítem visible —
+  // no tiene su propio permiso separado (una "sección" es una agrupación de
+  // UI, no una pantalla real del catálogo).
   visibleSections(): NavSection[] {
-    return this.navSections.filter(section => this.authService.isAuthorized(section.roles));
+    return this.navSections.filter(section => this.visibleItems(section).length > 0);
   }
 
   visibleItems(section: NavSection): NavItem[] {
-    return section.items.filter(item => this.authService.isAuthorized(item.roles));
+    return section.items.filter(item => this.authService.hasPermission(item.permission));
   }
 
   isSectionCollapsed(title: string): boolean {

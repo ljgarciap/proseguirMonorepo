@@ -105,13 +105,28 @@ describe('roleGuard', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/listas-sarlaft']);
   });
 
-  it('redirige cualquier otro rol a /dashboard', () => {
+  it('redirige cualquier otro rol a /dashboard cuando sí tiene ese permiso', () => {
     authSpy.isAuthenticated.and.returnValue(true);
-    authSpy.hasPermission.and.returnValue(false);
+    // false para el permiso de la ruta pedida ('users'), true para 'dashboard'
+    // (el fallback ahora verifica el permiso antes de asumirlo — ver siguiente test).
+    authSpy.hasPermission.and.callFake((p: string) => p === 'dashboard');
     authSpy.getActiveRole.and.returnValue('gerente');
 
     expect(run('users')).toBeFalse();
     expect(router.navigate).toHaveBeenCalledWith(['/dashboard']);
+  });
+
+  // RBAC Fase 2 (docs/specs/rbac-fase2-enforcement.md): un rol NUEVO sin
+  // ningún redirect específico y SIN el permiso 'dashboard' antes quedaba
+  // en un loop de redirect infinito (/dashboard lo rechazaba → lo volvía a
+  // mandar a /dashboard). /sin-acceso no requiere ningún permiso.
+  it('redirige a /sin-acceso cuando el rol no tiene ningún redirect conocido ni permiso dashboard', () => {
+    authSpy.isAuthenticated.and.returnValue(true);
+    authSpy.hasPermission.and.returnValue(false); // ni la ruta pedida, ni 'dashboard'
+    authSpy.getActiveRole.and.returnValue('auditor_externo');
+
+    expect(run('clientes')).toBeFalse();
+    expect(router.navigate).toHaveBeenCalledWith(['/sin-acceso']);
   });
 
   // --- Superadmin pasa siempre (AuthService.hasPermission ya maneja el bypass) ---

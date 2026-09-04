@@ -138,6 +138,19 @@ class RolesPermissionsSeeder extends Seeder
         ['clave' => 'ubicaciones', 'nombre' => 'Consultar Departamentos/Ciudades', 'modulo' => 'Clientes', 'roles' => ['superadmin', 'gerente', 'operativo', 'coordinador_comercial']],
         ['clave' => 'settlement:reconcile', 'nombre' => 'Conciliar Settlement', 'modulo' => 'Conciliación', 'roles' => ['operativo', 'superadmin']],
 
+        // Menú lateral (app.component.ts) — encontrado 2026-09-04 al conectar
+        // el gap: /mandatos y /creditos aparecen 2 veces en el menú (una vez
+        // para staff, otra para cliente en "Portal Cliente"), cada una con su
+        // propia audiencia — más angosta que el permiso de pantalla completo
+        // (`mandatos`/`creditos`, que cubre ambas audiencias juntas para el
+        // gate de la ruta). Reusar el permiso de pantalla acá le mostraría a
+        // un cliente el ítem "Revisión Mandatos" duplicado (pensado para
+        // staff), que hoy no ve.
+        ['clave' => 'menu:mandatos-staff', 'nombre' => 'Menú: Revisión Mandatos (staff)', 'modulo' => 'General', 'roles' => ['gerente', 'operativo', 'contable', 'superadmin']],
+        ['clave' => 'menu:mandatos-cliente', 'nombre' => 'Menú: Diligenciar Mandato (cliente)', 'modulo' => 'General', 'roles' => ['cliente']],
+        ['clave' => 'menu:creditos-staff', 'nombre' => 'Menú: Crédito Ordinario (staff)', 'modulo' => 'Crédito Ordinario', 'roles' => ['coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin']],
+        ['clave' => 'menu:creditos-cliente', 'nombre' => 'Menú: Mis Créditos (cliente)', 'modulo' => 'Crédito Ordinario', 'roles' => ['cliente']],
+
         ['clave' => 'dashboard:stats', 'nombre' => 'Ver Estadísticas del Dashboard', 'modulo' => 'General', 'roles' => ['gerente', 'operativo', 'superadmin']],
         ['clave' => 'dashboard:cartera-factoring', 'nombre' => 'Ver Cartera Factoring', 'modulo' => 'General', 'roles' => ['operativo', 'superadmin']],
         ['clave' => 'dashboard:cartera-factoring-export', 'nombre' => 'Exportar Cartera Factoring', 'modulo' => 'General', 'roles' => ['superadmin']],
