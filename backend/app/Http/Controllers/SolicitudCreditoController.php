@@ -329,11 +329,15 @@ class SolicitudCreditoController extends Controller
             }
 
             // 5. Send Notification Email
-            // SCRUM-244: $email/$cleanPassword son las credenciales reales
-            // ya usadas para aprovisionar el User en el paso 2 — se
-            // reutilizan tal cual para que el correo nunca pueda mostrar un
-            // usuario/clave distinto al que realmente funciona.
-            Mail::to($solicitud->correo_notificacion)->send(new SolicitudCreditoMail($solicitud, $documentosRequeridos, $email, $cleanPassword));
+            // SCRUM-328: AuthController::login() SOLO acepta numero_documento
+            // (no hay login por email — ver frontend/.../auth/login, el
+            // único campo es "Número de Documento"), así que el "Usuario:"
+            // del correo debe ser $cliente->numero_documento, no $email. El
+            // fix de SCRUM-244 (docblock de SolicitudCreditoMail) asumió que
+            // el usuario de acceso era el correo — nunca lo fue.
+            // $cleanPassword sigue siendo la clave real ya usada para
+            // aprovisionar el User en el paso 2.
+            Mail::to($solicitud->correo_notificacion)->send(new SolicitudCreditoMail($solicitud, $documentosRequeridos, $cliente->numero_documento, $cleanPassword));
 
             return response()->json($solicitud->load(['visita', 'cliente', 'usuarioRegistra', 'tipoCredito', 'amortizacion']), 201);
         });
