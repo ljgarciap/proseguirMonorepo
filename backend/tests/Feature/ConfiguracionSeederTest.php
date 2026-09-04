@@ -55,4 +55,35 @@ class ConfiguracionSeederTest extends TestCase
         $this->assertEquals('SECRETO-EN-PRODUCCION', $config->valor);
         $this->assertEquals('API Key de Mistral AI (OCR fallback)', $config->descripcion);
     }
+
+    /**
+     * SCRUM-329 (incidente 2026-09-04): una 'descripcion' de 265 caracteres
+     * (columna string() = VARCHAR(255)) reventó el deploy a test con
+     * "Data too long for column" — MySQL en modo estricto lo rechaza, pero
+     * SQLite (motor de esta misma suite) trunca en silencio sin fallar, así
+     * que ningún test funcional de arriba lo detectó. Se valida el límite
+     * directo sobre el array fuente del seeder, sin depender del motor de
+     * BD.
+     */
+    public function test_ninguna_descripcion_ni_clave_supera_el_limite_de_la_columna(): void
+    {
+        // SQLite (motor de esta suite) no trunca ni rechaza un string más
+        // largo que la columna — solo lo guarda entero. Comparar lo
+        // guardado contra el original detecta igual el caso que MySQL en
+        // modo estricto rechazaría con "Data too long for column".
+        $this->seed(ConfiguracionSeeder::class);
+
+        foreach (Configuracion::all() as $config) {
+            $this->assertLessThanOrEqual(
+                255,
+                mb_strlen($config->descripcion ?? ''),
+                "descripcion de '{$config->clave}' supera 255 caracteres (columna string())."
+            );
+            $this->assertLessThanOrEqual(
+                255,
+                mb_strlen($config->clave),
+                "clave '{$config->clave}' supera 255 caracteres (columna string())."
+            );
+        }
+    }
 }

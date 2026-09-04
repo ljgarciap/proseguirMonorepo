@@ -123,7 +123,7 @@ class ConfiguracionSeeder extends Seeder
             [
                 'clave'       => 'ANALISIS_FINANCIERO_TOLERANCIA_DIFERENCIA_MM',
                 'valor'       => '100000',
-                'descripcion' => 'Tolerancia (en COP) para la diferencia Activo - (Pasivo + Patrimonio) del último año antes de bloquear la confirmación del Análisis Financiero. Aplica sin importar la unidad de captura elegida (Millones/Miles de COP) — los totales siempre se calculan en COP reales.',
+                'descripcion' => 'Tolerancia (en COP reales) para la diferencia Activo - (Pasivo + Patrimonio) del último año antes de bloquear la confirmación del Análisis Financiero. Aplica sin importar la unidad de captura elegida.',
                 'grupo'       => 'analisis_financiero',
                 'es_secreto'  => false,
             ],
