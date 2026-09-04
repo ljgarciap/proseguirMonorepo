@@ -109,10 +109,21 @@ class ConfiguracionSeeder extends Seeder
                 'es_secreto'  => false,
             ],
             // Análisis Financiero (SCRUM-155)
+            // SCRUM-329: el nombre de la clave arrastra un sufijo "_MM"
+            // (millones) que nunca fue cierto — AnalisisFinancieroController::
+            // confirmar() siempre comparó $toleranciaMM contra
+            // diferencia_contable en COP reales (los totales de Activo/
+            // Pasivo/Patrimonio se calculan y muestran en COP, no en
+            // millones — ver AnalisisFinancieroCalculoService). Con el
+            // valor viejo (5) la tolerancia real era $5 COP, no $5.000.000
+            // como sugería la descripción. Se corrige la descripción y el
+            // valor a los $100.000 COP pedidos; la clave se deja igual
+            // para no romper referencias existentes (solo cambia lo que el
+            // superadmin lee/edita en /configuraciones).
             [
                 'clave'       => 'ANALISIS_FINANCIERO_TOLERANCIA_DIFERENCIA_MM',
-                'valor'       => '5',
-                'descripcion' => 'Tolerancia (en millones de COP) para la diferencia Activo - (Pasivo + Patrimonio) del último año antes de bloquear la confirmación del Análisis Financiero.',
+                'valor'       => '100000',
+                'descripcion' => 'Tolerancia (en COP) para la diferencia Activo - (Pasivo + Patrimonio) del último año antes de bloquear la confirmación del Análisis Financiero. Aplica sin importar la unidad de captura elegida (Millones/Miles de COP) — los totales siempre se calculan en COP reales.',
                 'grupo'       => 'analisis_financiero',
                 'es_secreto'  => false,
             ],
