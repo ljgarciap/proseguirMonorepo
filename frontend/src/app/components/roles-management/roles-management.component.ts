@@ -7,14 +7,15 @@ import { environment } from '../../../environments/environment';
 import Swal from 'sweetalert2';
 
 /**
- * Motor paramétrico de Roles y Permisos — Fase 1 (ver
- * docs/specs/rbac-roles-permisos-parametrico.md).
+ * Motor paramétrico de Roles y Permisos — Fase 1 + Fase 2 (ver
+ * docs/specs/rbac-roles-permisos-parametrico.md y
+ * docs/specs/rbac-fase2-enforcement.md).
  *
- * IMPORTANTE — no se enlaza desde ningún menú de navegación en este
- * deploy (decisión de Luis, 2026-09-03): los permisos que se editan acá
- * son catálogo puro, todavía no controlan acceso real a ninguna pantalla
- * ni endpoint (eso es Fase 2). El banner de abajo lo deja explícito para
- * quien llegue a esta ruta directamente.
+ * Fase 2 conectó el catálogo a la autorización real: gate de pantalla
+ * (roleGuard vía data.permission) y las acciones estáticas de backend
+ * (CheckPermission). Los 6 controladores con lógica de workflow BPMN
+ * (CreditoOrdinarioController, GestionCreditoController, etc.) quedan
+ * fuera de alcance permanentemente — sus reglas de negocio no se tocan.
  */
 @Component({
   selector: 'app-roles-management',
@@ -22,13 +23,6 @@ import Swal from 'sweetalert2';
   imports: [CommonModule, FormsModule],
   template: `
     <div class="view-container">
-      <div class="fase1-banner">
-        <span class="material-symbols-outlined">info</span>
-        Los permisos que asignes acá todavía <strong>no controlan el acceso real</strong> a
-        pantallas ni endpoints — es catálogo (Fase 1). El acceso real sigue funcionando exactamente
-        igual que antes, sin cambios.
-      </div>
-
       <header class="view-header">
         <div class="title-area">
           <h1>Gestión de Roles y Permisos</h1>
@@ -94,12 +88,6 @@ import Swal from 'sweetalert2';
   `,
   styles: [`
     .view-container { padding: 2.5rem 3rem; background: #F4F7FE; min-height: 100vh; }
-    .fase1-banner {
-      display: flex; align-items: center; gap: 10px; margin-bottom: 1.5rem;
-      background: #FFFAF0; border: 1px solid #FBD38D; color: #7B341E;
-      padding: 0.85rem 1.1rem; border-radius: 10px; font-size: 0.88rem;
-      .material-symbols-outlined { font-size: 20px; flex-shrink: 0; }
-    }
     .view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
     .title-area { h1 { margin: 0; font-size: 1.5rem; color: var(--primary); } p { margin: 4px 0 0 0; color: var(--text-muted); font-size: 0.9rem; } }
     .p-0 { padding: 0 !important; }

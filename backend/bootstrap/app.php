@@ -13,7 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'checkrole' => \App\Http\Middleware\CheckUserRole::class,
+            // CheckUserRole (alias 'checkrole') se eliminó — RBAC Fase 2
+            // (docs/specs/rbac-fase2-enforcement.md) migró TODAS las rutas
+            // que lo usaban a CheckPermission, verificado con la suite
+            // completa antes de borrarlo.
             'checkpermission' => \App\Http\Middleware\CheckPermission::class,
         ]);
     })

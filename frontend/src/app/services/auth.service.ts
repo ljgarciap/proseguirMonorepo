@@ -20,25 +20,47 @@ export class AuthService {
   private activeRoleSubject = new BehaviorSubject<string | null>(localStorage.getItem('active_role'));
   private allRolesSubject = new BehaviorSubject<string[]>(this.safeParse('all_roles', []));
   private userSubject = new BehaviorSubject<any>(this.safeParse('user_data', null));
-  
+  // RBAC Fase 2 (docs/specs/rbac-fase2-enforcement.md): unión de permisos
+  // de todos los roles del usuario, devuelta por /api/login y /api/me —
+  // roleGuard la usa en vez de comparar contra data.roles hardcodeado.
+  private permissionsSubject = new BehaviorSubject<string[]>(this.safeParse('permissions', []));
+
   public activeRole$: Observable<string | null> = this.activeRoleSubject.asObservable();
   public allRoles$: Observable<string[]> = this.allRolesSubject.asObservable();
   public user$: Observable<any> = this.userSubject.asObservable();
+  public permissions$: Observable<string[]> = this.permissionsSubject.asObservable();
 
   constructor() {}
 
-  login(token: string, user: any, roles: string[]): void {
+  login(token: string, user: any, roles: string[], permissions: string[] = []): void {
     localStorage.setItem('auth_token', token);
     localStorage.setItem('user_data', JSON.stringify(user));
     localStorage.setItem('all_roles', JSON.stringify(roles));
-    
+    localStorage.setItem('permissions', JSON.stringify(permissions));
+
     this.userSubject.next(user);
     this.allRolesSubject.next(roles);
+    this.permissionsSubject.next(permissions);
 
     // If only one role, set it as active immediately
     if (roles && roles.length === 1) {
       this.setActiveRole(roles[0]);
     }
+  }
+
+  getPermissions(): string[] {
+    return this.permissionsSubject.value;
+  }
+
+  /**
+   * RBAC Fase 2: true si el usuario tiene la clave de permiso pedida.
+   * superadmin siempre pasa (mismo bypass que CheckPermission en backend
+   * y que isAuthorized() ya tenía para roles) — no depende de que el
+   * catálogo le haya asignado esa clave explícitamente.
+   */
+  hasPermission(permission: string): boolean {
+    if (this.getActiveRole() === 'superadmin') return true;
+    return this.getPermissions().includes(permission);
   }
 
   setActiveRole(role: string): void {
@@ -77,6 +99,7 @@ export class AuthService {
     this.activeRoleSubject.next(null);
     this.allRolesSubject.next([]);
     this.userSubject.next(null);
+    this.permissionsSubject.next([]);
   }
 
   isAuthorized(allowedRoles: string[]): boolean {

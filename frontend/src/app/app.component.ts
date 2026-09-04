@@ -317,6 +317,10 @@ export class AppComponent implements OnInit, OnDestroy {
       roles: ['superadmin'],
       items: [
         { label: 'Gestión Usuarios', route: '/users', icon: 'group', roles: ['superadmin'] },
+        // RBAC Fase 2 (docs/specs/rbac-fase2-enforcement.md): recién se
+        // expone acá una vez el enforcement real quedó conectado — antes
+        // (Fase 1) la pantalla existía pero solo era catálogo inerte.
+        { label: 'Roles y Permisos', route: '/roles', icon: 'admin_panel_settings', roles: ['superadmin'] },
         { label: 'Parámetros', route: '/parameters', icon: 'settings_applications', roles: ['superadmin'] },
         { label: 'Limpieza BD', route: '/db-cleaner', icon: 'restart_alt', roles: ['superadmin'] },
         { label: 'Configuraciones', route: '/configuraciones', icon: 'key', roles: ['superadmin'] },

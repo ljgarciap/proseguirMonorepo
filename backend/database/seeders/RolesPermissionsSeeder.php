@@ -119,6 +119,7 @@ class RolesPermissionsSeeder extends Seeder
         ['clave' => 'uploads:validar', 'nombre' => 'Validar Documento (OCR)', 'modulo' => 'OCR y Cargas', 'roles' => ['operativo']],
         ['clave' => 'uploads:aprobar', 'nombre' => 'Aprobar Documento (OCR)', 'modulo' => 'OCR y Cargas', 'roles' => ['gerente']],
         ['clave' => 'uploads:eliminar', 'nombre' => 'Eliminar Documento (OCR)', 'modulo' => 'OCR y Cargas', 'roles' => ['cliente', 'superadmin']],
+        ['clave' => 'uploads:pending-count', 'nombre' => 'Ver Contador de Pendientes (OCR)', 'modulo' => 'OCR y Cargas', 'roles' => ['gerente', 'operativo', 'contable', 'superadmin']],
 
         ['clave' => 'mandatos:crear', 'nombre' => 'Crear Mandato', 'modulo' => 'General', 'roles' => ['cliente']],
         ['clave' => 'mandatos:ver', 'nombre' => 'Ver Mandatos', 'modulo' => 'General', 'roles' => ['cliente', 'gerente', 'operativo', 'superadmin']],
@@ -133,6 +134,31 @@ class RolesPermissionsSeeder extends Seeder
         ['clave' => 'document-requests:gestionar', 'nombre' => 'Gestionar Solicitudes de Documentos a Clientes', 'modulo' => 'Documentos', 'roles' => ['superadmin', 'operativo']],
 
         ['clave' => 'solicitudes-credito:editar', 'nombre' => 'Editar Condiciones Financieras de Solicitud de Crédito', 'modulo' => 'Crédito Ordinario', 'roles' => ['coordinador_comercial']],
+
+        ['clave' => 'ubicaciones', 'nombre' => 'Consultar Departamentos/Ciudades', 'modulo' => 'Clientes', 'roles' => ['superadmin', 'gerente', 'operativo', 'coordinador_comercial']],
+        ['clave' => 'settlement:reconcile', 'nombre' => 'Conciliar Settlement', 'modulo' => 'Conciliación', 'roles' => ['operativo', 'superadmin']],
+
+        ['clave' => 'dashboard:stats', 'nombre' => 'Ver Estadísticas del Dashboard', 'modulo' => 'General', 'roles' => ['gerente', 'operativo', 'superadmin']],
+        ['clave' => 'dashboard:cartera-factoring', 'nombre' => 'Ver Cartera Factoring', 'modulo' => 'General', 'roles' => ['operativo', 'superadmin']],
+        ['clave' => 'dashboard:cartera-factoring-export', 'nombre' => 'Exportar Cartera Factoring', 'modulo' => 'General', 'roles' => ['superadmin']],
+
+        ['clave' => 'logs:gestionar', 'nombre' => 'Gestionar Logs (Pipeline OCR y Sistema)', 'modulo' => 'Administración', 'roles' => ['gerente', 'operativo', 'superadmin']],
+
+        ['clave' => 'sectores', 'nombre' => 'Consultar Sectores', 'modulo' => 'Administración', 'roles' => ['superadmin']],
+
+        ['clave' => 'contable:importar', 'nombre' => 'Importar Archivo Contable', 'modulo' => 'OCR y Cargas', 'roles' => ['cliente', 'superadmin']],
+        ['clave' => 'contable:limpiar', 'nombre' => 'Limpiar Datos Contables', 'modulo' => 'OCR y Cargas', 'roles' => ['superadmin']],
+        ['clave' => 'contable:ver', 'nombre' => 'Ver Datos Contables', 'modulo' => 'OCR y Cargas', 'roles' => ['gerente', 'operativo', 'superadmin']],
+
+        ['clave' => 'planilla:cargar', 'nombre' => 'Cargar Planilla', 'modulo' => 'OCR y Cargas', 'roles' => ['cliente', 'superadmin']],
+        ['clave' => 'planilla:ver', 'nombre' => 'Ver Planilla', 'modulo' => 'OCR y Cargas', 'roles' => ['gerente', 'operativo', 'superadmin']],
+
+        ['clave' => 'datos-factor:ver', 'nombre' => 'Ver Datos Factor', 'modulo' => 'General', 'roles' => ['cliente', 'operativo', 'gerente', 'superadmin']],
+        ['clave' => 'datos-factor:editar', 'nombre' => 'Editar Datos Factor', 'modulo' => 'General', 'roles' => ['operativo', 'gerente', 'superadmin']],
+
+        ['clave' => 'internal-docs:gestionar', 'nombre' => 'Gestionar Documentos Internos y Ruta de Aprobación', 'modulo' => 'Documentos', 'roles' => ['operativo', 'contable', 'gerente', 'superadmin', 'coordinador_comercial']],
+        ['clave' => 'document-areas:ver', 'nombre' => 'Ver Áreas de Documentos', 'modulo' => 'Documentos', 'roles' => ['operativo', 'contable', 'gerente', 'superadmin', 'coordinador_comercial']],
+        ['clave' => 'document-requirements:gestionar', 'nombre' => 'Gestionar Requisitos de Documentos', 'modulo' => 'Documentos', 'roles' => ['superadmin', 'operativo']],
     ];
 
     /**

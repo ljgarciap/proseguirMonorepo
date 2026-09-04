@@ -104,7 +104,12 @@ class AuthController extends Controller
         return response()->json([
             'token' => $user->createToken('authToken')->accessToken,
             'user' => $user,
-            'roles' => $user->roles
+            'roles' => $user->roles,
+            // RBAC Fase 2 (docs/specs/rbac-fase2-enforcement.md): el
+            // frontend guarda esto junto al resto de la sesión desde el
+            // login mismo — evita un round-trip extra a /api/me solo para
+            // tener el gate de pantalla listo.
+            'permissions' => $this->permisosDelUsuario($user),
         ]);
     }
 
@@ -268,24 +273,36 @@ class AuthController extends Controller
     public function me(Request $request)
     {
         $user = $request->user();
+
+        $data = $user->toArray();
+        $data['permissions'] = $this->permisosDelUsuario($user);
+
+        return response()->json($data);
+    }
+
+    /**
+     * RBAC Fase 2: unión de claves de permiso de todos los roles del
+     * usuario. superadmin recibe TODAS las claves del catálogo, igual que
+     * su bypass en CheckPermission — consistente entre backend y
+     * frontend, ninguna pantalla/acción debería quedar inaccesible para
+     * superadmin por un permiso que el catálogo no le haya asignado
+     * explícitamente.
+     */
+    private function permisosDelUsuario(User $user)
+    {
         $userRoles = is_array($user->roles) ? $user->roles : [];
 
         if (in_array('superadmin', $userRoles, true)) {
-            $permissions = \App\Models\Permission::pluck('clave');
-        } else {
-            $permissions = Role::whereIn('slug', $userRoles)
-                ->with('permissions:id,clave')
-                ->get()
-                ->pluck('permissions')
-                ->flatten()
-                ->pluck('clave')
-                ->unique()
-                ->values();
+            return \App\Models\Permission::pluck('clave');
         }
 
-        $data = $user->toArray();
-        $data['permissions'] = $permissions;
-
-        return response()->json($data);
+        return Role::whereIn('slug', $userRoles)
+            ->with('permissions:id,clave')
+            ->get()
+            ->pluck('permissions')
+            ->flatten()
+            ->pluck('clave')
+            ->unique()
+            ->values();
     }
 }
