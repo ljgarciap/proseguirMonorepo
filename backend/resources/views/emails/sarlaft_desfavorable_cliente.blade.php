@@ -17,7 +17,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Proseguir Factoring</h1>
+            <h1>Proseguir Soluciones de Liquidez</h1>
             <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">Gestión de Liquidez y Soluciones de Crédito</div>
         </div>
         <div class="content">
@@ -26,7 +26,7 @@
             <div class="highlight-box">
                 <p style="margin:0;"><strong>Motivo:</strong> {{ $credito->sarlaft_observaciones }}</p>
             </div>
-            <p>Si tiene alguna inquietud, no dude en contactarse con su Coordinador Comercial asignado.</p>
+            <p>Si tiene alguna inquietud, no dude en contactarse con su Director de Crédito asignado.</p>
         </div>
         <div class="footer">
             Este es un correo automático enviado desde la plataforma Proseguir.<br>

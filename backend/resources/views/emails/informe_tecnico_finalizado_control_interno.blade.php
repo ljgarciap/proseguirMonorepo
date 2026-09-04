@@ -20,12 +20,12 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Proseguir Factoring</h1>
+            <h1>Proseguir Soluciones de Liquidez</h1>
             <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">Gestión de Liquidez y Soluciones de Crédito</div>
         </div>
         <div class="content">
             <p>Estimado(a) usuario(a) con rol Control Interno:</p>
-            <p>El Coordinador Comercial ha finalizado y registrado el Informe Técnico de la solicitud. La solicitud se encuentra lista para que proceda con la validación en listas restrictivas y SARLAFT.</p>
+            <p>El Director de Crédito ha finalizado y registrado el Informe Técnico de la solicitud. La solicitud se encuentra lista para que proceda con la validación en listas restrictivas y SARLAFT.</p>
             <div class="highlight-box">
                 <table>
                     <tr>

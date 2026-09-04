@@ -27,7 +27,7 @@ export class RoadmapComponent implements OnInit {
     { key: 'operativo', label: 'Operativo', color: '#10B981' },
     { key: 'contable', label: 'Contable', color: '#F59E0B' },
     { key: 'cliente', label: 'Cliente', color: '#EC4899' },
-    { key: 'coordinador_comercial', label: 'Coordinador Comercial', color: '#8B5CF6' },
+    { key: 'coordinador_comercial', label: 'Director de Crédito', color: '#8B5CF6' },
     { key: 'oficial_cumplimiento', label: 'Oficial de Cumplimiento', color: '#06B6D4' },
     { key: 'comite_credito', label: 'Comité de Crédito', color: '#EF4444' },
     { key: 'tesoreria', label: 'Tesorería', color: '#14B8A6' }

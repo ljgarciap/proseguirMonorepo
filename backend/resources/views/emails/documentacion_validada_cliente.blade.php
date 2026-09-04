@@ -17,14 +17,14 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Proseguir Factoring</h1>
+            <h1>Proseguir Soluciones de Liquidez</h1>
             <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">Gestión de Liquidez y Soluciones de Crédito</div>
         </div>
         <div class="content">
             <p>Estimado(a) {{ $credito->cliente->name ?? 'cliente' }},</p>
             <p>Le informamos que la documentación de su solicitud de crédito <strong>{{ $credito->numero_solicitud }}</strong> fue revisada y se encuentra en regla. Su solicitud continúa en proceso.</p>
             <div class="highlight-box">
-                <p style="margin:0;"><strong>Comentario del Coordinador Comercial:</strong><br>{{ $comentario }}</p>
+                <p style="margin:0;"><strong>Comentario del Director de Crédito:</strong><br>{{ $comentario }}</p>
             </div>
             <p>No es necesaria ninguna acción de su parte en este momento. Le informaremos por este mismo medio los próximos pasos de su solicitud.</p>
         </div>
