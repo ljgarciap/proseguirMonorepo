@@ -28,7 +28,7 @@
     @endphp
     <div class="container">
         <div class="header">
-            <h1>Proseguir Factoring</h1>
+            <h1>Proseguir Soluciones de Liquidez</h1>
             <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">Listas Restrictivas y SARLAFT</div>
         </div>
         <div class="content">
