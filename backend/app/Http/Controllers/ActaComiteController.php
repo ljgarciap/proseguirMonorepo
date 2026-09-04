@@ -649,8 +649,12 @@ class ActaComiteController extends Controller
             'pendiente' => ['estado' => 'pendiente_comite', 'origen' => 'comite_pendiente'],
         ];
 
+        // SCRUM-330: Factoring nunca se materializa (ver camposFaltantes())
+        // — se excluye acá también por defensividad, no solo por el gate
+        // de camposFaltantesParaMaterializar().
         $solicitudesManuales = $acta->solicitudes()
             ->where('origen', 'manual')
+            ->where('tipo_solicitud', '!=', 'Factoring')
             ->whereNull('credito_ordinario_id')
             ->get();
 
@@ -818,7 +822,15 @@ class ActaComiteController extends Controller
                 continue;
             }
 
-            if ($solicitud->origen === 'manual') {
+            // SCRUM-330: las solicitudes Factoring (tipo_solicitud fijo,
+            // ver ActaComiteController::agregarSolicitud()) nunca se
+            // materializan como CreditoOrdinario — Factoring no tiene
+            // catálogo TipoCredito ni flujo BPMN propio todavía, así que
+            // camposFaltantesParaMaterializar() las bloquearía para
+            // siempre exigiendo un "tipo de solicitud" que no puede
+            // existir. Decisión con Luis (2026-09-04): quedan solo como
+            // registro dentro del acta.
+            if ($solicitud->origen === 'manual' && $solicitud->tipo_solicitud !== 'Factoring') {
                 $faltantes = array_merge($faltantes, $this->camposFaltantesParaMaterializar($solicitud));
             }
         }

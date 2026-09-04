@@ -117,9 +117,9 @@
         </table>
       </div>
 
-      <!-- SCRUM-198: el alta manual solo permite enlazar un crédito ya
-           existente y elegible para comité — ya no se puede tipear datos
-           de un crédito desde cero. -->
+      <!-- SCRUM-198: el alta manual de créditos Ordinario/Constructor solo
+           permite enlazar un crédito ya existente y elegible para comité —
+           ya no se puede tipear datos de un crédito desde cero. -->
       <div class="inline-add-solicitud" *ngIf="!soloLectura">
         <app-credito-elegible-autocomplete
           [actaId]="actaId"
@@ -127,6 +127,18 @@
           (creditoSeleccionado)="onCreditoElegibleSeleccionado($event)"
           placeholder="Buscar crédito elegible (cliente o identificación)...">
         </app-credito-elegible-autocomplete>
+      </div>
+
+      <!-- SCRUM-330: Factoring no tiene flujo BPMN ni CreditoOrdinario
+           propio en el sistema todavía — a diferencia de arriba, esta
+           solicitud se crea desde cero (sin enlazar ningún crédito
+           existente) y queda como registro dentro del acta únicamente
+           (nunca se materializa, ver materializarSolicitudesManuales()). -->
+      <div class="inline-add-solicitud mt-2" *ngIf="!soloLectura">
+        <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitudFactoring.cliente_nombre" placeholder="Cliente (Factoring) *">
+        <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitudFactoring.cliente_identificacion" placeholder="N.° de identificación">
+        <input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="nuevaSolicitudFactoring.monto" placeholder="Monto *">
+        <button class="btn-pro sm primary" (click)="agregarSolicitudFactoring()">Agregar solicitud Factoring</button>
       </div>
     </section>
 
@@ -163,7 +175,10 @@
                dropdown para créditos manuales — ahora es catálogo real para
                los dos orígenes, evita typos que bloquearían la
                materialización a CreditoOrdinario (ver SCRUM-190.1). -->
-          <div class="form-field">
+          <!-- SCRUM-330: Factoring no tiene amortización (el crédito no se
+               amortiza en cuotas, se descuenta la factura) — campo oculto
+               solo para esta solicitud, el catálogo global no cambia. -->
+          <div class="form-field" *ngIf="s.tipo_solicitud !== 'Factoring'">
             <label>Amortización</label>
             <select class="pro-input" [(ngModel)]="s.amortizacion" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
               <option value="">Seleccione...</option>
@@ -174,8 +189,11 @@
             <label>Plazo (meses)</label>
             <input class="pro-input" type="number" [(ngModel)]="s.plazo_meses" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
           </div>
+          <!-- SCRUM-330: "Descuento" es el nombre propio del Factoring para
+               este concepto (no es una tasa de interés convencional) — se
+               sigue guardando en la misma columna tasa_interes. -->
           <div class="form-field">
-            <label>Tasa de interés (%)</label>
+            <label>{{ s.tipo_solicitud === 'Factoring' ? 'Descuento (%)' : 'Tasa de interés (%)' }}</label>
             <input class="pro-input" type="number" step="0.01" [(ngModel)]="s.tasa_interes" (change)="guardarSolicitud(s)" [disabled]="soloLectura">
           </div>
           <div class="form-field">
@@ -184,9 +202,12 @@
           </div>
           <!-- SCRUM-243 (punto 3): textarea en vez de input de una línea y
                spanning full width — el valor viene precargado desde la
-               Solicitud de Crédito y en ocasiones trae texto extenso. -->
+               Solicitud de Crédito y en ocasiones trae texto extenso.
+               SCRUM-330: en Factoring este campo es "Pagador" (quien le
+               debe la factura al cliente) — se sigue guardando en la misma
+               columna fuente_pago. -->
           <div class="form-field wide-field">
-            <label>Fuente de pago</label>
+            <label>{{ s.tipo_solicitud === 'Factoring' ? 'Pagador' : 'Fuente de pago' }}</label>
             <textarea class="pro-input" rows="2" [(ngModel)]="s.fuente_pago" (change)="guardarSolicitud(s)" [disabled]="soloLectura"></textarea>
           </div>
           <div class="form-field">
