@@ -535,7 +535,8 @@
                   <span class="doc-status-pill error" *ngIf="docFileCount(doc) === 0">Pendiente</span>
 
                   <div class="action-inline-upload" *ngIf="['revision_documental', 'completar_solicitud', 'validacion_documental_constructor', 'completar_solicitud_constructor'].includes(selectedCredito.estado) && ['cliente', 'coordinador_comercial', 'superadmin'].includes(activeRole) && puedeSubirDocumento(doc)">
-                    <input type="file" id="inline-file-{{doc.key}}" (change)="onMultiFileUpload($event, doc.key)" accept=".pdf" multiple hidden>
+                    <!-- SCRUM-328: en Etapa 1 el cliente además de PDF puede cargar Word/Excel (backend ya lo valida así, ver CreditoOrdinarioController::transition) -->
+                    <input type="file" id="inline-file-{{doc.key}}" (change)="onMultiFileUpload($event, doc.key)" [attr.accept]="activeRole === 'cliente' ? '.pdf,.doc,.docx,.xls,.xlsx' : '.pdf'" multiple hidden>
                     <label for="inline-file-{{doc.key}}" class="btn-inline-upload">Subir</label>
                   </div>
 

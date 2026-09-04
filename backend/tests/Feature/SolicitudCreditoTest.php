@@ -287,8 +287,13 @@ class SolicitudCreditoTest extends TestCase
      * aprovisionada — no depender de que el frontend haya concatenado texto
      * libre. Antes, en el flujo de cliente nuevo (registro manual), el
      * correo real podía salir sin URL/usuario/clave (bug de "trigger" en
-     * Angular: la reconstrucción del mensaje solo ocurría si el Coordinador
-     * tocaba ciertos selects después de escribir el número de documento).
+     * Angular: la reconstrucción del mensaje solo ocurría si el Director de
+     * Crédito tocaba ciertos selects después de escribir el número de
+     * documento).
+     *
+     * SCRUM-328: el "usuario" ya NO es el correo — AuthController::login()
+     * solo acepta numero_documento, así que $usuarioAcceso debe ser
+     * numero_documento (igual que $claveAcceso, sin guiones).
      */
     public function test_solicitud_credito_mail_usa_credenciales_reales_del_usuario_creado(): void
     {
@@ -320,7 +325,7 @@ class SolicitudCreditoTest extends TestCase
         $this->postJson('/api/solicitudes-credito', $payload)->assertStatus(201);
 
         Mail::assertSent(\App\Mail\SolicitudCreditoMail::class, function ($mail) {
-            return $mail->usuarioAcceso === 'nuevo.cliente@test.com' && $mail->claveAcceso === '1099887766';
+            return $mail->usuarioAcceso === '1099887766' && $mail->claveAcceso === '1099887766';
         });
     }
 

@@ -610,6 +610,47 @@ class CreditoOrdinarioTest extends TestCase
     }
 
     /**
+     * SCRUM-328: el cliente en Etapa 1 (completar_solicitud) ahora puede
+     * cargar Word/Excel además de PDF.
+     */
+    public function test_scrum328_cliente_puede_subir_docx_en_completar_solicitud(): void
+    {
+        [$creditoId, $item] = $this->creditoConPresetEtapa1();
+        CreditoOrdinario::find($creditoId)->update(['estado' => 'completar_solicitud']);
+        $campo = 'req_item_' . $item->id;
+
+        Passport::actingAs($this->cliente);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => $campo,
+            'archivos' => [UploadedFile::fake()->create('soporte.docx', 100, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')],
+        ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
+
+        $item->refresh();
+        $this->assertSame('subido', $item->estado);
+    }
+
+    /**
+     * SCRUM-328: fuera de Etapa 1 (ej. revision_documental, donde
+     * 'cliente' también figura como rol autorizado del mapa de arriba) la
+     * restricción sigue siendo estrictamente PDF — la ampliación de
+     * formatos es específica de la carga inicial, no un relajo general.
+     */
+    public function test_scrum328_docx_se_rechaza_fuera_de_etapa1(): void
+    {
+        [$creditoId, $item] = $this->creditoConPresetEtapa1();
+        CreditoOrdinario::find($creditoId)->update(['estado' => 'revision_documental']);
+        $campo = 'req_item_' . $item->id;
+
+        Passport::actingAs($this->cliente);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => $campo,
+            'archivos' => [UploadedFile::fake()->create('soporte.docx', 100, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')],
+        ], ['X-Active-Role' => 'cliente'])->assertStatus(422);
+    }
+
+    /**
      * Mismo guard, variante Constructor (completar_solicitud_constructor ->
      * aprobar) — la que reprodujo exactamente el screenshot de QA
      * ("Validacion_documental_constructor", documentos en PENDIENTE).

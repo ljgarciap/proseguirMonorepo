@@ -198,12 +198,22 @@ class CreditoOrdinarioController extends Controller
 
         $this->autorizarPropiedad($activeRole, $credito, $user);
 
+        // SCRUM-328: el cliente en Etapa 1 (completar_solicitud/
+        // completar_solicitud_constructor) ahora puede cargar Word/Excel
+        // además de PDF — el resto de las etapas (garantías, CYF,
+        // transferencia, etc.) y el resto de los roles se quedan en
+        // "solo PDF" (regla dura del proyecto, ver CLAUDE.md).
+        $mimesPermitidos = 'pdf';
+        if ($activeRole === 'cliente' && in_array($credito->estado, ['completar_solicitud', 'completar_solicitud_constructor'], true)) {
+            $mimesPermitidos = 'pdf,doc,docx,xls,xlsx';
+        }
+
         $request->validate([
             'accion'          => 'required|string|in:aprobar,rechazar,completar,subir_archivo,devolver',
             'comentario'      => 'nullable|string',
-            'archivo'         => 'nullable|file|mimes:pdf|max:102400',
+            'archivo'         => "nullable|file|mimes:{$mimesPermitidos}|max:102400",
             'archivos'        => 'nullable|array',
-            'archivos.*'      => 'file|mimes:pdf|max:102400',
+            'archivos.*'      => "file|mimes:{$mimesPermitidos}|max:102400",
             'campo_documento' => 'nullable|string',
         ]);
 

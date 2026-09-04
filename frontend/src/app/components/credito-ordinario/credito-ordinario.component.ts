@@ -437,19 +437,41 @@ export class CreditoOrdinarioComponent implements OnInit {
   }
 
   // SCRUM-146: documentos de Etapa 1 dirigidos por preset admiten varios
-  // archivos por documento (input con atributo "multiple").
+  // archivos por documento (input con atributo "multiple"). Este mismo
+  // método también sirve la grilla de Etapa 4 (garantías, ver template),
+  // que se queda en "solo PDF".
+  //
+  // SCRUM-328: el cliente en Etapa 1 (completar_solicitud/
+  // completar_solicitud_constructor) además de PDF puede cargar Word/Excel
+  // — mismo criterio que valida CreditoOrdinarioController::transition().
+  private static readonly MIMES_OFFICE = [
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ];
+
   onMultiFileUpload(event: Event, campoDoc: string) {
     const target = event.target as HTMLInputElement;
     const files = target.files ? Array.from(target.files) : [];
     if (!files.length) return;
 
-    const invalido = files.find(f => f.type !== 'application/pdf');
+    const esEtapa1Cliente = this.activeRole === 'cliente'
+      && ['completar_solicitud', 'completar_solicitud_constructor'].includes(this.selectedCredito?.estado);
+    const mimesPermitidos = esEtapa1Cliente
+      ? ['application/pdf', ...CreditoOrdinarioComponent.MIMES_OFFICE]
+      : ['application/pdf'];
+
+    const invalido = files.find(f => !mimesPermitidos.includes(f.type));
     if (invalido) {
-      Swal.fire('Formato Inválido', 'Solo se permite subir archivos en formato PDF.', 'warning');
+      const mensaje = esEtapa1Cliente
+        ? 'Solo se permite subir archivos en formato PDF, Word o Excel.'
+        : 'Solo se permite subir archivos en formato PDF.';
+      Swal.fire('Formato Inválido', mensaje, 'warning');
       return;
     }
 
-    this.executeTransition('subir_archivo', `Carga de soporte(s) PDF en campo: ${campoDoc}`, {
+    this.executeTransition('subir_archivo', `Carga de soporte(s) en campo: ${campoDoc}`, {
       _files: files,
       campo_documento: campoDoc
     });
