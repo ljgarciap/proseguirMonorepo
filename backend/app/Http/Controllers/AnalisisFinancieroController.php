@@ -80,6 +80,7 @@ class AnalisisFinancieroController extends Controller
         $analisis = $credito->analisisFinanciero ?? AnalisisFinanciero::create([
             'credito_ordinario_id' => $credito->id,
             'estado' => 'borrador',
+            'unidad' => 'MILLONES',
         ]);
 
         return response()->json([
@@ -115,13 +116,25 @@ class AnalisisFinancieroController extends Controller
             }
         }
 
+        // SCRUM-329: 'unidad' es solo cómo el frontend captura/muestra los
+        // números (ver AnalisisFinancieroDetalleComponent) — lo que llega
+        // acá en 'activo'/'pasivo'/etc. ya viene convertido a COP reales,
+        // así que el backend no necesita saber la escala para nada más que
+        // guardar la preferencia.
+        if ($request->has('unidad') && !in_array($request->input('unidad'), ['MILLONES', 'MILES'], true)) {
+            return response()->json([
+                'message' => 'La unidad del análisis debe ser MILLONES o MILES.',
+            ], 422);
+        }
+
         $analisis = $credito->analisisFinanciero ?? AnalisisFinanciero::create([
             'credito_ordinario_id' => $credito->id,
             'estado' => 'borrador',
+            'unidad' => 'MILLONES',
         ]);
 
         $datos = $request->only([
-            'anio_inicial', 'cantidad_anios', 'activo', 'pasivo', 'patrimonio',
+            'anio_inicial', 'cantidad_anios', 'unidad', 'activo', 'pasivo', 'patrimonio',
             'utilidad_neta', 'ori', 'cartera', 'observaciones', 'soporte_complementario',
         ]);
 
@@ -151,13 +164,14 @@ class AnalisisFinancieroController extends Controller
         $analisis = $credito->analisisFinanciero ?? AnalisisFinanciero::create([
             'credito_ordinario_id' => $credito->id,
             'estado' => 'borrador',
+            'unidad' => 'MILLONES',
         ]);
         if ($analisis->estado === 'confirmado') {
             return response()->json(['message' => 'El análisis financiero ya fue confirmado.'], 422);
         }
 
         $datos = $request->only([
-            'anio_inicial', 'cantidad_anios', 'activo', 'pasivo', 'patrimonio',
+            'anio_inicial', 'cantidad_anios', 'unidad', 'activo', 'pasivo', 'patrimonio',
             'utilidad_neta', 'ori', 'cartera', 'observaciones', 'soporte_complementario',
         ]);
         $analisis->fill($datos);
@@ -178,10 +192,17 @@ class AnalisisFinancieroController extends Controller
             ], 422);
         }
 
-        $toleranciaMM = (float) ConfiguracionService::get('ANALISIS_FINANCIERO_TOLERANCIA_DIFERENCIA_MM', 5);
-        if (abs($resumen['diferencia_contable']) > $toleranciaMM) {
+        // SCRUM-329: la clave de Configuracion arrastra un sufijo "_MM"
+        // (millones) que nunca fue cierto — diferencia_contable siempre
+        // está en COP reales (ver AnalisisFinancieroCalculoService), así
+        // que la tolerancia también se lee y compara en COP reales. La
+        // clave se deja igual para no romper la fila ya sembrada; el valor
+        // por default pasó de 5 (COP) a 100.000 (COP), ver
+        // ConfiguracionSeeder y la migración de corrección de datos.
+        $toleranciaCop = (float) ConfiguracionService::get('ANALISIS_FINANCIERO_TOLERANCIA_DIFERENCIA_MM', 100000);
+        if (abs($resumen['diferencia_contable']) > $toleranciaCop) {
             return response()->json([
-                'message' => "La ecuación contable no cuadra: Total Activo difiere de Pasivo + Patrimonio por {$resumen['diferencia_contable']} (tolerancia configurada: {$toleranciaMM}).",
+                'message' => "La ecuación contable no cuadra: Total Activo difiere de Pasivo + Patrimonio por {$resumen['diferencia_contable']} (tolerancia configurada: {$toleranciaCop}).",
                 'diferencia_contable' => $resumen['diferencia_contable'],
             ], 422);
         }
@@ -227,6 +248,7 @@ class AnalisisFinancieroController extends Controller
         $analisis = $credito->analisisFinanciero ?? AnalisisFinanciero::create([
             'credito_ordinario_id' => $credito->id,
             'estado' => 'borrador',
+            'unidad' => 'MILLONES',
         ]);
 
         $file = $request->file('archivo');

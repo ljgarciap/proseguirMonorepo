@@ -63,7 +63,11 @@
       </div>
       <div class="form-group">
         <label>Unidad</label>
-        <input class="pro-input" type="text" value="Millones de COP" disabled>
+        <!-- SCRUM-329: antes era un texto fijo sin efecto real. Ahora escala lo que se captura/muestra en todas las pestañas (campoInput/setCampoInput) — lo guardado en el backend siempre es COP reales. -->
+        <select class="pro-input" [(ngModel)]="unidad" [disabled]="!puedeEditar" (change)="actualizarUnidad()">
+          <option value="MILLONES">Millones de COP</option>
+          <option value="MILES">Miles de COP</option>
+        </select>
       </div>
     </div>
   </div>
@@ -597,33 +601,36 @@
 
     <!-- ================= RESUMEN ================= -->
     <div *ngIf="activeTab === 'resumen'">
-      <h3 class="card-title">RESUMEN DEL ANÁLISIS — Año {{ calculado?.resumen?.anio_resumen }}</h3>
+      <!-- SCRUM-329: antes solo mostraba el año final (calculado.resumen.anio_resumen) aunque el análisis cubriera varios años estudiados; ahora se repite un bloque de tarjetas por cada año en calculado.resumen.por_anio. Las Validaciones automáticas de abajo siguen evaluando únicamente el año final — mismo criterio que confirmar() en el backend. -->
+      <div *ngFor="let anioResumen of calculado?.resumen?.por_anio" class="resumen-anio-block mt-4">
+        <h3 class="card-title">RESUMEN DEL ANÁLISIS — Año {{ anioResumen.anio }}</h3>
 
-      <div class="resumen-cards mt-4">
-        <div class="resumen-card">
-          <span class="label">Total Activo</span>
-          <span class="value">$ {{ calculado?.resumen?.total_activo | number:'1.0-0':'es-CO' }}</span>
-          <span class="variation" *ngIf="calculado?.resumen?.variacion_total_activo !== null">{{ fmtPct(calculado?.resumen?.variacion_total_activo) }}</span>
-        </div>
-        <div class="resumen-card">
-          <span class="label">Total Pasivo</span>
-          <span class="value">$ {{ calculado?.resumen?.total_pasivo | number:'1.0-0':'es-CO' }}</span>
-          <span class="variation" *ngIf="calculado?.resumen?.variacion_total_pasivo !== null">{{ fmtPct(calculado?.resumen?.variacion_total_pasivo) }}</span>
-        </div>
-        <div class="resumen-card">
-          <span class="label">Patrimonio</span>
-          <span class="value">$ {{ calculado?.resumen?.total_patrimonio | number:'1.0-0':'es-CO' }}</span>
-          <span class="variation" *ngIf="calculado?.resumen?.variacion_total_patrimonio !== null">{{ fmtPct(calculado?.resumen?.variacion_total_patrimonio) }}</span>
-        </div>
-        <div class="resumen-card">
-          <span class="label">Utilidad Neta</span>
-          <span class="value">$ {{ calculado?.resumen?.utilidad_neta | number:'1.0-0':'es-CO' }}</span>
-          <span class="variation" *ngIf="calculado?.resumen?.variacion_utilidad_neta !== null">{{ fmtPct(calculado?.resumen?.variacion_utilidad_neta) }}</span>
-        </div>
-        <div class="resumen-card">
-          <span class="label">Cartera Neta</span>
-          <span class="value">$ {{ calculado?.resumen?.cartera_neta | number:'1.0-0':'es-CO' }}</span>
-          <span class="variation" *ngIf="calculado?.resumen?.variacion_cartera_neta !== null">{{ fmtPct(calculado?.resumen?.variacion_cartera_neta) }}</span>
+        <div class="resumen-cards mt-4">
+          <div class="resumen-card">
+            <span class="label">Total Activo</span>
+            <span class="value">$ {{ anioResumen.total_activo | number:'1.0-0':'es-CO' }}</span>
+            <span class="variation" *ngIf="anioResumen.variacion_total_activo !== null">{{ fmtPct(anioResumen.variacion_total_activo) }}</span>
+          </div>
+          <div class="resumen-card">
+            <span class="label">Total Pasivo</span>
+            <span class="value">$ {{ anioResumen.total_pasivo | number:'1.0-0':'es-CO' }}</span>
+            <span class="variation" *ngIf="anioResumen.variacion_total_pasivo !== null">{{ fmtPct(anioResumen.variacion_total_pasivo) }}</span>
+          </div>
+          <div class="resumen-card">
+            <span class="label">Patrimonio</span>
+            <span class="value">$ {{ anioResumen.total_patrimonio | number:'1.0-0':'es-CO' }}</span>
+            <span class="variation" *ngIf="anioResumen.variacion_total_patrimonio !== null">{{ fmtPct(anioResumen.variacion_total_patrimonio) }}</span>
+          </div>
+          <div class="resumen-card">
+            <span class="label">Utilidad Neta</span>
+            <span class="value">$ {{ anioResumen.utilidad_neta | number:'1.0-0':'es-CO' }}</span>
+            <span class="variation" *ngIf="anioResumen.variacion_utilidad_neta !== null">{{ fmtPct(anioResumen.variacion_utilidad_neta) }}</span>
+          </div>
+          <div class="resumen-card">
+            <span class="label">Cartera Neta</span>
+            <span class="value">$ {{ anioResumen.cartera_neta | number:'1.0-0':'es-CO' }}</span>
+            <span class="variation" *ngIf="anioResumen.variacion_cartera_neta !== null">{{ fmtPct(anioResumen.variacion_cartera_neta) }}</span>
+          </div>
         </div>
       </div>
 

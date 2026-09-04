@@ -16,6 +16,7 @@ class AnalisisFinanciero extends Model
         'estado',
         'anio_inicial',
         'cantidad_anios',
+        'unidad',
         'activo',
         'pasivo',
         'patrimonio',

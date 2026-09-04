@@ -213,6 +213,15 @@ class AnalisisFinancieroCalculoServiceTest extends TestCase
 
         // Utilidad Neta cae ~25.8% de 2024 a 2025 (visible en el prototipo).
         $this->assertEqualsWithDelta(-0.258, $resumen['variacion_utilidad_neta'], 0.005);
+
+        // SCRUM-329: 'por_anio' trae un bloque por cada año estudiado, no
+        // solo el último — el primer año no tiene variación (sin anterior).
+        $this->assertCount(2, $resumen['por_anio']);
+        $this->assertEquals(2024, $resumen['por_anio'][0]['anio']);
+        $this->assertNull($resumen['por_anio'][0]['variacion_utilidad_neta']);
+        $this->assertEquals(2025, $resumen['por_anio'][1]['anio']);
+        $this->assertEqualsWithDelta($resumen['total_activo'], $resumen['por_anio'][1]['total_activo'], 0.01);
+        $this->assertEqualsWithDelta(-0.258, $resumen['por_anio'][1]['variacion_utilidad_neta'], 0.005);
     }
 
     public function test_tres_anios_agrega_columna_adicional_de_variacion(): void

@@ -263,34 +263,58 @@ class AnalisisFinancieroCalculoService
     }
 
     /**
-     * Resumen — tarjetas del último año, validaciones automáticas
-     * (FA-05/FA-06/CA-17). La tolerancia de la ecuación contable es un
-     * parámetro configurable (Configuracion `ANALISIS_FINANCIERO_TOLERANCIA_DIFERENCIA_MM`),
+     * Resumen — tarjetas del último año (usadas por
+     * AnalisisFinancieroController::confirmar() para las validaciones
+     * automáticas FA-05/FA-06/CA-17 — la ecuación contable y los mínimos
+     * requeridos SIEMPRE se validan contra el año final, nunca contra todos)
+     * más el detalle año por año en 'por_anio' (SCRUM-329: la pestaña
+     * Resumen mostraba solo el año final aunque el análisis cubriera varios
+     * años estudiados). La tolerancia de la ecuación contable es un
+     * parámetro configurable (Configuracion `ANALISIS_FINANCIERO_TOLERANCIA_DIFERENCIA_COP`),
      * nunca una constante hardcodeada — se lee y aplica en el controller,
      * este método solo expone la diferencia calculada.
      */
     public function calcularResumen(array $anios, array $activo, array $pasivo, array $patrimonio, array $utilidadNeta, array $cartera): array
     {
-        $ultimoAnio = end($anios);
-        $anioAnterior = $anios[count($anios) - 2] ?? null;
+        $porAnio = [];
+        foreach ($anios as $index => $anio) {
+            $anioAnterior = $anios[$index - 1] ?? null;
+            $variacion = fn (array $serie) => $anioAnterior !== null
+                ? $this->variacionRelativa($serie[$anio] ?? 0.0, $serie[$anioAnterior] ?? 0.0)
+                : null;
 
-        $variacionUltimo = fn (array $serie) => $anioAnterior !== null
-            ? $this->variacionRelativa($serie[$ultimoAnio] ?? 0.0, $serie[$anioAnterior] ?? 0.0)
-            : null;
+            $porAnio[] = [
+                'anio' => $anio,
+                'total_activo' => $activo['total_activo'][$anio] ?? 0.0,
+                'total_pasivo' => $pasivo['total_pasivo'][$anio] ?? 0.0,
+                'total_patrimonio' => $patrimonio['total_patrimonio'][$anio] ?? 0.0,
+                'utilidad_neta' => $utilidadNeta['utilidad_neta'][$anio] ?? 0.0,
+                'cartera_neta' => $cartera['cartera_neta'][$anio] ?? 0.0,
+                'variacion_total_activo' => $variacion($activo['total_activo']),
+                'variacion_total_pasivo' => $variacion($pasivo['total_pasivo']),
+                'variacion_total_patrimonio' => $variacion($patrimonio['total_patrimonio']),
+                'variacion_utilidad_neta' => $variacion($utilidadNeta['utilidad_neta']),
+                'variacion_cartera_neta' => $variacion($cartera['cartera_neta']),
+                'diferencia_contable' => $patrimonio['validacion_contable'][$anio] ?? 0.0,
+            ];
+        }
+
+        $ultimo = end($porAnio);
 
         return [
-            'anio_resumen' => $ultimoAnio,
-            'total_activo' => $activo['total_activo'][$ultimoAnio] ?? 0.0,
-            'total_pasivo' => $pasivo['total_pasivo'][$ultimoAnio] ?? 0.0,
-            'total_patrimonio' => $patrimonio['total_patrimonio'][$ultimoAnio] ?? 0.0,
-            'utilidad_neta' => $utilidadNeta['utilidad_neta'][$ultimoAnio] ?? 0.0,
-            'cartera_neta' => $cartera['cartera_neta'][$ultimoAnio] ?? 0.0,
-            'variacion_total_activo' => $variacionUltimo($activo['total_activo']),
-            'variacion_total_pasivo' => $variacionUltimo($pasivo['total_pasivo']),
-            'variacion_total_patrimonio' => $variacionUltimo($patrimonio['total_patrimonio']),
-            'variacion_utilidad_neta' => $variacionUltimo($utilidadNeta['utilidad_neta']),
-            'variacion_cartera_neta' => $variacionUltimo($cartera['cartera_neta']),
-            'diferencia_contable' => $patrimonio['validacion_contable'][$ultimoAnio] ?? 0.0,
+            'anio_resumen' => $ultimo['anio'],
+            'total_activo' => $ultimo['total_activo'],
+            'total_pasivo' => $ultimo['total_pasivo'],
+            'total_patrimonio' => $ultimo['total_patrimonio'],
+            'utilidad_neta' => $ultimo['utilidad_neta'],
+            'cartera_neta' => $ultimo['cartera_neta'],
+            'variacion_total_activo' => $ultimo['variacion_total_activo'],
+            'variacion_total_pasivo' => $ultimo['variacion_total_pasivo'],
+            'variacion_total_patrimonio' => $ultimo['variacion_total_patrimonio'],
+            'variacion_utilidad_neta' => $ultimo['variacion_utilidad_neta'],
+            'variacion_cartera_neta' => $ultimo['variacion_cartera_neta'],
+            'diferencia_contable' => $ultimo['diferencia_contable'],
+            'por_anio' => $porAnio,
         ];
     }
 
