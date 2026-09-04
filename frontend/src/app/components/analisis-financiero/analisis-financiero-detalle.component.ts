@@ -185,6 +185,11 @@ export class AnalisisFinancieroDetalleComponent implements OnInit, OnDestroy {
   observaciones = '';
   anioInicial: number | null = null;
   cantidadAnios: number = 2;
+  // SCRUM-329: 'unidad' es puramente de captura/visualización — divide el
+  // valor guardado (siempre COP reales) al mostrarlo, y multiplica lo que
+  // el usuario escribe antes de guardarlo (ver campoInput/setCampoInput).
+  // El backend nunca ve ni necesita la escala para calcular nada.
+  unidad: 'MILLONES' | 'MILES' = 'MILLONES';
   subiendoAdjunto = false;
 
   carteraChartData: Record<number, ChartData<'doughnut'>> = {};
@@ -261,6 +266,7 @@ export class AnalisisFinancieroDetalleComponent implements OnInit, OnDestroy {
     this.observaciones = this.analisis?.observaciones || '';
     this.anioInicial = this.analisis?.anio_inicial ?? (new Date().getFullYear() - 1);
     this.cantidadAnios = this.analisis?.cantidad_anios ?? 2;
+    this.unidad = this.analisis?.unidad ?? 'MILLONES';
     this.hidratarCustomFilas();
   }
 
@@ -457,13 +463,29 @@ export class AnalisisFinancieroDetalleComponent implements OnInit, OnDestroy {
     this.activeTab = tab;
   }
 
+  // SCRUM-329: factor de escala de la unidad de captura elegida —
+  // this.inputs SIEMPRE guarda COP reales, esta es la única frontera de
+  // conversión (ver docblock de `unidad` arriba).
+  private get escalaUnidad(): number {
+    return this.unidad === 'MILES' ? 1_000 : 1_000_000;
+  }
+
   campoInput(tab: string, clave: string, anio: number): number | null {
-    return this.inputs[tab]?.[clave]?.[anio] ?? null;
+    const valorCop = this.inputs[tab]?.[clave]?.[anio] ?? null;
+    return valorCop === null ? null : valorCop / this.escalaUnidad;
   }
 
   setCampoInput(tab: string, clave: string, anio: number, valor: number | null): void {
     if (!this.inputs[tab][clave]) this.inputs[tab][clave] = {};
-    this.inputs[tab][clave][anio] = valor;
+    this.inputs[tab][clave][anio] = valor === null ? null : valor * this.escalaUnidad;
+  }
+
+  // Cambiar la unidad NO reescribe this.inputs (los valores ya guardados
+  // siguen siendo los mismos COP reales) — solo cambia el divisor con el
+  // que se muestran/capturan de acá en adelante. Se guarda igual que
+  // anio_inicial/cantidad_anios (actualizarAnios()).
+  actualizarUnidad(): void {
+    this.guardarBorrador(true);
   }
 
   estructural(seccion: string, clave: string, anio: number): number | null {
@@ -512,6 +534,7 @@ export class AnalisisFinancieroDetalleComponent implements OnInit, OnDestroy {
     return {
       anio_inicial: this.anioInicial,
       cantidad_anios: this.cantidadAnios,
+      unidad: this.unidad,
       activo: this.inputs['activo'],
       pasivo: this.inputs['pasivo'],
       patrimonio: this.inputs['patrimonio'],

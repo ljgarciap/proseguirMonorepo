@@ -208,6 +208,51 @@ class AnalisisFinancieroTest extends TestCase
         ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(422);
     }
 
+    /**
+     * SCRUM-329: 'unidad' es puramente de captura/visualización en el
+     * frontend — el backend solo la persiste tal cual (los montos que
+     * llegan en 'activo'/etc. siempre son COP reales, sin importar qué
+     * unidad se usó para escribirlos) y por default queda en 'MILLONES'.
+     */
+    public function test_guardar_borrador_persiste_unidad_elegida(): void
+    {
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+
+        Passport::actingAs($this->coordinador);
+        $payload = $this->payloadValido();
+        $payload['unidad'] = 'MILES';
+
+        $response = $this->putJson("/api/analisis-financiero/{$credito->id}/borrador", $payload, [
+            'X-Active-Role' => 'coordinador_comercial',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertSame('MILES', $response->json('analisis.unidad'));
+        $this->assertDatabaseHas('analisis_financieros', ['credito_ordinario_id' => $credito->id, 'unidad' => 'MILES']);
+    }
+
+    public function test_unidad_default_es_millones_sin_elegir_nada(): void
+    {
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+
+        Passport::actingAs($this->coordinador);
+        $this->getJson("/api/analisis-financiero/{$credito->id}", ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(200)
+            ->assertJsonPath('analisis.unidad', 'MILLONES');
+    }
+
+    public function test_unidad_invalida_falla_422(): void
+    {
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+
+        Passport::actingAs($this->coordinador);
+        $this->putJson("/api/analisis-financiero/{$credito->id}/borrador", [
+            'anio_inicial' => 2024,
+            'cantidad_anios' => 2,
+            'unidad' => 'PESOS',
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(422);
+    }
+
     public function test_confirmar_sin_configurar_anios_falla_422(): void
     {
         $credito = $this->crearCreditoEnAnalisisFinanciero();
