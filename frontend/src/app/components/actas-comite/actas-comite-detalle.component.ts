@@ -252,6 +252,38 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
 
   // --- Solicitudes ---
   // SCRUM-198: el alta manual solo enlaza un crédito ya existente y
+  // SCRUM-330: restaura la creación de una solicitud "desde cero" que
+  // SCRUM-198 había quitado — pero acotada a Factoring, que no tiene
+  // CreditoOrdinario/flujo BPMN propio (a diferencia de Ordinario/
+  // Constructor, que siguen exigiendo enlazar un crédito real de
+  // arriba). tipo_solicitud fijo en 'Factoring' — sin selector, es la
+  // única razón de ser de este formulario. Decisión con Luis
+  // (2026-09-04): esta solicitud NUNCA se materializa como
+  // CreditoOrdinario — queda solo como registro dentro del acta (ver
+  // ActaComiteController::materializarSolicitudesManuales(), que la
+  // excluye explícitamente).
+  nuevaSolicitudFactoring = { cliente_nombre: '', cliente_identificacion: '', monto: null as number | null };
+
+  agregarSolicitudFactoring(): void {
+    const faltantes: string[] = [];
+    if (!this.nuevaSolicitudFactoring.cliente_nombre) faltantes.push('Cliente');
+    if (!this.nuevaSolicitudFactoring.monto) faltantes.push('Monto');
+    if (faltantes.length) {
+      Swal.fire('Datos incompletos', `Falta diligenciar: ${faltantes.join(', ')}.`, 'warning');
+      return;
+    }
+
+    const payload = { ...this.nuevaSolicitudFactoring, tipo_solicitud: 'Factoring' };
+    this.http.post<any>(`${environment.apiUrl}/actas-comite/${this.actaId}/solicitudes`, payload, this.headers()).subscribe({
+      next: (solicitud) => {
+        this.prellenarMontoDecision(solicitud);
+        this.acta.solicitudes.push(solicitud);
+        this.nuevaSolicitudFactoring = { cliente_nombre: '', cliente_identificacion: '', monto: null };
+      },
+      error: (err) => Swal.fire('Error', err?.error?.message || 'No se pudo agregar la solicitud.', 'error')
+    });
+  }
+
   // elegible para comité (buscarCreditosElegibles) — ya no se puede
   // tipear un crédito desde cero.
   onCreditoElegibleSeleccionado(credito: any): void {

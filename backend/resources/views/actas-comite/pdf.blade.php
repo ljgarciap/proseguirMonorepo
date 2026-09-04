@@ -8,8 +8,8 @@
         h1 { font-size: 16px; margin-bottom: 4px; text-align: center; }
         h2 { font-size: 13px; margin: 18px 0 6px 0; padding-bottom: 3px; border-bottom: 2px solid #334155; }
         h3 { font-size: 11.5px; margin: 10px 0 4px 0; color: #475569; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-        th, td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 8px; table-layout: fixed; }
+        th, td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; text-align: left; word-wrap: break-word; overflow-wrap: break-word; }
         th { background: #f1f5f9; font-size: 9.5px; text-transform: uppercase; color: #64748b; }
         .total-row td { font-weight: bold; background: #f8fafc; border-top: 1.5px solid #94a3b8; }
         .header-box { margin-bottom: 14px; }
@@ -77,7 +77,7 @@
     <tbody>
         @forelse($acta->solicitudes as $solicitud)
             <tr>
-                <td>{{ $solicitud->cliente_nombre }}</td>
+                <td><strong>{{ $solicitud->cliente_nombre }}</strong></td>
                 <td>{{ $solicitud->tipo_solicitud }}</td>
                 <td>${{ number_format($solicitud->monto ?? 0, 0, ',', '.') }}</td>
                 <td>{{ $solicitud->origen === 'sistema' ? 'Análisis financiero' : 'Adicionada manualmente' }}</td>
@@ -90,6 +90,10 @@
 
 <h2>Decisión y detalle de solicitudes</h2>
 <table>
+    <colgroup>
+        <col style="width: 14%"><col style="width: 9%"><col style="width: 10%"><col style="width: 7%">
+        <col style="width: 9%"><col style="width: 17%"><col style="width: 17%"><col style="width: 8%"><col style="width: 9%">
+    </colgroup>
     <thead>
         <tr>
             <th>Cliente</th><th>Monto</th><th>Amortización</th><th>Plazo</th>
@@ -99,11 +103,12 @@
     <tbody>
         @forelse($acta->solicitudes as $solicitud)
             <tr>
-                <td>{{ $solicitud->cliente_nombre }} @if($solicitud->cliente_identificacion)({{ $solicitud->cliente_identificacion }})@endif</td>
+                <td><strong>{{ $solicitud->cliente_nombre }}</strong> @if($solicitud->cliente_identificacion)({{ $solicitud->cliente_identificacion }})@endif</td>
                 <td>${{ number_format($solicitud->monto ?? 0, 0, ',', '.') }}</td>
                 <td>{{ $solicitud->amortizacion ?? '—' }}</td>
                 <td>{{ $solicitud->plazo_meses ?? '—' }} meses</td>
-                <td>{{ $solicitud->tasa_interes !== null ? number_format($solicitud->tasa_interes, 2) . '%' : '—' }}</td>
+                <!-- SCRUM-330: NMV (Nominal Mes Vencido) por defecto junto a la tasa — clasifica el tipo de tasa del crédito. -->
+                <td>{{ $solicitud->tasa_interes !== null ? number_format($solicitud->tasa_interes, 2) . '% NMV' : '—' }}</td>
                 <td>{{ $solicitud->garantias ?? '—' }}</td>
                 <td>{{ $solicitud->fuente_pago ?? '—' }}</td>
                 <td>{{ strtoupper($solicitud->estado_decision ?? 'pendiente') }}</td>
@@ -122,7 +127,7 @@
     <tbody>
         @forelse($acta->solicitudes as $solicitud)
             <tr>
-                <td>{{ $solicitud->cliente_nombre }}</td>
+                <td><strong>{{ $solicitud->cliente_nombre }}</strong></td>
                 <td>{{ strtoupper($solicitud->estado_decision ?? 'PENDIENTE') }}</td>
                 <td>${{ number_format($solicitud->monto_decision ?? 0, 0, ',', '.') }}</td>
             </tr>

@@ -423,6 +423,58 @@ class ActaComiteTest extends TestCase
     }
 
     /**
+     * SCRUM-330: Factoring restaura el alta manual "desde cero" que
+     * SCRUM-198 había quitado, pero sin catálogo TipoCredito ni flujo BPMN
+     * propio — a diferencia de test_registrar_bloquea_solicitud_manual_
+     * no_vinculada_a_catalogos() de arriba (mismo escenario sin catálogos
+     * vinculados, pero tipo_solicitud NO es 'Factoring'), acá registrar()
+     * debe pasar igual y no debe crear ningún CreditoOrdinario/
+     * SolicitudCredito para ella — queda solo como registro dentro del
+     * acta (decisión con Luis, 2026-09-04).
+     */
+    public function test_registrar_no_bloquea_ni_materializa_solicitud_factoring(): void
+    {
+        $this->crearCreditoEnComiteEvaluacion();
+        Passport::actingAs($this->coordinador);
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+        $acta = $this->postJson('/api/actas-comite/generar', [], $headers)->json();
+        $sistemaId = $acta['solicitudes'][0]['id'];
+
+        $factoring = $this->postJson("/api/actas-comite/{$acta['id']}/solicitudes", [
+            'cliente_nombre' => 'Avenida Construcciones S A S',
+            'tipo_solicitud' => 'Factoring',
+            'monto' => 2000000000,
+        ], $headers)->assertStatus(201)->assertJsonPath('origen', 'manual')->json();
+
+        $this->putJson("/api/actas-comite/{$acta['id']}/solicitudes/{$factoring['id']}", [
+            'tasa_interes' => 1.80, // "Descuento" en el frontend, misma columna
+            'plazo_meses' => 12,
+            'fuente_pago' => 'Fiduciaria XYZ', // "Pagador" en el frontend, misma columna
+            'garantias' => 'Pagaré',
+            'estado_decision' => 'aprobado',
+            'monto_decision' => 2000000000,
+        ], $headers)->assertStatus(200);
+
+        $this->putJson("/api/actas-comite/{$acta['id']}/solicitudes/{$sistemaId}", [
+            'estado_decision' => 'aprobado', 'monto_decision' => 30000000,
+        ], $headers)->assertStatus(200);
+
+        $this->putJson("/api/actas-comite/{$acta['id']}", [
+            'fecha_reunion' => '2026-08-12', 'lugar' => '<p>Sala</p>', 'hora_inicio' => '09:00',
+            'asistentes' => [['nombre' => 'Juan Pérez']], 'observaciones_generales' => '<p>—</p>',
+            'hora_finalizacion' => '10:00', 'firmantes' => [['nombre' => 'Juan Pérez', 'rol' => 'Presidente']],
+        ], $headers)->assertStatus(200);
+        $this->postJson("/api/actas-comite/{$acta['id']}/aprobar-orden-dia", [], $headers)->assertStatus(200);
+
+        $this->postJson("/api/actas-comite/{$acta['id']}/registrar", [], $headers)->assertStatus(200);
+
+        $factoringRefrescada = \App\Models\ActaComiteSolicitud::find($factoring['id']);
+        $this->assertNull($factoringRefrescada->credito_ordinario_id);
+        $this->assertSame('aprobado', $factoringRefrescada->estado_decision);
+        $this->assertDatabaseCount('credito_ordinarios', 1); // solo el de sistema, Factoring no materializa.
+    }
+
+    /**
      * SCRUM-190 (2026-08-12, punto 1): con cliente/tipo/amortización
      * vinculables a catálogos reales, registrar() debe crear un
      * CreditoOrdinario real (con su SolicitudCredito) para la solicitud
