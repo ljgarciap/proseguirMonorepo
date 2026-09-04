@@ -27,10 +27,14 @@ Route::get('/dashboard/cartera-factoring/export', [\App\Http\Controllers\Dashboa
         Route::patch('/history/{categoria}/{id}', [\App\Http\Controllers\HistoryController::class, 'updateRecord'])
             ->middleware(['auth:api', 'checkpermission:logs:gestionar']);
 
-        // Nota: /history/{categoria}/export queda sin ningún middleware de
-        // auth/rol, tal como estaba antes de Fase 2 — hallazgo adyacente,
-        // fuera de alcance de este ticket, reportado a Luis por separado.
-        Route::get('/history/{categoria}/export', [\App\Http\Controllers\HistoryController::class, 'export']);
+        // Hallazgo de seguridad 2026-09-04 (encontrado durante RBAC Fase 2,
+        // tratado a pedido explícito de Luis): esta ruta no tenía NINGÚN
+        // middleware de auth/rol — cualquiera sin sesión podía descargar el
+        // Excel completo de cartera/operaciones/pagos/confirming/compraventa
+        // pegándole directo a la URL. Mismo permiso que el resto de las
+        // acciones de este grupo (index/update/delete).
+        Route::get('/history/{categoria}/export', [\App\Http\Controllers\HistoryController::class, 'export'])
+            ->middleware(['auth:api', 'checkpermission:logs:gestionar']);
 
         // Sectores
         Route::get('/sectores', \App\Http\Controllers\SectorController::class)
