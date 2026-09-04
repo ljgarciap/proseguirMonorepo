@@ -2,7 +2,7 @@
 
 **Date**: 2026-09-03
 **Requested by**: Luis
-**Status**: Approved (Luis, 2026-09-03) — en diseño con el Arquitecto
+**Status**: Approved (Luis, 2026-09-03) — diseño + Cybersecurity cerrados, lista para desglose de PM
 **Project**: Proseguir Factoring
 
 ## Problem
@@ -256,6 +256,36 @@ reportarlo a Luis para decidir si se abre un ticket de seguridad aparte.
   `docs/specs/checkrole-faltante-rutas-criticas.md`. No bloquea esta spec ni depende de ella.
 - **Cybersecurity**: sigue revisando el modelo de datos de esta spec antes de pasar a PM (ver
   sección siguiente).
+
+## Revisión de Cybersecurity (2026-09-03)
+
+Threat model sobre el modelo de datos de Fase 1 (no sobre enforcement — no cambia en esta fase).
+
+- **Slug de `superadmin` protegido**: el `slug` de los roles semilla es la identidad que el código
+  legacy sigue comparando literal (`in_array('superadmin', ...)`, `resolveActiveRole()`) mientras
+  Fase 2 no exista. Renombrar o eliminar el rol `superadmin`, o el slug de cualquiera de los otros
+  9 roles semilla, rompe autorización real en producción sin que Fase 1 lo detecte (Fase 1 no
+  hace enforcement, así que el error se manifiesta como "usuario legítimo perdió acceso", no como
+  un error de esta feature). **Criterio de aceptación agregado**: el `slug` de los 10 roles
+  `es_sistema` no es editable desde la UI (solo nombre/descripción/permisos lo son); crear un rol
+  nuevo sí permite definir su propio slug libremente, porque no hay código legacy que lo lea.
+- **Mass-assignment en `PUT /api/roles/{id}`**: el endpoint que asigna permisos a un rol debe
+  validar que cada `permission_id` recibido exista en la tabla `permissions` (`exists:permissions,id`)
+  — no aceptar arrays libres. Bajo riesgo real hoy (Fase 1 es inerte), pero es higiene necesaria
+  antes de Fase 2, cuando esos IDs sí van a decidir acceso real.
+- **Auto-bloqueo de superadmin**: ya cubierto en criterios de aceptación (no se puede eliminar el
+  rol `superadmin` ni quitarle su propio permiso de gestión de roles) — se mantiene, es la
+  protección correcta contra que alguien se deje a sí mismo sin acceso a la pantalla de gestión.
+- **Auditoría**: ya cubierta en criterios de aceptación (reutilizar `ActivityLogController`) —
+  necesaria en Fase 1 pese a ser inerte, porque el historial de "quién creó qué rol/permiso" es
+  insumo para el threat model de Fase 2, no algo que se pueda reconstruir después.
+- **Blast radius de Fase 1**: bajo — sin enforcement conectado, un error en el modelo de datos o en
+  la UI no puede otorgar ni quitar acceso real a nadie. El riesgo real de este proyecto vive
+  íntegramente en Fase 2 (ahí sí amerita una revisión de Cybersecurity nueva, específica sobre el
+  reemplazo de cada punto hardcodeado, antes de mergear).
+
+**Aprobado para pasar a PM** con los 2 criterios de aceptación agregados arriba (slug protegido,
+`exists:permissions,id` en la validación).
 
 ## References
 
