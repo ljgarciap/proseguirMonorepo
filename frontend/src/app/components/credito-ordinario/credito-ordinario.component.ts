@@ -28,8 +28,8 @@ export class CreditoOrdinarioComponent implements OnInit {
 
   // BPMN Stepper definition
   bpmnSteps = [
-    { key: 'revision_documental', label: 'Revisión Solicitud', role: 'coordinador_comercial', roleLabel: 'Coordinador Comercial', desc: 'Revisar la solicitud inicial del cliente y verificar que los soportes y formularios estén completos.' },
-    { key: 'completar_solicitud', label: 'Completar Sop.', role: 'cliente', roleLabel: 'Cliente', desc: 'Completar la documentación faltante solicitada por el Coordinador Comercial.' },
+    { key: 'revision_documental', label: 'Revisión Solicitud', role: 'coordinador_comercial', roleLabel: 'Director de Crédito', desc: 'Revisar la solicitud inicial del cliente y verificar que los soportes y formularios estén completos.' },
+    { key: 'completar_solicitud', label: 'Completar Sop.', role: 'cliente', roleLabel: 'Cliente', desc: 'Completar la documentación faltante solicitada por el Director de Crédito.' },
     // SCRUM-128: el paso combinado analisis_sarlaft_financiero se separó en dos
     // etapas secuenciales. La validación de Listas Restrictivas y SARLAFT ahora
     // se diligencia en el módulo dedicado (/listas-sarlaft, Oficial de
@@ -40,7 +40,7 @@ export class CreditoOrdinarioComponent implements OnInit {
     // el Análisis Financiero ya pasa directo a Comité de Crédito. La
     // presentación para el Comité se adjunta después, en Actas Comité de
     // Crédito (una por solicitud dentro del acta).
-    { key: 'pendiente_analisis_financiero', label: 'Análisis Financiero', role: 'coordinador_comercial', roleLabel: 'Coordinador Comercial', desc: 'Realizar el análisis financiero del cliente.' },
+    { key: 'pendiente_analisis_financiero', label: 'Análisis Financiero', role: 'coordinador_comercial', roleLabel: 'Director de Crédito', desc: 'Realizar el análisis financiero del cliente.' },
     { key: 'comite_evaluacion', label: 'Comité de Crédito', role: 'comite_credito', roleLabel: 'Comité de Crédito', desc: 'Evaluar el perfil de crédito y firmar el Acta oficial de decisión del Comité.' },
     { key: 'formalizacion_garantias', label: 'Garantías', role: 'operativo', roleLabel: 'Dirección Administrativa', desc: 'Revisar y registrar las garantías firmadas por el cliente.' },
     { key: 'aprobacion_registro_cyf', label: 'Registro CYF', role: 'gerente', roleLabel: 'Gerencia', desc: 'Aprobar el registro de la operación en la plataforma core CYF.' },
@@ -159,9 +159,9 @@ export class CreditoOrdinarioComponent implements OnInit {
   // "Expediente de Documentos" (informeTecnicoStatusLabel).
   get bpmnStepsConstructor() {
     return [
-      { key: 'validacion_documental_constructor', label: 'Revisión Solicitud', role: 'coordinador_comercial', roleLabel: 'Coordinador Comercial', desc: 'Revisar el expediente inicial del cliente y verificar que los soportes estén completos.' },
-      { key: 'completar_solicitud_constructor', label: 'Completar Sop.', role: 'cliente', roleLabel: 'Cliente', desc: 'Completar la documentación faltante solicitada por el Coordinador Comercial.' },
-      { key: 'informe_tecnico', label: 'Informe Técnico', role: 'ingeniero', roleLabel: 'Ingeniero / Coordinador Comercial', desc: 'Elaboración y registro del Informe Técnico del proyecto.', altKeys: ['informe_tecnico_ingeniero', 'informe_tecnico_coordinador', 'informe_tecnico_finalizado'] },
+      { key: 'validacion_documental_constructor', label: 'Revisión Solicitud', role: 'coordinador_comercial', roleLabel: 'Director de Crédito', desc: 'Revisar el expediente inicial del cliente y verificar que los soportes estén completos.' },
+      { key: 'completar_solicitud_constructor', label: 'Completar Sop.', role: 'cliente', roleLabel: 'Cliente', desc: 'Completar la documentación faltante solicitada por el Director de Crédito.' },
+      { key: 'informe_tecnico', label: 'Informe Técnico', role: 'ingeniero', roleLabel: 'Ingeniero / Director de Crédito', desc: 'Elaboración y registro del Informe Técnico del proyecto.', altKeys: ['informe_tecnico_ingeniero', 'informe_tecnico_coordinador', 'informe_tecnico_finalizado'] },
       ...this.bpmnSteps.slice(2)
     ];
   }
@@ -312,7 +312,7 @@ export class CreditoOrdinarioComponent implements OnInit {
         // /validation como vía alterna (avanza igual si aprueba ahí primero).
         return {
           title: 'Validación documental en curso',
-          message: 'El expediente inicial de este crédito Constructor está siendo revisado por el Coordinador Comercial. Alternativamente, este paso también avanza si Operaciones valida y aprueba todos los soportes desde el módulo de Validación de Documentos.',
+          message: 'El expediente inicial de este crédito Constructor está siendo revisado por el Director de Crédito. Alternativamente, este paso también avanza si Operaciones valida y aprueba todos los soportes desde el módulo de Validación de Documentos.',
           link: '/validation',
           linkLabel: 'Ir a Validación de Documentos',
           roles: ['operativo', 'gerente']
@@ -320,7 +320,7 @@ export class CreditoOrdinarioComponent implements OnInit {
       case 'informe_tecnico_ingeniero':
         return {
           title: 'Informe Técnico en elaboración',
-          message: 'El Ingeniero está elaborando el Informe Técnico del proyecto. El flujo continuará automáticamente cuando lo envíe a revisión del Coordinador Comercial.',
+          message: 'El Ingeniero está elaborando el Informe Técnico del proyecto. El flujo continuará automáticamente cuando lo envíe a revisión del Director de Crédito.',
           link: `/informes-tecnicos/${creditoId}`,
           linkLabel: 'Ver Informe Técnico',
           roles: ['ingeniero', 'coordinador_comercial']
@@ -328,7 +328,7 @@ export class CreditoOrdinarioComponent implements OnInit {
       case 'informe_tecnico_coordinador':
         return {
           title: 'Informe Técnico en revisión',
-          message: 'El Informe Técnico está pendiente de revisión y registro por el Coordinador Comercial. El flujo continuará automáticamente al finalizar esa revisión.',
+          message: 'El Informe Técnico está pendiente de revisión y registro por el Director de Crédito. El flujo continuará automáticamente al finalizar esa revisión.',
           link: `/informes-tecnicos/${creditoId}`,
           linkLabel: 'Ver Informe Técnico',
           roles: ['ingeniero', 'coordinador_comercial']

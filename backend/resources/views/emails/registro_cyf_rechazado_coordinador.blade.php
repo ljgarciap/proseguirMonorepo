@@ -21,7 +21,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Proseguir Factoring</h1>
+            <h1>Proseguir Soluciones de Liquidez</h1>
             <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">Gestión de Liquidez y Soluciones de Crédito</div>
         </div>
         <div class="content">

@@ -86,11 +86,11 @@ class UserSeeder extends Seeder
             ]
         );
 
-        // 7. Coordinador Comercial
+        // 7. Director de Crédito (slug interno sigue siendo coordinador_comercial — SCRUM-331)
         User::updateOrCreate(
             ['numero_documento' => '7890'],
             [
-                'name' => 'Coordinador Comercial de Prueba',
+                'name' => 'Director de Crédito de Prueba',
                 'email' => 'comercial@test.com',
                 'password' => '7890',
                 'tipo_documento_id' => $cc,

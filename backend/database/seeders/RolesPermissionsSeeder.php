@@ -94,7 +94,10 @@ class RolesPermissionsSeeder extends Seeder
         // Documentos
         ['clave' => 'internal-docs', 'nombre' => 'Documentos Internos (Bandeja Interna)', 'modulo' => 'Documentos', 'roles' => ['operativo', 'contable', 'gerente', 'superadmin']],
         ['clave' => 'document-requests', 'nombre' => 'Solicitudes de Documentos a Clientes', 'modulo' => 'Documentos', 'roles' => ['operativo', 'superadmin']],
-        ['clave' => 'document-config', 'nombre' => 'Configuración de Documentos', 'modulo' => 'Documentos', 'roles' => ['operativo', 'superadmin']],
+        // SCRUM-327: Coordinador Comercial también necesita esta pantalla —
+        // agregado 2026-09-04, ver migración de grant para instalaciones
+        // donde el catálogo ya estaba sembrado antes de este cambio.
+        ['clave' => 'document-config', 'nombre' => 'Configuración de Documentos', 'modulo' => 'Documentos', 'roles' => ['operativo', 'coordinador_comercial', 'superadmin']],
 
         // Clientes
         ['clave' => 'clientes', 'nombre' => 'Clientes', 'modulo' => 'Clientes', 'roles' => ['superadmin', 'gerente', 'operativo', 'coordinador_comercial']],
@@ -171,7 +174,11 @@ class RolesPermissionsSeeder extends Seeder
 
         ['clave' => 'internal-docs:gestionar', 'nombre' => 'Gestionar Documentos Internos y Ruta de Aprobación', 'modulo' => 'Documentos', 'roles' => ['operativo', 'contable', 'gerente', 'superadmin', 'coordinador_comercial']],
         ['clave' => 'document-areas:ver', 'nombre' => 'Ver Áreas de Documentos', 'modulo' => 'Documentos', 'roles' => ['operativo', 'contable', 'gerente', 'superadmin', 'coordinador_comercial']],
-        ['clave' => 'document-requirements:gestionar', 'nombre' => 'Gestionar Requisitos de Documentos', 'modulo' => 'Documentos', 'roles' => ['superadmin', 'operativo']],
+        // SCRUM-327: mismo grant que 'document-config' arriba — sin este
+        // permiso de acción, Coordinador Comercial vería la pantalla pero
+        // cada operación de la pantalla (listar/crear/editar/eliminar
+        // requisitos) le devolvería 403.
+        ['clave' => 'document-requirements:gestionar', 'nombre' => 'Gestionar Requisitos de Documentos', 'modulo' => 'Documentos', 'roles' => ['superadmin', 'operativo', 'coordinador_comercial']],
     ];
 
     /**
@@ -188,7 +195,12 @@ class RolesPermissionsSeeder extends Seeder
         ['slug' => 'operativo', 'nombre' => 'Operativo', 'descripcion' => 'Operación diaria: cargas, validación, desembolsos.'],
         ['slug' => 'cliente', 'nombre' => 'Cliente', 'descripcion' => 'Portal de clientes de factoring.'],
         ['slug' => 'contable', 'nombre' => 'Contable', 'descripcion' => 'Bandeja interna y conciliación contable.'],
-        ['slug' => 'coordinador_comercial', 'nombre' => 'Coordinador Comercial', 'descripcion' => 'Gestión comercial de solicitudes de crédito.'],
+        // SCRUM-331: renombrado de "Coordinador Comercial" a "Director de
+        // Crédito" (cambio de cargo interno en Proseguir) — el slug NO
+        // cambia (nunca editable desde la UI, ver docblock arriba), solo
+        // el nombre visible. Ver migración de rename para instalaciones
+        // donde el rol ya estaba sembrado antes de este cambio.
+        ['slug' => 'coordinador_comercial', 'nombre' => 'Director de Crédito', 'descripcion' => 'Gestión comercial de solicitudes de crédito.'],
         ['slug' => 'oficial_cumplimiento', 'nombre' => 'Oficial de Cumplimiento', 'descripcion' => 'Listas restrictivas y SARLAFT.'],
         ['slug' => 'comite_credito', 'nombre' => 'Comité de Crédito', 'descripcion' => 'Evaluación de créditos en comité.'],
         ['slug' => 'tesoreria', 'nombre' => 'Tesorería', 'descripcion' => 'Transferencias y desembolsos bancarios.'],

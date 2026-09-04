@@ -96,7 +96,7 @@
     Fecha: {{ optional($informe->diligenciado_por_ingeniero_at)->format('Y-m-d H:i') ?? '—' }}
 </div>
 
-<h2>Sección Coordinador Comercial</h2>
+<h2>Sección Director de Crédito</h2>
 
 <h3>④ Crédito Solicitado</h3>
 <table>
@@ -156,7 +156,7 @@
     (máx {{ number_format(($cob['cobertura_garantia']['umbral_maximo'] ?? 0) * 100, 0) }}%)
 </div>
 
-<h3 style="margin-top: 14px;">Observaciones del Coordinador Comercial</h3>
+<h3 style="margin-top: 14px;">Observaciones del Director de Crédito</h3>
 <p>{{ $informe->observaciones_coordinador ?: '—' }}</p>
 <div class="traceability">
     Diligenciado por: {{ $informe->coordinador->name ?? '—' }} ·

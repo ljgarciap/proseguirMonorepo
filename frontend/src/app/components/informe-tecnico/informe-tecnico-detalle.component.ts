@@ -408,9 +408,9 @@ export class InformeTecnicoDetalleComponent implements OnInit, OnDestroy {
   registrar(): void {
     const esIngeniero = this.credito.estado === 'informe_tecnico_ingeniero';
     Swal.fire({
-      title: esIngeniero ? '¿Registrar informe del Ingeniero?' : '¿Registrar informe del Coordinador Comercial?',
+      title: esIngeniero ? '¿Registrar informe del Ingeniero?' : '¿Registrar informe del Director de Crédito?',
       text: esIngeniero
-        ? 'Tu sección quedará bloqueada para edición y pasará a Coordinador Comercial.'
+        ? 'Tu sección quedará bloqueada para edición y pasará a Director de Crédito.'
         : 'El informe técnico quedará finalizado y no podrá editarse más.',
       icon: 'question',
       showCancelButton: true,

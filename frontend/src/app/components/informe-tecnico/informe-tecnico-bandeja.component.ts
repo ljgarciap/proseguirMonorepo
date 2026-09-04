@@ -19,7 +19,7 @@ const ROL_POR_ESTADO: Record<string, string> = {
 
 const ESTADO_LABELS: Record<string, string> = {
   informe_tecnico_ingeniero: 'Diligenciando Ingeniero',
-  informe_tecnico_coordinador: 'Diligenciando Coordinador Comercial',
+  informe_tecnico_coordinador: 'Diligenciando Director de Crédito',
   informe_tecnico_finalizado: 'Finalizado',
 };
 
@@ -108,7 +108,7 @@ export class InformeTecnicoBandejaComponent implements OnInit, OnDestroy {
   rolActual(estado: string): string {
     if (estado === 'informe_tecnico_finalizado') return '—';
     const rol = ROL_POR_ESTADO[estado];
-    return rol === 'ingeniero' ? 'Ingeniero' : rol === 'coordinador_comercial' ? 'Coordinador Comercial' : '—';
+    return rol === 'ingeniero' ? 'Ingeniero' : rol === 'coordinador_comercial' ? 'Director de Crédito' : '—';
   }
 
   proyecto(credito: any): string {

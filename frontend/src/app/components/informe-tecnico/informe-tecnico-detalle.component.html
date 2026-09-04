@@ -196,13 +196,13 @@
   <div class="content-card mt-4" *ngIf="seccionCoordinadorVisible" (input)="seccionCoordinadorEditable && onCampoCambiado()">
     <h3 class="card-title">
       <span class="material-symbols-outlined">badge</span>
-      Sección Coordinador Comercial
+      Sección Director de Crédito
     </h3>
     <p class="card-subtitle">Crédito Solicitado, Saldos por recaudar, Análisis de financiación y Coberturas.</p>
 
     <div class="alert-readonly subtle">
       <span class="material-symbols-outlined">lock</span>
-      La sección Ingeniero (arriba) se muestra en modo solo lectura para el Coordinador Comercial.
+      La sección Ingeniero (arriba) se muestra en modo solo lectura para el Director de Crédito.
     </div>
 
     <!-- Crédito Solicitado -->
@@ -351,7 +351,7 @@
 
     <div class="form-grid mt-4">
       <div class="form-group span-full">
-        <label>Observaciones del Coordinador Comercial</label>
+        <label>Observaciones del Director de Crédito</label>
         <textarea class="pro-input textarea" [(ngModel)]="observacionesCoordinador"
                   [disabled]="!seccionCoordinadorEditable" placeholder="Observaciones / concepto"></textarea>
       </div>
@@ -370,7 +370,7 @@
   <div class="content-card mt-4" *ngIf="!seccionCoordinadorVisible">
     <p class="card-subtitle pending-msg">
       <span class="material-symbols-outlined">hourglass_top</span>
-      La sección del Coordinador Comercial se habilita una vez el Ingeniero registre su informe.
+      La sección del Director de Crédito se habilita una vez el Ingeniero registre su informe.
     </p>
   </div>
 

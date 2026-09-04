@@ -94,7 +94,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Proseguir Factoring</h1>
+            <h1>Proseguir Soluciones de Liquidez</h1>
             <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">Gestión de Liquidez y Soluciones de Crédito</div>
         </div>
         <div class="content">
@@ -144,7 +144,7 @@
                 </p>
             </div>
 
-            <p style="margin-top: 25px;">Si tiene alguna inquietud o requiere apoyo adicional, no dude en contactarse con su Coordinador Comercial asignado.</p>
+            <p style="margin-top: 25px;">Si tiene alguna inquietud o requiere apoyo adicional, no dude en contactarse con su Director de Crédito asignado.</p>
 
             <p style="text-align:center;">
                 <a href="{{ $urlIngreso }}" class="btn">INGRESAR A LA PLATAFORMA</a>

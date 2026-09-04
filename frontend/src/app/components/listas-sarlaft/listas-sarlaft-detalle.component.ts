@@ -150,7 +150,7 @@ export class ListasSarlaftDetalleComponent implements OnInit {
       title: esFavorable ? '¿Finalizar con concepto favorable?' : '¿Finalizar con concepto desfavorable?',
       text: esFavorable
         ? 'El crédito pasará a la etapa de Análisis Financiero.'
-        : 'El crédito quedará rechazado y disponible en Gestión de Créditos para que el Coordinador Comercial notifique al cliente.',
+        : 'El crédito quedará rechazado y disponible en Gestión de Créditos para que el Director de Crédito notifique al cliente.',
       icon: 'question',
       showCancelButton: true,
       confirmButtonText: 'Sí, finalizar',

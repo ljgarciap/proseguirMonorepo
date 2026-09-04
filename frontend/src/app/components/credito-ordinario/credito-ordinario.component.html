@@ -208,10 +208,10 @@
 
           <!-- AUTHORIZED ACTIONS BY STATE -->
           <div class="authorized-actions" *ngIf="isUserRoleAuthorized()">
-            <!-- Stage 1 (Constructor): validacion_documental_constructor (Coordinador Comercial) -->
+            <!-- Stage 1 (Constructor): validacion_documental_constructor (Director de Crédito) -->
             <!-- SCRUM-151: expediente inicial de Constructor, mismo mecanismo que revision_documental -->
             <div *ngIf="selectedCredito.estado === 'validacion_documental_constructor' && activeRole !== 'cliente'" class="action-buttons-layout">
-              <p class="action-instructions">Como <strong>Coordinador Comercial</strong>, debes verificar que los documentos del expediente inicial cargados por el cliente estén correctos.</p>
+              <p class="action-instructions">Como <strong>Director de Crédito</strong>, debes verificar que los documentos del expediente inicial cargados por el cliente estén correctos.</p>
               <div class="flex-actions">
                 <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Documentación inicial verificada y aprobada.')">
                   <span class="material-symbols-outlined">check_circle</span> Aprobar Documentos
@@ -230,15 +230,15 @@
 
             <!-- Stage 1b (Constructor): completar_solicitud_constructor (Cliente) -->
             <div *ngIf="selectedCredito.estado === 'completar_solicitud_constructor'">
-              <p class="action-instructions">Como <strong>Cliente</strong>, debes completar la información del expediente inicial solicitada por el Coordinador Comercial. Una vez realizado, confirma el envío.</p>
+              <p class="action-instructions">Como <strong>Cliente</strong>, debes completar la información del expediente inicial solicitada por el Director de Crédito. Una vez realizado, confirma el envío.</p>
               <button class="btn-pro primary" (click)="executeTransition('aprobar', 'El cliente ha enviado la información complementaria solicitada del expediente inicial.')">
                 <span class="material-symbols-outlined">send</span> Enviar Solicitud Completada
               </button>
             </div>
 
-            <!-- Stage 1: revision_documental (Coordinador Comercial) -->
+            <!-- Stage 1: revision_documental (Director de Crédito) -->
             <div *ngIf="selectedCredito.estado === 'revision_documental'" class="action-buttons-layout">
-              <p class="action-instructions">Como <strong>Coordinador Comercial</strong>, debes verificar que los documentos iniciales cargados en el expediente del cliente estén correctos.</p>
+              <p class="action-instructions">Como <strong>Director de Crédito</strong>, debes verificar que los documentos iniciales cargados en el expediente del cliente estén correctos.</p>
               <div class="flex-actions">
                 <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Documentación inicial verificada y aprobada.')">
                   <span class="material-symbols-outlined">check_circle</span> Aprobar Documentos
@@ -260,7 +260,7 @@
               </button>
             </div>
 
-            <!-- Stage 3: pendiente_analisis_financiero (Coordinador Comercial) -->
+            <!-- Stage 3: pendiente_analisis_financiero (Director de Crédito) -->
             <!-- SCRUM-128: el concepto SARLAFT/Listas Restrictivas ya se resolvió
                  en la bandeja dedicada (Oficial de Cumplimiento) antes de llegar
                  acá — este estado solo cubre el análisis financiero comercial.
@@ -274,7 +274,7 @@
 
               <div class="parallel-actions-grid">
                 <div class="role-action-box" [class.active]="activeRole === 'coordinador_comercial' || activeRole === 'superadmin'">
-                  <h5>📈 Coordinador Comercial</h5>
+                  <h5>📈 Director de Crédito</h5>
                   <p>Debe confirmar el Análisis Financiero (módulo "Análisis Financiero").</p>
 
                   <div class="upload-controls">
@@ -414,7 +414,7 @@
               <div class="cyf-layout">
                 <div class="cyf-box">
                   <h5>📝 Registro de Crédito en CYF (Comercial)</h5>
-                  <p>El Coordinador Comercial debe registrar el crédito en CYF y cargar el soporte.</p>
+                  <p>El Director de Crédito debe registrar el crédito en CYF y cargar el soporte.</p>
                   <input type="file" id="file-cyf" (change)="onFileUpload($event, 'registro_cyf')" 
                          [disabled]="!(activeRole === 'coordinador_comercial' || activeRole === 'superadmin')" accept=".pdf" class="file-input-hide">
                   <label for="file-cyf" class="btn-pro secondary sm btn-upload">
@@ -556,14 +556,14 @@
           <!-- ETAPA 2 (SOLO CONSTRUCTOR): Informe Técnico -->
           <!-- SCRUM-151: solo aplica a Crédito Constructor, corre en 1 la numeración de las etapas siguientes -->
           <div class="stage-doc-group" *ngIf="isCreditoConstructor">
-            <h4>Etapa 2: Informe Técnico <span class="stage-owner">Ingeniero / Coordinador Comercial</span></h4>
+            <h4>Etapa 2: Informe Técnico <span class="stage-owner">Ingeniero / Director de Crédito</span></h4>
             <div class="documents-grid-grouped">
               <div class="doc-box-new">
                 <div class="doc-main-info">
                   <span class="material-symbols-outlined doc-icon-new" [class.completed]="informeTecnicoStatusLabel === 'Completado'">engineering</span>
                   <div class="doc-title-desc">
                     <h5>Informe Técnico del Proyecto</h5>
-                    <p>Diligenciado por el Ingeniero y revisado/registrado por el Coordinador Comercial.</p>
+                    <p>Diligenciado por el Ingeniero y revisado/registrado por el Director de Crédito.</p>
                   </div>
                 </div>
                 <div class="doc-action-status">
@@ -609,7 +609,7 @@
                   <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.analisis_financiero?.estado === 'confirmado'">analytics</span>
                   <div class="doc-title-desc">
                     <h5>Análisis Financiero de Solicitud</h5>
-                    <p>Cálculo de capacidad de endeudamiento. Se diligencia en el módulo Análisis Financiero. Responsable: Coordinador Comercial.</p>
+                    <p>Cálculo de capacidad de endeudamiento. Se diligencia en el módulo Análisis Financiero. Responsable: Director de Crédito.</p>
                   </div>
                 </div>
                 <div class="doc-action-status">
@@ -664,16 +664,16 @@
           <div class="stage-doc-group">
             <h4>Etapa {{ 4 + etapaOffset }}: Formalización de Garantías <span class="stage-owner">Cliente / Dirección Administrativa</span></h4>
             <!-- SCRUM-229: documentos dirigidos por el preset que solicitó el
-                 Coordinador Comercial al gestionar "Aprobada para gestión de
+                 Director de Crédito al gestionar "Aprobada para gestión de
                  garantías" (mismo patrón preset+DocumentRequest de Etapa 1,
                  SCRUM-146 — fallback a la lista fija legacy si el crédito no
                  tiene DocumentRequest de garantías, ej. créditos anteriores a
                  SCRUM-193/205). -->
             <p class="section-desc" *ngIf="etapa4PresetNombre">Documentación solicitada: <strong>{{ etapa4PresetNombre }}</strong></p>
-            <!-- SCRUM-292: mientras el Coordinador Comercial no complete la
+            <!-- SCRUM-292: mientras el Director de Crédito no complete la
                  gestión (elegir preset en Gestión de Créditos), todavía no
                  existe ningún documento real que cargar. -->
-            <p class="section-desc" *ngIf="etapa4PendienteGestion">Pendiente de gestión por el Coordinador Comercial. La carga de documentos se habilita una vez enviada esa gestión desde Gestión de Créditos.</p>
+            <p class="section-desc" *ngIf="etapa4PendienteGestion">Pendiente de gestión por el Director de Crédito. La carga de documentos se habilita una vez enviada esa gestión desde Gestión de Créditos.</p>
             <div class="documents-grid-grouped" *ngIf="!etapa4PendienteGestion">
               <div class="doc-box-new" *ngFor="let doc of etapa4Docs">
                 <div class="doc-main-info">
@@ -718,7 +718,7 @@
                   <span class="material-symbols-outlined doc-icon-new" [class.completed]="selectedCredito.documentos?.registro_cyf">account_balance</span>
                   <div class="doc-title-desc">
                     <h5>Registro core CYF</h5>
-                    <p>Soporte de cargue en el core financiero. Responsable: Coordinador Comercial.</p>
+                    <p>Soporte de cargue en el core financiero. Responsable: Director de Crédito.</p>
                   </div>
                 </div>
                 <div class="doc-action-status">

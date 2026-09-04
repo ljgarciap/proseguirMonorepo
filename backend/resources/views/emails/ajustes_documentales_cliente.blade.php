@@ -18,14 +18,14 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Proseguir Factoring</h1>
+            <h1>Proseguir Soluciones de Liquidez</h1>
             <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">Gestión de Liquidez y Soluciones de Crédito</div>
         </div>
         <div class="content">
             <p>Estimado(a) {{ $credito->cliente->name ?? 'cliente' }},</p>
             <p>Su solicitud de crédito <strong>{{ $credito->numero_solicitud }}</strong> requiere ajustes en la documentación cargada antes de continuar con el proceso.</p>
             <div class="highlight-box">
-                <p style="margin:0;"><strong>Observación del Coordinador Comercial:</strong><br>{{ $comentario }}</p>
+                <p style="margin:0;"><strong>Observación del Director de Crédito:</strong><br>{{ $comentario }}</p>
             </div>
             <p>Por favor ingrese al sistema para revisar y actualizar los documentos solicitados.</p>
             <p style="text-align:center;">
