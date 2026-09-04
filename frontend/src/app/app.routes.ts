@@ -301,5 +301,18 @@ export const routes: Routes = [
         canActivate: [roleGuard],
         data: { roles: ['superadmin'] }
     },
+    {
+        // Motor paramétrico de Roles y Permisos — Fase 1 (ver
+        // docs/specs/rbac-roles-permisos-parametrico.md). A propósito SIN
+        // enlace en ningún menú/nav — decisión de Luis (2026-09-03): los
+        // permisos que se editan acá todavía no controlan acceso real
+        // (Fase 2), así que no se expone hasta entonces. Ruta protegida
+        // igual que cualquier otra pantalla de superadmin, solo alcanzable
+        // tipeando la URL directamente.
+        path: 'roles',
+        loadComponent: () => import('./components/roles-management/roles-management.component').then(m => m.RolesManagementComponent),
+        canActivate: [roleGuard],
+        data: { roles: ['superadmin'] }
+    },
     { path: '**', redirectTo: '' }
 ];

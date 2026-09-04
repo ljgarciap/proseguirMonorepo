@@ -379,6 +379,11 @@ import Swal from 'sweetalert2';
 export class UserManagementComponent implements OnInit {
   users: any[] = [];
   documentTypes: any[] = [];
+  // Motor paramétrico de Roles y Permisos — Fase 1 (ver
+  // docs/specs/rbac-roles-permisos-parametrico.md): el catálogo de roles
+  // asignables ya no vive hardcodeado acá, se lee de /api/roles — un rol
+  // creado desde /roles aparece en este modal sin deploy.
+  roles: any[] = [];
   apiUrl = `${environment.apiUrl}/users`;
 
   // Tab & search controls
@@ -392,6 +397,7 @@ export class UserManagementComponent implements OnInit {
   ngOnInit() {
     this.loadUsers();
     this.loadDocumentTypes();
+    this.loadRoles();
   }
 
   loadUsers() {
@@ -403,6 +409,10 @@ export class UserManagementComponent implements OnInit {
 
   loadDocumentTypes() {
     this.http.get<any[]>(`${environment.apiUrl}/document-types`).subscribe(data => this.documentTypes = data);
+  }
+
+  loadRoles() {
+    this.http.get<any[]>(`${environment.apiUrl}/roles`).subscribe(data => this.roles = data);
   }
 
   setTab(tab: 'active' | 'inactive') {
@@ -433,8 +443,14 @@ export class UserManagementComponent implements OnInit {
     const isEdit = !!user;
     
     // Build options for document types
-    const docOptions = this.documentTypes.map(t => 
+    const docOptions = this.documentTypes.map(t =>
       `<option value="${t.id}" ${user?.tipo_documento_id === t.id ? 'selected' : ''}>${t.codigo} - ${t.nombre}</option>`
+    ).join('');
+
+    // Catálogo dinámico (/api/roles) en vez de la lista hardcodeada de 10
+    // checkboxes que vivía acá antes (ver docs/specs/rbac-roles-permisos-parametrico.md).
+    const roleOptions = this.roles.map(r =>
+      `<label><input type="checkbox" class="swal-role" value="${r.slug}" ${user?.roles?.includes(r.slug) ? 'checked' : ''}> ${r.nombre}</label>`
     ).join('');
 
     const { value: formValues } = await Swal.fire({
@@ -473,16 +489,7 @@ export class UserManagementComponent implements OnInit {
              <div class="pro-input-group">
                 <label style="display:block; margin-bottom:10px; font-weight:600;">Roles / Perfiles</label>
                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 0.82rem;">
-                   <label><input type="checkbox" class="swal-role" value="operativo" ${user?.roles?.includes('operativo') ? 'checked' : ''}> Dir. Administrativa</label>
-                   <label><input type="checkbox" class="swal-role" value="gerente" ${user?.roles?.includes('gerente') ? 'checked' : ''}> Gerencia</label>
-                   <label><input type="checkbox" class="swal-role" value="superadmin" ${user?.roles?.includes('superadmin') ? 'checked' : ''}> Admin</label>
-                   <label><input type="checkbox" class="swal-role" value="cliente" ${user?.roles?.includes('cliente') ? 'checked' : ''}> Cliente</label>
-                   <label><input type="checkbox" class="swal-role" value="contable" ${user?.roles?.includes('contable') ? 'checked' : ''}> Contable</label>
-                   <label><input type="checkbox" class="swal-role" value="coordinador_comercial" ${user?.roles?.includes('coordinador_comercial') ? 'checked' : ''}> Comercial</label>
-                   <label><input type="checkbox" class="swal-role" value="oficial_cumplimiento" ${user?.roles?.includes('oficial_cumplimiento') ? 'checked' : ''}> Oficial Cumpl.</label>
-                   <label><input type="checkbox" class="swal-role" value="comite_credito" ${user?.roles?.includes('comite_credito') ? 'checked' : ''}> Comité Crédito</label>
-                   <label><input type="checkbox" class="swal-role" value="tesoreria" ${user?.roles?.includes('tesoreria') ? 'checked' : ''}> Tesorería</label>
-                   <label><input type="checkbox" class="swal-role" value="ingeniero" ${user?.roles?.includes('ingeniero') ? 'checked' : ''}> Ingeniero</label>
+                   ${roleOptions}
                  </div>
              </div>
           </div>

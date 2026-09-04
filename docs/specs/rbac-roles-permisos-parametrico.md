@@ -159,12 +159,12 @@ simplicidad, no reinventar un framework de permisos.
 Inventario completo revisado antes de diseñar: `routes/api.php` (394 líneas, todos los grupos) y
 las 43 rutas de `app.routes.ts` con sus `data.roles`. Con esa base:
 
-### Modelo de datos
+### Modelo de datos (corregido durante implementación, 2026-09-04 — ver nota abajo)
 
 ```
 roles
-  id, nombre (display), slug (unique, snake_case — compatibilidad con código legacy, ver abajo),
-  descripcion, es_sistema (bool), created_at, updated_at
+  id, nombre (display), slug (unique, snake_case — igual string que usa hoy users.roles para los
+  10 roles semilla), descripcion, es_sistema (bool), created_at, updated_at
 
 permissions
   id, clave (unique, ej. 'gestion-creditos:formalizacion-garantias'), nombre, descripcion,
@@ -172,27 +172,33 @@ permissions
 
 role_permission
   role_id, permission_id   (PK compuesta)
-
-user_role   -- NUEVA, reemplaza la columna users.roles (json)
-  user_id, role_id   (PK compuesta)
 ```
 
-**`users.roles` deja de ser la fuente de verdad** — se migra a `user_role` (tabla relacional, con
-integridad referencial real, imprescindible para el criterio de aceptación "bloquear eliminar rol
-con usuarios asignados"). Para no tocar el enforcement en Fase 1 (los 19 controladores y
-`resolveActiveRole()` siguen leyendo `$user->roles` como array de strings), `User` expone un
-**accessor Eloquent** `getRolesAttribute()` que arma ese mismo array de strings a partir de la
-relación `user_role → roles.slug`. El resto del código no se entera del cambio interno — sigue
-recibiendo lo mismo que hoy. Migración de datos: por cada string en el `json` actual, resolver la
-fila de `roles` por `slug` y crear el pivote; los 10 roles semilla usan como `slug` exactamente el
-string que usan hoy (`superadmin`, `coordinador_comercial`, etc.) para que la migración sea 1:1 sin
-ambigüedad.
+**Nota de corrección (Backend Dev, 2026-09-04):** el diseño original de esta sección proponía migrar
+`users.roles` (columna `json`) a una tabla pivote `user_role`, con un accessor Eloquent
+(`getRolesAttribute()`) para que el resto del código siguiera funcionando igual. Al implementar se
+encontró que esa premisa era falsa: **12 sitios en 9 archivos** (`GarantiasFormalizacionService`,
+`InformeTecnicoNotificationService`, `ValidacionDocumentalNotificationService`,
+`GestionCreditoController`, `DocumentEnvioController`, `InternalDocumentController`,
+`VisitaController`, `DocumentRequestController`, `CreditoOrdinarioController`) hacen
+`User::whereJsonContains('roles', ...)` — **consultas SQL directas sobre la columna física**, no
+lecturas de `$user->roles` en un modelo ya cargado. Un accessor de Eloquent no intercepta eso: la
+migración tal como estaba diseñada habría roto 12 flujos de notificación en producción sin que
+ningún test unitario lo detectara a tiempo (son queries, no accesos a atributo).
+
+**Corrección**: `users.roles` **no se toca, sigue siendo la fuente de verdad tal cual está hoy** —
+no hay tabla `user_role`, no hay accessor nuevo, cero cambios en `User.php`. "Cuántos usuarios
+tiene asignado este rol" (necesario para bloquear el `DELETE` de un rol con usuarios) se resuelve
+con el mismo patrón que ya usa el resto del código:
+`User::whereJsonContains('roles', $role->slug)->count()`. Esto reduce el blast radius de Fase 1
+todavía más de lo que ya estimó Cybersecurity — ni siquiera se toca el modelo `User`.
 
 `UserController::store()`/`update()` cambia la validación `roles.* => in:superadmin,...` (lista
-hardcodeada) por `roles.* => in:' . Role::pluck('slug')->implode(',')` (o `exists:roles,slug`) —
-esto es lo que hace que un rol creado en la UI nueva se pueda asignar de inmediato a un usuario,
-cumpliendo el criterio de aceptación correspondiente. El modal de `user-management.component.ts`
-pasa de checkboxes hardcodeados a iterar `GET /api/roles`.
+hardcodeada) por `roles.* => exists:roles,slug` — el catálogo de `roles` provee el mismo conjunto
+de strings válidos que antes vivían hardcodeados, y el usuario se sigue guardando exactamente igual
+(`'roles' => $request->roles` sobre la columna `json`, sin cambios). Esto es lo que hace que un rol
+creado en la UI nueva se pueda asignar de inmediato a un usuario. El modal de
+`user-management.component.ts` pasa de checkboxes hardcodeados a iterar `GET /api/roles`.
 
 ### Ubicación de la UI
 

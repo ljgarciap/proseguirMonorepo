@@ -42,7 +42,7 @@ class UserController extends Controller
             'email' => 'nullable|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
             'roles' => 'required|array',
-            'roles.*' => 'string|in:superadmin,gerente,operativo,cliente,contable,coordinador_comercial,oficial_cumplimiento,comite_credito,tesoreria,ingeniero'
+            'roles.*' => 'string|exists:roles,slug'
         ]);
 
         $user = User::create([
@@ -76,7 +76,7 @@ class UserController extends Controller
             ],
             'password' => 'nullable|string|min:8',
             'roles' => 'required|array',
-            'roles.*' => 'string|in:superadmin,gerente,operativo,cliente,contable,coordinador_comercial,oficial_cumplimiento,comite_credito,tesoreria,ingeniero'
+            'roles.*' => 'string|exists:roles,slug'
         ]);
 
         $data = [

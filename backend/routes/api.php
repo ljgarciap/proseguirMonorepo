@@ -332,6 +332,17 @@ Route::prefix('configuraciones')->middleware(['auth:api', 'checkrole:superadmin'
     Route::put('/{id}', [\App\Http\Controllers\ConfiguracionController::class, 'update']);
 });
 
+// Motor paramétrico de Roles y Permisos — Fase 1 (Superadmin). Catálogo
+// puro, sin enforcement real todavía — ver docs/specs/rbac-roles-permisos-parametrico.md.
+Route::prefix('roles')->middleware(['auth:api', 'checkrole:superadmin'])->group(function () {
+    Route::get('/', [\App\Http\Controllers\RoleController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\RoleController::class, 'store']);
+    Route::put('/{role}', [\App\Http\Controllers\RoleController::class, 'update']);
+    Route::delete('/{role}', [\App\Http\Controllers\RoleController::class, 'destroy']);
+});
+Route::get('/permissions', [\App\Http\Controllers\PermissionController::class, 'index'])
+    ->middleware(['auth:api', 'checkrole:superadmin']);
+
 // Limpieza de Base de Datos (Superadmin)
 Route::prefix('db-cleaner')->middleware(['auth:api', 'checkrole:superadmin'])->group(function () {
     Route::post('/clear-tables', [\App\Http\Controllers\DbCleanerController::class, 'clearTables']);
