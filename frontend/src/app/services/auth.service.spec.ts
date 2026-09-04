@@ -47,6 +47,20 @@ describe('AuthService', () => {
       service.allRoles$.subscribe(r => emitted = r);
       expect(emitted).toEqual(['superadmin', 'gerente']);
     });
+
+    it('persiste permissions en localStorage y las emite por permissions$ (RBAC Fase 2)', () => {
+      service.login('tok', {}, ['operativo'], ['upload', 'sheets']);
+
+      expect(JSON.parse(localStorage.getItem('permissions')!)).toEqual(['upload', 'sheets']);
+      let emitted: string[] = [];
+      service.permissions$.subscribe(p => emitted = p);
+      expect(emitted).toEqual(['upload', 'sheets']);
+    });
+
+    it('permissions queda vacío si no se pasa (compatibilidad con llamadas previas a Fase 2)', () => {
+      service.login('tok', {}, ['operativo']);
+      expect(service.getPermissions()).toEqual([]);
+    });
   });
 
   // --- setActiveRole() / getActiveRole() ---
@@ -117,6 +131,28 @@ describe('AuthService', () => {
     });
   });
 
+  // --- hasPermission() (RBAC Fase 2) ---
+
+  describe('hasPermission()', () => {
+    it('retorna false cuando el usuario no tiene la clave', () => {
+      service.login('tok', {}, ['operativo'], ['upload']);
+      service.setActiveRole('operativo');
+      expect(service.hasPermission('users')).toBeFalse();
+    });
+
+    it('retorna true cuando el usuario tiene la clave', () => {
+      service.login('tok', {}, ['operativo'], ['upload']);
+      service.setActiveRole('operativo');
+      expect(service.hasPermission('upload')).toBeTrue();
+    });
+
+    it('superadmin pasa siempre, tenga o no la clave en permissions', () => {
+      service.login('tok', {}, ['superadmin'], []); // permissions vacío a propósito
+      service.setActiveRole('superadmin');
+      expect(service.hasPermission('cualquier-cosa')).toBeTrue();
+    });
+  });
+
   // --- logout() ---
 
   describe('logout()', () => {
@@ -131,6 +167,7 @@ describe('AuthService', () => {
       expect(service.getActiveRole()).toBeNull();
       expect(service.getAllRoles()).toEqual([]);
       expect(service.getUser()).toBeNull();
+      expect(service.getPermissions()).toEqual([]);
     });
   });
 });
