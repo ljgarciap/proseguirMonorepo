@@ -15,13 +15,47 @@ class CreditoOrdinarioController extends Controller
     use ResolvesActiveRole;
 
     /**
+     * Hallazgo de seguridad 2026-09-03 (docs/specs/checkrole-faltante-rutas-criticas.md): mismo set de roles que ya declara `data.roles` de la ruta
+     * 'creditos' en app.routes.ts (frontend) — hasta ahora era la única
+     * fuente de verdad, este controller no rechazaba a nadie autenticado.
+     * Cualquier rol fuera de esta lista (ej. 'contable', 'ingeniero') podía
+     * listar/ver créditos de cualquier cliente pegándole directo a la API.
+     *
+     * @var string[]
+     */
+    private const ROLES_AUTORIZADOS = [
+        'cliente', 'coordinador_comercial', 'oficial_cumplimiento',
+        'comite_credito', 'operativo', 'tesoreria', 'gerente', 'superadmin',
+    ];
+
+    /**
+     * Hallazgo de seguridad 2026-09-03 (docs/specs/checkrole-faltante-rutas-criticas.md): index() ya filtraba por cliente_id para el rol 'cliente',
+     * pero show()/transition() nunca comparaban el crédito solicitado
+     * contra el usuario autenticado — un cliente podía ver o transicionar
+     * (subir archivos, disparar cambios de estado) el crédito de OTRO
+     * cliente con solo cambiar el {id} de la URL (IDOR). Los roles staff no
+     * tienen noción de "propiedad" — ven/operan todos los créditos, como
+     * siempre.
+     */
+    private function autorizarPropiedad(string $activeRole, CreditoOrdinario $credito, $user): void
+    {
+        if ($activeRole === 'cliente' && $credito->cliente_id !== $user->id) {
+            abort(403, 'No tienes autorización para acceder a este crédito.');
+        }
+    }
+
+    /**
      * Listar las solicitudes de crédito ordinario
      */
     public function index(Request $request)
     {
         $user = Auth::user();
         $activeRole = $this->resolveActiveRole($request);
-        
+
+        if (!in_array($activeRole, self::ROLES_AUTORIZADOS, true)) {
+            abort(403, 'No tienes autorización para acceder a este módulo.');
+        }
+
         $query = CreditoOrdinario::with(['cliente', 'informeTecnico', 'analisisFinanciero', 'solicitudCredito.tipoCredito', 'solicitudCredito.documentRequest.items.requirement', 'solicitudCredito.documentRequest.items.upload', 'solicitudCredito.garantiasDocumentRequest.items.requirement', 'solicitudCredito.garantiasDocumentRequest.items.upload']);
 
         // Si el rol es cliente, solo puede ver sus propias solicitudes
@@ -45,6 +79,10 @@ class CreditoOrdinarioController extends Controller
 
         $user = Auth::user();
         $activeRole = $this->resolveActiveRole($request);
+
+        if (!in_array($activeRole, self::ROLES_AUTORIZADOS, true)) {
+            abort(403, 'No tienes autorización para acceder a este módulo.');
+        }
 
         // Determinar el cliente
         $clienteId = $request->cliente_id;
@@ -71,9 +109,19 @@ class CreditoOrdinarioController extends Controller
     /**
      * Obtener el detalle de una solicitud
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
+        $user = Auth::user();
+        $activeRole = $this->resolveActiveRole($request);
+
+        if (!in_array($activeRole, self::ROLES_AUTORIZADOS, true)) {
+            abort(403, 'No tienes autorización para acceder a este módulo.');
+        }
+
         $credito = CreditoOrdinario::with(['cliente', 'informeTecnico', 'analisisFinanciero', 'solicitudCredito.tipoCredito', 'solicitudCredito.documentRequest.items.requirement', 'solicitudCredito.documentRequest.items.upload', 'solicitudCredito.garantiasDocumentRequest.items.requirement', 'solicitudCredito.garantiasDocumentRequest.items.upload'])->findOrFail($id);
+
+        $this->autorizarPropiedad($activeRole, $credito, $user);
+
         return response()->json($credito);
     }
 
@@ -143,6 +191,12 @@ class CreditoOrdinarioController extends Controller
         $credito = CreditoOrdinario::with('solicitudCredito.documentRequest.items')->findOrFail($id);
         $user = Auth::user();
         $activeRole = $this->resolveActiveRole($request);
+
+        if (!in_array($activeRole, self::ROLES_AUTORIZADOS, true)) {
+            abort(403, 'No tienes autorización para acceder a este módulo.');
+        }
+
+        $this->autorizarPropiedad($activeRole, $credito, $user);
 
         $request->validate([
             'accion'          => 'required|string|in:aprobar,rechazar,completar,subir_archivo,devolver',

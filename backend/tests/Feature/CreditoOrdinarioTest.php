@@ -802,4 +802,80 @@ class CreditoOrdinarioTest extends TestCase
             ->assertStatus(200)
             ->assertJsonPath('estado', 'aprobada_garantias');
     }
+
+    /**
+     * Hallazgo de seguridad 2026-09-03 (docs/specs/checkrole-faltante-rutas-criticas.md): show()/transition() no comparaban credito.cliente_id contra
+     * el usuario autenticado — un cliente podía ver y transicionar (subir
+     * archivos, aprobar/rechazar) el crédito de OTRO cliente con solo
+     * cambiar el {id} de la URL. index()/store() tampoco rechazaban roles
+     * fuera de los que el frontend declara para esta pantalla.
+     */
+    public function test_cliente_no_puede_ver_ni_operar_credito_ajeno(): void
+    {
+        Passport::actingAs($this->admin);
+        $creditoAjenoId = $this->postJson('/api/creditos', [
+            'monto'       => 10000000.00,
+            'plazo_meses' => 12,
+            'cliente_id'  => $this->coordinador->id, // dueño distinto a $this->cliente
+        ], ['X-Active-Role' => 'superadmin'])->json('id');
+
+        // Ver el detalle del crédito ajeno: bloqueado.
+        Passport::actingAs($this->cliente);
+        $this->getJson("/api/creditos/{$creditoAjenoId}", ['X-Active-Role' => 'cliente'])
+            ->assertStatus(403);
+
+        // Subir un archivo al crédito ajeno: bloqueado, sin escritura.
+        $this->subirArchivo($creditoAjenoId, 'formulario_solicitud', 'cliente')
+            ->assertStatus(403);
+        $this->assertEmpty(
+            CreditoOrdinario::find($creditoAjenoId)->documentos_raw['formulario_solicitud'] ?? null
+        );
+
+        // El listado del cliente jamás incluye el crédito ajeno (ya cubierto
+        // por el filtro de index(), se reafirma acá).
+        $ids = $this->getJson('/api/creditos', ['X-Active-Role' => 'cliente'])->json('*.id');
+        $this->assertNotContains($creditoAjenoId, $ids);
+
+        // Su propio crédito sigue accesible sin cambio de comportamiento.
+        $creditoPropioId = $this->postJson('/api/creditos', [
+            'monto'       => 5000000.00,
+            'plazo_meses' => 6,
+        ], ['X-Active-Role' => 'cliente'])->assertStatus(201)->json('id');
+
+        $this->getJson("/api/creditos/{$creditoPropioId}", ['X-Active-Role' => 'cliente'])
+            ->assertStatus(200);
+    }
+
+    /**
+     * Hallazgo de seguridad 2026-09-03 (docs/specs/checkrole-faltante-rutas-criticas.md): index()/show() no rechazaban ningún rol autenticado — un
+     * usuario con un rol fuera de data.roles de la pantalla 'creditos'
+     * (ej. 'contable', 'ingeniero') podía listar y ver créditos de
+     * cualquier cliente pegándole directo a la API.
+     */
+    public function test_rol_no_autorizado_no_puede_listar_ni_ver_creditos(): void
+    {
+        $contable = User::create([
+            'name' => 'Contable Test',
+            'email' => 'contable.test@test.com',
+            'password' => bcrypt('password'),
+            'numero_documento' => '999000',
+            'tipo_documento_id' => $this->docCC->id,
+            'roles' => ['contable'],
+        ]);
+
+        Passport::actingAs($this->admin);
+        $creditoId = $this->postJson('/api/creditos', [
+            'monto'       => 10000000.00,
+            'plazo_meses' => 12,
+            'cliente_id'  => $this->cliente->id,
+        ], ['X-Active-Role' => 'superadmin'])->json('id');
+
+        Passport::actingAs($contable);
+        $this->getJson('/api/creditos', ['X-Active-Role' => 'contable'])->assertStatus(403);
+        $this->getJson("/api/creditos/{$creditoId}", ['X-Active-Role' => 'contable'])->assertStatus(403);
+        $this->postJson('/api/creditos', [
+            'monto' => 1000000.00,
+            'plazo_meses' => 3,
+        ], ['X-Active-Role' => 'contable'])->assertStatus(403);
+    }
 }
