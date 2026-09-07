@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import Swal from 'sweetalert2';
+import { getRoleLabel } from '../../shared/role-label.util';
 
 @Component({
   selector: 'app-user-management',
@@ -71,7 +72,7 @@ import Swal from 'sweetalert2';
                 <td>
                   <div class="roles-badges">
                     <span *ngFor="let role of user.roles" class="pro-status" [ngClass]="role">
-                      {{ role.split('_').join(' ') | titlecase }}
+                      {{ roleLabel(role) }}
                     </span>
                   </div>
                 </td>
@@ -377,6 +378,8 @@ import Swal from 'sweetalert2';
   `]
 })
 export class UserManagementComponent implements OnInit {
+  // SCRUM-331 (rebote): ver shared/role-label.util.ts.
+  roleLabel = getRoleLabel;
   users: any[] = [];
   documentTypes: any[] = [];
   // Motor paramétrico de Roles y Permisos — Fase 1 (ver

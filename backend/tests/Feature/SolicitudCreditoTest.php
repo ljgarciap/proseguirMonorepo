@@ -251,6 +251,64 @@ class SolicitudCreditoTest extends TestCase
     }
 
     /**
+     * SCRUM-335 (rebote — "Error de servidor en el registro de crédito"):
+     * causa real fue un outage de red del servidor (sin salida a internet,
+     * ver comentario en Jira), pero el mecanismo que convirtió eso en un 500
+     * total era de código: Mail::send() síncrono DENTRO de la misma
+     * transacción que crea Cliente/User/SolicitudCredito/CreditoOrdinario/
+     * DocumentRequest — cualquier falla del proveedor de correo tumbaba TODO
+     * el registro. Mismo patrón que
+     * test_desembolso_ingreso_registra_actividad_al_fallar_la_notificacion_a_gerente
+     * en GestionCreditoTest: un fallo de envío es solo informativo, no debe
+     * revertir el registro que ya es válido.
+     */
+    public function test_register_credit_request_succeeds_even_if_notification_email_fails(): void
+    {
+        Passport::actingAs($this->admin);
+
+        Mail::shouldReceive('to')->once()->andReturnSelf();
+        Mail::shouldReceive('send')->once()->andThrow(new \Exception('Could not resolve host: login.microsoftonline.com'));
+
+        $payload = [
+            'cliente_id' => $this->clientNatural->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'garantia' => 'Firma personal',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'juan_modificado@test.com',
+            'asunto_notificacion' => 'Documentación para Crédito',
+            'mensaje_notificacion' => 'Por favor adjunta los archivos.',
+            'document_preset_id' => $this->preset->id,
+            'nombres' => 'Juan Carlos',
+            'primer_apellido' => 'Perez',
+            'segundo_apellido' => 'Gomez',
+            'correo_electronico' => 'juan_modificado@test.com',
+            'telefono' => '3119999999',
+            'direccion' => 'Avenida Principal 12',
+            'pais' => 'Colombia',
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id
+        ];
+
+        $response = $this->postJson('/api/solicitudes-credito', $payload);
+
+        $response->assertStatus(201)->assertJsonPath('notificacion_enviada', false);
+
+        $this->assertDatabaseHas('solicitudes_credito', [
+            'cliente_id' => $this->clientNatural->id,
+            'monto_solicitado' => 20000000.00,
+        ]);
+        $user = User::where('numero_documento', '12345678')->first();
+        $this->assertDatabaseHas('credito_ordinarios', [
+            'cliente_id' => $user->id,
+            'estado' => 'revision_documental',
+        ]);
+    }
+
+    /**
      * SCRUM-244 (RF-07 + feedback QA 2026-08-26): el correo debe incluir un
      * botón real "Ingresar a la plataforma" Y un bloque fijo de datos de
      * acceso (URL/Usuario/Clave) — ambos como componentes automáticos de la

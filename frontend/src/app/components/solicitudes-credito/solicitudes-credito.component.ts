@@ -532,9 +532,16 @@ export class SolicitudesCreditoComponent implements OnInit {
           document_preset_id: this.selectedPresetId
         };
 
-        this.http.post(`${environment.apiUrl}/solicitudes-credito`, payload).subscribe({
-          next: () => {
-            Swal.fire('Registro Exitoso', 'La solicitud de crédito ha sido registrada y se ha enviado la notificación al cliente.', 'success');
+        this.http.post<any>(`${environment.apiUrl}/solicitudes-credito`, payload).subscribe({
+          next: (res) => {
+            // SCRUM-335: el registro ya no se revierte si falla el envío del
+            // correo (ver SolicitudCreditoController::store()) — se avisa
+            // aparte para que el usuario sepa que debe reenviar la notificación.
+            if (res?.notificacion_enviada === false) {
+              Swal.fire('Registro Exitoso', 'La solicitud de crédito fue registrada, pero no se pudo enviar la notificación al cliente. Intenta reenviarla manualmente.', 'warning');
+            } else {
+              Swal.fire('Registro Exitoso', 'La solicitud de crédito ha sido registrada y se ha enviado la notificación al cliente.', 'success');
+            }
             this.resetForm();
             this.switchTab('pendientes');
           },

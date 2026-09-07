@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClientModule, HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
+import { getRoleLabel } from '../../shared/role-label.util';
 
 @Component({
   selector: 'app-profile-settings',
@@ -40,7 +41,7 @@ import { AuthService } from '../../services/auth.service';
             </div>
             <div class="info-group">
               <label>Rol Asignado</label>
-              <div class="value badge-role">{{ authService.getActiveRole() | titlecase }}</div>
+              <div class="value badge-role">{{ roleLabel(authService.getActiveRole()) }}</div>
             </div>
 
             <div class="pro-input-group full-width">
@@ -201,6 +202,8 @@ import { AuthService } from '../../services/auth.service';
   `]
 })
 export class ProfileSettingsComponent implements OnInit {
+  // SCRUM-331 (rebote): ver shared/role-label.util.ts.
+  roleLabel = getRoleLabel;
   user: any;
   pwdData = {
     current_password: '',

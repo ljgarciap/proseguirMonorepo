@@ -6,6 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { AuthService } from './services/auth.service';
 import { environment } from '../environments/environment';
 import { interval, Subscription } from 'rxjs';
+import { getRoleLabel } from './shared/role-label.util';
 
 interface NavItem {
   label: string;
@@ -65,7 +66,7 @@ interface NavSection {
           <div class="test-role-switcher">
             <span class="material-symbols-outlined">person_pin</span>
              <select [ngModel]="authService.getActiveRole()" (ngModelChange)="switchRole($event)">
-               <option *ngFor="let r of authService.getAllRoles()" [value]="r">{{ r.split('_').join(' ') | titlecase }}</option>
+               <option *ngFor="let r of authService.getAllRoles()" [value]="r">{{ roleLabel(r) }}</option>
                <option *ngIf="authService.isAuthorized(['superadmin'])" value="superadmin">Superadmin</option>
              </select>
           </div>
@@ -111,7 +112,7 @@ interface NavSection {
                 <div class="avatar">{{ authService.getActiveRole()?.charAt(0)?.toUpperCase() }}</div>
                  <div class="user-info">
                    <span class="name">{{ authService.getUser()?.name || 'Usuario' }}</span>
-                   <span class="status">Perfil: {{ authService.getActiveRole()?.split('_')?.join(' ') | titlecase }}</span>
+                   <span class="status">Perfil: {{ roleLabel(authService.getActiveRole()) }}</span>
                  </div>
                 <span class="material-symbols-outlined expand-icon">expand_more</span>
               </div>
@@ -214,6 +215,9 @@ interface NavSection {
 export class AppComponent implements OnInit, OnDestroy {
   showUserMenu = false;
   isSidebarOpen = false;
+
+  // SCRUM-331 (rebote): ver shared/role-label.util.ts.
+  roleLabel = getRoleLabel;
   pendingCounts: {
     operativo: number,
     gerente: number,
@@ -259,6 +263,8 @@ export class AppComponent implements OnInit, OnDestroy {
         { label: 'Validación', route: '/validation', icon: 'rule', permission: 'validation', badge: () => this.getValidationBadge() },
         { label: 'Bandeja Interna', route: '/internal-docs', icon: 'mail', permission: 'internal-docs', badge: () => this.getInternalDocsBadge() },
         { label: 'Revisión Mandatos', route: '/mandatos', icon: 'contract', permission: 'menu:mandatos-staff', badge: () => this.getMandatosBadge() },
+        // SCRUM-336: movido desde el bloque "Administración" a pedido de Juan Andrés.
+        { label: 'Conciliación Susuerte', route: '/conciliacion-susuerte', icon: 'fact_check', permission: 'conciliacion-susuerte' },
       ],
     },
     {
@@ -277,7 +283,6 @@ export class AppComponent implements OnInit, OnDestroy {
     {
       title: 'Administración',
       items: [
-        { label: 'Conciliación Susuerte', route: '/conciliacion-susuerte', icon: 'fact_check', permission: 'conciliacion-susuerte' },
         { label: 'Registro de Clientes', route: '/clientes', icon: 'group', permission: 'clientes' },
         { label: 'Registro de Visita a Cliente', route: '/visitas', icon: 'chat_bubble', permission: 'visitas' },
       ],

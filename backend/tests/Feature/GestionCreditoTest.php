@@ -1748,7 +1748,11 @@ class GestionCreditoTest extends TestCase
                 && $mail->tipoCredito === 'Crédito Ordinario'
                 && $mail->transferencia['tipo_documento_titular_nombre'] === 'Cédula';
         });
-        Mail::assertSentTimes(TransferenciaRegistradaInternaMail::class, 2); // Gerente + Coordinador Comercial
+        // SCRUM-334: ahora también notifica a Operativo, no solo Gerente + Director de Crédito.
+        Mail::assertSentTimes(TransferenciaRegistradaInternaMail::class, 3);
+        Mail::assertSent(TransferenciaRegistradaInternaMail::class, function ($mail) {
+            return $mail->hasTo($this->operativo->email);
+        });
     }
 
     // ---- Visibilidad por rol (tarjetas/index) -----------------------------

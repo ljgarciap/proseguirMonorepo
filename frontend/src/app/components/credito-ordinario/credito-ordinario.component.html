@@ -9,7 +9,7 @@
     <div class="header-actions">
       <span class="role-indicator-badge">
         <span class="material-symbols-outlined">shield_person</span>
-        Perfil Activo: {{ activeRole | titlecase }}
+        Perfil Activo: {{ roleLabel(activeRole) }}
       </span>
     </div>
   </header>
@@ -201,7 +201,7 @@
               <span class="material-symbols-outlined">warning</span>
               <div>
                 <strong>Acceso Restringido</strong>
-                <p>Tu rol activo ({{ activeRole | titlecase }}) no tiene permisos para operar en esta etapa del proceso. La acción debe ser ejecutada por el rol correspondiente de la matriz BPMN.</p>
+                <p>Tu rol activo ({{ roleLabel(activeRole) }}) no tiene permisos para operar en esta etapa del proceso. La acción debe ser ejecutada por el rol correspondiente de la matriz BPMN.</p>
               </div>
             </div>
           </div>

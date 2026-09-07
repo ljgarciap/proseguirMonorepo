@@ -16,7 +16,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 class SolicitudCreditoController extends Controller
 {
@@ -337,9 +339,33 @@ class SolicitudCreditoController extends Controller
             // el usuario de acceso era el correo — nunca lo fue.
             // $cleanPassword sigue siendo la clave real ya usada para
             // aprovisionar el User en el paso 2.
-            Mail::to($solicitud->correo_notificacion)->send(new SolicitudCreditoMail($solicitud, $documentosRequeridos, $cliente->numero_documento, $cleanPassword));
+            //
+            // SCRUM-335: Mail::send() es síncrono y estaba DENTRO de la misma
+            // transacción que crea el Cliente/User/SolicitudCredito/CreditoOrdinario/
+            // DocumentRequest — cualquier falla del proveedor de correo (Graph API,
+            // DNS, red) tumbaba TODA la transacción con un 500 genérico, perdiendo
+            // el registro completo pese a que el crédito en sí no tenía ningún
+            // problema. Causa real del rebote: outage de salida a internet en el
+            // servidor test (ver comentario en Jira), no un bug de esta lógica.
+            // Mismo patrón try/catch + log ya usado en GestionCreditoController
+            // para notificaciones que no deben bloquear la acción de negocio.
+            $notificacionEnviada = true;
+            try {
+                Mail::to($solicitud->correo_notificacion)->send(new SolicitudCreditoMail($solicitud, $documentosRequeridos, $cliente->numero_documento, $cleanPassword));
+            } catch (Throwable $e) {
+                $notificacionEnviada = false;
+                Log::error('Falló el envío de la notificación de registro de solicitud de crédito.', [
+                    'solicitud_id' => $solicitud->id,
+                    'correo_notificacion' => $solicitud->correo_notificacion,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
-            return response()->json($solicitud->load(['visita', 'cliente', 'usuarioRegistra', 'tipoCredito', 'amortizacion']), 201);
+            return response()->json(
+                $solicitud->load(['visita', 'cliente', 'usuarioRegistra', 'tipoCredito', 'amortizacion'])
+                    ->setAttribute('notificacion_enviada', $notificacionEnviada),
+                201
+            );
         });
     }
 

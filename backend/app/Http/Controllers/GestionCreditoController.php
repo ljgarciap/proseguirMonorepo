@@ -1613,9 +1613,19 @@ class GestionCreditoController extends Controller
             $fechaSolicitudCorreo,
             $tipoCreditoCorreo
         ), $credito, 'transferencia_registrada_interna');
+        // SCRUM-334: la notificación de Transferencia Bancaria registrada
+        // también debe llegar al rol Operativo, no solo a Gerente/Director de Crédito.
+        $this->notificarPorRol('operativo', new TransferenciaRegistradaInternaMail(
+            $credito,
+            $transferencia,
+            $urlIngresoGerente,
+            $tipoDocumentoClienteCorreo,
+            $fechaSolicitudCorreo,
+            $tipoCreditoCorreo
+        ), $credito, 'transferencia_registrada_interna');
 
         return response()->json([
-            'message' => 'Transferencia bancaria registrada. El cliente y los usuarios de Gerencia/Coordinación Comercial fueron notificados.',
+            'message' => 'Transferencia bancaria registrada. El cliente y los usuarios de Gerencia, Dirección de Crédito y Operativo fueron notificados.',
             'credito' => $this->conFechaValidacion($credito->fresh(self::RELACIONES_DETALLE)),
         ]);
     }
