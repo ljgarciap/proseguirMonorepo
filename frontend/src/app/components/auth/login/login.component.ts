@@ -5,6 +5,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { HttpClientModule, HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environments/environment';
 import { AuthService } from '../../../services/auth.service';
+import { getRoleLabel } from '../../../shared/role-label.util';
 
 @Component({
   selector: 'app-login',
@@ -60,7 +61,7 @@ import { AuthService } from '../../../services/auth.service';
           <div class="role-list">
              <button *ngFor="let role of availableRoles" (click)="selectRole(role)" class="btn-role">
                 <span class="material-symbols-outlined">person_pin</span>
-                {{ role.split('_').join(' ') | titlecase }}
+                {{ roleLabel(role) }}
                 <span class="material-symbols-outlined chevron">chevron_right</span>
              </button>
           </div>
@@ -186,6 +187,8 @@ export class LoginComponent implements OnInit {
   sessionExpired = false;
   showRoleSelector = false;
   availableRoles: string[] = [];
+  // SCRUM-331 (rebote): ver shared/role-label.util.ts.
+  roleLabel = getRoleLabel;
   /** SCRUM-219 §8.7/10.3: ruta de retorno tras el login, cuando se llega
    * desde el botón "Ingresar al sistema" de un correo de Gestión de
    * Créditos (?returnTo=/gestion-creditos/123/...). Solo se acepta una ruta

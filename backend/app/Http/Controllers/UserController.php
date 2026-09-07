@@ -43,6 +43,11 @@ class UserController extends Controller
             'password' => 'required|string|min:8',
             'roles' => 'required|array',
             'roles.*' => 'string|exists:roles,slug'
+        ], [
+            // SCRUM-337: mensaje por defecto de Laravel ("The numero documento
+            // has already been taken.") quedaba sin traducir en Gestión de Usuarios.
+            'numero_documento.unique' => 'El número de documento ingresado ya se encuentra registrado en el sistema.',
+            'email.unique' => 'El correo electrónico ingresado ya se encuentra registrado en el sistema.',
         ]);
 
         $user = User::create([
@@ -77,6 +82,10 @@ class UserController extends Controller
             'password' => 'nullable|string|min:8',
             'roles' => 'required|array',
             'roles.*' => 'string|exists:roles,slug'
+        ], [
+            // SCRUM-337: mismo mensaje traducido que store().
+            'numero_documento.unique' => 'El número de documento ingresado ya se encuentra registrado en el sistema.',
+            'email.unique' => 'El correo electrónico ingresado ya se encuentra registrado en el sistema.',
         ]);
 
         $data = [

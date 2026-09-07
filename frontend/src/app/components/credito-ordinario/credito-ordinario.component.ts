@@ -6,6 +6,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
 import Swal from 'sweetalert2';
+import { getRoleLabel } from '../../shared/role-label.util';
 
 @Component({
   selector: 'app-credito-ordinario',
@@ -15,6 +16,8 @@ import Swal from 'sweetalert2';
   styleUrls: ['./credito-ordinario.component.css']
 })
 export class CreditoOrdinarioComponent implements OnInit {
+  // SCRUM-331 (rebote): ver shared/role-label.util.ts.
+  roleLabel = getRoleLabel;
   creditos: any[] = [];
   selectedCredito: any = null;
   activeRole: string = 'cliente';
