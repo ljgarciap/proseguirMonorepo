@@ -6,7 +6,7 @@
     <style>
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f6f9; color: #333333; margin: 0; padding: 0; }
         .container { max-width: 600px; margin: 30px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
-        .header { background: linear-gradient(135deg, #14532d 0%, #16a34a 100%); padding: 30px; text-align: center; color: #ffffff; }
+        .header { background-color: #14532d; background: linear-gradient(135deg, #14532d 0%, #16a34a 100%); padding: 30px; text-align: center; color: #ffffff; }
         .header h1 { margin: 0; font-size: 24px; font-weight: 700; }
         .content { padding: 30px; line-height: 1.6; }
         .content p { margin: 0 0 15px 0; font-size: 16px; color: #4a5568; }
@@ -24,7 +24,6 @@
     <div class="container">
         <div class="header">
             <h1>Proseguir Soluciones de Liquidez</h1>
-            <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">Bandeja Interna de Documentos</div>
         </div>
         <div class="content">
             <p>Estimado(a):</p>

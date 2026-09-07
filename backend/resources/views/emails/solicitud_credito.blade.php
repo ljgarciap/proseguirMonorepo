@@ -21,7 +21,7 @@
             border: 1px solid #e2e8f0;
         }
         .header {
-            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            background-color: #1e3a8a; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
             padding: 30px;
             text-align: center;
             color: #ffffff;
@@ -95,7 +95,6 @@
     <div class="container">
         <div class="header">
             <h1>Proseguir Soluciones de Liquidez</h1>
-            <div style="font-size: 14px; margin-top: 5px; opacity: 0.9;">Gestión de Liquidez y Soluciones de Crédito</div>
         </div>
         <div class="content">
             <p>Estimado(a) <strong>{{ $solicitud->cliente->nombre }}</strong>,</p>
