@@ -121,6 +121,12 @@ class AnalisisFinancieroController extends Controller
         // acá en 'activo'/'pasivo'/etc. ya viene convertido a COP reales,
         // así que el backend no necesita saber la escala para nada más que
         // guardar la preferencia.
+        // Rebote SCRUM-329: la opción "Miles de COP" se renombró a "COP" en
+        // el frontend (la persona digita el número completo, sin que el
+        // sistema le sume por defecto tres ceros) — solo cambia el
+        // label/factor de captura (ver escalaUnidad() en
+        // AnalisisFinancieroDetalleComponent); el valor interno del enum se
+        // queda como 'MILES' para no migrar filas ya sembradas con esa clave.
         if ($request->has('unidad') && !in_array($request->input('unidad'), ['MILLONES', 'MILES'], true)) {
             return response()->json([
                 'message' => 'La unidad del análisis debe ser MILLONES o MILES.',
@@ -199,12 +205,20 @@ class AnalisisFinancieroController extends Controller
         // clave se deja igual para no romper la fila ya sembrada; el valor
         // por default pasó de 5 (COP) a 100.000 (COP), ver
         // ConfiguracionSeeder y la migración de corrección de datos.
+        //
+        // Rebote SCRUM-329: antes solo se validaba contra el año final
+        // ($resumen['diferencia_contable']) — un desbalance en un año
+        // intermedio del análisis (2 o 3 años estudiados) pasaba sin
+        // detectarse. Se valida cada año de $resumen['por_anio'].
         $toleranciaCop = (float) ConfiguracionService::get('ANALISIS_FINANCIERO_TOLERANCIA_DIFERENCIA_MM', 100000);
-        if (abs($resumen['diferencia_contable']) > $toleranciaCop) {
-            return response()->json([
-                'message' => "La ecuación contable no cuadra: Total Activo difiere de Pasivo + Patrimonio por {$resumen['diferencia_contable']} (tolerancia configurada: {$toleranciaCop}).",
-                'diferencia_contable' => $resumen['diferencia_contable'],
-            ], 422);
+        foreach ($resumen['por_anio'] as $filaAnio) {
+            if (abs($filaAnio['diferencia_contable']) > $toleranciaCop) {
+                return response()->json([
+                    'message' => "La ecuación contable no cuadra en el año {$filaAnio['anio']}: Total Activo difiere de Pasivo + Patrimonio por {$filaAnio['diferencia_contable']} (tolerancia configurada: {$toleranciaCop}).",
+                    'diferencia_contable' => $filaAnio['diferencia_contable'],
+                    'anio' => $filaAnio['anio'],
+                ], 422);
+            }
         }
 
         $analisis->estado = 'confirmado';

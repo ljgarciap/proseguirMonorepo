@@ -189,6 +189,9 @@ export class AnalisisFinancieroDetalleComponent implements OnInit, OnDestroy {
   // valor guardado (siempre COP reales) al mostrarlo, y multiplica lo que
   // el usuario escribe antes de guardarlo (ver campoInput/setCampoInput).
   // El backend nunca ve ni necesita la escala para calcular nada.
+  // 'MILES' es el valor interno de la opción que el selector muestra como
+  // "COP" (rebote SCRUM-329, ver escalaUnidad) — se deja así para no migrar
+  // análisis ya guardados con esa clave.
   unidad: 'MILLONES' | 'MILES' = 'MILLONES';
   subiendoAdjunto = false;
 
@@ -466,8 +469,12 @@ export class AnalisisFinancieroDetalleComponent implements OnInit, OnDestroy {
   // SCRUM-329: factor de escala de la unidad de captura elegida —
   // this.inputs SIEMPRE guarda COP reales, esta es la única frontera de
   // conversión (ver docblock de `unidad` arriba).
+  //
+  // Rebote SCRUM-329: la opción interna 'MILES' se muestra ahora como
+  // "COP" en el selector — la persona digita el número completo, sin que
+  // el sistema le sume tres ceros por defecto (factor 1, no 1_000).
   private get escalaUnidad(): number {
-    return this.unidad === 'MILES' ? 1_000 : 1_000_000;
+    return this.unidad === 'MILES' ? 1 : 1_000_000;
   }
 
   campoInput(tab: string, clave: string, anio: number): number | null {

@@ -264,15 +264,16 @@ class AnalisisFinancieroCalculoService
 
     /**
      * Resumen — tarjetas del último año (usadas por
-     * AnalisisFinancieroController::confirmar() para las validaciones
-     * automáticas FA-05/FA-06/CA-17 — la ecuación contable y los mínimos
-     * requeridos SIEMPRE se validan contra el año final, nunca contra todos)
+     * AnalisisFinancieroController::confirmar() para el mínimo requerido de
+     * Activo/Ingresos Ordinarios, que sí se valida solo contra el año final)
      * más el detalle año por año en 'por_anio' (SCRUM-329: la pestaña
      * Resumen mostraba solo el año final aunque el análisis cubriera varios
      * años estudiados). La tolerancia de la ecuación contable es un
-     * parámetro configurable (Configuracion `ANALISIS_FINANCIERO_TOLERANCIA_DIFERENCIA_COP`),
-     * nunca una constante hardcodeada — se lee y aplica en el controller,
-     * este método solo expone la diferencia calculada.
+     * parámetro configurable (Configuracion `ANALISIS_FINANCIERO_TOLERANCIA_DIFERENCIA_COP`)
+     * que el controller valida contra CADA año de 'por_anio' (rebote
+     * SCRUM-329 — un desbalance en un año intermedio pasaba sin detectarse
+     * cuando solo se chequeaba el año final), nunca una constante
+     * hardcodeada — este método solo expone la diferencia calculada.
      */
     public function calcularResumen(array $anios, array $activo, array $pasivo, array $patrimonio, array $utilidadNeta, array $cartera): array
     {

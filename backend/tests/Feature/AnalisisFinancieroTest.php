@@ -295,6 +295,32 @@ class AnalisisFinancieroTest extends TestCase
     }
 
     /**
+     * Rebote SCRUM-329: la validación solo miraba el año final
+     * (diferencia_contable del resumen), así que un desbalance en un año
+     * intermedio del análisis (2024, no el año final 2025) pasaba sin
+     * detectarse — QA lo reprodujo con un desbalance de 101.000 COP en un
+     * año que no era el último.
+     */
+    public function test_confirmar_con_diferencia_contable_fuera_de_tolerancia_en_anio_no_final_falla_422(): void
+    {
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+
+        $payload = $this->payloadValido();
+        // 2024 (no es el año final) queda desbalanceado; 2025 se deja
+        // exactamente como en payloadValido() — balanceado.
+        $payload['patrimonio'] = ['capital_suscrito_pagado' => ['2024' => 700, '2025' => 950]];
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/analisis-financiero/{$credito->id}/confirmar", $payload, [
+            'X-Active-Role' => 'coordinador_comercial',
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertSame(2024, $response->json('anio'));
+        $this->assertDatabaseHas('analisis_financieros', ['credito_ordinario_id' => $credito->id, 'estado' => 'borrador']);
+    }
+
+    /**
      * SCRUM-183 (2026-08-05, decisión de Luis tras hablar con Lorena): se
      * eliminó el paso "Presentación para el Comité" + aprobación de
      * Gerencia — confirmar el Análisis Financiero ya alcanza, por sí solo,
