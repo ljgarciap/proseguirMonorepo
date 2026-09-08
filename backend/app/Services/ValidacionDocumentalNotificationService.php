@@ -39,15 +39,20 @@ use Throwable;
  * mismo estado de origen. Mismo criterio que ya usan el resto de los
  * correos de este controlador (SarlaftDesfavorableClienteMail,
  * DesembolsoRechazadoOperativoMail), ninguno con columna dedicada.
+ *
+ * SCRUM-339: 'completar' ahora recibe además $documentosSolicitados (nombres
+ * itemizados desde la pantalla "Solicitud de Documentos") — cierra el gap
+ * que el docblock de AjustesDocumentalesClienteMail dejó explícito en
+ * SCRUM-258 ("itemizar por documento requeriría una pantalla nueva").
  */
 class ValidacionDocumentalNotificationService
 {
-    public function notificar(string $tipo, CreditoOrdinario $credito, string $comentario): void
+    public function notificar(string $tipo, CreditoOrdinario $credito, string $comentario, array $documentosSolicitados = []): void
     {
         match ($tipo) {
             'aprobar_constructor' => $this->notificarAprobacion($credito, $comentario, 'constructor'),
             'aprobar_ordinario'   => $this->notificarAprobacion($credito, $comentario, 'ordinario'),
-            'completar'           => $this->notificarCompletarSoportes($credito, $comentario),
+            'completar'           => $this->notificarCompletarSoportes($credito, $comentario, $documentosSolicitados),
             'rechazar'            => $this->notificarNegacion($credito, $comentario),
             default               => null,
         };
@@ -92,7 +97,15 @@ class ValidacionDocumentalNotificationService
         }
     }
 
-    private function notificarCompletarSoportes(CreditoOrdinario $credito, string $comentario): void
+    /**
+     * SCRUM-339: $documentosSolicitados (nombres, ya sea del catálogo o
+     * ad-hoc) itemiza el correo — viene vacío desde el flujo de Constructor
+     * (validacion_documental_constructor), que todavía no pasa por la
+     * pantalla "Solicitud de Documentos" (fuera de alcance de SCRUM-339,
+     * ver "Out of scope" de la spec), así que el mail sigue mostrando solo
+     * el párrafo genérico en ese caso.
+     */
+    private function notificarCompletarSoportes(CreditoOrdinario $credito, string $comentario, array $documentosSolicitados = []): void
     {
         $cliente = $credito->cliente;
         if (!$cliente || !$cliente->email) {
@@ -101,7 +114,7 @@ class ValidacionDocumentalNotificationService
         }
 
         try {
-            Mail::to($cliente->email)->send(new AjustesDocumentalesClienteMail($credito, $comentario));
+            Mail::to($cliente->email)->send(new AjustesDocumentalesClienteMail($credito, $comentario, $documentosSolicitados));
         } catch (Throwable $e) {
             Log::error("SCRUM-258: no se pudo enviar 'Ajustes requeridos' al cliente del crédito {$credito->id}: " . $e->getMessage());
         }

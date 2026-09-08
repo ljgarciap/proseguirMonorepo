@@ -223,6 +223,14 @@ class CreditoOrdinarioController extends Controller
             'archivos'        => 'nullable|array',
             'archivos.*'      => "file|mimes:{$mimesPermitidos}|max:102400",
             'campo_documento' => 'nullable|string',
+            // SCRUM-339: "Solicitud de Documentos" (revision_documental,
+            // accion=completar) — documentos existentes a re-solicitar y
+            // documentos ad-hoc nuevos (sin catálogo, ver DocumentRequestItem).
+            'items_para_completar'             => 'nullable|array',
+            'items_para_completar.*'           => 'integer|exists:document_request_items,id',
+            'nuevos_documentos'                => 'nullable|array',
+            'nuevos_documentos.*.nombre'       => 'required_with:nuevos_documentos|string|max:255',
+            'nuevos_documentos.*.descripcion'  => 'nullable|string|max:1000',
         ]);
 
         $accion = $request->accion;
@@ -238,6 +246,10 @@ class CreditoOrdinarioController extends Controller
         // al final del método, después de $credito->save()). Se setea desde
         // las ramas de Etapa 1 (aprobar/completar/rechazar) más abajo.
         $notificacionValidacion = null;
+        // SCRUM-339: nombres de los documentos solicitados en "Solicitud de
+        // Documentos" (revision_documental -> completar), para itemizar el
+        // correo — vacío en cualquier otra rama.
+        $documentosParaNotificar = [];
 
         // Bypassear validaciones estrictas de rol si es superadmin (para facilitar pruebas)
         $isAuthorized = ($activeRole === 'superadmin');
@@ -502,9 +514,93 @@ class CreditoOrdinarioController extends Controller
             }
         } elseif ($accion === 'completar') {
             if ($estadoActual === 'revision_documental') {
+                // SCRUM-339: "Solicitud de Documentos" — el Director de
+                // Crédito elige documentos ya cargados a re-solicitar
+                // (items_para_completar) y/o agrega tipos documentales
+                // nuevos ad-hoc (nuevos_documentos, sin fila en el catálogo
+                // compartido document_requirements — decisión de Luis
+                // 2026-09-07, ver spec docs/specs/scrum-339-*).
+                //
+                // Retrocompatibilidad: si el caller no manda NINGUNO de los
+                // dos campos (ni siquiera un array vacío), se asume que no
+                // pasó por la pantalla nueva — mismo criterio "mínimo
+                // viable" de SCRUM-258, sin itemizar ni exigir selección.
+                // La pantalla "Solicitud de Documentos" real siempre manda
+                // al menos uno de los dos (aunque sea []), así que esto solo
+                // preserva callers viejos, no abre un atajo para la UI nueva.
+                $usaSolicitudDeDocumentos = $request->has('items_para_completar') || $request->has('nuevos_documentos');
+                $itemsParaCompletar = $request->input('items_para_completar', []);
+                $nuevosDocumentos = $request->input('nuevos_documentos', []);
+
+                if ($usaSolicitudDeDocumentos && empty($itemsParaCompletar) && empty($nuevosDocumentos)) {
+                    return response()->json([
+                        'message' => 'Debe seleccionar o agregar al menos un documento para solicitar al cliente.',
+                    ], 422);
+                }
+
+                if ($usaSolicitudDeDocumentos && !$request->filled('comentario')) {
+                    return response()->json([
+                        'message' => 'Las observaciones para el cliente son obligatorias.',
+                    ], 422);
+                }
+
+                $documentRequest = $usaSolicitudDeDocumentos ? $credito->solicitudCredito?->documentRequest : null;
+
+                // Créditos legacy sin preset (pre-SCRUM-146) no tienen
+                // DocumentRequest todavía — se crea uno bajo demanda con el
+                // mismo shape que GestionCreditoController::crearSolicitudDocumentos(),
+                // para poder anexarle los ítems de esta solicitud.
+                if ($usaSolicitudDeDocumentos && !$documentRequest && $credito->solicitudCredito) {
+                    $documentRequest = \App\Models\DocumentRequest::create([
+                        'cliente_id'           => $credito->cliente_id,
+                        'creado_por'           => $user->id,
+                        'solicitud_credito_id' => $credito->solicitud_credito_id,
+                        'estado'               => 'pendiente',
+                        'etapa'                => 'revision_documental',
+                    ]);
+                }
+
+                if ($documentRequest) {
+                    $documentRequest->observaciones = $comentario;
+                    $documentRequest->estado = 'pendiente';
+                    $documentRequest->save();
+
+                    if (!empty($itemsParaCompletar)) {
+                        // where document_request_id: un item solo puede
+                        // re-solicitarse dentro de SU propia solicitud, no
+                        // la de otro crédito/cliente.
+                        $items = \App\Models\DocumentRequestItem::where('document_request_id', $documentRequest->id)
+                            ->whereIn('id', $itemsParaCompletar)
+                            ->get();
+
+                        foreach ($items as $item) {
+                            // Se conserva client_upload_id (el archivo previo
+                            // queda de referencia/auditoría) — solo vuelve a
+                            // 'pendiente' para que etapa1KeySatisfecha() lo
+                            // vuelva a bloquear hasta que el cliente lo
+                            // reemplace (ClientUploadController::store()
+                            // sobreescribe client_upload_id al recargar).
+                            $item->estado = 'pendiente';
+                            $item->save();
+                            $documentosParaNotificar[] = $item->nombre_mostrado;
+                        }
+                    }
+
+                    foreach ($nuevosDocumentos as $nuevo) {
+                        $item = \App\Models\DocumentRequestItem::create([
+                            'document_request_id'       => $documentRequest->id,
+                            'document_requirement_id'   => null,
+                            'nombre_personalizado'      => $nuevo['nombre'],
+                            'descripcion_personalizada' => $nuevo['descripcion'] ?? null,
+                            'estado'                    => 'pendiente',
+                        ]);
+                        $documentosParaNotificar[] = $item->nombre_mostrado;
+                    }
+                }
+
                 $estadoNuevo = 'completar_solicitud';
                 $comentario = 'Documentación incompleta. Solicitud enviada al cliente para completar. ' . $comentario;
-                $notificacionValidacion = 'completar'; // SCRUM-258 (5.2)
+                $notificacionValidacion = 'completar'; // SCRUM-258 (5.2) + SCRUM-339 (itemizado)
             } elseif ($estadoActual === 'validacion_documental_constructor') {
                 $estadoNuevo = 'completar_solicitud_constructor';
                 $comentario = 'Documentación incompleta del expediente inicial. Solicitud enviada al cliente para completar. ' . $comentario;
@@ -695,7 +791,7 @@ class CreditoOrdinarioController extends Controller
         // $comentario acumuló arriba para el historial).
         if ($notificacionValidacion) {
             (new \App\Services\ValidacionDocumentalNotificationService())
-                ->notificar($notificacionValidacion, $credito, $comentarioOriginal);
+                ->notificar($notificacionValidacion, $credito, $comentarioOriginal, $documentosParaNotificar);
         }
 
         return response()->json($credito->load('cliente'));

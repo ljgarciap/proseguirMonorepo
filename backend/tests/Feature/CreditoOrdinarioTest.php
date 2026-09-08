@@ -14,8 +14,10 @@ use App\Models\DocumentRequirement;
 use App\Models\SolicitudCredito;
 use App\Models\TipoCredito;
 use App\Models\Amortizacion;
+use App\Mail\AjustesDocumentalesClienteMail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Passport\Passport;
 use Tests\TestCase;
@@ -961,5 +963,128 @@ class CreditoOrdinarioTest extends TestCase
             'monto' => 1000000.00,
             'plazo_meses' => 3,
         ], ['X-Active-Role' => 'contable'])->assertStatus(403);
+    }
+
+    // ------------------------------------------------------------------
+    // SCRUM-339: "Solicitud de Documentos" — Director de Crédito re-solicita
+    // documentos ya cargados y/o agrega documentos ad-hoc desde
+    // revision_documental (accion=completar).
+    // ------------------------------------------------------------------
+
+    public function test_scrum339_solicitud_documentos_requiere_al_menos_un_documento(): void
+    {
+        [$creditoId, ] = $this->creditoConPresetEtapa1();
+
+        Passport::actingAs($this->coordinador);
+        // items_para_completar=[] (vs. omitirlo por completo) es lo que
+        // distingue "abrió la pantalla nueva y no marcó nada" de un caller
+        // viejo que ni conoce el campo (ver $usaSolicitudDeDocumentos).
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'completar',
+            'comentario' => 'Observaciones para el cliente.',
+            'items_para_completar' => [],
+        ], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Debe seleccionar o agregar al menos un documento para solicitar al cliente.');
+
+        $this->assertSame('revision_documental', CreditoOrdinario::find($creditoId)->estado);
+    }
+
+    public function test_scrum339_solicitud_documentos_requiere_observaciones(): void
+    {
+        [$creditoId, $item] = $this->creditoConPresetEtapa1();
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'completar',
+            'items_para_completar' => [$item->id],
+        ], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Las observaciones para el cliente son obligatorias.');
+    }
+
+    public function test_scrum339_re_solicita_documento_existente_conserva_archivo_previo_y_bloquea_etapa(): void
+    {
+        [$creditoId, $item1, $item2] = $this->creditoConPresetEtapa1DosDocumentos();
+
+        // Ambos documentos ya fueron cargados y aprobados — el crédito
+        // podría avanzar si no se re-solicitara ninguno.
+        $item1->update(['estado' => 'aprobado', 'client_upload_id' => null]);
+        $item2->update(['estado' => 'aprobado']);
+        $upload = \App\Models\ClientUpload::create([
+            'user_id' => $this->cliente->id,
+            'upload_role' => 'cliente',
+            'filename' => 'client_uploads/rut_v1.pdf',
+            'original_name' => 'rut_v1.pdf',
+            'status' => 'aprobado',
+        ]);
+        $item1->update(['client_upload_id' => $upload->id]);
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'completar',
+            'comentario' => 'El RUT está vencido, adjunte uno vigente.',
+            'items_para_completar' => [$item1->id],
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200)
+            ->assertJsonPath('estado', 'completar_solicitud');
+
+        $item1->refresh();
+        $item2->refresh();
+        // Se resetea a pendiente pero conserva el archivo previo de
+        // referencia/auditoría — no se borra hasta que el cliente lo
+        // reemplace.
+        $this->assertSame('pendiente', $item1->estado);
+        $this->assertSame($upload->id, $item1->client_upload_id);
+        // El documento NO seleccionado no se toca.
+        $this->assertSame('aprobado', $item2->estado);
+
+        $documentRequest = $item1->request;
+        $this->assertSame('El RUT está vencido, adjunte uno vigente.', $documentRequest->fresh()->observaciones);
+    }
+
+    public function test_scrum339_agrega_documento_ad_hoc_sin_registrarlo_en_el_catalogo_global(): void
+    {
+        [$creditoId, ] = $this->creditoConPresetEtapa1();
+        $totalRequirementsAntes = DocumentRequirement::count();
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'completar',
+            'comentario' => 'Adjunte también la certificación de ingresos.',
+            'nuevos_documentos' => [
+                ['nombre' => 'Certificación de ingresos', 'descripcion' => 'Expedición no mayor a 30 días.'],
+            ],
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+
+        // Decisión de Luis (2026-09-07): el documento ad-hoc NO crea fila
+        // nueva en el catálogo compartido document_requirements.
+        $this->assertSame($totalRequirementsAntes, DocumentRequirement::count());
+
+        $item = DocumentRequestItem::whereNull('document_requirement_id')
+            ->where('nombre_personalizado', 'Certificación de ingresos')
+            ->first();
+        $this->assertNotNull($item);
+        $this->assertSame('pendiente', $item->estado);
+        $this->assertSame('Expedición no mayor a 30 días.', $item->descripcion_personalizada);
+        $this->assertSame('Certificación de ingresos', $item->nombre_mostrado);
+    }
+
+    public function test_scrum339_correo_itemiza_documentos_solicitados_existentes_y_nuevos(): void
+    {
+        Mail::fake();
+        [$creditoId, $item1, $item2] = $this->creditoConPresetEtapa1DosDocumentos();
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'completar',
+            'comentario' => 'Ajustes requeridos.',
+            'items_para_completar' => [$item1->id],
+            'nuevos_documentos' => [['nombre' => 'Certificación de ingresos']],
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+
+        Mail::assertSent(AjustesDocumentalesClienteMail::class, function ($mail) {
+            return $mail->documentos === ['RUT', 'Certificación de ingresos']
+                && $mail->comentario === 'Ajustes requeridos.';
+        });
     }
 }
