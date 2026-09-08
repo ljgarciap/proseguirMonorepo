@@ -6,6 +6,7 @@
 
 use App\Models\Amortizacion;
 use App\Models\Cliente;
+use App\Models\ClientUpload;
 use App\Models\CreditoOrdinario;
 use App\Models\DocumentPreset;
 use App\Models\DocumentRequest;
@@ -107,10 +108,26 @@ $documentRequest = DocumentRequest::create([
     'preset_nombre' => $preset->nombre,
 ]);
 
+// SCRUM-339 rebote (Juan Andrés): necesita un ClientUpload real detrás del
+// item, no solo estado 'aprobado' — el bug de "Mis Créditos no deja
+// re-cargar" solo se dispara cuando client_upload_id queda seteado (el
+// archivo previo se conserva de referencia/auditoría al re-solicitar, ver
+// CreditoOrdinarioController::transition()). Sin upload real, docFileCount()
+// nunca lo contaba como "cargado" y el bug no se reproducía.
+$uploadPrevio = ClientUpload::create([
+    'user_id' => $usuarioCliente->id,
+    'upload_role' => 'cliente',
+    'category' => 'credito_ordinario',
+    'filename' => 'rut-playwright-339-previo.pdf',
+    'original_name' => 'rut-playwright-339-previo.pdf',
+    'status' => 'aprobado',
+]);
+
 // Ya cargado y aprobado — el spec lo re-solicita desde el modal.
 DocumentRequestItem::create([
     'document_request_id' => $documentRequest->id,
     'document_requirement_id' => $requirement->id,
+    'client_upload_id' => $uploadPrevio->id,
     'estado' => 'aprobado',
 ]);
 
