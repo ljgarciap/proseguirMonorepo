@@ -18,6 +18,7 @@ class DocumentRequest extends Model
         'preset_id',
         'preset_nombre',
         'notificado_completado_at',
+        'observaciones',
     ];
 
     protected $casts = [

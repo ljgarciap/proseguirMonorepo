@@ -29,6 +29,16 @@ export class CreditoOrdinarioComponent implements OnInit {
   // revisando.
   routeCreditoId: number | null = null;
 
+  // SCRUM-339: modal "Solicitud de Documentos" (revision_documental,
+  // Director de Crédito) — reemplaza el executeTransition('completar', ...)
+  // directo por una pantalla que permite elegir qué documento(s) del
+  // expediente re-solicitar y/o agregar tipos documentales nuevos ad-hoc.
+  showSolicitudDocumentosModal = false;
+  solicitudDocumentosItems: { itemId: number; nombre: string; descripcion: string; upload: any; seleccionado: boolean }[] = [];
+  solicitudDocumentosNuevos: { nombre: string; descripcion: string }[] = [];
+  solicitudDocumentosObservaciones = '';
+  solicitudDocumentosEnviando = false;
+
   // BPMN Stepper definition
   bpmnSteps = [
     { key: 'revision_documental', label: 'Revisión Solicitud', role: 'coordinador_comercial', roleLabel: 'Director de Crédito', desc: 'Revisar la solicitud inicial del cliente y verificar que los soportes y formularios estén completos.' },
@@ -359,13 +369,17 @@ export class CreditoOrdinarioComponent implements OnInit {
   // registrar la SolicitudCredito. Si el crédito no tiene preset asociado
   // (créditos legacy anteriores a SCRUM-120/146), se mantiene la lista fija
   // original de 4 documentos.
-  get etapa1Docs(): { key: string; nombre: string; descripcion: string; upload?: any; estado?: string }[] {
+  get etapa1Docs(): { key: string; nombre: string; descripcion: string; upload?: any; estado?: string; itemId?: number }[] {
     const items = this.selectedCredito?.solicitud_credito?.document_request?.items;
     if (items && items.length > 0) {
       return items.map((item: any) => ({
         key: 'req_item_' + item.id,
-        nombre: item.requirement?.nombre || 'Documento requerido',
-        descripcion: item.requirement?.descripcion || '',
+        itemId: item.id,
+        // SCRUM-339: nombre_mostrado/descripcion_mostrada ya resuelven el
+        // fallback a documento ad-hoc (sin requirement) en el backend —
+        // ver DocumentRequestItem::getNombreMostradoAttribute().
+        nombre: item.nombre_mostrado || item.requirement?.nombre || 'Documento requerido',
+        descripcion: item.descripcion_mostrada || item.requirement?.descripcion || '',
         upload: item.upload || null,
         estado: item.estado || null
       }));
@@ -607,6 +621,139 @@ export class CreditoOrdinarioComponent implements OnInit {
           }
         });
       }
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // SCRUM-339: modal "Solicitud de Documentos" — reemplaza el
+  // executeTransition('completar', ...) directo en revision_documental.
+  // ------------------------------------------------------------------
+
+  abrirSolicitudDocumentos(): void {
+    // Ninguno pre-seleccionado: el Director elige explícitamente qué
+    // re-solicitar, no se asume que todo lo cargado está mal.
+    this.solicitudDocumentosItems = this.etapa1Docs
+      .filter(doc => !!doc.itemId)
+      .map(doc => ({
+        itemId: doc.itemId!,
+        nombre: doc.nombre,
+        descripcion: doc.descripcion,
+        upload: doc.upload,
+        seleccionado: false
+      }));
+    this.solicitudDocumentosNuevos = [];
+    this.solicitudDocumentosObservaciones = '';
+    this.showSolicitudDocumentosModal = true;
+  }
+
+  cerrarSolicitudDocumentos(): void {
+    if (this.solicitudDocumentosEnviando) return;
+    this.showSolicitudDocumentosModal = false;
+  }
+
+  agregarDocumentoNuevo(): void {
+    this.solicitudDocumentosNuevos.push({ nombre: '', descripcion: '' });
+  }
+
+  quitarDocumentoNuevo(index: number): void {
+    this.solicitudDocumentosNuevos.splice(index, 1);
+  }
+
+  get solicitudDocumentosCantidadSeleccionada(): number {
+    const existentes = this.solicitudDocumentosItems.filter(i => i.seleccionado).length;
+    const nuevos = this.solicitudDocumentosNuevos.filter(n => n.nombre.trim().length > 0).length;
+    return existentes + nuevos;
+  }
+
+  // Mismo patrón que operator-validation.component.ts::preview() — Swal +
+  // iframe/img, sin abandonar el modal de la solicitud (RF explícito del
+  // ticket: "cerrar la previsualización y regresar a la solicitud sin
+  // perder las selecciones realizadas").
+  previsualizarDocumento(upload: any): void {
+    if (!upload) return;
+    const url = `${environment.apiUrl}/uploads/${upload.id}/download`;
+    const nombreArchivo: string = upload.original_name || '';
+    const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(nombreArchivo);
+    const isPdf = /\.pdf$/i.test(nombreArchivo);
+
+    Swal.fire({ title: 'Cargando previsualización...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+    this.http.get(url, { headers: { 'X-Active-Role': this.activeRole }, responseType: 'blob' }).subscribe({
+      next: (blob: Blob) => {
+        const fileUrl = window.URL.createObjectURL(blob);
+        let htmlContent = '';
+        if (isImage) {
+          htmlContent = `<img src="${fileUrl}" style="max-width: 100%; max-height: 70vh; border-radius: 8px;">`;
+        } else if (isPdf) {
+          htmlContent = `<iframe src="${fileUrl}" style="width: 100%; height: 70vh; border: none; border-radius: 8px;"></iframe>`;
+        } else {
+          htmlContent = `<div style="padding: 2rem; text-align: center;">
+            <span class="material-symbols-outlined" style="font-size: 48px; color: #A0AEC0;">insert_drive_file</span>
+            <p style="margin-top: 1rem;">Previsualización no disponible para este tipo de archivo.</p>
+            <p style="font-size: 0.85rem; color: #718096;">${nombreArchivo}</p>
+          </div>`;
+        }
+        Swal.fire({
+          title: nombreArchivo || 'Previsualización del documento',
+          html: htmlContent,
+          width: isImage ? 'auto' : '80%',
+          showCloseButton: true,
+          showConfirmButton: false
+        });
+      },
+      error: () => {
+        Swal.fire('Error', 'No se pudo cargar la previsualización del documento.', 'error');
+      }
+    });
+  }
+
+  enviarSolicitudDocumentos(): void {
+    const itemsParaCompletar = this.solicitudDocumentosItems.filter(i => i.seleccionado).map(i => i.itemId);
+    const nuevosDocumentos = this.solicitudDocumentosNuevos
+      .filter(n => n.nombre.trim().length > 0)
+      .map(n => ({ nombre: n.nombre.trim(), descripcion: n.descripcion?.trim() || null }));
+
+    if (itemsParaCompletar.length === 0 && nuevosDocumentos.length === 0) {
+      Swal.fire('Falta seleccionar documentos', 'Debe seleccionar o agregar al menos un documento para solicitar al cliente.', 'warning');
+      return;
+    }
+    if (!this.solicitudDocumentosObservaciones.trim()) {
+      Swal.fire('Falta la observación', 'Las observaciones para el cliente son obligatorias.', 'warning');
+      return;
+    }
+
+    const cantidad = itemsParaCompletar.length + nuevosDocumentos.length;
+    Swal.fire({
+      title: '¿Enviar solicitud de documentos?',
+      html: `Se enviará una notificación al correo registrado del cliente con <strong>${cantidad} documento${cantidad === 1 ? '' : 's'} solicitado${cantidad === 1 ? '' : 's'}</strong> y las observaciones ingresadas.<br><br>La solicitud volverá a la etapa <strong>Completar soportes</strong> y quedará pendiente de la gestión del cliente.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Confirmar envío',
+      cancelButtonText: 'Volver',
+      confirmButtonColor: '#3182CE'
+    }).then((result) => {
+      if (!result.isConfirmed) return;
+
+      this.solicitudDocumentosEnviando = true;
+      const headers = { 'X-Active-Role': this.activeRole };
+      const url = `${environment.apiUrl}/creditos/${this.selectedCredito.id}/transition`;
+      this.http.post(url, {
+        accion: 'completar',
+        comentario: this.solicitudDocumentosObservaciones.trim(),
+        items_para_completar: itemsParaCompletar,
+        nuevos_documentos: nuevosDocumentos
+      }, { headers }).subscribe({
+        next: () => {
+          this.solicitudDocumentosEnviando = false;
+          this.showSolicitudDocumentosModal = false;
+          Swal.fire('¡Solicitud enviada!', 'Se notificó al cliente y la solicitud pasó a la etapa Completar soportes.', 'success');
+          this.loadCreditos();
+        },
+        error: (err) => {
+          this.solicitudDocumentosEnviando = false;
+          Swal.fire('Error', err.error?.message || 'No se pudo enviar la solicitud de documentos.', 'error');
+        }
+      });
     });
   }
 

@@ -14,14 +14,12 @@ use Illuminate\Queue\SerializesModels;
  * SCRUM-258 (5.2 Solicitar Completar Soportes): notifica al cliente que el
  * Coordinador Comercial requiere ajustes en la documentación de Etapa 1.
  *
- * Alcance acotado (decisión de Luis 2026-08-26, mismo criterio "mínimo
- * viable" de SCRUM-252): la spec (RF-08, §7) pide "cada documento que
- * requiere ajuste y la observación asociada", pero Etapa 1 hoy no tiene una
- * pantalla de revisión POR documento — la acción "Solicitar Completar
- * Soportes" es a nivel de toda la solicitud, con un único comentario de
- * auditoría (RF-03). El correo usa ese comentario como la observación;
- * itemizar por documento requeriría una pantalla nueva de revisión
- * individual, fuera de alcance de este ticket.
+ * SCRUM-339: la pantalla "Solicitud de Documentos" ahora sí itemiza por
+ * documento (ver docs/specs/scrum-339-*) — $documentos trae los nombres
+ * solicitados (catálogo o ad-hoc) y se muestra como tabla antes del bloque
+ * de observaciones. Viene vacío desde el flujo de Constructor, que todavía
+ * no pasa por esa pantalla (fuera de alcance de SCRUM-339); en ese caso el
+ * correo se ve igual que antes (solo el párrafo de observación).
  */
 class AjustesDocumentalesClienteMail extends Mailable
 {
@@ -30,11 +28,13 @@ class AjustesDocumentalesClienteMail extends Mailable
     public CreditoOrdinario $credito;
     public string $comentario;
     public string $urlAcceso;
+    public array $documentos;
 
-    public function __construct(CreditoOrdinario $credito, string $comentario)
+    public function __construct(CreditoOrdinario $credito, string $comentario, array $documentos = [])
     {
         $this->credito = $credito;
         $this->comentario = $comentario;
+        $this->documentos = $documentos;
         $this->urlAcceso = ConfiguracionService::urlIngresoSistema('/creditos/' . $credito->id);
     }
 

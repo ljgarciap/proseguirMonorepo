@@ -243,7 +243,11 @@
                 <button class="btn-pro primary" (click)="executeTransition('aprobar', 'Documentación inicial verificada y aprobada.')">
                   <span class="material-symbols-outlined">check_circle</span> Aprobar Documentos
                 </button>
-                <button class="btn-pro warning" (click)="executeTransition('completar', 'Se solicita al cliente completar la documentación.')">
+                <!-- SCRUM-339: abre el modal "Solicitud de Documentos" en vez de
+                     ejecutar la transición directo — permite elegir qué
+                     documento(s) del expediente re-solicitar y/o agregar
+                     tipos documentales nuevos ad-hoc. -->
+                <button class="btn-pro warning" (click)="abrirSolicitudDocumentos()">
                   <span class="material-symbols-outlined">assignment_return</span> Solicitar Completar Soportes
                 </button>
                 <button class="btn-pro danger" (click)="executeTransition('rechazar', 'Solicitud negada en revisión inicial.', {}, true)">
@@ -520,6 +524,12 @@
           <!-- ETAPA 1 -->
           <div class="stage-doc-group">
             <h4>Etapa 1: Registro e Identificación <span class="stage-owner">Cliente / Comercial</span></h4>
+            <!-- SCRUM-339: observación única de la Solicitud de Documentos
+                 (Director de Crédito) — mismo dato que ya se muestra en
+                 Mis Cargas (client-upload.component.ts). -->
+            <div class="director-observaciones-box mb-2" *ngIf="selectedCredito.solicitud_credito?.document_request?.observaciones">
+              <strong>Observaciones del Director de Crédito:</strong> {{ selectedCredito.solicitud_credito.document_request.observaciones }}
+            </div>
             <div class="documents-grid-grouped">
               <!-- SCRUM-146: documentos dirigidos por el preset elegido en la Solicitud de Crédito (fallback a la lista fija si el crédito no tiene preset asociado) -->
               <div class="doc-box-new" *ngFor="let doc of etapa1Docs">
@@ -828,5 +838,91 @@
         </div>
       </div>
     </main>
+  </div>
+
+  <!-- SCRUM-339: modal "Solicitud de Documentos" (revision_documental,
+       Director de Crédito) — reusa el patrón modal-backdrop/modal-card ya
+       definido en este mismo componente (ver .css), con el modificador
+       "wide" para el ancho extra que necesita la tabla de documentos. -->
+  <div class="modal-backdrop" *ngIf="showSolicitudDocumentosModal" (click)="cerrarSolicitudDocumentos()">
+    <div class="modal-card wide" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3>Solicitud de Documentos</h3>
+          <p class="section-desc">Seleccione los documentos que el cliente debe volver a adjuntar o agregue un nuevo tipo de documento.</p>
+        </div>
+        <button class="btn-close" (click)="cerrarSolicitudDocumentos()">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="solicitud-docs-cliente-info" *ngIf="selectedCredito">
+          <strong>Cliente:</strong> {{ selectedCredito.cliente?.name }}
+          <strong style="margin-left:1.5rem;">Solicitud:</strong> {{ selectedCredito.numero_solicitud }}
+        </div>
+
+        <div class="pro-table-wrapper">
+          <table class="pro-table">
+            <thead>
+              <tr>
+                <th>Solicitar</th>
+                <th>Documento</th>
+                <th>Archivo cargado</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of solicitudDocumentosItems" [class.selected-row]="item.seleccionado">
+                <td><input type="checkbox" [(ngModel)]="item.seleccionado"></td>
+                <td>
+                  <strong>{{ item.nombre }}</strong>
+                  <p class="doc-desc-inline" *ngIf="item.descripcion">{{ item.descripcion }}</p>
+                </td>
+                <td>{{ item.upload?.original_name || 'Sin archivo cargado' }}</td>
+                <td>
+                  <button type="button" class="btn-link-preview" *ngIf="item.upload" (click)="previsualizarDocumento(item.upload)">
+                    <span class="material-symbols-outlined">visibility</span> Previsualizar
+                  </button>
+                </td>
+              </tr>
+              <tr *ngFor="let nuevo of solicitudDocumentosNuevos; let i = index" class="selected-row nuevo-doc-row">
+                <td><span class="material-symbols-outlined" style="color:#16a34a;">check_box</span></td>
+                <td>
+                  <input type="text" class="input-inline" placeholder="Nombre del documento *" [(ngModel)]="nuevo.nombre">
+                  <span class="badge-nuevo">Nuevo</span>
+                  <input type="text" class="input-inline mt-1" placeholder="Descripción / instrucción (opcional)" [(ngModel)]="nuevo.descripcion">
+                </td>
+                <td>Sin archivo previo</td>
+                <td>
+                  <button type="button" class="btn-link-quitar" (click)="quitarDocumentoNuevo(i)">
+                    <span class="material-symbols-outlined">delete</span> Quitar
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <button type="button" class="btn-pro secondary sm mt-2" (click)="agregarDocumentoNuevo()">
+          <span class="material-symbols-outlined">add</span> Agregar documento
+        </button>
+
+        <div class="pro-input-group mt-3">
+          <label>Observaciones para el cliente <span class="required-mark">*</span></label>
+          <textarea rows="4" class="pro-input" placeholder="Instrucciones o ajustes requeridos para el cliente..." [(ngModel)]="solicitudDocumentosObservaciones"></textarea>
+        </div>
+
+        <div class="info-note mt-2">
+          <span class="material-symbols-outlined">info</span>
+          <p>Para enviar, debe existir al menos un documento seleccionado y las observaciones son obligatorias.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-pro secondary" [disabled]="solicitudDocumentosEnviando" (click)="cerrarSolicitudDocumentos()">Cancelar</button>
+        <button class="btn-pro primary" [disabled]="solicitudDocumentosEnviando" (click)="enviarSolicitudDocumentos()">
+          <span class="material-symbols-outlined">mail</span> {{ solicitudDocumentosEnviando ? 'Enviando...' : 'Enviar solicitud' }}
+        </button>
+      </div>
+    </div>
   </div>
 </div>

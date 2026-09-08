@@ -1,4 +1,5 @@
 import { Page, expect } from '@playwright/test';
+import { getRoleLabel } from '../../src/app/shared/role-label.util';
 
 /**
  * Login + selección de rol activo, reusable entre specs (notas operativas
@@ -17,7 +18,10 @@ export async function loginAs(page: Page, numeroDocumento: string, password: str
   await page.locator('input[name="password"]').fill(password);
   await page.locator('button[type="submit"]').click();
 
-  const labelRol = rol.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+  // SCRUM-339: el selector de perfil usa role-label.util.ts desde SCRUM-331
+  // (coordinador_comercial -> "Director de Crédito", no un title-case
+  // genérico del slug) — mismo mapeo acá para no desincronizarse de nuevo.
+  const labelRol = getRoleLabel(rol);
   const selectorPerfil = page.getByRole('heading', { name: 'Selecciona un Perfil' });
 
   // NOTA: Locator.isVisible() no espera — consulta el DOM en el instante y

@@ -49,14 +49,22 @@ import Swal from 'sweetalert2';
           <span class="material-symbols-outlined">playlist_add_check</span> Soportes Requeridos por Proseguir
         </h3>
         <p class="card-subtitle">A continuación se listan los documentos solicitados. Aquellos que posean plantilla descargable deben ser completados y firmados antes de cargarse en formato PDF.</p>
-        
+
+        <!-- SCRUM-339: observación única de la solicitud completa (Director
+             de Crédito, pantalla "Solicitud de Documentos") — distinta de
+             item.observaciones (motivo de rechazo de UN documento puntual,
+             ver abajo). -->
+        <div class="director-observaciones-box mt-2" *ngIf="activeRequest.observaciones">
+          <strong>Observaciones del Director de Crédito:</strong> {{ activeRequest.observaciones }}
+        </div>
+
         <div class="items-list-vertical mt-3">
           <div class="item-row" *ngFor="let item of activeRequest.items" [class.approved-row]="item.estado === 'aprobado'">
             <div class="item-header-info">
               <span class="material-symbols-outlined icon-doc">description</span>
               <div class="title-details">
-                <span class="item-title">{{ item.requirement?.nombre }}</span>
-                <span class="item-desc" *ngIf="item.requirement?.descripcion">{{ item.requirement?.descripcion }}</span>
+                <span class="item-title">{{ item.nombre_mostrado || item.requirement?.nombre }}</span>
+                <span class="item-desc" *ngIf="item.descripcion_mostrada">{{ item.descripcion_mostrada }}</span>
                 
                 <!-- Template box if requirement provides one -->
                 <div class="template-box-inline mt-1" *ngIf="item.requirement?.tiene_plantilla">
@@ -486,6 +494,18 @@ import Swal from 'sweetalert2';
       gap: 8px;
       p { margin: 0; font-size: 0.8rem; color: #c53030; font-weight: 500; }
       .material-symbols-outlined { font-size: 16px; color: #e53e3e; }
+    }
+
+    /* SCRUM-339: observación única de toda la solicitud (Director de
+       Crédito), distinta de item-observations (motivo de rechazo por
+       documento, arriba). */
+    .director-observaciones-box {
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: #eff6ff;
+      border: 1px solid #dbeafe;
+      font-size: 0.85rem;
+      color: #1e3a8a;
     }
 
     .category-badge {

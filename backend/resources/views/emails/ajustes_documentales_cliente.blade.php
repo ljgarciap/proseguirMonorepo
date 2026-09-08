@@ -11,6 +11,9 @@
         .content { padding: 30px; line-height: 1.6; }
         .content p { margin: 0 0 15px 0; font-size: 16px; color: #4a5568; }
         .highlight-box { background-color: #fffbeb; border-left: 4px solid #d97706; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0; }
+        .docs-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 15px; }
+        .docs-table th { text-align: left; background-color: #eff6ff; color: #1e3a8a; padding: 10px 12px; border: 1px solid #dbeafe; }
+        .docs-table td { padding: 10px 12px; border: 1px solid #edf2f7; color: #4a5568; }
         .btn { display: inline-block; background: #1d4ed8; color: #ffffff !important; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 700; margin-top: 10px; }
         .footer { background-color: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #edf2f7; font-size: 13px; color: #a0aec0; }
     </style>
@@ -23,8 +26,20 @@
         <div class="content">
             <p>Estimado(a) {{ $credito->cliente->name ?? 'cliente' }},</p>
             <p>Su solicitud de crédito <strong>{{ $credito->numero_solicitud }}</strong> requiere ajustes en la documentación cargada antes de continuar con el proceso.</p>
+            @if(!empty($documentos))
+            <table class="docs-table">
+                <thead>
+                    <tr><th>Documento solicitado</th></tr>
+                </thead>
+                <tbody>
+                    @foreach($documentos as $documento)
+                    <tr><td>{{ $documento }}</td></tr>
+                    @endforeach
+                </tbody>
+            </table>
+            @endif
             <div class="highlight-box">
-                <p style="margin:0;"><strong>Observación del Director de Crédito:</strong><br>{{ $comentario }}</p>
+                <p style="margin:0;"><strong>Observaciones del Director de Crédito:</strong><br>{{ $comentario }}</p>
             </div>
             <p>Por favor ingrese al sistema para revisar y actualizar los documentos solicitados.</p>
             <p style="text-align:center;">

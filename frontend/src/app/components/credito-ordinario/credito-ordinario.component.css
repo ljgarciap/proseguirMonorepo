@@ -1179,3 +1179,99 @@
   background: #1d4ed8;
 }
 
+/* SCRUM-339: modal "Solicitud de Documentos" — reusa .modal-backdrop/
+   .modal-card/.modal-header/.btn-close/.modal-body/.modal-footer ya
+   definidos arriba, con el modificador .wide para el ancho extra que
+   necesita la tabla de documentos. */
+.modal-card.wide {
+  width: 780px;
+  max-width: 92vw;
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.solicitud-docs-cliente-info {
+  background: #F8FAFC;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+.selected-row td {
+  background-color: #EFF6FF;
+}
+
+.doc-desc-inline {
+  margin: 2px 0 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.nuevo-doc-row td {
+  background-color: #FFFBEB;
+}
+
+.input-inline {
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.badge-nuevo {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #B7791F;
+  background: #FFF9E6;
+  border: 1px solid #FEEBC8;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-bottom: 4px;
+}
+
+.btn-link-preview, .btn-link-quitar {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+}
+
+.btn-link-preview {
+  color: var(--secondary, #0E76BC);
+}
+
+.btn-link-quitar {
+  color: #C53030;
+}
+
+.required-mark {
+  color: #C53030;
+}
+
+.mt-1 { margin-top: 0.35rem; }
+.mt-2 { margin-top: 0.75rem; }
+.mt-3 { margin-top: 1.25rem; }
+.mb-2 { margin-bottom: 0.75rem; }
+
+/* SCRUM-339: mismo estilo que la caja equivalente en
+   client-upload.component.ts (Mis Cargas) — observación única de la
+   Solicitud de Documentos completa. */
+.director-observaciones-box {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  font-size: 0.85rem;
+  color: #1e3a8a;
+}
+
