@@ -198,13 +198,21 @@ class CreditoOrdinarioController extends Controller
 
         $this->autorizarPropiedad($activeRole, $credito, $user);
 
-        // SCRUM-328: el cliente en Etapa 1 (completar_solicitud/
-        // completar_solicitud_constructor) ahora puede cargar Word/Excel
-        // además de PDF — el resto de las etapas (garantías, CYF,
-        // transferencia, etc.) y el resto de los roles se quedan en
-        // "solo PDF" (regla dura del proyecto, ver CLAUDE.md).
+        // SCRUM-328: el cliente en Etapa 1 (Registro e Identificación) ahora
+        // puede cargar Word/Excel además de PDF — el resto de las etapas
+        // (garantías, CYF, transferencia, etc.) y el resto de los roles se
+        // quedan en "solo PDF" (regla dura del proyecto, ver CLAUDE.md).
+        //
+        // Rebote SCRUM-328: el primer fix solo cubría
+        // completar_solicitud/completar_solicitud_constructor (mientras el
+        // cliente arma la solicitud), pero el cliente también puede resubir
+        // documentos de esta misma Etapa 1 una vez que Comercial ya inició
+        // la revisión — revision_documental/validacion_documental_constructor
+        // (mismos 4 estados que habilita el checklist de Etapa 1 en el
+        // frontend, ver credito-ordinario.component.html).
         $mimesPermitidos = 'pdf';
-        if ($activeRole === 'cliente' && in_array($credito->estado, ['completar_solicitud', 'completar_solicitud_constructor'], true)) {
+        $estadosEtapa1Cliente = ['completar_solicitud', 'completar_solicitud_constructor', 'revision_documental', 'validacion_documental_constructor'];
+        if ($activeRole === 'cliente' && in_array($credito->estado, $estadosEtapa1Cliente, true)) {
             $mimesPermitidos = 'pdf,doc,docx,xls,xlsx';
         }
 

@@ -631,15 +631,58 @@ class CreditoOrdinarioTest extends TestCase
     }
 
     /**
-     * SCRUM-328: fuera de Etapa 1 (ej. revision_documental, donde
-     * 'cliente' también figura como rol autorizado del mapa de arriba) la
-     * restricción sigue siendo estrictamente PDF — la ampliación de
-     * formatos es específica de la carga inicial, no un relajo general.
+     * Rebote SCRUM-328: el primer fix solo cubría completar_solicitud/
+     * completar_solicitud_constructor (mientras el cliente arma la
+     * solicitud), pero dejaba forzado a PDF el momento en que el cliente
+     * resube documentos de esa MISMA Etapa 1 una vez que Comercial ya
+     * inició la revisión — revision_documental/validacion_documental_constructor
+     * (mismos 4 estados que habilita el checklist de Etapa 1 en el
+     * frontend). Cubre ambos.
+     */
+    public function test_scrum328_rebote_cliente_puede_subir_docx_en_revision_documental(): void
+    {
+        [$creditoId, $item] = $this->creditoConPresetEtapa1();
+        CreditoOrdinario::find($creditoId)->update(['estado' => 'revision_documental']);
+        $campo = 'req_item_' . $item->id;
+
+        Passport::actingAs($this->cliente);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => $campo,
+            'archivos' => [UploadedFile::fake()->create('soporte.docx', 100, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')],
+        ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
+
+        $item->refresh();
+        $this->assertSame('subido', $item->estado);
+    }
+
+    public function test_scrum328_rebote_cliente_puede_subir_docx_en_validacion_documental_constructor(): void
+    {
+        [$creditoId, $item] = $this->creditoConPresetEtapa1();
+        CreditoOrdinario::find($creditoId)->update(['estado' => 'validacion_documental_constructor']);
+        $campo = 'req_item_' . $item->id;
+
+        Passport::actingAs($this->cliente);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => $campo,
+            'archivos' => [UploadedFile::fake()->create('soporte.xlsx', 100, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')],
+        ], ['X-Active-Role' => 'cliente'])->assertStatus(200);
+
+        $item->refresh();
+        $this->assertSame('subido', $item->estado);
+    }
+
+    /**
+     * SCRUM-328: fuera de Etapa 1 (ej. Etapa 4 de garantías, donde
+     * 'cliente' también figura como rol autorizado) la restricción sigue
+     * siendo estrictamente PDF — la ampliación de formatos es específica
+     * de Etapa 1, no un relajo general.
      */
     public function test_scrum328_docx_se_rechaza_fuera_de_etapa1(): void
     {
         [$creditoId, $item] = $this->creditoConPresetEtapa1();
-        CreditoOrdinario::find($creditoId)->update(['estado' => 'revision_documental']);
+        CreditoOrdinario::find($creditoId)->update(['estado' => 'aprobada_garantias']);
         $campo = 'req_item_' . $item->id;
 
         Passport::actingAs($this->cliente);

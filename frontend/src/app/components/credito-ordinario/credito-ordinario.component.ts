@@ -459,8 +459,12 @@ export class CreditoOrdinarioComponent implements OnInit {
     const files = target.files ? Array.from(target.files) : [];
     if (!files.length) return;
 
+    // Rebote SCRUM-328: el cliente también puede resubir documentos de
+    // Etapa 1 en revision_documental/validacion_documental_constructor
+    // (una vez que Comercial ya inició la revisión), no solo mientras arma
+    // la solicitud — mismo criterio que CreditoOrdinarioController::transition().
     const esEtapa1Cliente = this.activeRole === 'cliente'
-      && ['completar_solicitud', 'completar_solicitud_constructor'].includes(this.selectedCredito?.estado);
+      && ['completar_solicitud', 'completar_solicitud_constructor', 'revision_documental', 'validacion_documental_constructor'].includes(this.selectedCredito?.estado);
     const mimesPermitidos = esEtapa1Cliente
       ? ['application/pdf', ...CreditoOrdinarioComponent.MIMES_OFFICE]
       : ['application/pdf'];
