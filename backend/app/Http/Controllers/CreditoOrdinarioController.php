@@ -563,6 +563,18 @@ class CreditoOrdinarioController extends Controller
                 if ($documentRequest) {
                     $documentRequest->observaciones = $comentario;
                     $documentRequest->estado = 'pendiente';
+                    // SCRUM-339 (comentario Juan Andrés, 2026-09-08): notificado_completado_at
+                    // se marca la PRIMERA vez que el cliente completa toda la
+                    // solicitud (DocumentRequestNotificationService::
+                    // notificarCargaCompletaSiAplica()) y nunca se limpiaba —
+                    // un ciclo de re-solicitud posterior (este mismo bloque)
+                    // revive ítems a 'pendiente', pero ese guard de idempotencia
+                    // (pensado solo para el primer ciclo) bloqueaba para
+                    // siempre la notificación al Director de Crédito de que el
+                    // cliente volvió a completar la documentación. Se limpia
+                    // acá para que el próximo ciclo de completitud pueda
+                    // volver a disparar el correo.
+                    $documentRequest->notificado_completado_at = null;
                     $documentRequest->save();
 
                     if (!empty($itemsParaCompletar)) {

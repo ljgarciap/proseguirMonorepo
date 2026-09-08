@@ -291,6 +291,70 @@ class DocumentRequestNotificationTest extends TestCase
     }
 
     /**
+     * SCRUM-339 (comentario Juan Andrés, 2026-09-08): notificado_completado_at
+     * quedaba marcado para siempre tras el PRIMER ciclo de completitud — un
+     * ciclo de re-solicitud posterior (Director re-solicita un ítem vía
+     * "Solicitud de Documentos") nunca podía volver a notificar al Director
+     * cuando el cliente completaba de nuevo, porque el guard de idempotencia
+     * de notificarCargaCompletaSiAplica() lo bloqueaba sin distinguir entre
+     * "ya notificado de este ciclo" y "notificado de un ciclo anterior".
+     */
+    public function test_notifica_de_nuevo_al_director_tras_re_solicitar_y_completar_otra_vez(): void
+    {
+        $this->asociarSolicitud();
+        $solicitudId = $this->documentRequest->fresh()->solicitud_credito_id;
+
+        $credito = CreditoOrdinario::create([
+            'numero_solicitud' => 'CO-SCRUM339-2NOTIF',
+            'cliente_id' => $this->clienteUser->id,
+            'solicitud_credito_id' => $solicitudId,
+            'monto' => 10000000,
+            'plazo_meses' => 12,
+            'estado' => 'revision_documental',
+            'documentos' => [],
+        ]);
+
+        // --- Ciclo 1: cliente completa todo, notifica una vez ---
+        Passport::actingAs($this->clienteUser);
+        $this->postJson('/api/uploads', [
+            'file' => UploadedFile::fake()->createWithContent('doc1.pdf', 'contenido ciclo 1 doc1'),
+            'active_role' => 'cliente',
+            'document_request_item_id' => $this->item1->id,
+        ])->assertStatus(200);
+        $this->postJson('/api/uploads', [
+            'file' => UploadedFile::fake()->createWithContent('doc2.pdf', 'contenido ciclo 1 doc2'),
+            'active_role' => 'cliente',
+            'document_request_item_id' => $this->item2->id,
+        ])->assertStatus(200);
+
+        Mail::assertSent(CargaCompletaCoordinadorMail::class, 1);
+        $this->assertNotNull($this->documentRequest->fresh()->notificado_completado_at);
+
+        // --- Director re-solicita "Documento 1" desde "Solicitud de Documentos" ---
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/creditos/{$credito->id}/transition", [
+            'accion' => 'completar',
+            'comentario' => 'Ajuste requerido en Documento 1.',
+            'items_para_completar' => [$this->item1->id],
+            'nuevos_documentos' => [],
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+
+        $this->assertSame('pendiente', $this->item1->fresh()->estado);
+        $this->assertNull($this->documentRequest->fresh()->notificado_completado_at);
+
+        // --- Ciclo 2: cliente vuelve a completar (solo el ítem re-solicitado) ---
+        Passport::actingAs($this->clienteUser);
+        $this->postJson('/api/uploads', [
+            'file' => UploadedFile::fake()->createWithContent('doc1-corregido.pdf', 'contenido ciclo 2 doc1'),
+            'active_role' => 'cliente',
+            'document_request_item_id' => $this->item1->id,
+        ])->assertStatus(200);
+
+        Mail::assertSent(CargaCompletaCoordinadorMail::class, 2);
+        $this->assertNotNull($this->documentRequest->fresh()->notificado_completado_at);
+    }
+
+    /**
      * SCRUM-256 (comentario Juan Andrés, 2026-08-26): un archivo cargado
      * para 'Documento 1' no debe poder registrarse también como 'Documento
      * 2' del mismo expediente — antes ningún guard lo evitaba, cada
