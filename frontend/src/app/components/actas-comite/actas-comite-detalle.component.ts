@@ -9,6 +9,7 @@ import { debounceTime } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
 import { CreditoElegibleAutocompleteComponent } from '../shared/credito-elegible-autocomplete/credito-elegible-autocomplete.component';
+import { ClienteAutocompleteComponent } from '../shared/cliente-autocomplete/cliente-autocomplete.component';
 import { TimeSelect12hComponent } from '../shared/time-select-12h/time-select-12h.component';
 import { MilesSeparatorDirective } from '../../directives/miles-separator.directive';
 import Swal from 'sweetalert2';
@@ -37,7 +38,7 @@ interface OrdenDiaItem {
 @Component({
   selector: 'app-actas-comite-detalle',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, QuillModule, CreditoElegibleAutocompleteComponent, TimeSelect12hComponent, MilesSeparatorDirective],
+  imports: [CommonModule, FormsModule, RouterModule, QuillModule, CreditoElegibleAutocompleteComponent, ClienteAutocompleteComponent, TimeSelect12hComponent, MilesSeparatorDirective],
   templateUrl: './actas-comite-detalle.component.html',
   styleUrls: ['./actas-comite-detalle.component.css']
 })
@@ -263,6 +264,18 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
   // ActaComiteController::materializarSolicitudesManuales(), que la
   // excluye explícitamente).
   nuevaSolicitudFactoring = { cliente_nombre: '', cliente_identificacion: '', monto: null as number | null };
+  // Rebote SCRUM-330: nuevaSolicitudFactoring es texto libre (sin cliente_id
+  // real, ver docblock arriba) — este autocomplete es solo un atajo para
+  // prellenar nombre/identificación desde un Cliente ya existente en el
+  // sistema. clienteFactoringBusquedaId no se envía a ningún lado, existe
+  // únicamente para el binding del componente (ControlValueAccessor);
+  // los 2 inputs de texto siguen editables para un cliente que no exista.
+  clienteFactoringBusquedaId: number | null = null;
+
+  onClienteExistenteFactoringSeleccionado(cliente: any): void {
+    this.nuevaSolicitudFactoring.cliente_nombre = cliente.nombre;
+    this.nuevaSolicitudFactoring.cliente_identificacion = cliente.numero_documento;
+  }
 
   agregarSolicitudFactoring(): void {
     const faltantes: string[] = [];
@@ -279,6 +292,7 @@ export class ActasComiteDetalleComponent implements OnInit, OnDestroy {
         this.prellenarMontoDecision(solicitud);
         this.acta.solicitudes.push(solicitud);
         this.nuevaSolicitudFactoring = { cliente_nombre: '', cliente_identificacion: '', monto: null };
+        this.clienteFactoringBusquedaId = null;
       },
       error: (err) => Swal.fire('Error', err?.error?.message || 'No se pudo agregar la solicitud.', 'error')
     });

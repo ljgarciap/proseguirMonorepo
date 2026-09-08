@@ -135,6 +135,15 @@
            existente) y queda como registro dentro del acta únicamente
            (nunca se materializa, ver materializarSolicitudesManuales()). -->
       <div class="inline-add-solicitud mt-2" *ngIf="!soloLectura">
+        <!-- Rebote SCRUM-330: buscar un Cliente ya existente en el sistema
+             prellena nombre/identificación abajo (mismo componente que
+             solicitudes-credito) — no reemplaza los inputs de texto libre,
+             que siguen editables para un cliente que no esté registrado. -->
+        <app-cliente-autocomplete
+          [(ngModel)]="clienteFactoringBusquedaId"
+          (clienteSeleccionado)="onClienteExistenteFactoringSeleccionado($event)"
+          placeholder="Buscar cliente existente (opcional)...">
+        </app-cliente-autocomplete>
         <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitudFactoring.cliente_nombre" placeholder="Cliente (Factoring) *">
         <input class="pro-input" type="text" [(ngModel)]="nuevaSolicitudFactoring.cliente_identificacion" placeholder="N.° de identificación">
         <input class="pro-input" type="text" inputmode="decimal" milesSeparator [(ngModel)]="nuevaSolicitudFactoring.monto" placeholder="Monto *">
