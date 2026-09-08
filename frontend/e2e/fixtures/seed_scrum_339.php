@@ -124,11 +124,22 @@ $uploadPrevio = ClientUpload::create([
 ]);
 
 // Ya cargado y aprobado — el spec lo re-solicita desde el modal.
-DocumentRequestItem::create([
+$itemPrevio = DocumentRequestItem::create([
     'document_request_id' => $documentRequest->id,
     'document_requirement_id' => $requirement->id,
     'client_upload_id' => $uploadPrevio->id,
     'estado' => 'aprobado',
 ]);
+
+// SCRUM-339 2do rebote (Juan Andrés): el fixture de arriba solo simulaba
+// una carga original hecha desde "Mis Cargas" (client_upload_id sin nada
+// en documentos_raw). El bug real se disparaba cuando la carga original
+// vino de "Mis Créditos" — CreditoOrdinarioController::transition()
+// (línea ~388, campo_documento) escribe el archivo en AMBOS destinos: el
+// DocumentRequestItem Y credito.documentos[req_item_{id}]. Se replica ese
+// segundo destino acá para reproducir el rebote real (docFileCount()
+// miraba ese arreglo legado ANTES que estado y nunca llegaba a chequearlo).
+$c->documentos = ['req_item_' . $itemPrevio->id => ['credito_documentos/' . $c->id . '/rut-playwright-339-previo.pdf']];
+$c->save();
 
 echo "Listo {$numero} (credito id {$c->id}) en revision_documental con DocumentRequest {$documentRequest->id}.\n";

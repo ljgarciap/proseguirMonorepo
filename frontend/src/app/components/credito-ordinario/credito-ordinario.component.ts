@@ -538,11 +538,23 @@ export class CreditoOrdinarioComponent implements OnInit {
   // para volver a subirse desde Mis Créditos — Mis Cargas no tenía este bug
   // porque confía directamente en item.estado (ver activeRequest.items en
   // client-upload.component.html), no en la presencia de un upload previo.
+  //
+  // SCRUM-339 2do rebote: ese chequeo de estado quedaba DESPUÉS de mirar
+  // getDocFiles(doc.key) (credito.documentos[key], el arreglo legado) — si
+  // la primera carga del ítem se hizo desde esta misma pantalla (Mis
+  // Créditos), transition() (línea ~388, campo_documento) escribe el
+  // archivo en AMBOS destinos: el DocumentRequestItem Y documentos[key].
+  // Al re-solicitar, el backend resetea item.estado pero NUNCA limpia esa
+  // entrada legada (queda de auditoría, igual que client_upload_id) — el
+  // arreglo seguía teniendo enArreglo > 0 y el método retornaba antes de
+  // llegar a mirar estado, tapando por completo el fix del primer rebote
+  // para cualquier ítem cuya primera carga no vino de Mis Cargas. Mismo
+  // criterio que ya usa el backend en etapa1KeySatisfecha() (SCRUM-256):
+  // para claves de preset, estado se chequea PRIMERO.
   docFileCount(doc: { key: string; upload?: any; estado?: string }): number {
-    const enArreglo = this.getDocFiles(doc.key).length;
-    if (enArreglo > 0) return enArreglo;
     if (doc.estado === 'pendiente') return 0;
-    return doc.upload ? 1 : 0;
+    const enArreglo = this.getDocFiles(doc.key).length;
+    return enArreglo > 0 ? enArreglo : (doc.upload ? 1 : 0);
   }
 
   // SCRUM-256: el botón "Subir" debe desaparecer una vez el documento ya

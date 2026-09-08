@@ -17,6 +17,17 @@ import { loginAs } from './helpers/auth';
  *   solo desde Mis Cargas — antes docFileCount() contaba el client_upload_id
  *   conservado como referencia/auditoría y lo mostraba "Cargado", ocultando
  *   el botón "Subir" para el documento que sí tenía un archivo previo.
+ * - 2do REBOTE (Juan Andrés, 2026-09-08, misma dinámica): el fix de arriba
+ *   solo cubría el caso en que la carga original vino de Mis Cargas. Cuando
+ *   vino de Mis Créditos (que además de DocumentRequestItem escribe en
+ *   credito.documentos[key], ver CreditoOrdinarioController::transition()),
+ *   docFileCount() miraba ese arreglo legado ANTES que estado y seguía
+ *   marcando "Cargado" tras el re-solicitar — el fixture ahora reproduce
+ *   ese origen (documentos[req_item_{id}] poblado), no solo el ClientUpload.
+ * - 2do REBOTE, punto 2: "Mis Cargas" nunca recibió la ampliación de
+ *   formatos de SCRUM-328 (Word/Excel en Etapa 1) para la carga por ítem —
+ *   quedaba hardcodeada a solo PDF mientras Mis Créditos ya aceptaba Word/
+ *   Excel para el mismo documento.
  *
  * Requiere: docker cp + tinker del seed (ver e2e/README.md), ng serve
  * (localhost:4200) + backend Docker corriendo.
@@ -95,4 +106,19 @@ test('Director de Crédito re-solicita un documento y agrega uno ad-hoc desde el
   await expect(boxNuevo).toBeVisible();
   await expect(boxNuevo.getByText('Pendiente')).toBeVisible();
   await expect(boxNuevo.locator('label.btn-inline-upload')).toBeVisible();
+
+  // --- 5. 2do rebote, punto 2: Mis Cargas debe aceptar Word/Excel en
+  // Etapa 1 (revision_documental), igual que Mis Créditos (SCRUM-328) ---
+  await page.goto('/client-upload');
+  const filaCertificacion = page.locator('.item-row', { hasText: 'Certificación Playwright 339' });
+  await expect(filaCertificacion).toBeVisible({ timeout: 10000 });
+
+  await filaCertificacion.locator('input[type="file"]').setInputFiles({
+    name: 'certificacion-playwright-339.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    buffer: Buffer.from('contenido de prueba SCRUM-339'),
+  });
+
+  await expect(page.getByText('Formato Inválido')).not.toBeVisible();
+  await expect(page.getByText('Carga Exitosa')).toBeVisible({ timeout: 10000 });
 });
