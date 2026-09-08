@@ -24,7 +24,15 @@ test('flujo completo: notificar garantías → cliente diligencia → Formalizac
   await loginAs(page, '1234', '1234', 'coordinador_comercial');
   await page.goto('/gestion-creditos');
   const filaInicial = page.locator('tr', { hasText: 'GC193205-PW-1' });
-  await expect(filaInicial).toBeVisible({ timeout: 10000 });
+  // 20s (no 10s): esta es la primera navegación real del test a una ruta
+  // lazy-loaded — en un browser recién arrancado contra `ng serve` (bundle
+  // sin minificar, sin caché HTTP previa) puede tardar más que el resto de
+  // los `toBeVisible` de este archivo, que reusan una página/caché ya
+  // tibia. Encontrado en sesión SCRUM-339 (2026-09-08): fallaba
+  // intermitentemente solo cuando este spec corría primero en una
+  // invocación nueva de `npx playwright test`, nunca corriendo solo con
+  // margen o después de otro spec ya haber calentado el bundle.
+  await expect(filaInicial).toBeVisible({ timeout: 20000 });
   await filaInicial.getByRole('button', { name: /Gestionar/i }).click();
   await expect(page).toHaveURL(/\/gestion-creditos\/\d+$/);
 

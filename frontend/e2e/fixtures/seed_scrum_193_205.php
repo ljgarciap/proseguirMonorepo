@@ -29,6 +29,20 @@ if (!$usuarioCliente) {
     exit(1);
 }
 
+// Higiene compartida (hallado en sesión SCRUM-339, 2026-09-08): doc 2345 es
+// el único usuario portal 'cliente' autenticable para e2e y lo reutilizan
+// TODOS los fixtures de este directorio — una solicitud 'pendiente' que
+// dejó otro fixture (u otra corrida de este mismo) le gana el fallback de
+// DocumentRequestController::activeRequest() ("sin match exacto, la más
+// reciente pendiente de este cliente") a la de este test, y Mis Cargas
+// termina mostrando datos de un fixture ajeno. Se cancelan acá todas las
+// demás 'pendiente' de este cliente antes de crear/resetear la propia, para
+// que esta corrida sea determinística sin importar qué corrió antes en la
+// misma BD local.
+DocumentRequest::where('cliente_id', $usuarioCliente->id)
+    ->where('estado', 'pendiente')
+    ->update(['estado' => 'cancelado']);
+
 $cliente = Cliente::firstOrCreate(
     ['numero_documento' => '2345'],
     [
