@@ -678,12 +678,44 @@ export class ClientUploadComponent implements OnInit {
     });
   }
 
+  // SCRUM-328: el cliente en Etapa 1 (Registro e Identificación) puede
+  // cargar Word/Excel además de PDF — mismo criterio que valida
+  // CreditoOrdinarioController::transition() y que ya aplicaba
+  // onMultiFileUpload() en Mis Créditos (credito-ordinario.component.ts).
+  //
+  // SCRUM-339 rebote (Juan Andrés): esa ampliación nunca llegó a este
+  // componente — "Mis Cargas" seguía hardcodeado a solo PDF para la carga
+  // por ítem de "Solicitud de Documentos", mientras Mis Créditos ya
+  // aceptaba Word/Excel para el mismo documento. El backend
+  // (ClientUploadController::store()) no valida mimetype — la restricción
+  // era puramente de este componente.
+  private static readonly MIMES_OFFICE = [
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ];
+
+  private esEtapa1Cliente(): boolean {
+    const estadoCredito = this.activeRequest?.solicitud_credito?.credito_ordinario?.estado;
+    return ['completar_solicitud', 'completar_solicitud_constructor', 'revision_documental', 'validacion_documental_constructor']
+      .includes(estadoCredito);
+  }
+
   onFileSelectedForItem(event: any, itemId: number): void {
     const file = event.target.files[0];
     if (!file) return;
 
-    if (file.type !== 'application/pdf') {
-      Swal.fire('Formato Inválido', 'Solo se permite subir archivos en formato PDF.', 'warning');
+    const esEtapa1 = this.esEtapa1Cliente();
+    const mimesPermitidos = esEtapa1
+      ? ['application/pdf', ...ClientUploadComponent.MIMES_OFFICE]
+      : ['application/pdf'];
+
+    if (!mimesPermitidos.includes(file.type)) {
+      const mensaje = esEtapa1
+        ? 'Solo se permite subir archivos en formato PDF, Word o Excel.'
+        : 'Solo se permite subir archivos en formato PDF.';
+      Swal.fire('Formato Inválido', mensaje, 'warning');
       return;
     }
 
