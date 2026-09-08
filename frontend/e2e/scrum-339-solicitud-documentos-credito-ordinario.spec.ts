@@ -12,6 +12,11 @@ import { loginAs } from './helpers/auth';
  * - El crédito pasa a completar_solicitud.
  * - El cliente ve ambos documentos pendientes y la observación en Mis
  *   Cargas (client-upload).
+ * - REBOTE (Juan Andrés, 2026-09-08): el mismo re-solicitado también debe
+ *   quedar cargable desde Mis Créditos (credito-ordinario.component), no
+ *   solo desde Mis Cargas — antes docFileCount() contaba el client_upload_id
+ *   conservado como referencia/auditoría y lo mostraba "Cargado", ocultando
+ *   el botón "Subir" para el documento que sí tenía un archivo previo.
  *
  * Requiere: docker cp + tinker del seed (ver e2e/README.md), ng serve
  * (localhost:4200) + backend Docker corriendo.
@@ -73,4 +78,21 @@ test('Director de Crédito re-solicita un documento y agrega uno ad-hoc desde el
   await expect(page.locator('.item-row', { hasText: 'RUT Playwright 339' }).getByText('PENDIENTE')).toBeVisible();
   await expect(page.locator('.item-row', { hasText: 'Certificación Playwright 339' }).getByText('PENDIENTE')).toBeVisible();
   await expect(page.getByText('Expedición no mayor a 30 días.')).toBeVisible();
+
+  // --- 4. Rebote: mismo cliente, mismos documentos, desde Mis Créditos ---
+  // "RUT Playwright 339" trae un client_upload_id previo (conservado de
+  // auditoría) — antes del fix quedaba marcado "Cargado" y sin botón
+  // "Subir" acá, aunque en Mis Cargas ya se veía "Pendiente" (arriba).
+  await page.goto(`/creditos/${creditoId}`);
+  await expect(page.locator('.director-observaciones-box')).toContainText('Ajuste requerido: RUT vencido y certificación nueva.', { timeout: 10000 });
+
+  const boxExistente = page.locator('.doc-box-new', { hasText: 'RUT Playwright 339' });
+  await expect(boxExistente).toBeVisible();
+  await expect(boxExistente.getByText('Pendiente')).toBeVisible();
+  await expect(boxExistente.locator('label.btn-inline-upload')).toBeVisible();
+
+  const boxNuevo = page.locator('.doc-box-new', { hasText: 'Certificación Playwright 339' });
+  await expect(boxNuevo).toBeVisible();
+  await expect(boxNuevo.getByText('Pendiente')).toBeVisible();
+  await expect(boxNuevo.locator('label.btn-inline-upload')).toBeVisible();
 });

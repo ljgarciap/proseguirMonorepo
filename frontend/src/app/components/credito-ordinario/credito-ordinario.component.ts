@@ -529,9 +529,20 @@ export class CreditoOrdinarioComponent implements OnInit {
   // upload vino de acá mismo y doc.upload es ese mismo archivo — no se suma
   // aparte. doc.upload solo cuenta solo cuando el arreglo está vacío, es
   // decir, cuando la carga vino exclusivamente de otra pantalla.
-  docFileCount(doc: { key: string; upload?: any }): number {
+  //
+  // SCRUM-339 rebote (Juan Andrés): un ítem re-solicitado por "Solicitud de
+  // Documentos" vuelve a estado 'pendiente' pero el backend CONSERVA
+  // doc.upload apuntando al archivo previo, como referencia/auditoría
+  // (ver CreditoOrdinarioController::transition(), comentario junto a
+  // "$item->estado = 'pendiente'"). Contarlo como cargado acá lo bloqueaba
+  // para volver a subirse desde Mis Créditos — Mis Cargas no tenía este bug
+  // porque confía directamente en item.estado (ver activeRequest.items en
+  // client-upload.component.html), no en la presencia de un upload previo.
+  docFileCount(doc: { key: string; upload?: any; estado?: string }): number {
     const enArreglo = this.getDocFiles(doc.key).length;
-    return enArreglo > 0 ? enArreglo : (doc.upload ? 1 : 0);
+    if (enArreglo > 0) return enArreglo;
+    if (doc.estado === 'pendiente') return 0;
+    return doc.upload ? 1 : 0;
   }
 
   // SCRUM-256: el botón "Subir" debe desaparecer una vez el documento ya
