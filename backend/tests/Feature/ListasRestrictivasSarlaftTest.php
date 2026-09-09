@@ -320,6 +320,30 @@ class ListasRestrictivasSarlaftTest extends TestCase
             ->assertJsonFragment(['message' => 'Adjunte el documento Síntesis Oficial de Cumplimiento en formato PDF.']);
     }
 
+    /**
+     * SCRUM-343: el PDF de síntesis solo es obligatorio en concepto
+     * favorable — en desfavorable las observaciones ya sustentan el
+     * rechazo y el oficial de cumplimiento puede finalizar sin adjuntarlo.
+     */
+    public function test_finalizar_desfavorable_sin_pdf_no_falla(): void
+    {
+        $credito = $this->crearCreditoEnSarlaftControlInterno();
+
+        Passport::actingAs($this->cumplimiento);
+        $this->postJson("/api/listas-sarlaft/{$credito->id}/finalizar", [
+            'sarlaft_concepto' => 'desfavorable',
+            'sarlaft_observaciones' => 'Coincidencia en lista OFAC.',
+        ], ['X-Active-Role' => 'oficial_cumplimiento'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'rechazado');
+
+        $this->assertDatabaseHas('credito_ordinarios', [
+            'id' => $credito->id,
+            'estado' => 'rechazado',
+            'sarlaft_concepto' => 'desfavorable',
+        ]);
+    }
+
     public function test_finalizar_con_archivo_no_pdf_falla_422(): void
     {
         $credito = $this->crearCreditoEnSarlaftControlInterno();
