@@ -128,7 +128,11 @@ class ListasRestrictivasSarlaftController extends Controller
             return response()->json(['message' => 'Ingrese las observaciones que sustentan el concepto.'], 422);
         }
 
-        if (empty($pdf)) {
+        // SCRUM-343: el PDF de síntesis solo es obligatorio cuando el concepto
+        // es favorable — en desfavorable las observaciones ya sustentan el
+        // rechazo y el oficial de cumplimiento puede no tener el documento
+        // formal listo en el momento de finalizar.
+        if ($concepto === 'favorable' && empty($pdf)) {
             return response()->json(['message' => 'Adjunte el documento Síntesis Oficial de Cumplimiento en formato PDF.'], 422);
         }
 

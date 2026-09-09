@@ -109,7 +109,7 @@
       </div>
 
       <div class="form-group span-full mt-4">
-        <label>Síntesis Oficial de Cumplimiento (PDF) <span class="required">*</span></label>
+        <label>Síntesis Oficial de Cumplimiento (PDF) <span class="required" *ngIf="concepto === 'favorable'">*</span></label>
         <div class="upload-controls">
           <input type="file" id="file-sintesis-oficial" (change)="onArchivoSeleccionado($event)"
                  [disabled]="!puedeEditar" accept=".pdf" class="file-input-hide">
