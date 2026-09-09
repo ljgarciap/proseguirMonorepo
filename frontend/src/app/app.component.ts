@@ -276,8 +276,9 @@ export class AppComponent implements OnInit, OnDestroy {
         { label: 'Crédito Ordinario', route: '/creditos', icon: 'payments', permission: 'menu:creditos-staff' },
         { label: 'Gestión de Créditos', route: '/gestion-creditos', icon: 'task_alt', permission: 'gestion-creditos' },
         { label: 'Informe Técnico', route: '/informes-tecnicos', icon: 'engineering', permission: 'informes-tecnicos' },
-        { label: 'Listas Restrictivas y SARLAFT', route: '/listas-sarlaft', icon: 'gavel', permission: 'listas-sarlaft' },
         { label: 'Registro Solicitud Crédito', route: '/solicitudes-credito', icon: 'assignment_turned_in', permission: 'solicitudes-credito' },
+        // SCRUM-343 (2º rebote): renombrado desde "Listas Restrictivas y SARLAFT" — ruta/permiso sin cambios.
+        { label: 'Sistema LA/FT/FP y C/ST', route: '/listas-sarlaft', icon: 'gavel', permission: 'listas-sarlaft' },
       ],
     },
     {
