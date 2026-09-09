@@ -41,7 +41,16 @@ class RolesPermissionsSeeder extends Seeder
 
         // General
         ['clave' => 'mandatos', 'nombre' => 'Mandatos', 'modulo' => 'General', 'roles' => ['cliente', 'superadmin', 'operativo', 'gerente', 'contable']],
-        ['clave' => 'profile', 'nombre' => 'Mi Perfil', 'modulo' => 'General', 'roles' => ['gerente', 'operativo', 'cliente', 'contable', 'superadmin']],
+        // SCRUM-340: 'profile' replicaba línea por línea lo que ya vivía
+        // hardcodeado en app.routes.ts al migrar a RBAC paramétrico — pero
+        // ese hardcodeo original nunca cubrió estos 5 roles, así que nunca
+        // pudieron cambiar su propia contraseña desde la UI (el backend
+        // /change-password no restringe por rol; solo la pantalla que lo
+        // expone estaba gateada). Reportado por Luis: perfil nuevo de
+        // oficial_cumplimiento (Verónica Villegas) no podía cambiar su
+        // password — mismo gap en coordinador_comercial, comite_credito,
+        // tesoreria e ingeniero.
+        ['clave' => 'profile', 'nombre' => 'Mi Perfil', 'modulo' => 'General', 'roles' => ['gerente', 'operativo', 'cliente', 'contable', 'superadmin', 'coordinador_comercial', 'oficial_cumplimiento', 'comite_credito', 'tesoreria', 'ingeniero']],
         ['clave' => 'dashboard', 'nombre' => 'Dashboard', 'modulo' => 'General', 'roles' => ['gerente', 'operativo', 'contable', 'superadmin']],
 
         // Administración
