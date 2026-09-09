@@ -48,9 +48,12 @@ class RoleControllerTest extends TestCase
         $this->assertSame(10, Role::count());
         $this->assertGreaterThan(0, Permission::count());
 
+        // SCRUM-340: 'profile' se sumó a los 5 roles que nunca lo tuvieron
+        // (ver comentario en RolesPermissionsSeeder) — 'ingeniero' es uno de
+        // ellos, por eso ahora trae 2 permisos y no 1.
         $ingeniero = Role::where('slug', 'ingeniero')->first();
         $this->assertEqualsCanonicalizing(
-            ['informes-tecnicos'],
+            ['informes-tecnicos', 'profile'],
             $ingeniero->permissions->pluck('clave')->all()
         );
 
