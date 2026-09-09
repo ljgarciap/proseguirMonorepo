@@ -3,12 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\ActivityLog\ActivityLogService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    public function __construct(private ActivityLogService $activityLog)
+    {
+    }
+
     public function index(Request $request)
     {
         $status = $request->query('status', 'active');
@@ -59,6 +65,15 @@ class UserController extends Controller
             'roles' => $request->roles,
         ]);
 
+        $this->activityLog->registrar(
+            'usuario_creado',
+            "Se creó el usuario \"{$user->name}\" ({$user->numero_documento}).",
+            Auth::user(),
+            $user,
+            ['roles' => $user->roles],
+            $request,
+        );
+
         return response()->json($user, 201);
     }
 
@@ -88,6 +103,13 @@ class UserController extends Controller
             'email.unique' => 'El correo electrónico ingresado ya se encuentra registrado en el sistema.',
         ]);
 
+        // Se guarda ANTES del update — no hay otra forma de saber qué cambió
+        // (ver hallazgo 2026-09-09: cambios de rol hechos por la UI no dejaban
+        // ningún rastro en activity_logs porque este controller nunca llamaba
+        // a ActivityLogService).
+        $rolesAnteriores = $user->roles;
+        $documentoAnterior = $user->numero_documento;
+
         $data = [
             'name' => $request->name,
             'numero_documento' => $request->numero_documento,
@@ -102,10 +124,24 @@ class UserController extends Controller
 
         $user->update($data);
 
+        $this->activityLog->registrar(
+            'usuario_actualizado',
+            "Se actualizó el usuario \"{$user->name}\" ({$user->numero_documento}).",
+            Auth::user(),
+            $user,
+            [
+                'roles_anteriores' => $rolesAnteriores,
+                'roles_nuevos' => $user->roles,
+                'numero_documento_anterior' => $documentoAnterior,
+                'password_cambiada' => $request->filled('password'),
+            ],
+            $request,
+        );
+
         return response()->json($user);
     }
 
-    public function destroy(User $user)
+    public function destroy(Request $request, User $user)
     {
         // Prevent deleting the last superadmin or yourself
         if ($user->id === auth()->id()) {
@@ -113,13 +149,33 @@ class UserController extends Controller
         }
 
         $user->delete();
+
+        $this->activityLog->registrar(
+            'usuario_desactivado',
+            "Se desactivó el usuario \"{$user->name}\" ({$user->numero_documento}).",
+            Auth::user(),
+            $user,
+            [],
+            $request,
+        );
+
         return response()->json(null, 204);
     }
 
-    public function restore($id)
+    public function restore(Request $request, $id)
     {
         $user = User::onlyTrashed()->findOrFail($id);
         $user->restore();
+
+        $this->activityLog->registrar(
+            'usuario_restaurado',
+            "Se restauró el usuario \"{$user->name}\" ({$user->numero_documento}).",
+            Auth::user(),
+            $user,
+            [],
+            $request,
+        );
+
         return response()->json($user);
     }
 }
