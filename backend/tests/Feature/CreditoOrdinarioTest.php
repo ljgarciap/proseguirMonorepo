@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\ClientUpload;
 use App\Models\DocumentType;
 use App\Models\CreditoOrdinario;
 use App\Models\Cliente;
@@ -1181,6 +1182,46 @@ class CreditoOrdinarioTest extends TestCase
 
         $response->assertStatus(403);
         $this->assertSame('desembolso_ingreso', CreditoOrdinario::find($creditoId)->estado);
+    }
+
+    /**
+     * SCRUM-345: "carga interna de adjuntos" por parte del Director de
+     * Crédito en Etapa 1 — el botón "Subir" y la autorización de backend
+     * para 'coordinador_comercial' YA existían (ver $rolesAutorizados y la
+     * condición del template), pero el ClientUpload resultante quedaba con
+     * 'user_id' = el propio Director (quien ejecuta la subida) en vez del
+     * cliente dueño del crédito — exactamente lo que 'upload_role' existe
+     * para distinguir (SCRUM-... migración 2026_05_08). Consecuencia real:
+     * el cliente recibía 403 ("No tienes permiso para ver este archivo")
+     * al intentar ver/descargar un documento que el Director había subido
+     * por él — el requisito explícito del ticket ("los demás roles...
+     * puedan visualizar y descargar... así como sucede con los que carga
+     * el cliente") no se cumplía. Mismo bug si cualquier otro rol staff
+     * autorizado en esta etapa sube por el cliente.
+     */
+    public function test_scrum345_documento_subido_por_director_queda_asociado_al_cliente_no_al_director(): void
+    {
+        [$creditoId, $item] = $this->creditoConPresetEtapa1();
+        $campo = 'req_item_' . $item->id;
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => $campo,
+            'archivos' => [$this->pdf('subido_por_director.pdf')],
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+
+        $item->refresh();
+        $upload = ClientUpload::find($item->client_upload_id);
+        $this->assertNotNull($upload);
+        // El documento queda a nombre del CLIENTE dueño del crédito...
+        $this->assertSame($this->cliente->id, $upload->user_id);
+        // ...pero la auditoría de quién lo cargó de verdad no se pierde.
+        $this->assertSame('coordinador_comercial', $upload->upload_role);
+
+        // El cliente dueño del crédito puede ver/descargar su propio documento.
+        Passport::actingAs($this->cliente);
+        $this->get("/api/uploads/{$upload->id}/download")->assertStatus(200);
     }
 
     public function test_negar_credito_no_permitido_si_ya_esta_en_estado_final(): void
