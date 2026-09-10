@@ -24,7 +24,8 @@ export class RoadmapComponent implements OnInit {
   allRoles = [
     { key: 'superadmin', label: 'Superadmin', color: '#6366F1' },
     { key: 'gerente', label: 'Gerente', color: '#3B82F6' },
-    { key: 'operativo', label: 'Operativo', color: '#10B981' },
+    // SCRUM-346: renombrado a "Director Administrativo" (slug sin cambios).
+    { key: 'operativo', label: 'Director Administrativo', color: '#10B981' },
     { key: 'contable', label: 'Contable', color: '#F59E0B' },
     { key: 'cliente', label: 'Cliente', color: '#EC4899' },
     { key: 'coordinador_comercial', label: 'Director de Crédito', color: '#8B5CF6' },
