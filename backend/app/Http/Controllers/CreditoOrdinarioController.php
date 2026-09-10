@@ -419,8 +419,19 @@ class CreditoOrdinarioController extends Controller
                 $nombres[]  = $fileName;
 
                 if ($requestItemId) {
+                    // SCRUM-345: 'user_id' es el DUEÑO del documento (el
+                    // cliente del crédito), no quien ejecuta la subida —
+                    // para eso existe 'upload_role' (migración
+                    // 2026_05_08_...add_upload_role...). Antes se guardaba
+                    // $user->id (el actor) acá, así que cuando un rol
+                    // staff autorizado en esta etapa (Director de Crédito)
+                    // subía un documento POR el cliente, el cliente
+                    // recibía 403 al intentar ver/descargar su propio
+                    // documento (ClientUploadController::download()
+                    // compara upload->user_id contra el usuario que pide
+                    // verlo) y tampoco aparecía en su "Mis Cargas".
                     $upload = ClientUpload::create([
-                        'user_id'       => $user->id,
+                        'user_id'       => $credito->cliente_id,
                         'upload_role'   => $activeRole,
                         'filename'      => $path,
                         'original_name' => $fileName,
