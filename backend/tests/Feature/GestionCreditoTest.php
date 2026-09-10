@@ -1755,6 +1755,30 @@ class GestionCreditoTest extends TestCase
         });
     }
 
+    /**
+     * SCRUM-347: 'correo_notificacion_pago' acepta varios destinatarios
+     * separados por coma/punto y coma, igual que 'correo_notificacion' en
+     * SolicitudCreditoController.
+     */
+    public function test_transferencia_bancaria_acepta_multiples_destinatarios_de_notificacion(): void
+    {
+        $credito = $this->creditoPendienteTransferenciaBancaria('tb-multi');
+
+        Passport::actingAs($this->tesoreria);
+        $payload = $this->payloadTransferenciaValido();
+        $payload['correo_notificacion_pago'] = 'pago.cliente@test.com, otro.pago@test.com';
+
+        $response = $this->postJson("/api/gestion-creditos/{$credito->id}/transferencia-bancaria", $payload, [
+            'X-Active-Role' => 'tesoreria',
+        ]);
+
+        $response->assertStatus(200);
+
+        Mail::assertSent(TransferenciaRealizadaClienteMail::class, function ($mail) {
+            return $mail->hasTo('pago.cliente@test.com') && $mail->hasTo('otro.pago@test.com');
+        });
+    }
+
     // ---- Visibilidad por rol (tarjetas/index) -----------------------------
 
     public function test_tarjetas_gerente_solo_ve_sus_propias_claves(): void
