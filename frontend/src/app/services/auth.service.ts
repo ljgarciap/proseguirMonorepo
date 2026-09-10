@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
+import { setRoleLabelsCache } from '../shared/role-label.util';
 
 @Injectable({
   providedIn: 'root'
@@ -24,28 +25,56 @@ export class AuthService {
   // de todos los roles del usuario, devuelta por /api/login y /api/me —
   // roleGuard la usa en vez de comparar contra data.roles hardcodeado.
   private permissionsSubject = new BehaviorSubject<string[]>(this.safeParse('permissions', []));
+  // SCRUM-346 (seguimiento): mapa slug → nombre de TODO el catálogo de
+  // roles, sembrado desde login()/me() (AuthController::etiquetasDeRoles())
+  // — única fuente de verdad para mostrar el nombre de un rol, ver
+  // shared/role-label.util.ts. Se siembra la caché del util también en el
+  // constructor (no solo en login()) para que getRoleLabel() funcione
+  // inmediatamente tras un refresh de página, antes de cualquier llamada
+  // nueva al backend.
+  private roleLabelsSubject = new BehaviorSubject<Record<string, string>>(this.safeParse('role_labels', {}));
 
   public activeRole$: Observable<string | null> = this.activeRoleSubject.asObservable();
   public allRoles$: Observable<string[]> = this.allRolesSubject.asObservable();
   public user$: Observable<any> = this.userSubject.asObservable();
   public permissions$: Observable<string[]> = this.permissionsSubject.asObservable();
+  public roleLabels$: Observable<Record<string, string>> = this.roleLabelsSubject.asObservable();
 
-  constructor() {}
+  constructor() {
+    setRoleLabelsCache(this.roleLabelsSubject.value);
+  }
 
-  login(token: string, user: any, roles: string[], permissions: string[] = []): void {
+  login(token: string, user: any, roles: string[], permissions: string[] = [], roleLabels: Record<string, string> = {}): void {
     localStorage.setItem('auth_token', token);
     localStorage.setItem('user_data', JSON.stringify(user));
     localStorage.setItem('all_roles', JSON.stringify(roles));
     localStorage.setItem('permissions', JSON.stringify(permissions));
+    localStorage.setItem('role_labels', JSON.stringify(roleLabels));
 
     this.userSubject.next(user);
     this.allRolesSubject.next(roles);
     this.permissionsSubject.next(permissions);
+    this.setRoleLabels(roleLabels);
 
     // If only one role, set it as active immediately
     if (roles && roles.length === 1) {
       this.setActiveRole(roles[0]);
     }
+  }
+
+  /**
+   * SCRUM-346 (seguimiento): actualiza la caché de nombres de rol —
+   * llamado desde login() y, si en el futuro se agrega, desde cualquier
+   * refresco vía /api/me. Separado de login() para eso.
+   */
+  setRoleLabels(roleLabels: Record<string, string>): void {
+    localStorage.setItem('role_labels', JSON.stringify(roleLabels));
+    this.roleLabelsSubject.next(roleLabels);
+    setRoleLabelsCache(roleLabels);
+  }
+
+  getRoleLabels(): Record<string, string> {
+    return this.roleLabelsSubject.value;
   }
 
   getPermissions(): string[] {
@@ -100,6 +129,11 @@ export class AuthService {
     this.allRolesSubject.next([]);
     this.userSubject.next(null);
     this.permissionsSubject.next([]);
+    // roleLabelsSubject NO se limpia a propósito: son nombres de rol del
+    // catálogo general (no datos de la sesión ni del usuario), y dejarlos
+    // en memoria evita que la próxima pantalla de login (selector de
+    // perfil, si el usuario tiene varios roles) muestre el fallback
+    // genérico mientras espera la respuesta del próximo login().
   }
 
   isAuthorized(allowedRoles: string[]): boolean {

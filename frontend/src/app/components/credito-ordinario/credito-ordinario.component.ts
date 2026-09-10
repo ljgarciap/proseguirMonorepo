@@ -8,6 +8,18 @@ import { AuthService } from '../../services/auth.service';
 import Swal from 'sweetalert2';
 import { getRoleLabel } from '../../shared/role-label.util';
 
+/** Paso del stepper BPMN. 'role' (un solo slug) o 'roles' (varios, ver
+ * stepRoleLabel()) — nunca ambos a la vez. 'altKeys' solo lo usa el paso
+ * combinado de Informe Técnico (bpmnStepsConstructor). */
+interface BpmnStep {
+  key: string;
+  label: string;
+  role?: string;
+  roles?: string[];
+  desc: string;
+  altKeys?: string[];
+}
+
 @Component({
   selector: 'app-credito-ordinario',
   standalone: true,
@@ -18,6 +30,18 @@ import { getRoleLabel } from '../../shared/role-label.util';
 export class CreditoOrdinarioComponent implements OnInit {
   // SCRUM-331 (rebote): ver shared/role-label.util.ts.
   roleLabel = getRoleLabel;
+
+  /** Nombre del/los rol(es) dueño(s) de un paso del stepper BPMN — 'role'
+   * (un solo slug) o 'roles' (varios, unidos con " / ", ej. informe_tecnico
+   * en el flujo Constructor). Siempre vía roleLabel() (DB), nunca un
+   * string guardado en el paso mismo (ver SCRUM-346, seguimiento). */
+  stepRoleLabel(step: { role?: string; roles?: string[] }): string {
+    if (step.roles?.length) {
+      return step.roles.map(r => this.roleLabel(r)).join(' / ');
+    }
+    return step.role ? this.roleLabel(step.role) : '—';
+  }
+
   creditos: any[] = [];
   selectedCredito: any = null;
   activeRole: string = 'cliente';
@@ -40,26 +64,33 @@ export class CreditoOrdinarioComponent implements OnInit {
   solicitudDocumentosEnviando = false;
 
   // BPMN Stepper definition
-  bpmnSteps = [
-    { key: 'revision_documental', label: 'Revisión Solicitud', role: 'coordinador_comercial', roleLabel: 'Director de Crédito', desc: 'Revisar la solicitud inicial del cliente y verificar que los soportes y formularios estén completos.' },
-    { key: 'completar_solicitud', label: 'Completar Sop.', role: 'cliente', roleLabel: 'Cliente', desc: 'Completar la documentación faltante solicitada por el Director de Crédito.' },
+  // SCRUM-346 (seguimiento, a pedido explícito de Luis — "lo ideal es que
+  // sea desde la base de datos"): 'roleLabel' se sacó de cada paso — ya
+  // había quedado desactualizado sin que nadie lo notara ('operativo'
+  // decía "Dirección Administrativa", ni siquiera "Director
+  // Administrativo" del rename real de SCRUM-346). El nombre se arma
+  // ahora con stepRoleLabel(step), que llama a roleLabel() (DB) sobre el
+  // slug de 'role' — un solo lugar que nunca puede quedar desactualizado.
+  bpmnSteps: BpmnStep[] = [
+    { key: 'revision_documental', label: 'Revisión Solicitud', role: 'coordinador_comercial', desc: 'Revisar la solicitud inicial del cliente y verificar que los soportes y formularios estén completos.' },
+    { key: 'completar_solicitud', label: 'Completar Sop.', role: 'cliente', desc: 'Completar la documentación faltante solicitada por el Director de Crédito.' },
     // SCRUM-128: el paso combinado analisis_sarlaft_financiero se separó en dos
     // etapas secuenciales. La validación de Listas Restrictivas y SARLAFT ahora
     // se diligencia en el módulo dedicado (/listas-sarlaft, Oficial de
     // Cumplimiento) — este paso del stepper solo queda como referencia visual
     // de progreso, sin panel de acción propio en esta pantalla.
-    { key: 'sarlaft_control_interno', label: 'Sistema LA/FT/FP y C/ST', role: 'oficial_cumplimiento', roleLabel: 'Oficial de Cumplimiento', desc: 'Validar Listas Restrictivas y emitir concepto SARLAFT (gestionado desde el módulo Sistema LA/FT/FP y C/ST).' },
+    { key: 'sarlaft_control_interno', label: 'Sistema LA/FT/FP y C/ST', role: 'oficial_cumplimiento', desc: 'Validar Listas Restrictivas y emitir concepto SARLAFT (gestionado desde el módulo Sistema LA/FT/FP y C/ST).' },
     // SCRUM-183: se retiró el paso "Aprobación Pres." (Gerencia) — confirmar
     // el Análisis Financiero ya pasa directo a Comité de Crédito. La
     // presentación para el Comité se adjunta después, en Actas Comité de
     // Crédito (una por solicitud dentro del acta).
-    { key: 'pendiente_analisis_financiero', label: 'Análisis Financiero', role: 'coordinador_comercial', roleLabel: 'Director de Crédito', desc: 'Realizar el análisis financiero del cliente.' },
-    { key: 'comite_evaluacion', label: 'Comité de Crédito', role: 'comite_credito', roleLabel: 'Comité de Crédito', desc: 'Evaluar el perfil de crédito y firmar el Acta oficial de decisión del Comité.' },
-    { key: 'formalizacion_garantias', label: 'Garantías', role: 'operativo', roleLabel: 'Dirección Administrativa', desc: 'Revisar y registrar las garantías firmadas por el cliente.' },
-    { key: 'aprobacion_registro_cyf', label: 'Registro CYF', role: 'gerente', roleLabel: 'Gerencia', desc: 'Aprobar el registro de la operación en la plataforma core CYF.' },
-    { key: 'desembolso_ingreso', label: 'Egreso CYF', role: 'operativo', roleLabel: 'Dirección Administrativa', desc: 'Ingresar y registrar la operación de desembolso en la plataforma core CYF.' },
-    { key: 'desembolso_aprobacion', label: 'Aprobación Des.', role: 'gerente', roleLabel: 'Gerencia', desc: 'Dar aprobación final a la orden de desembolso bancario.' },
-    { key: 'ejecucion_transferencia', label: 'Transferencia', role: 'tesoreria', roleLabel: 'Tesorería', desc: 'Ejecutar la transferencia bancaria y enviar el comprobante de pago al cliente.' }
+    { key: 'pendiente_analisis_financiero', label: 'Análisis Financiero', role: 'coordinador_comercial', desc: 'Realizar el análisis financiero del cliente.' },
+    { key: 'comite_evaluacion', label: 'Comité de Crédito', role: 'comite_credito', desc: 'Evaluar el perfil de crédito y firmar el Acta oficial de decisión del Comité.' },
+    { key: 'formalizacion_garantias', label: 'Garantías', role: 'operativo', desc: 'Revisar y registrar las garantías firmadas por el cliente.' },
+    { key: 'aprobacion_registro_cyf', label: 'Registro CYF', role: 'gerente', desc: 'Aprobar el registro de la operación en la plataforma core CYF.' },
+    { key: 'desembolso_ingreso', label: 'Egreso CYF', role: 'operativo', desc: 'Ingresar y registrar la operación de desembolso en la plataforma core CYF.' },
+    { key: 'desembolso_aprobacion', label: 'Aprobación Des.', role: 'gerente', desc: 'Dar aprobación final a la orden de desembolso bancario.' },
+    { key: 'ejecucion_transferencia', label: 'Transferencia', role: 'tesoreria', desc: 'Ejecutar la transferencia bancaria y enviar el comprobante de pago al cliente.' }
   ];
 
   constructor(
@@ -170,11 +201,13 @@ export class CreditoOrdinarioComponent implements OnInit {
   // (ingeniero/coordinador/finalizado, ver InformeTecnicoController) se
   // consolidan en un solo paso visual, igual que ya hace el checklist de
   // "Expediente de Documentos" (informeTecnicoStatusLabel).
-  get bpmnStepsConstructor() {
+  get bpmnStepsConstructor(): BpmnStep[] {
     return [
-      { key: 'validacion_documental_constructor', label: 'Revisión Solicitud', role: 'coordinador_comercial', roleLabel: 'Director de Crédito', desc: 'Revisar el expediente inicial del cliente y verificar que los soportes estén completos.' },
-      { key: 'completar_solicitud_constructor', label: 'Completar Sop.', role: 'cliente', roleLabel: 'Cliente', desc: 'Completar la documentación faltante solicitada por el Director de Crédito.' },
-      { key: 'informe_tecnico', label: 'Informe Técnico', role: 'ingeniero', roleLabel: 'Ingeniero / Director de Crédito', desc: 'Elaboración y registro del Informe Técnico del proyecto.', altKeys: ['informe_tecnico_ingeniero', 'informe_tecnico_coordinador', 'informe_tecnico_finalizado'] },
+      { key: 'validacion_documental_constructor', label: 'Revisión Solicitud', role: 'coordinador_comercial', desc: 'Revisar el expediente inicial del cliente y verificar que los soportes estén completos.' },
+      { key: 'completar_solicitud_constructor', label: 'Completar Sop.', role: 'cliente', desc: 'Completar la documentación faltante solicitada por el Director de Crédito.' },
+      // 'roles' (plural) en vez de 'role': este paso lo comparten 2 roles —
+      // ver stepRoleLabel(), que los une con " / ".
+      { key: 'informe_tecnico', label: 'Informe Técnico', roles: ['ingeniero', 'coordinador_comercial'], desc: 'Elaboración y registro del Informe Técnico del proyecto.', altKeys: ['informe_tecnico_ingeniero', 'informe_tecnico_coordinador', 'informe_tecnico_finalizado'] },
       ...this.bpmnSteps.slice(2)
     ];
   }

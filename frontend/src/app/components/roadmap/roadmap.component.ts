@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
+import { getRoleLabel as getRoleLabelFromDb } from '../../shared/role-label.util';
 
 interface Feature {
   name: string;
@@ -21,17 +22,22 @@ interface Feature {
   styleUrls: ['./roadmap.component.css']
 })
 export class RoadmapComponent implements OnInit {
+  // SCRUM-346 (seguimiento): 'label' se sacó de acá — el nombre de cada
+  // rol ahora sale siempre de la BD (ver getRoleLabel() abajo y
+  // shared/role-label.util.ts), nunca de un mapa hardcodeado que hay que
+  // recordar actualizar cada vez que alguien renombra un rol desde Roles
+  // y Permisos (ya pasó 2 veces: SCRUM-331 y SCRUM-346). 'color' sí sigue
+  // acá — es puramente visual, sin equivalente en la BD.
   allRoles = [
-    { key: 'superadmin', label: 'Superadmin', color: '#6366F1' },
-    { key: 'gerente', label: 'Gerente', color: '#3B82F6' },
-    // SCRUM-346: renombrado a "Director Administrativo" (slug sin cambios).
-    { key: 'operativo', label: 'Director Administrativo', color: '#10B981' },
-    { key: 'contable', label: 'Contable', color: '#F59E0B' },
-    { key: 'cliente', label: 'Cliente', color: '#EC4899' },
-    { key: 'coordinador_comercial', label: 'Director de Crédito', color: '#8B5CF6' },
-    { key: 'oficial_cumplimiento', label: 'Oficial de Cumplimiento', color: '#06B6D4' },
-    { key: 'comite_credito', label: 'Comité de Crédito', color: '#EF4444' },
-    { key: 'tesoreria', label: 'Tesorería', color: '#14B8A6' }
+    { key: 'superadmin', color: '#6366F1' },
+    { key: 'gerente', color: '#3B82F6' },
+    { key: 'operativo', color: '#10B981' },
+    { key: 'contable', color: '#F59E0B' },
+    { key: 'cliente', color: '#EC4899' },
+    { key: 'coordinador_comercial', color: '#8B5CF6' },
+    { key: 'oficial_cumplimiento', color: '#06B6D4' },
+    { key: 'comite_credito', color: '#EF4444' },
+    { key: 'tesoreria', color: '#14B8A6' }
   ];
 
   areas = [
@@ -274,8 +280,7 @@ export class RoadmapComponent implements OnInit {
   }
 
   getRoleLabel(roleKey: string): string {
-    const role = this.allRoles.find(r => r.key === roleKey);
-    return role ? role.label : roleKey;
+    return getRoleLabelFromDb(roleKey);
   }
 
   getRoleColor(roleKey: string): string {

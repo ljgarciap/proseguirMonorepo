@@ -216,7 +216,7 @@ export class LoginComponent implements OnInit {
 
     this.http.post<any>(`${environment.apiUrl}/login`, this.credentials).subscribe({
       next: (response) => {
-        this.authService.login(response.token, response.user, response.roles, response.permissions);
+        this.authService.login(response.token, response.user, response.roles, response.permissions, response.role_labels);
 
         if (response.roles && response.roles.length > 1) {
           this.availableRoles = response.roles;
