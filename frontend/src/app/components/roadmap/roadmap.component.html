@@ -40,7 +40,7 @@
         <label for="role">Filtrar por Rol Involucrado</label>
         <select id="role" [(ngModel)]="selectedRole" (ngModelChange)="applyFilters()">
           <option value="Todos">Todos los roles</option>
-          <option *ngFor="let r of allRoles" [value]="r.key">{{ r.label }}</option>
+          <option *ngFor="let r of allRoles" [value]="r.key">{{ getRoleLabel(r.key) }}</option>
         </select>
       </div>
     </div>
@@ -115,7 +115,7 @@
               <th class="sticky-col first-header">Funcionalidad (Módulo)</th>
               <th *ngFor="let role of allRoles" class="role-header-col">
                 <span class="role-header-indicator" [style.background-color]="role.color"></span>
-                {{ role.label }}
+                {{ getRoleLabel(role.key) }}
               </th>
             </tr>
           </thead>
