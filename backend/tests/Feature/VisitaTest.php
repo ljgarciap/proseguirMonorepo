@@ -195,6 +195,26 @@ class VisitaTest extends TestCase
     }
 
     /**
+     * Auditoría post-SCRUM-348 (fallo en prod de solicitudes_credito.garantia
+     * como string()/VARCHAR 255): 'visitas.garantia' es el mismo campo de
+     * negocio, el mismo <input type="text"> sin maxlength en el frontend, y
+     * la misma validación 'nullable|string' sin límite en
+     * VisitaController::store()/update() — mismo riesgo real de "Data too
+     * long for column" en MySQL modo estricto con un texto largo de
+     * garantías/avalistas. Se valida el tipo real de columna en el schema,
+     * no el comportamiento de inserción — SQLite (motor de esta suite) no
+     * trunca ni rechaza un string más largo que la columna.
+     */
+    public function test_garantia_column_is_text_to_support_long_content(): void
+    {
+        $this->assertEquals(
+            'text',
+            \Illuminate\Support\Facades\Schema::getColumnType('visitas', 'garantia'),
+            "'garantia' debe ser text() — un string() (VARCHAR 255) revienta en MySQL modo estricto con texto real de garantías/avalistas (ver SCRUM-348)."
+        );
+    }
+
+    /**
      * Test update visit.
      */
     public function test_update_visit_successfully(): void
