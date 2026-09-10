@@ -307,6 +307,21 @@ export class CreditoOrdinarioComponent implements OnInit {
     return 'Pendiente';
   }
 
+  // SCRUM-344: "Negar Crédito" — Director de Crédito y Gerente pueden
+  // negar el crédito desde cualquier etapa del proceso, excepto
+  // 'comite_evaluacion' (se mantiene exclusivo de Actas de Comité, decisión
+  // de Luis) y los estados ya terminales (mismo criterio que valida
+  // CreditoOrdinarioController::transition()).
+  get puedeNegarCredito(): boolean {
+    if (!this.selectedCredito) return false;
+    if (!['coordinador_comercial', 'gerente', 'superadmin'].includes(this.activeRole)) return false;
+    return !['rechazado', 'completado', 'comite_evaluacion'].includes(this.selectedCredito.estado);
+  }
+
+  confirmarNegarCredito(): void {
+    this.executeTransition('negar');
+  }
+
   // SCRUM-151: algunos estados del flujo no tienen panel de acción en esta
   // pantalla porque se gestionan en un módulo dedicado (Informe Técnico,
   // Listas Restrictivas y SARLAFT) o avanzan automáticamente al completar la
@@ -349,14 +364,17 @@ export class CreditoOrdinarioComponent implements OnInit {
       case 'informe_tecnico_finalizado':
         return {
           title: 'Informe Técnico finalizado',
-          message: 'El Informe Técnico fue registrado. El crédito continuará automáticamente a la etapa de Listas Restrictivas y SARLAFT.'
+          // SCRUM-343 (4º rebote): quedaba el nombre viejo de la pantalla.
+          message: 'El Informe Técnico fue registrado. El crédito continuará automáticamente a la etapa de Sistema LA/FT/FP y C/ST.'
         };
       case 'sarlaft_control_interno':
         return {
-          title: 'Listas Restrictivas y SARLAFT en curso',
-          message: 'La validación de Listas Restrictivas y el concepto SARLAFT se gestionan desde el módulo dedicado.',
+          // SCRUM-343 (4º rebote): idem — "SARLAFT" acá nombraba la
+          // pantalla ya renombrada, no el concepto regulatorio.
+          title: 'Sistema LA/FT/FP y C/ST en curso',
+          message: 'La validación de Listas Restrictivas y el concepto SARLAFT se gestionan desde el módulo Sistema LA/FT/FP y C/ST.',
           link: `/listas-sarlaft/${creditoId}`,
-          linkLabel: 'Ir a Listas Restrictivas y SARLAFT',
+          linkLabel: 'Ir a Sistema LA/FT/FP y C/ST',
           roles: ['oficial_cumplimiento']
         };
       default:
@@ -597,17 +615,24 @@ export class CreditoOrdinarioComponent implements OnInit {
   // los "rechazar" del BPMN (Comité, Garantías, CYF, Desembolso) no cambian
   // de wording, la clave interna `accion` sigue siendo 'rechazar' en todos.
   executeTransition(accion: string, comentarioDefecto: string = '', extraData: any = {}, esNegarSolicitud: boolean = false) {
+    // SCRUM-344: 'negar' (Director de Crédito / Gerente, cualquier etapa)
+    // es una acción propia distinta de 'rechazar' — no confundir con
+    // esNegarSolicitud de arriba, que solo cambia el wording de un
+    // 'rechazar' de Etapa 1. Acá el motivo es obligatorio (backend lo
+    // exige con required_if:accion,negar).
+    const esNegarCredito = accion === 'negar';
     Swal.fire({
-      title: accion === 'rechazar' ? (esNegarSolicitud ? '¿Negar Solicitud?' : '¿Rechazar Solicitud?') : 'Confirmar Acción',
-      text: accion === 'rechazar' ? (esNegarSolicitud ? 'Por favor ingresa el motivo de la negación:' : 'Por favor ingresa el motivo del rechazo:') : 'Ingresa un comentario de auditoría para este paso (Opcional):',
+      title: esNegarCredito ? '¿Negar Crédito?' : (accion === 'rechazar' ? (esNegarSolicitud ? '¿Negar Solicitud?' : '¿Rechazar Solicitud?') : 'Confirmar Acción'),
+      text: esNegarCredito ? 'Esta acción es terminal e irreversible. Ingresa el motivo de la negación:' : (accion === 'rechazar' ? (esNegarSolicitud ? 'Por favor ingresa el motivo de la negación:' : 'Por favor ingresa el motivo del rechazo:') : 'Ingresa un comentario de auditoría para este paso (Opcional):'),
       input: 'text',
       inputValue: comentarioDefecto,
       inputPlaceholder: 'Escribe un comentario...',
-      icon: accion === 'rechazar' ? 'warning' : 'question',
+      inputValidator: esNegarCredito ? (value) => (value?.trim() ? undefined : 'El motivo es obligatorio para negar un crédito.') : undefined,
+      icon: (esNegarCredito || accion === 'rechazar') ? 'warning' : 'question',
       showCancelButton: true,
-      confirmButtonText: accion === 'rechazar' ? (esNegarSolicitud ? 'Sí, negar' : 'Sí, rechazar') : 'Confirmar y Avanzar',
+      confirmButtonText: esNegarCredito ? 'Sí, negar crédito' : (accion === 'rechazar' ? (esNegarSolicitud ? 'Sí, negar' : 'Sí, rechazar') : 'Confirmar y Avanzar'),
       cancelButtonText: 'Cancelar',
-      confirmButtonColor: accion === 'rechazar' ? '#E53E3E' : '#3182CE'
+      confirmButtonColor: (esNegarCredito || accion === 'rechazar') ? '#E53E3E' : '#3182CE'
     }).then((result) => {
       if (result.isConfirmed) {
         const comentario = result.value || comentarioDefecto;
