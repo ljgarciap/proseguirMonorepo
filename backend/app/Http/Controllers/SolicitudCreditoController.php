@@ -12,6 +12,7 @@ use App\Models\DocumentRequest;
 use App\Models\DocumentRequestItem;
 use App\Models\TipoPersona;
 use App\Mail\SolicitudCreditoMail;
+use App\Rules\MultipleEmails;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -71,7 +72,10 @@ class SolicitudCreditoController extends Controller
             'destino_recurso' => 'required|string',
             'garantia' => 'nullable|string',
             'fuente_pago' => 'required|string',
-            'correo_notificacion' => 'required|email',
+            // SCRUM-347: acepta 1 o más destinatarios separados por coma
+            // y/o punto y coma (ver MultipleEmails) — antes 'email' a secas
+            // rechazaba de plano cualquier lista de más de un correo.
+            'correo_notificacion' => ['required', 'string', new MultipleEmails()],
             'asunto_notificacion' => 'required|string',
             'mensaje_notificacion' => 'required|string',
             'document_preset_id' => 'nullable|exists:document_presets,id',
@@ -351,7 +355,11 @@ class SolicitudCreditoController extends Controller
             // para notificaciones que no deben bloquear la acción de negocio.
             $notificacionEnviada = true;
             try {
-                Mail::to($solicitud->correo_notificacion)->send(new SolicitudCreditoMail($solicitud, $documentosRequeridos, $cliente->numero_documento, $cleanPassword));
+                // SCRUM-347: 'correo_notificacion' puede traer varios
+                // destinatarios separados por coma/punto y coma — se
+                // reparten en Mail::to() (acepta array), no como un único
+                // string con todos adentro.
+                Mail::to(MultipleEmails::parse($solicitud->correo_notificacion))->send(new SolicitudCreditoMail($solicitud, $documentosRequeridos, $cliente->numero_documento, $cleanPassword));
             } catch (Throwable $e) {
                 $notificacionEnviada = false;
                 Log::error('Falló el envío de la notificación de registro de solicitud de crédito.', [

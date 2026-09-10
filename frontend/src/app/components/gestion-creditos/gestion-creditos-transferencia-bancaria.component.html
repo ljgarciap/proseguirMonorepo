@@ -149,7 +149,10 @@
         </div>
         <div class="form-group span-2">
           <label>Correo electrónico para notificación del pago <span class="required">*</span></label>
-          <input class="pro-input" type="email" [(ngModel)]="correoNotificacionPago" [disabled]="!puedeGestionar">
+          <!-- SCRUM-347: texto libre, no email — acepta varios destinatarios
+               separados por coma o punto y coma (ver MultipleEmails backend). -->
+          <input class="pro-input" type="text" [(ngModel)]="correoNotificacionPago" [disabled]="!puedeGestionar" placeholder="correo@cliente.com, otro@cliente.com">
+          <small class="text-muted">Uno o más correos separados por coma o punto y coma.</small>
         </div>
         <div class="form-group span-3">
           <label>Certificado bancario (PDF, JPG o PNG) <span class="required">*</span></label>

@@ -24,6 +24,7 @@ use App\Models\DocumentRequestItem;
 use App\Models\DocumentType;
 use App\Models\EntidadBancaria;
 use App\Models\User;
+use App\Rules\MultipleEmails;
 use App\Services\ActivityLog\ActivityLogService;
 use App\Services\ConfiguracionService;
 use Illuminate\Http\Request;
@@ -1444,7 +1445,9 @@ class GestionCreditoController extends Controller
             'numero_cuenta' => 'required|string|max:50',
             'numero_cuenta_confirmacion' => 'required|string|max:50',
             'moneda_cuenta' => 'required|string|max:10',
-            'correo_notificacion_pago' => 'required|email',
+            // SCRUM-347: acepta 1 o más destinatarios separados por coma
+            // y/o punto y coma (ver MultipleEmails).
+            'correo_notificacion_pago' => ['required', 'string', new MultipleEmails()],
             'certificado_bancario' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
             'observaciones_bancarias' => 'nullable|string',
             'fecha_transferencia' => 'required|date|before_or_equal:today',
@@ -1568,8 +1571,11 @@ class GestionCreditoController extends Controller
         $tipoCreditoCorreo = $this->tipoCreditoParaCorreo($credito);
 
         $correoCliente = $request->input('correo_notificacion_pago');
+        // SCRUM-347: puede traer varios destinatarios separados por
+        // coma/punto y coma — Mail::to() acepta array.
+        $destinatariosCliente = MultipleEmails::parse($correoCliente);
         try {
-            Mail::to($correoCliente)
+            Mail::to($destinatariosCliente)
                 ->send(new TransferenciaRealizadaClienteMail(
                     $credito,
                     $transferencia,
@@ -1584,7 +1590,7 @@ class GestionCreditoController extends Controller
                 "Notificación transferencia_realizada_cliente enviada al cliente para la solicitud {$credito->numero_solicitud}.",
                 $user,
                 $credito,
-                ['tipo_notificacion' => 'transferencia_realizada_cliente', 'destinatarios' => [$correoCliente]]
+                ['tipo_notificacion' => 'transferencia_realizada_cliente', 'destinatarios' => $destinatariosCliente]
             );
         } catch (Throwable $e) {
             app(ActivityLogService::class)->registrar(
@@ -1592,7 +1598,7 @@ class GestionCreditoController extends Controller
                 "Falló el envío de la notificación transferencia_realizada_cliente al cliente para la solicitud {$credito->numero_solicitud}.",
                 $user,
                 $credito,
-                ['tipo_notificacion' => 'transferencia_realizada_cliente', 'destinatarios' => [$correoCliente], 'error' => $e->getMessage()]
+                ['tipo_notificacion' => 'transferencia_realizada_cliente', 'destinatarios' => $destinatariosCliente, 'error' => $e->getMessage()]
             );
         }
 
