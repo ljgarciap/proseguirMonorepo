@@ -251,6 +251,27 @@ class SolicitudCreditoTest extends TestCase
     }
 
     /**
+     * SCRUM-348 (fallo en prod): 'garantia' quedó como string() (VARCHAR 255)
+     * en la migración original mientras que 'destino_recurso' y
+     * 'mensaje_notificacion' del mismo formulario ya son text() — un texto
+     * real de garantías/avalistas (>255 caracteres) revienta el INSERT en
+     * MySQL modo estricto con "Data too long for column" (mismo patrón que
+     * operacion_carteras.garantia_detalle/tipo_garantia, ya corregido antes).
+     * SQLite (motor de esta suite) no trunca ni rechaza un string más largo
+     * que la columna, así que un test funcional que solo mande un texto
+     * largo y espere 201 pasaría igual sin el fix — se valida el tipo real
+     * de columna en el schema, no el comportamiento de inserción.
+     */
+    public function test_garantia_column_is_text_to_support_long_content(): void
+    {
+        $this->assertEquals(
+            'text',
+            \Illuminate\Support\Facades\Schema::getColumnType('solicitudes_credito', 'garantia'),
+            "'garantia' debe ser text() — un string() (VARCHAR 255) revienta en MySQL modo estricto con texto real de garantías/avalistas (ver SCRUM-348)."
+        );
+    }
+
+    /**
      * SCRUM-335 (rebote — "Error de servidor en el registro de crédito"):
      * causa real fue un outage de red del servidor (sin salida a internet,
      * ver comentario en Jira), pero el mecanismo que convirtió eso en un 500
