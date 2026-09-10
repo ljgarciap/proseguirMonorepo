@@ -1087,4 +1087,110 @@ class CreditoOrdinarioTest extends TestCase
                 && $mail->comentario === 'Ajustes requeridos.';
         });
     }
+
+    // ---- SCRUM-344: "Negar Crédito" desde cualquier etapa (Director de --
+    // ---- Crédito / Gerente), excepto comite_evaluacion --------------------
+
+    private function creditoEnEstado(string $estado): int
+    {
+        $credito = CreditoOrdinario::iniciar(
+            clienteId: $this->cliente->id,
+            monto: 10000000,
+            plazoMeses: 12,
+            usuario: $this->coordinador->name,
+            rol: 'coordinador_comercial',
+            comentario: 'Solicitud registrada.',
+        );
+        $credito->update(['estado' => $estado]);
+
+        return $credito->id;
+    }
+
+    public function test_director_credito_puede_negar_desde_etapa_que_no_le_pertenece(): void
+    {
+        // 'desembolso_ingreso' solo está autorizado para 'operativo' en el
+        // mapa de roles por etapa — Director de Crédito no la posee.
+        $creditoId = $this->creditoEnEstado('desembolso_ingreso');
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'negar',
+            'comentario' => 'Cliente incumplió requisitos adicionales solicitados.',
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200)->assertJsonPath('estado', 'rechazado');
+
+        $historial = CreditoOrdinario::find($creditoId)->historial_estados;
+        $ultimoHistorial = end($historial);
+        $this->assertStringContainsString('negado manualmente', $ultimoHistorial['comentario']);
+        $this->assertStringContainsString('Cliente incumplió requisitos adicionales solicitados.', $ultimoHistorial['comentario']);
+    }
+
+    public function test_gerente_puede_negar_desde_cualquier_etapa(): void
+    {
+        $creditoId = $this->creditoEnEstado('formalizacion_garantias');
+
+        Passport::actingAs($this->gerente);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'negar',
+            'comentario' => 'Garantías ofrecidas insuficientes.',
+        ], ['X-Active-Role' => 'gerente'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'rechazado');
+    }
+
+    public function test_negar_credito_requiere_motivo(): void
+    {
+        $creditoId = $this->creditoEnEstado('revision_documental');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'negar',
+        ], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['comentario']);
+    }
+
+    public function test_negar_credito_no_permitido_en_comite_evaluacion(): void
+    {
+        $creditoId = $this->creditoEnEstado('comite_evaluacion');
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'negar',
+            'comentario' => 'Intento de negar durante Comité.',
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString('Actas de Comité', $response->json('message'));
+        $this->assertSame('comite_evaluacion', CreditoOrdinario::find($creditoId)->estado);
+    }
+
+    public function test_negar_credito_rechazado_por_roles_no_autorizados_aunque_sean_dueños_de_la_etapa(): void
+    {
+        // Operativo SÍ está autorizado para actuar en 'desembolso_ingreso'
+        // (aprobar/subir_archivo) — pero 'negar' es exclusivo de Director de
+        // Crédito y Gerente, sin importar de quién sea la etapa.
+        $creditoId = $this->creditoEnEstado('desembolso_ingreso');
+
+        Passport::actingAs($this->operativo);
+        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'negar',
+            'comentario' => 'Intento no autorizado.',
+        ], ['X-Active-Role' => 'operativo']);
+
+        $response->assertStatus(403);
+        $this->assertSame('desembolso_ingreso', CreditoOrdinario::find($creditoId)->estado);
+    }
+
+    public function test_negar_credito_no_permitido_si_ya_esta_en_estado_final(): void
+    {
+        $creditoId = $this->creditoEnEstado('rechazado');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'negar',
+            'comentario' => 'Intento redundante.',
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(422);
+    }
 }
