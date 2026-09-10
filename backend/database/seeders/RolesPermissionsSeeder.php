@@ -201,7 +201,11 @@ class RolesPermissionsSeeder extends Seeder
     private const ROLES = [
         ['slug' => 'superadmin', 'nombre' => 'Super Administrador', 'descripcion' => 'Acceso completo al sistema.'],
         ['slug' => 'gerente', 'nombre' => 'Gerencia', 'descripcion' => 'Dirección administrativa y financiera.'],
-        ['slug' => 'operativo', 'nombre' => 'Operativo', 'descripcion' => 'Operación diaria: cargas, validación, desembolsos.'],
+        // SCRUM-346: renombrado de "Operativo" a "Director Administrativo"
+        // desde la pantalla de Roles y Permisos — mismo criterio que el
+        // rename de coordinador_comercial en SCRUM-331 (slug sin cambios,
+        // firstOrCreate no pisa el 'nombre' ya sembrado en prod/test).
+        ['slug' => 'operativo', 'nombre' => 'Director Administrativo', 'descripcion' => 'Operación diaria: cargas, validación, desembolsos.'],
         ['slug' => 'cliente', 'nombre' => 'Cliente', 'descripcion' => 'Portal de clientes de factoring.'],
         ['slug' => 'contable', 'nombre' => 'Contable', 'descripcion' => 'Bandeja interna y conciliación contable.'],
         // SCRUM-331: renombrado de "Coordinador Comercial" a "Director de

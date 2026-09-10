@@ -16,7 +16,10 @@
 export const ROLE_LABELS: Record<string, string> = {
   superadmin: 'Superadmin',
   gerente: 'Gerente',
-  operativo: 'Operativo',
+  // SCRUM-346: renombrado de "Operativo" a "Director Administrativo" desde
+  // la pantalla de Roles y Permisos — mismo gap que motivó este archivo en
+  // SCRUM-331 (el slug interno 'operativo' no cambia a propósito).
+  operativo: 'Director Administrativo',
   contable: 'Contable',
   cliente: 'Cliente',
   coordinador_comercial: 'Director de Crédito',
