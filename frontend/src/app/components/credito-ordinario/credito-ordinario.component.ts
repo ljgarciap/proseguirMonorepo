@@ -48,7 +48,7 @@ export class CreditoOrdinarioComponent implements OnInit {
     // se diligencia en el módulo dedicado (/listas-sarlaft, Oficial de
     // Cumplimiento) — este paso del stepper solo queda como referencia visual
     // de progreso, sin panel de acción propio en esta pantalla.
-    { key: 'sarlaft_control_interno', label: 'Listas Restrictivas / SARLAFT', role: 'oficial_cumplimiento', roleLabel: 'Oficial de Cumplimiento', desc: 'Validar Listas Restrictivas y emitir concepto SARLAFT (gestionado desde el módulo Listas Restrictivas y SARLAFT).' },
+    { key: 'sarlaft_control_interno', label: 'Sistema LA/FT/FP y C/ST', role: 'oficial_cumplimiento', roleLabel: 'Oficial de Cumplimiento', desc: 'Validar Listas Restrictivas y emitir concepto SARLAFT (gestionado desde el módulo Sistema LA/FT/FP y C/ST).' },
     // SCRUM-183: se retiró el paso "Aprobación Pres." (Gerencia) — confirmar
     // el Análisis Financiero ya pasa directo a Comité de Crédito. La
     // presentación para el Comité se adjunta después, en Actas Comité de
