@@ -35,7 +35,7 @@ export class GestionCreditosBandejaComponent implements OnInit, OnDestroy {
     { clave: 'aprobacion_registro_cyf', label: 'Aprobación Registro de Crédito en CYF', icono: 'fact_check', iconoClase: 'warning' },
     { clave: 'desembolso_aprobacion', label: 'Aprobación Registro Operación de Desembolso en CYF', icono: 'price_check', iconoClase: 'success' },
     { clave: 'aprobada_garantias', label: 'Aprobados para gestión de garantías', icono: 'verified', iconoClase: 'success' },
-    { clave: 'sarlaft_desfavorable', label: 'Listas Restrictivas y SARLAFT desfavorable', icono: 'gavel', iconoClase: 'danger' },
+    { clave: 'sarlaft_desfavorable', label: 'Sistema de autocontrol y gestión del riesgo desfavorable', icono: 'gavel', iconoClase: 'danger' },
     { clave: 'pendiente_comite', label: 'Pendientes - Comité de Créditos', icono: 'hourglass_top', iconoClase: 'warning' },
     { clave: 'pendiente_formalizacion_garantias', label: 'Pendientes para Formalización de Garantías', icono: 'fact_check', iconoClase: 'purple' },
     { clave: 'rechazada_comite', label: 'Negados - Comité de Créditos', icono: 'cancel', iconoClase: 'danger' },

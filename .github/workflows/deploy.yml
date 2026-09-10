@@ -4,6 +4,17 @@ on:
   push:
     branches: [ master, test ]
 
+# 2026-09-10: 2 eventos push idénticos (mismo head_sha) para el mismo push a
+# `test` dispararon 2 runs en paralelo — ambos deploys corrieron
+# `docker compose up` contra el mismo servidor SSH al mismo tiempo y uno
+# chocó al recrear factoring_backend (conflicto de nombre de contenedor).
+# `concurrency` pone en cola los runs del mismo ref en vez de dejarlos
+# competir; cancel-in-progress: false para no matar un deploy a mitad de
+# `docker compose up` (dejaría contenedores a medio recrear).
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test-backend:
     name: Backend Tests (Laravel)
