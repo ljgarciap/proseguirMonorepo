@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\ClientUpload;
 use App\Models\DocumentType;
 use App\Models\CreditoOrdinario;
 use App\Models\Cliente;
@@ -1086,5 +1087,151 @@ class CreditoOrdinarioTest extends TestCase
             return $mail->documentos === ['RUT', 'Certificación de ingresos']
                 && $mail->comentario === 'Ajustes requeridos.';
         });
+    }
+
+    // ---- SCRUM-344: "Negar Crédito" desde cualquier etapa (Director de --
+    // ---- Crédito / Gerente), excepto comite_evaluacion --------------------
+
+    private function creditoEnEstado(string $estado): int
+    {
+        $credito = CreditoOrdinario::iniciar(
+            clienteId: $this->cliente->id,
+            monto: 10000000,
+            plazoMeses: 12,
+            usuario: $this->coordinador->name,
+            rol: 'coordinador_comercial',
+            comentario: 'Solicitud registrada.',
+        );
+        $credito->update(['estado' => $estado]);
+
+        return $credito->id;
+    }
+
+    public function test_director_credito_puede_negar_desde_etapa_que_no_le_pertenece(): void
+    {
+        // 'desembolso_ingreso' solo está autorizado para 'operativo' en el
+        // mapa de roles por etapa — Director de Crédito no la posee.
+        $creditoId = $this->creditoEnEstado('desembolso_ingreso');
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'negar',
+            'comentario' => 'Cliente incumplió requisitos adicionales solicitados.',
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(200)->assertJsonPath('estado', 'rechazado');
+
+        $historial = CreditoOrdinario::find($creditoId)->historial_estados;
+        $ultimoHistorial = end($historial);
+        $this->assertStringContainsString('negado manualmente', $ultimoHistorial['comentario']);
+        $this->assertStringContainsString('Cliente incumplió requisitos adicionales solicitados.', $ultimoHistorial['comentario']);
+    }
+
+    public function test_gerente_puede_negar_desde_cualquier_etapa(): void
+    {
+        $creditoId = $this->creditoEnEstado('formalizacion_garantias');
+
+        Passport::actingAs($this->gerente);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'negar',
+            'comentario' => 'Garantías ofrecidas insuficientes.',
+        ], ['X-Active-Role' => 'gerente'])
+            ->assertStatus(200)
+            ->assertJsonPath('estado', 'rechazado');
+    }
+
+    public function test_negar_credito_requiere_motivo(): void
+    {
+        $creditoId = $this->creditoEnEstado('revision_documental');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'negar',
+        ], ['X-Active-Role' => 'coordinador_comercial'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['comentario']);
+    }
+
+    public function test_negar_credito_no_permitido_en_comite_evaluacion(): void
+    {
+        $creditoId = $this->creditoEnEstado('comite_evaluacion');
+
+        Passport::actingAs($this->coordinador);
+        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'negar',
+            'comentario' => 'Intento de negar durante Comité.',
+        ], ['X-Active-Role' => 'coordinador_comercial']);
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString('Actas de Comité', $response->json('message'));
+        $this->assertSame('comite_evaluacion', CreditoOrdinario::find($creditoId)->estado);
+    }
+
+    public function test_negar_credito_rechazado_por_roles_no_autorizados_aunque_sean_dueños_de_la_etapa(): void
+    {
+        // Operativo SÍ está autorizado para actuar en 'desembolso_ingreso'
+        // (aprobar/subir_archivo) — pero 'negar' es exclusivo de Director de
+        // Crédito y Gerente, sin importar de quién sea la etapa.
+        $creditoId = $this->creditoEnEstado('desembolso_ingreso');
+
+        Passport::actingAs($this->operativo);
+        $response = $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'negar',
+            'comentario' => 'Intento no autorizado.',
+        ], ['X-Active-Role' => 'operativo']);
+
+        $response->assertStatus(403);
+        $this->assertSame('desembolso_ingreso', CreditoOrdinario::find($creditoId)->estado);
+    }
+
+    /**
+     * SCRUM-345: "carga interna de adjuntos" por parte del Director de
+     * Crédito en Etapa 1 — el botón "Subir" y la autorización de backend
+     * para 'coordinador_comercial' YA existían (ver $rolesAutorizados y la
+     * condición del template), pero el ClientUpload resultante quedaba con
+     * 'user_id' = el propio Director (quien ejecuta la subida) en vez del
+     * cliente dueño del crédito — exactamente lo que 'upload_role' existe
+     * para distinguir (SCRUM-... migración 2026_05_08). Consecuencia real:
+     * el cliente recibía 403 ("No tienes permiso para ver este archivo")
+     * al intentar ver/descargar un documento que el Director había subido
+     * por él — el requisito explícito del ticket ("los demás roles...
+     * puedan visualizar y descargar... así como sucede con los que carga
+     * el cliente") no se cumplía. Mismo bug si cualquier otro rol staff
+     * autorizado en esta etapa sube por el cliente.
+     */
+    public function test_scrum345_documento_subido_por_director_queda_asociado_al_cliente_no_al_director(): void
+    {
+        [$creditoId, $item] = $this->creditoConPresetEtapa1();
+        $campo = 'req_item_' . $item->id;
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'subir_archivo',
+            'campo_documento' => $campo,
+            'archivos' => [$this->pdf('subido_por_director.pdf')],
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+
+        $item->refresh();
+        $upload = ClientUpload::find($item->client_upload_id);
+        $this->assertNotNull($upload);
+        // El documento queda a nombre del CLIENTE dueño del crédito...
+        $this->assertSame($this->cliente->id, $upload->user_id);
+        // ...pero la auditoría de quién lo cargó de verdad no se pierde.
+        $this->assertSame('coordinador_comercial', $upload->upload_role);
+
+        // El cliente dueño del crédito puede ver/descargar su propio documento.
+        Passport::actingAs($this->cliente);
+        $this->get("/api/uploads/{$upload->id}/download")->assertStatus(200);
+    }
+
+    public function test_negar_credito_no_permitido_si_ya_esta_en_estado_final(): void
+    {
+        $creditoId = $this->creditoEnEstado('rechazado');
+
+        Passport::actingAs($this->coordinador);
+        $this->postJson("/api/creditos/{$creditoId}/transition", [
+            'accion' => 'negar',
+            'comentario' => 'Intento redundante.',
+        ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(422);
     }
 }

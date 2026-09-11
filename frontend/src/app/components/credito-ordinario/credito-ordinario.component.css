@@ -253,6 +253,13 @@
   color: #FBD38D;
 }
 
+/* SCRUM-344: botón "Negar Crédito" dentro del banner oscuro. */
+.banner-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
 .status-detail-badge {
   font-size: 0.7rem;
   padding: 4px 10px;

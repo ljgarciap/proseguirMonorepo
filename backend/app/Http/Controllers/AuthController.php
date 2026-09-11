@@ -110,6 +110,8 @@ class AuthController extends Controller
             // login mismo — evita un round-trip extra a /api/me solo para
             // tener el gate de pantalla listo.
             'permissions' => $this->permisosDelUsuario($user),
+            // SCRUM-346 (seguimiento): idem, ver etiquetasDeRoles().
+            'role_labels' => $this->etiquetasDeRoles(),
         ]);
     }
 
@@ -276,6 +278,7 @@ class AuthController extends Controller
 
         $data = $user->toArray();
         $data['permissions'] = $this->permisosDelUsuario($user);
+        $data['role_labels'] = $this->etiquetasDeRoles();
 
         return response()->json($data);
     }
@@ -304,5 +307,24 @@ class AuthController extends Controller
             ->pluck('clave')
             ->unique()
             ->values();
+    }
+
+    /**
+     * SCRUM-346 (seguimiento): mapa slug → nombre de TODOS los roles del
+     * catálogo (no solo los del usuario — pantallas como Gestión de
+     * Usuarios o Roadmap muestran el rol de OTROS usuarios, o el catálogo
+     * completo). Única fuente de verdad para mostrar el nombre de un rol
+     * en el frontend — reemplaza los mapas hardcodeados por pantalla
+     * (role-label.util.ts, roadmap.component.ts, etc.) que quedaban
+     * desactualizados cada vez que un rol se renombraba desde Roles y
+     * Permisos (ya pasó 2 veces: SCRUM-331 y SCRUM-346). Se manda en
+     * login()/me() en vez de un endpoint aparte para que estar disponible
+     * no dependa de que el usuario tenga el permiso 'roles' (GET /roles
+     * sí lo exige, correctamente — ese trae permisos/conteos, no solo
+     * nombres).
+     */
+    private function etiquetasDeRoles()
+    {
+        return Role::pluck('nombre', 'slug');
     }
 }

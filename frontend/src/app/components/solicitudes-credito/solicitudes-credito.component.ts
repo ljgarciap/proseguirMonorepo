@@ -487,9 +487,12 @@ export class SolicitudesCreditoComponent implements OnInit {
     if (!this.form.destino_recurso || !this.form.fuente_pago) return false;
     if (!this.form.correo_notificacion || !this.form.asunto_notificacion || !this.form.mensaje_notificacion) return false;
 
-    // Check email format
+    // Check email format — uno o más correos separados por coma y/o punto y
+    // coma (SCRUM-347); un solo regex sobre el string completo nunca acepta
+    // 2+ direcciones, hay que validar cada una por separado.
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(this.form.correo_notificacion)) return false;
+    const correos = this.form.correo_notificacion.split(/[,;]+/).map((c: string) => c.trim()).filter((c: string) => c !== '');
+    if (correos.length === 0 || !correos.every((c: string) => emailRegex.test(c))) return false;
 
     if (this.isPersonaJuridica()) {
       if (!this.form.nombre_razon_social || !this.form.tipo_empresa || !this.form.actividad_economica) return false;

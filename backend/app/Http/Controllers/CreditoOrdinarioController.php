@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\ResolvesActiveRole;
 use App\Models\ClientUpload;
 use App\Models\CreditoOrdinario;
 use App\Models\DocumentRequestItem;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -217,8 +218,15 @@ class CreditoOrdinarioController extends Controller
         }
 
         $request->validate([
-            'accion'          => 'required|string|in:aprobar,rechazar,completar,subir_archivo,devolver',
-            'comentario'      => 'nullable|string',
+            // SCRUM-344: 'negar' — negación manual desde cualquier etapa
+            // del proceso (Director de Crédito / Gerente), distinta de
+            // 'rechazar' (que ya existía por etapa, restringida a quien es
+            // dueño de esa etapa puntual).
+            'accion'          => 'required|string|in:aprobar,rechazar,completar,subir_archivo,devolver,negar',
+            // SCRUM-344: motivo obligatorio solo para 'negar' — decisión
+            // terminal e irreversible sobre el crédito de un cliente,
+            // ejecutada fuera del flujo normal de la etapa.
+            'comentario'      => 'nullable|string|required_if:accion,negar',
             'archivo'         => "nullable|file|mimes:{$mimesPermitidos}|max:102400",
             'archivos'        => 'nullable|array',
             'archivos.*'      => "file|mimes:{$mimesPermitidos}|max:102400",
@@ -253,6 +261,28 @@ class CreditoOrdinarioController extends Controller
 
         // Bypassear validaciones estrictas de rol si es superadmin (para facilitar pruebas)
         $isAuthorized = ($activeRole === 'superadmin');
+
+        // SCRUM-344: Director de Crédito y Gerente pueden negar el crédito
+        // sin importar qué rol es "dueño" de la etapa actual (a diferencia
+        // de 'rechazar', ver $rolesAutorizados más abajo) — acotado a la
+        // propia acción 'negar' nada más, no un bypass general como
+        // $isAuthorized. 'comite_evaluacion' NO queda cubierto por este
+        // flag a propósito: el corte de la línea de arriba (!$isAuthorized)
+        // ya bloquea esa etapa para cualquiera que no sea superadmin antes
+        // de llegar acá — decisión de Luis de mantener esa etapa exclusiva
+        // de Actas de Comité.
+        $puedeNegarDesdeCualquierEtapa = $accion === 'negar' && in_array($activeRole, ['coordinador_comercial', 'gerente'], true);
+        $activeRoleLabel = Role::where('slug', $activeRole)->value('nombre') ?? $activeRole;
+
+        // SCRUM-344: 'negar' es exclusivo de Director de Crédito y Gerente
+        // (más superadmin) — sin este chequeo explícito, un rol que ya es
+        // "dueño" de la etapa actual (ej. Operativo en 'desembolso_ingreso')
+        // pasaría igual el mapa de $rolesAutorizados de abajo, que solo
+        // valida "quién puede actuar en esta etapa" para CUALQUIER acción,
+        // no específicamente quién puede negar.
+        if ($accion === 'negar' && !$isAuthorized && !$puedeNegarDesdeCualquierEtapa) {
+            return response()->json(['message' => 'No tienes autorización para negar un crédito.'], 403);
+        }
 
         // SCRUM-178: 'comite_evaluacion' ya no se transiciona manualmente
         // desde acá — la única salida de ese estado es registrar el Acta de
@@ -294,7 +324,7 @@ class CreditoOrdinarioController extends Controller
         ];
 
         // Validar que el rol activo tiene permisos en la etapa actual
-        if (!$isAuthorized && isset($rolesAutorizados[$estadoActual])) {
+        if (!$isAuthorized && !$puedeNegarDesdeCualquierEtapa && isset($rolesAutorizados[$estadoActual])) {
             if (!in_array($activeRole, $rolesAutorizados[$estadoActual])) {
                 return response()->json([
                     'message' => 'No tienes autorización para realizar acciones en esta etapa.',
@@ -389,8 +419,19 @@ class CreditoOrdinarioController extends Controller
                 $nombres[]  = $fileName;
 
                 if ($requestItemId) {
+                    // SCRUM-345: 'user_id' es el DUEÑO del documento (el
+                    // cliente del crédito), no quien ejecuta la subida —
+                    // para eso existe 'upload_role' (migración
+                    // 2026_05_08_...add_upload_role...). Antes se guardaba
+                    // $user->id (el actor) acá, así que cuando un rol
+                    // staff autorizado en esta etapa (Director de Crédito)
+                    // subía un documento POR el cliente, el cliente
+                    // recibía 403 al intentar ver/descargar su propio
+                    // documento (ClientUploadController::download()
+                    // compara upload->user_id contra el usuario que pide
+                    // verlo) y tampoco aparecía en su "Mis Cargas".
                     $upload = ClientUpload::create([
-                        'user_id'       => $user->id,
+                        'user_id'       => $credito->cliente_id,
                         'upload_role'   => $activeRole,
                         'filename'      => $path,
                         'original_name' => $fileName,
@@ -618,6 +659,22 @@ class CreditoOrdinarioController extends Controller
                 $comentario = 'Documentación incompleta del expediente inicial. Solicitud enviada al cliente para completar. ' . $comentario;
                 $notificacionValidacion = 'completar'; // SCRUM-258 (5.2)
             }
+        } elseif ($accion === 'negar') {
+            // SCRUM-344: Director de Crédito y Gerente pueden negar el
+            // crédito desde cualquier etapa del proceso — a diferencia de
+            // 'rechazar' (que solo lo puede ejecutar quien ya es dueño de
+            // la etapa actual vía $rolesAutorizados), acá el bypass de
+            // etapa-dueño ya se resolvió más arriba (ver
+            // $puedeNegarDesdeCualquierEtapa). 'comite_evaluacion' queda
+            // excluido a propósito (decisión de Luis): ese estado ya
+            // cortó la ejecución más arriba para cualquier rol que no sea
+            // superadmin, antes de llegar acá — sigue siendo exclusivo de
+            // Actas de Comité.
+            if (in_array($estadoActual, ['rechazado', 'completado'], true)) {
+                return response()->json(['message' => 'Este crédito ya se encuentra en un estado final.'], 422);
+            }
+            $estadoNuevo = 'rechazado';
+            $comentario = "Crédito negado manualmente por {$activeRoleLabel} en la etapa: {$estadoActual}. Motivo: " . $comentario;
         } elseif ($accion === 'aprobar' || $accion === 'subir_archivo') {
             switch ($estadoActual) {
                 case 'validacion_documental_constructor':

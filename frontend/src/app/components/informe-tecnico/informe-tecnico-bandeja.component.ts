@@ -6,6 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
+import { getRoleLabel } from '../../shared/role-label.util';
 import Swal from 'sweetalert2';
 
 /**
@@ -17,10 +18,13 @@ const ROL_POR_ESTADO: Record<string, string> = {
   informe_tecnico_coordinador: 'coordinador_comercial',
 };
 
-const ESTADO_LABELS: Record<string, string> = {
-  informe_tecnico_ingeniero: 'Diligenciando Ingeniero',
-  informe_tecnico_coordinador: 'Diligenciando Director de Crédito',
-  informe_tecnico_finalizado: 'Finalizado',
+// SCRUM-346 (seguimiento): el nombre del rol embebido en cada label ya no
+// se hardcodea — se arma con getRoleLabel() (DB) al momento de mostrarse,
+// no al cargar el módulo.
+const ESTADO_LABELS: Record<string, () => string> = {
+  informe_tecnico_ingeniero: () => `Diligenciando ${getRoleLabel('ingeniero')}`,
+  informe_tecnico_coordinador: () => `Diligenciando ${getRoleLabel('coordinador_comercial')}`,
+  informe_tecnico_finalizado: () => 'Finalizado',
 };
 
 @Component({
@@ -102,13 +106,13 @@ export class InformeTecnicoBandejaComponent implements OnInit, OnDestroy {
   }
 
   estadoLabel(estado: string): string {
-    return ESTADO_LABELS[estado] || estado;
+    return ESTADO_LABELS[estado]?.() || estado;
   }
 
   rolActual(estado: string): string {
     if (estado === 'informe_tecnico_finalizado') return '—';
     const rol = ROL_POR_ESTADO[estado];
-    return rol === 'ingeniero' ? 'Ingeniero' : rol === 'coordinador_comercial' ? 'Director de Crédito' : '—';
+    return rol ? getRoleLabel(rol) : '—';
   }
 
   proyecto(credito: any): string {

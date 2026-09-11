@@ -95,6 +95,14 @@
             </span>
           </div>
         </div>
+        <!-- SCRUM-344: Director de Crédito / Gerente pueden negar el
+             crédito desde cualquier etapa del proceso (excepto Comité,
+             que sigue exclusivo de Actas de Comité). -->
+        <div class="banner-actions" *ngIf="puedeNegarCredito">
+          <button type="button" class="btn-pro danger" (click)="confirmarNegarCredito()">
+            <span class="material-symbols-outlined">block</span> Negar Crédito
+          </button>
+        </div>
       </div>
 
       <!-- Simplified Timeline Progress for Client and Management -->
@@ -159,7 +167,7 @@
             </div>
             <div class="step-label">
               <span class="label-text">{{ step.label }}</span>
-              <span class="label-role">{{ step.roleLabel }}</span>
+              <span class="label-role">{{ stepRoleLabel(step) }}</span>
             </div>
           </div>
         </div>
@@ -591,15 +599,18 @@
           </div>
 
           <!-- ETAPA 2 / 3 (según tipo de crédito) -->
+          <!-- SCRUM-343 (4º rebote): "Análisis SARLAFT y Financiero" / "Síntesis
+               SARLAFT" nombraban la pantalla ya renombrada a Sistema LA/FT/FP y
+               C/ST — quedaron afuera de los 3 rebotes anteriores por descuido. -->
           <div class="stage-doc-group">
-            <h4>Etapa {{ 2 + etapaOffset }}: Análisis SARLAFT y Financiero <span class="stage-owner">Cumplimiento / Comercial</span></h4>
+            <h4>Etapa {{ 2 + etapaOffset }}: Sistema LA/FT/FP y C/ST y Financiero <span class="stage-owner">Cumplimiento / Comercial</span></h4>
             <div class="documents-grid-grouped">
-              <!-- Síntesis SARLAFT -->
+              <!-- Síntesis Sistema LA/FT/FP y C/ST -->
               <div class="doc-box-new">
                 <div class="doc-main-info">
                   <span class="material-symbols-outlined doc-icon-new" [class.completed]="sarlaftEstadoLabel !== 'Pendiente'">verified_user</span>
                   <div class="doc-title-desc">
-                    <h5>Síntesis SARLAFT</h5>
+                    <h5>Síntesis Sistema LA/FT/FP y C/ST</h5>
                     <p>Reporte de validación de listas restrictivas. Responsable: Oficial de Cumplimiento.</p>
                   </div>
                 </div>

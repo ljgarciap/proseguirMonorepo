@@ -400,7 +400,12 @@
           <div class="form-grid mt-4">
             <div class="form-group span-full">
               <label>Destino de Notificación (Correo del Cliente) <span class="required">*</span></label>
-              <input type="email" [(ngModel)]="form.correo_notificacion" name="correo_notificacion" required class="pro-input" />
+              <!-- SCRUM-347: type="email" con [multiple] solo acepta coma como
+                   separador (spec HTML5) — el requerimiento pide también punto
+                   y coma, así que se valida como texto libre y la validación
+                   real de cada correo la hace el backend (MultipleEmails). -->
+              <input type="text" [(ngModel)]="form.correo_notificacion" name="correo_notificacion" required class="pro-input" placeholder="correo@cliente.com, otro@cliente.com" />
+              <small class="text-muted">Uno o más correos separados por coma o punto y coma.</small>
             </div>
 
             <div class="form-group span-full">

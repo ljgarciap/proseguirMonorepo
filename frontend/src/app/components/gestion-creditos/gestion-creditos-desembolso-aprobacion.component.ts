@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../services/auth.service';
+import { getRoleLabel } from '../../shared/role-label.util';
 import Swal from 'sweetalert2';
 
 /**
@@ -33,6 +34,10 @@ export class GestionCreditosDesembolsoAprobacionComponent implements OnInit {
 
   decision: 'aprobar' | 'rechazar' | '' = '';
   observaciones = '';
+
+  // SCRUM-346 (seguimiento): el <label> de esta pantalla decía "Observaciones
+  // de Operativo" hardcodeado — el nombre del rol ahora sale siempre de la BD.
+  roleLabel = getRoleLabel;
 
   constructor(
     private route: ActivatedRoute,

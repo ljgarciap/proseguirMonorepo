@@ -478,6 +478,86 @@ class SolicitudCreditoTest extends TestCase
     }
 
     /**
+     * SCRUM-347: 'correo_notificacion' acepta varios destinatarios
+     * separados por coma y/o punto y coma, con o sin espacios — antes la
+     * regla 'email' a secas rechazaba de plano cualquier lista de más de
+     * un correo.
+     */
+    public function test_register_credit_request_accepts_multiple_notification_recipients(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $payload = [
+            'cliente_id' => $this->clientNatural->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'garantia' => 'Firma personal',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'uno@test.com, dos@test.com ; tres@test.com',
+            'asunto_notificacion' => 'Documentación para Crédito',
+            'mensaje_notificacion' => 'Por favor adjunta los archivos.',
+            'document_preset_id' => $this->preset->id,
+            'nombres' => 'Juan Carlos',
+            'primer_apellido' => 'Perez',
+            'correo_electronico' => 'juan@test.com',
+            'telefono' => '3119999999',
+            'direccion' => 'Avenida Principal 12',
+            'pais' => 'Colombia',
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id,
+        ];
+
+        $response = $this->postJson('/api/solicitudes-credito', $payload);
+
+        $response->assertStatus(201);
+
+        Mail::assertSent(SolicitudCreditoMail::class, function ($mail) {
+            return $mail->hasTo('uno@test.com')
+                && $mail->hasTo('dos@test.com')
+                && $mail->hasTo('tres@test.com');
+        });
+    }
+
+    /**
+     * SCRUM-347: si alguno de los correos de la lista es inválido, se
+     * rechaza con un 422 explícito (no se registra nada a medias).
+     */
+    public function test_register_credit_request_rejects_invalid_email_in_notification_list(): void
+    {
+        Passport::actingAs($this->admin);
+
+        $payload = [
+            'cliente_id' => $this->clientNatural->id,
+            'tipo_credito_id' => $this->creditoOrdinario->id,
+            'monto_solicitado' => 20000000.00,
+            'plazo_meses' => 12,
+            'amortizacion_id' => $this->amortizacionMensual->id,
+            'destino_recurso' => 'Capital de trabajo',
+            'garantia' => 'Firma personal',
+            'fuente_pago' => 'Ingresos operacionales',
+            'correo_notificacion' => 'uno@test.com, no-es-un-correo',
+            'asunto_notificacion' => 'Documentación para Crédito',
+            'mensaje_notificacion' => 'Por favor adjunta los archivos.',
+            'nombres' => 'Juan Carlos',
+            'primer_apellido' => 'Perez',
+            'correo_electronico' => 'juan@test.com',
+            'telefono' => '3119999999',
+            'direccion' => 'Avenida Principal 12',
+            'pais' => 'Colombia',
+            'departamento_id' => $this->departamentoValle->id,
+            'ciudad_id' => $this->ciudadCali->id,
+        ];
+
+        $response = $this->postJson('/api/solicitudes-credito', $payload);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['correo_notificacion']);
+    }
+
+    /**
      * SCRUM-185: si 'cliente_id' viene vacío pero el 'numero_documento' ya
      * pertenece a otro cliente, debe rechazarse con un 422 de validación
      * explícito — no crear un duplicado ni reventar con un error de BD.
