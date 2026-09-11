@@ -16,12 +16,23 @@ export async function loginAs(page: Page, numeroDocumento: string, password: str
   await page.goto('/login');
   await page.locator('input[name="numero_documento"]').fill(numeroDocumento);
   await page.locator('input[name="password"]').fill(password);
-  await page.locator('button[type="submit"]').click();
 
-  // SCRUM-339: el selector de perfil usa role-label.util.ts desde SCRUM-331
-  // (coordinador_comercial -> "Director de Crédito", no un title-case
-  // genérico del slug) — mismo mapeo acá para no desincronizarse de nuevo.
-  const labelRol = getRoleLabel(rol);
+  // Bug encontrado armando la spec de SCRUM-345 (rebote): getRoleLabel()
+  // importado acá corre en el proceso Node de Playwright, no dentro del
+  // navegador — la caché que SCRUM-346 llena en AuthService (desde
+  // 'role_labels' de la respuesta de /login) nunca se puebla acá, así que
+  // getRoleLabel() siempre caía al transform genérico del slug ("Director
+  // de Crédito" -> nunca; devolvía "Coordinador Comercial" para
+  // 'coordinador_comercial', el nombre viejo pre-SCRUM-346) y el picker de
+  // perfil rompía con cualquier rol renombrado. Se intercepta la respuesta
+  // real de /login (misma 'role_labels' que usa el frontend) en vez de
+  // confiar en la caché estática.
+  const [loginResponse] = await Promise.all([
+    page.waitForResponse(resp => resp.url().includes('/api/login') && resp.request().method() === 'POST'),
+    page.locator('button[type="submit"]').click(),
+  ]);
+  const roleLabels = await loginResponse.json().then(body => body.role_labels ?? {}).catch(() => ({}));
+  const labelRol: string = roleLabels[rol] ?? getRoleLabel(rol);
   const selectorPerfil = page.getByRole('heading', { name: 'Selecciona un Perfil' });
 
   // NOTA: Locator.isVisible() no espera — consulta el DOM en el instante y

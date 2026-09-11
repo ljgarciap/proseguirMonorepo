@@ -163,6 +163,7 @@ export class CreditoOrdinarioComponent implements OnInit {
         // "estancada": mostraba en silencio un crédito distinto al que el
         // usuario venía revisando. Se deja sin seleccionar hasta que el
         // usuario elija uno de la lista.
+        this.loadAnexos();
       },
       error: () => {
         Swal.fire('Error', 'No se pudieron cargar las solicitudes de crédito.', 'error');
@@ -173,6 +174,55 @@ export class CreditoOrdinarioComponent implements OnInit {
   selectCredito(credito: any) {
     this.selectedCredito = credito;
     this.router.navigate(['/creditos', credito.id]);
+    this.loadAnexos();
+  }
+
+  // SCRUM-345 (rebote): "Anexos" — archivos sueltos sin preset ni clave
+  // predefinida, cargados por el Director de Crédito en cualquier etapa,
+  // visibles para el resto de roles internos. Endpoint propio, separado
+  // del JSON 'documentos' (que solo admite claves fijas conocidas de
+  // antemano). No visible para el cliente (uso interno del proceso).
+  anexos: any[] = [];
+
+  get puedeVerAnexos(): boolean {
+    return this.activeRole !== 'cliente';
+  }
+
+  get puedeSubirAnexo(): boolean {
+    return ['coordinador_comercial', 'superadmin'].includes(this.activeRole);
+  }
+
+  loadAnexos(): void {
+    this.anexos = [];
+    if (!this.selectedCredito || !this.puedeVerAnexos) return;
+    this.http.get<any[]>(`${environment.apiUrl}/creditos/${this.selectedCredito.id}/anexos`, {
+      headers: { 'X-Active-Role': this.activeRole }
+    }).subscribe({
+      next: (data) => this.anexos = data,
+      error: () => this.anexos = []
+    });
+  }
+
+  onAnexoUpload(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !this.selectedCredito) return;
+
+    const formData = new FormData();
+    formData.append('archivo', file);
+
+    this.http.post<any>(`${environment.apiUrl}/creditos/${this.selectedCredito.id}/anexos`, formData, {
+      headers: { 'X-Active-Role': this.activeRole }
+    }).subscribe({
+      next: (anexo) => {
+        this.anexos = [anexo, ...this.anexos];
+        input.value = '';
+      },
+      error: (err) => {
+        Swal.fire('Error', err?.error?.message || 'No se pudo cargar el anexo.', 'error');
+        input.value = '';
+      }
+    });
   }
 
   // SCRUM-143: filtro client-side por cliente, documento o número de

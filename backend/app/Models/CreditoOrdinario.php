@@ -196,6 +196,15 @@ class CreditoOrdinario extends Model
         return $this->hasOne(InformeTecnico::class, 'credito_ordinario_id');
     }
 
+    /**
+     * SCRUM-345 (rebote): anexos genéricos (sin preset ni clave
+     * predefinida) cargados internamente por el Director de Crédito.
+     */
+    public function anexos()
+    {
+        return $this->hasMany(CreditoOrdinarioAnexo::class)->latest();
+    }
+
     public function analisisFinanciero()
     {
         return $this->hasOne(AnalisisFinanciero::class, 'credito_ordinario_id');

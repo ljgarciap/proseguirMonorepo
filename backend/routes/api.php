@@ -194,6 +194,7 @@ Route::get('/document-types', function() { return \App\Models\DocumentType::all(
 
 use App\Http\Controllers\MandatoController;
 use App\Http\Controllers\CreditoOrdinarioController;
+use App\Http\Controllers\CreditoOrdinarioAnexoController;
 
 // RBAC Fase 2
 Route::prefix('mandatos')->middleware('auth:api')->group(function () {
@@ -211,6 +212,9 @@ Route::prefix('creditos')->middleware('auth:api')->group(function () {
     Route::post('/', [CreditoOrdinarioController::class, 'store']);
     Route::get('/{id}', [CreditoOrdinarioController::class, 'show']);
     Route::post('/{id}/transition', [CreditoOrdinarioController::class, 'transition']);
+    // SCRUM-345 (rebote): anexos genéricos, sin preset — ver CreditoOrdinarioAnexoController.
+    Route::get('/{id}/anexos', [CreditoOrdinarioAnexoController::class, 'index']);
+    Route::post('/{id}/anexos', [CreditoOrdinarioAnexoController::class, 'store']);
 });
 
 // Informe Técnico — Crédito Constructor (SCRUM-120)
