@@ -823,6 +823,37 @@
         </div>
       </div>
 
+      <!-- SCRUM-345 (rebote): "Anexos" — archivos sueltos sin preset ni
+           clave predefinida, cargados por el Director de Crédito en
+           cualquier etapa. Uso interno del proceso: no visible para el
+           cliente. -->
+      <div class="card documents-card" *ngIf="puedeVerAnexos">
+        <h3>Anexos</h3>
+        <p class="section-desc">Archivos adicionales asociados al crédito, sin relación con los documentos solicitados por preset — comprobantes, valoraciones u otro soporte que el Director de Crédito considere relevante para el expediente.</p>
+
+        <div class="action-inline-upload" *ngIf="puedeSubirAnexo" style="margin-bottom: 12px;">
+          <input type="file" id="anexo-upload" (change)="onAnexoUpload($event)" hidden>
+          <label for="anexo-upload" class="btn-inline-upload">Cargar anexo</label>
+        </div>
+
+        <p class="text-muted" *ngIf="anexos.length === 0">No hay anexos cargados todavía.</p>
+
+        <div class="doc-box-new" *ngFor="let anexo of anexos">
+          <div class="doc-main-info">
+            <span class="material-symbols-outlined doc-icon-new completed">attach_file</span>
+            <div class="doc-title-desc">
+              <h5>{{ anexo.nombre_original }}</h5>
+              <p>Cargado por {{ anexo.subido_por?.name || 'usuario' }} ({{ roleLabel(anexo.subido_por_rol) }}) — {{ anexo.created_at | date:'dd/MM/yyyy HH:mm' }}</p>
+            </div>
+          </div>
+          <div class="doc-action-status">
+            <a [href]="anexo.url" target="_blank" class="btn-view-doc">
+              <span class="material-symbols-outlined">open_in_new</span> Ver
+            </a>
+          </div>
+        </div>
+      </div>
+
       <!-- Audit Log Timeline -->
       <div class="card timeline-card">
         <h3>Historial de Auditoría y Trazabilidad</h3>
