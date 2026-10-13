@@ -780,6 +780,10 @@ class ActaComiteController extends Controller
             return $html;
         }
 
+        // Quill guarda cada espacio como &nbsp; — sin puntos de corte, DomPDF
+        // no parte la línea y el texto se sale por el borde derecho del PDF.
+        $html = str_replace(['&nbsp;', "\u{00A0}"], ' ', $html);
+
         return preg_replace_callback('/(<img[^>]+src=")([^"]+)(")/i', function ($m) {
             $marcador = '/storage/';
             $pos = strpos($m[2], $marcador);

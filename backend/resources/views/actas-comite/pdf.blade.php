@@ -19,7 +19,7 @@
             padding: 8px 12px; font-weight: bold; text-align: center; margin-bottom: 12px; border-radius: 4px;
         }
         .rich-text { margin-bottom: 6px; }
-        .rich-text img { max-width: 100%; }
+        .rich-text img, li img { max-width: 100%; height: auto; }
         .rich-text p, li p { margin: 0 0 4px 0; }
         .ql-align-justify { text-align: justify; }
         .ql-align-center { text-align: center; }
@@ -62,7 +62,7 @@
 <ol>
     @foreach($ordenDiaPdf as $item)
         {{-- 'texto' es HTML de Quill (rich text), igual que 'desarrollo' y 'lugar' — no escapar. --}}
-        <li>{!! $item['texto'] ?? '' !!}</li>
+        <li><div class="rich-text">{!! $item['texto'] ?? '' !!}</div></li>
     @endforeach
 </ol>
 

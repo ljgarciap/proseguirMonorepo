@@ -274,7 +274,8 @@ class ActaComiteTest extends TestCase
         $this->assertStringNotContainsString('&lt;p', $html);
         $this->assertStringNotContainsString('&amp;nbsp;', $html);
         $decodificado = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $this->assertStringContainsString('<li><p class="ql-align-justify">Verificación', $decodificado);
+        // Sin &nbsp; entre palabras (si no, DomPDF no parte la línea y se sale del PDF).
+        $this->assertStringContainsString('<p class="ql-align-justify">Verificación de <strong>quórum</strong>', $decodificado);
         $this->assertMatchesRegularExpression('/<h3>Verificación de quórum<\/h3>/u', $decodificado);
     }
 
