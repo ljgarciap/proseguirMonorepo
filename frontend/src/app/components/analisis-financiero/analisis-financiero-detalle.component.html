@@ -693,7 +693,7 @@
         <p *ngIf="!analisis?.archivos_adjuntos?.length" class="card-subtitle">No hay archivos adjuntos.</p>
 
         <div class="mt-2" *ngIf="puedeEditar">
-          <input type="file" id="file-adjunto-af" (change)="subirAdjunto($event)" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" hidden [disabled]="subiendoAdjunto">
+          <input type="file" id="file-adjunto-af" (change)="subirAdjunto($event)" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png" hidden [disabled]="subiendoAdjunto">
           <label for="file-adjunto-af" class="btn-pro secondary sm btn-upload">
             <span class="material-symbols-outlined">attach_file</span> {{ subiendoAdjunto ? 'Subiendo...' : 'Adjuntar archivo' }}
           </label>

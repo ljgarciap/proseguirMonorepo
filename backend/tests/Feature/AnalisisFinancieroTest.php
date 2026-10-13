@@ -487,6 +487,23 @@ class AnalisisFinancieroTest extends TestCase
         Storage::disk('public')->assertExists($adjuntos[0]['ruta']);
     }
 
+    public function test_subir_adjunto_acepta_powerpoint_ppt_y_pptx(): void
+    {
+        Storage::fake('public');
+        $credito = $this->crearCreditoEnAnalisisFinanciero();
+        $casos = [
+            ['presentacion.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+            ['presentacion.ppt', 'application/vnd.ms-powerpoint'],
+        ];
+
+        Passport::actingAs($this->coordinador);
+        foreach ($casos as [$nombre, $mime]) {
+            $this->postJson("/api/analisis-financiero/{$credito->id}/adjuntos", [
+                'archivo' => UploadedFile::fake()->create($nombre, 100, $mime),
+            ], ['X-Active-Role' => 'coordinador_comercial'])->assertStatus(200);
+        }
+    }
+
     public function test_subir_adjunto_rechaza_tipo_de_archivo_no_permitido(): void
     {
         Storage::fake('public');

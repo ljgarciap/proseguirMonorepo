@@ -11,6 +11,21 @@ export const roleGuard: CanActivateFn = (route, state) => {
     return false;
   }
 
+  // Sesión con token pero sin perfil activo (multi-rol que hizo login y abrió
+  // otra URL/pestaña antes de elegir perfil): AppComponent solo dibuja el
+  // layout con menú lateral si hay token Y rol activo — sin esto la pantalla
+  // renderiza "pelada", sin menú y con X-Active-Role vacío en cada request.
+  if (!authService.getActiveRole()) {
+    const roles = authService.getAllRoles();
+    if (roles.length === 1) {
+      authService.setActiveRole(roles[0]);
+    } else {
+      authService.logout();
+      router.navigate(['/login'], { queryParams: { returnTo: state.url } });
+      return false;
+    }
+  }
+
   // RBAC Fase 2 (docs/specs/rbac-fase2-enforcement.md): data['permission']
   // reemplaza data['roles'] — el gate compara contra el catálogo
   // paramétrico (vía AuthService.hasPermission) en vez de una lista de
