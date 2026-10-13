@@ -269,10 +269,13 @@ class ActaComiteTest extends TestCase
         $html = $generarPdf->invoke($controller, \App\Models\ActaComite::findOrFail($acta['id']))
             ->getDomPDF()->outputHtml();
 
+        // DomPDF puede devolver los acentos como entidades (&oacute;) según
+        // el entorno — se decodifican para comparar contra el texto real.
         $this->assertStringNotContainsString('&lt;p', $html);
         $this->assertStringNotContainsString('&amp;nbsp;', $html);
-        $this->assertStringContainsString('<li><p class="ql-align-justify">Verificación', $html);
-        $this->assertMatchesRegularExpression('/<h3>Verificación de quórum<\/h3>/u', $html);
+        $decodificado = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $this->assertStringContainsString('<li><p class="ql-align-justify">Verificación', $decodificado);
+        $this->assertMatchesRegularExpression('/<h3>Verificación de quórum<\/h3>/u', $decodificado);
     }
 
     public function test_generar_rechaza_si_ya_existe_pendiente_o_borrador(): void
