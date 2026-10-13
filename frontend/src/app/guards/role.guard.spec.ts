@@ -21,8 +21,13 @@ describe('roleGuard', () => {
     authSpy = jasmine.createSpyObj('AuthService', [
       'isAuthenticated',
       'hasPermission',
-      'getActiveRole'
+      'getActiveRole',
+      'getAllRoles',
+      'setActiveRole',
+      'logout'
     ]);
+    authSpy.getActiveRole.and.returnValue('gerente');
+    authSpy.getAllRoles.and.returnValue([]);
 
     TestBed.configureTestingModule({
       providers: [
@@ -42,6 +47,29 @@ describe('roleGuard', () => {
 
     expect(run('upload')).toBeFalse();
     expect(router.navigate).toHaveBeenCalledWith(['/login']);
+  });
+
+  // --- Token sin perfil activo (causa del layout sin menú lateral) ---
+
+  it('multi-rol con token pero sin perfil activo: cierra sesión y manda a /login con returnTo', () => {
+    authSpy.isAuthenticated.and.returnValue(true);
+    authSpy.getActiveRole.and.returnValue(null);
+    authSpy.getAllRoles.and.returnValue(['director_credito', 'operativo']);
+    const st = { url: '/analisis-financiero/5' } as RouterStateSnapshot;
+
+    expect(TestBed.runInInjectionContext(() => roleGuard(route('analisis_financiero'), st))).toBeFalse();
+    expect(authSpy.logout).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/login'], { queryParams: { returnTo: '/analisis-financiero/5' } });
+  });
+
+  it('un solo rol y sin perfil activo: lo fija y deja pasar', () => {
+    authSpy.isAuthenticated.and.returnValue(true);
+    authSpy.getActiveRole.and.returnValue(null);
+    authSpy.getAllRoles.and.returnValue(['gerente']);
+    authSpy.hasPermission.and.returnValue(true);
+
+    expect(run('upload')).toBeTrue();
+    expect(authSpy.setActiveRole).toHaveBeenCalledWith('gerente');
   });
 
   // --- Autenticado y autorizado ---

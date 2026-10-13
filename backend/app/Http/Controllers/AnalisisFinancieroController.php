@@ -256,7 +256,7 @@ class AnalisisFinancieroController extends Controller
         }
 
         $request->validate([
-            'archivo' => 'required|file|max:20480|mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png',
+            'archivo' => 'required|file|max:20480|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png',
         ]);
 
         $analisis = $credito->analisisFinanciero ?? AnalisisFinanciero::create([
