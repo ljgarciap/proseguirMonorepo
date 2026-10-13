@@ -20,6 +20,10 @@
         }
         .rich-text { margin-bottom: 6px; }
         .rich-text img { max-width: 100%; }
+        .rich-text p, li p { margin: 0 0 4px 0; }
+        .ql-align-justify { text-align: justify; }
+        .ql-align-center { text-align: center; }
+        .ql-align-right { text-align: right; }
         .orden-dia-item { margin-bottom: 10px; }
         .firma-box { display: inline-block; width: 45%; margin: 20px 2% 0 0; text-align: center; border-top: 1px solid #334155; padding-top: 4px; }
     </style>
@@ -57,14 +61,15 @@
 <h2>Orden del día {{ $acta->orden_dia_aprobado ? '(aprobado por unanimidad)' : '' }}</h2>
 <ol>
     @foreach($ordenDiaPdf as $item)
-        <li>{{ $item['texto'] ?? '' }}</li>
+        {{-- 'texto' es HTML de Quill (rich text), igual que 'desarrollo' y 'lugar' — no escapar. --}}
+        <li>{!! $item['texto'] ?? '' !!}</li>
     @endforeach
 </ol>
 
 <h2>Desarrollo</h2>
 @foreach($ordenDiaPdf as $item)
     <div class="orden-dia-item">
-        <h3>{{ $item['texto'] ?? '' }}</h3>
+        <h3>{{ $item['titulo'] ?? '' }}</h3>
         <div class="rich-text">{!! ($desarrolloPdf[$item['id']] ?? null) ?: '—' !!}</div>
     </div>
 @endforeach
