@@ -754,6 +754,9 @@ class ActaComiteController extends Controller
 
         $ordenDiaPdf = collect($acta->orden_dia ?? [])->map(function ($item) {
             $item['texto'] = $this->resolverImagenesParaPdf($item['texto'] ?? '');
+            // Título del <h3> de Desarrollo: texto plano, sin tags ni entidades (&nbsp;).
+            $plano = html_entity_decode(strip_tags($item['texto']), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $item['titulo'] = trim(preg_replace('/[\s\x{00A0}]+/u', ' ', $plano));
             return $item;
         })->all();
 

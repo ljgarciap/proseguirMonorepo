@@ -243,6 +243,38 @@ class ActaComiteTest extends TestCase
             ->assertHeader('content-type', 'application/pdf');
     }
 
+    /**
+     * Regresión: orden_dia[].texto es HTML de Quill (cada ítem es un
+     * quill-editor). El PDF lo imprimía escapado (`{{ }}`), y el PDF mostraba
+     * literalmente `<ol><li>…&nbsp;…` en "Orden del día" y en los títulos de
+     * "Desarrollo".
+     */
+    public function test_pdf_renderiza_orden_del_dia_rich_text_sin_escapar_tags(): void
+    {
+        $this->crearCreditoEnComiteEvaluacion();
+        Passport::actingAs($this->coordinador);
+        $headers = ['X-Active-Role' => 'coordinador_comercial'];
+        $acta = $this->postJson('/api/actas-comite/generar', [], $headers)->assertStatus(201)->json();
+
+        $this->putJson("/api/actas-comite/{$acta['id']}", [
+            'orden_dia' => [
+                ['id' => 1, 'orden' => 1, 'texto' => '<p class="ql-align-justify">Verificación&nbsp;de&nbsp;<strong>quórum</strong></p>'],
+            ],
+            'desarrollo' => [1 => '<p>Se verificó el quórum.</p>'],
+        ], $headers)->assertStatus(200);
+
+        $controller = app(\App\Http\Controllers\ActaComiteController::class);
+        $generarPdf = new \ReflectionMethod($controller, 'generarPdf');
+        $generarPdf->setAccessible(true);
+        $html = $generarPdf->invoke($controller, \App\Models\ActaComite::findOrFail($acta['id']))
+            ->getDomPDF()->outputHtml();
+
+        $this->assertStringNotContainsString('&lt;p', $html);
+        $this->assertStringNotContainsString('&amp;nbsp;', $html);
+        $this->assertStringContainsString('<li><p class="ql-align-justify">Verificación', $html);
+        $this->assertMatchesRegularExpression('/<h3>Verificación de quórum<\/h3>/u', $html);
+    }
+
     public function test_generar_rechaza_si_ya_existe_pendiente_o_borrador(): void
     {
         $this->crearCreditoEnComiteEvaluacion();
