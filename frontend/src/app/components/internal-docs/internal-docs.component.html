@@ -4,7 +4,7 @@
       <h1>Bandeja Interna de Documentos</h1>
       <p>Gestión de flujo documental secuencial entre áreas.</p>
     </div>
-    <button class="btn-pro primary" (click)="openUploadModal()" *ngIf="authService.isAuthorized(['operativo', 'contable', 'gerente', 'coordinador_comercial', 'superadmin'])">
+    <button class="btn-pro primary" (click)="openUploadModal()" *ngIf="authService.hasPermission('internal-docs:gestionar')">
       <span class="material-symbols-outlined">send</span> Nuevo Envío
     </button>
   </header>
