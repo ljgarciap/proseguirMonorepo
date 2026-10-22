@@ -1,4 +1,6 @@
-FROM php:8.4-fpm AS base
+# Mínimo 8.4.27: corrige CVE-2026-109618/109619 (RCE, aviso CISA 2026-10-21).
+# Tag fijo (no flotante) para que el build en el servidor descargue la imagen nueva en vez de reusar la capa cacheada.
+FROM php:8.4.27-fpm AS base
 
 # Instalar dependencias del sistema
 RUN apt-get update && apt-get install -y \
